@@ -11,6 +11,7 @@ import com.tirup.app.domain.model.GlucoseStatistics
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.domain.repository.GlucoseRepository
 import com.tirup.app.domain.repository.SettingsRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -18,7 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -35,6 +36,7 @@ sealed interface ReportEvent {
     data class Error(val message: String) : ReportEvent
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ReportsViewModel(
     private val context: Context,
     private val glucoseRepository: GlucoseRepository,
@@ -55,19 +57,26 @@ class ReportsViewModel(
 
     private fun loadData() {
         viewModelScope.launch {
-            val now = System.currentTimeMillis()
-            val past14d = now - (14L * 86400000L)
-
             combine(
-                glucoseRepository.getReadingsBetween(past14d, now),
+                glucoseRepository.getLatestReading(),
                 settingsRepository.getSettings()
-            ) { readings, settings ->
-                val stats = GlucoseMetricsCalculator.calculateStatistics(readings, settings.targetRanges)
-                ReportsUiState(
-                    statistics = stats,
-                    userSettings = settings,
-                    readings = readings
-                )
+            ) { latest, settings ->
+                Pair(latest, settings)
+            }.flatMapLatest { (latest, settings) ->
+                val now = System.currentTimeMillis()
+                val referenceTime = latest?.timestamp ?: now
+                val past14d = referenceTime - (14L * 86400000L)
+
+                glucoseRepository.getReadingsBetween(past14d, referenceTime + 86400000L).combine(
+                    settingsRepository.getSettings()
+                ) { readings, latestSettings ->
+                    val stats = GlucoseMetricsCalculator.calculateStatistics(readings, latestSettings.targetRanges)
+                    ReportsUiState(
+                        statistics = stats,
+                        userSettings = latestSettings,
+                        readings = readings
+                    )
+                }
             }.collect { state ->
                 _uiState.value = state
             }

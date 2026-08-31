@@ -9,12 +9,10 @@ import com.tirup.app.domain.repository.GlucoseRepository
 import com.tirup.app.domain.repository.SettingsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -35,17 +33,30 @@ class TrendsViewModel(
 
     private fun observeData() {
         viewModelScope.launch {
-            combine(_selectedPeriod, settingsRepository.getSettings()) { period, settings ->
-                Pair(period, settings)
-            }.flatMapLatest { (period, settings) ->
+            combine(
+                _selectedPeriod,
+                settingsRepository.getSettings(),
+                glucoseRepository.getLatestReading()
+            ) { period, settings, latestReading ->
+                Triple(period, settings, latestReading)
+            }.flatMapLatest { (period, settings, latestReading) ->
                 val now = System.currentTimeMillis()
+                // Use latest reading timestamp or now as reference point
+                val referenceTime = latestReading?.timestamp ?: now
+
                 val startTime = if (period.days > 0) {
-                    now - (period.days.toLong() * 86400000L)
+                    referenceTime - (period.days.toLong() * 86400000L)
                 } else {
                     0L // All time
                 }
 
-                glucoseRepository.getReadingsBetween(startTime, now).combine(
+                val endTime = if (period.days > 0) {
+                    referenceTime + 86400000L
+                } else {
+                    Long.MAX_VALUE
+                }
+
+                glucoseRepository.getReadingsBetween(startTime, endTime).combine(
                     settingsRepository.getSettings()
                 ) { readings, latestSettings ->
                     val stats = GlucoseMetricsCalculator.calculateStatistics(readings, latestSettings.targetRanges)

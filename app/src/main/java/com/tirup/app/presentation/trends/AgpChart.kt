@@ -3,38 +3,26 @@ package com.tirup.app.presentation.trends
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.tirup.app.R
 import com.tirup.app.domain.model.AGPPercentileBin
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.TargetRanges
 import com.tirup.app.presentation.theme.ColorLow
 import com.tirup.app.presentation.theme.ColorTight
-import com.tirup.app.presentation.theme.DarkBorder
 import com.tirup.app.presentation.theme.DarkSurfaceElevated
 import com.tirup.app.presentation.theme.PrimaryEmerald
-import com.tirup.app.presentation.theme.TextMutedDark
-import com.tirup.app.presentation.theme.TextSecondaryDark
 
 @Composable
 fun AgpChart(
@@ -58,13 +46,11 @@ fun AgpChart(
 
             if (bins.isEmpty()) return@Canvas
 
-            // Helper to map mmol/L to Y coordinate (0 mmol -> bottom, maxMmol -> top)
             fun yForMmol(mmol: Double): Float {
                 val clamped = mmol.coerceIn(0.0, maxMmol.toDouble()).toFloat()
                 return height - (clamped / maxMmol) * height
             }
 
-            // Helper to map bin index to X coordinate
             fun xForBin(index: Int): Float {
                 return (index.toFloat() / (bins.size - 1).coerceAtLeast(1)) * width
             }
@@ -113,13 +99,13 @@ fun AgpChart(
             val validBins = bins.filter { it.readingsCount > 0 }
             if (validBins.size < 2) return@Canvas
 
-            // 1. Draw 10-90th percentile outer cloud
+            // 1. Draw 10-90th percentile outer cloud across valid bins
             val path1090 = Path()
-            path1090.moveTo(xForBin(bins.first().binIndex), yForMmol(bins.first().p90))
-            bins.forEach { bin ->
+            path1090.moveTo(xForBin(validBins.first().binIndex), yForMmol(validBins.first().p90))
+            validBins.forEach { bin ->
                 path1090.lineTo(xForBin(bin.binIndex), yForMmol(bin.p90))
             }
-            bins.reversed().forEach { bin ->
+            validBins.reversed().forEach { bin ->
                 path1090.lineTo(xForBin(bin.binIndex), yForMmol(bin.p10))
             }
             path1090.close()
@@ -127,11 +113,11 @@ fun AgpChart(
 
             // 2. Draw 25-75th percentile interquartile band
             val path2575 = Path()
-            path2575.moveTo(xForBin(bins.first().binIndex), yForMmol(bins.first().p75))
-            bins.forEach { bin ->
+            path2575.moveTo(xForBin(validBins.first().binIndex), yForMmol(validBins.first().p75))
+            validBins.forEach { bin ->
                 path2575.lineTo(xForBin(bin.binIndex), yForMmol(bin.p75))
             }
-            bins.reversed().forEach { bin ->
+            validBins.reversed().forEach { bin ->
                 path2575.lineTo(xForBin(bin.binIndex), yForMmol(bin.p25))
             }
             path2575.close()
@@ -140,7 +126,7 @@ fun AgpChart(
             // 3. Draw 50th percentile (Median curve)
             val path50 = Path()
             var started = false
-            bins.forEach { bin ->
+            validBins.forEach { bin ->
                 val x = xForBin(bin.binIndex)
                 val y = yForMmol(bin.p50)
                 if (!started) {
