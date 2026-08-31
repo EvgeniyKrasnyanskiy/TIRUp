@@ -76,14 +76,23 @@ class SettingsViewModel(
 
     fun importFile(uri: Uri) {
         viewModelScope.launch {
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
             _uiState.update { it.copy(isImporting = true, importedCount = 0, importMessage = null) }
+
             val result = streamingImporter.importFromUri(uri) { count ->
                 _uiState.update { it.copy(importedCount = count) }
             }
+
             result.onSuccess { total ->
-                _uiState.update { it.copy(isImporting = false, importMessage = "Successfully imported $total readings.") }
+                val msg = if (total > 0) {
+                    if (isRu) "Успешно импортировано $total записей." else "Successfully imported $total readings."
+                } else {
+                    if (isRu) "Записи сахара не найдены. Убедитесь, что внутри архива или CSV есть данные сахара." else "No glucose readings found in selected file."
+                }
+                _uiState.update { it.copy(isImporting = false, importMessage = msg) }
             }.onFailure { error ->
-                _uiState.update { it.copy(isImporting = false, importMessage = "Import error: ${error.message}") }
+                val prefix = if (isRu) "Ошибка импорта: " else "Import error: "
+                _uiState.update { it.copy(isImporting = false, importMessage = prefix + (error.localizedMessage ?: error.message)) }
             }
         }
     }
@@ -94,8 +103,10 @@ class SettingsViewModel(
 
     fun clearAllData() {
         viewModelScope.launch {
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
             glucoseRepository.clearAllData()
-            _uiState.update { it.copy(showClearDialog = false, importMessage = "All data cleared.") }
+            val msg = if (isRu) "Все данные успешно очищены." else "All data successfully cleared."
+            _uiState.update { it.copy(showClearDialog = false, importMessage = msg) }
         }
     }
 }

@@ -24,12 +24,20 @@
             </intent-filter>
         </activity>
 
-        <!-- BroadcastReceiver for xDrip+ / Juggluco local broadcast estimates -->
+        <!-- BroadcastReceiver for xDrip+ / Juggluco / Nightscout local broadcasts -->
         <receiver
             android:name=".data.receiver.DexdripBroadcastReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="com.eveningoutpost.dexdrip.BgEstimate" />
+                <action android:name="com.eveningoutpost.dexdrip.BgEstimate.NEW_DATA" />
+                <action android:name="com.eveningoutpost.dexdrip.ACTION_NEW_BG_ESTIMATE" />
+                <action android:name="com.eveningoutpost.dexdrip.ACTION_NEW_BG" />
+                <action android:name="info.nightscout.android.NEW_SGV" />
+                <action android:name="info.nightscout.android.EXTRA_DATA" />
+                <action android:name="com.juggluco.action.NEW_GLUCOSE" />
+                <action android:name="com.dexcom.g6.ACTION_NEW_BG" />
+                <action android:name="com.dexcom.cgm.ACTION_NEW_BG" />
             </intent-filter>
         </receiver>
 

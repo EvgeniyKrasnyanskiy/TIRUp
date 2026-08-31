@@ -196,7 +196,7 @@ fun SettingsScreen(
                     } else {
                         Button(
                             onClick = {
-                                filePicker.launch(arrayOf("text/*", "application/*", "*/*"))
+                                filePicker.launch(arrayOf("*/*"))
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
