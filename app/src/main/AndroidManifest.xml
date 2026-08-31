@@ -3,6 +3,19 @@
 
     <!-- STRICTLY OFFLINE APPLICATION: NO INTERNET PERMISSION DECLARED -->
 
+    <queries>
+        <package android:name="com.eveningoutpost.dexdrip" />
+        <package android:name="de.michelinside.glucodatahandler" />
+        <package android:name="tk.glucodata" />
+        <package android:name="com.diaclock.nightstand" />
+        <intent>
+            <action android:name="com.eveningoutpost.dexdrip.BgEstimate" />
+        </intent>
+        <intent>
+            <action android:name="glucodata.Minute" />
+        </intent>
+    </queries>
+
     <application
         android:name=".TirupApplication"
         android:allowBackup="true"
@@ -24,7 +37,7 @@
             </intent-filter>
         </activity>
 
-        <!-- BroadcastReceiver for xDrip+ / Juggluco / Nightscout local broadcasts -->
+        <!-- BroadcastReceiver for xDrip+ / Juggluco / Nightscout / GlucoDataHandler local broadcasts -->
         <receiver
             android:name=".data.receiver.DexdripBroadcastReceiver"
             android:exported="true">
@@ -33,6 +46,9 @@
                 <action android:name="com.eveningoutpost.dexdrip.BgEstimate.NEW_DATA" />
                 <action android:name="com.eveningoutpost.dexdrip.ACTION_NEW_BG_ESTIMATE" />
                 <action android:name="com.eveningoutpost.dexdrip.ACTION_NEW_BG" />
+                <action android:name="glucodata.Minute" />
+                <action android:name="de.michelinside.glucodatahandler.GLUCODATA" />
+                <action android:name="de.michelinside.glucodatahandler.MINUTE" />
                 <action android:name="info.nightscout.android.NEW_SGV" />
                 <action android:name="info.nightscout.android.EXTRA_DATA" />
                 <action android:name="com.juggluco.action.NEW_GLUCOSE" />

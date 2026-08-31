@@ -37,7 +37,7 @@ class StreamingGlucoseImporter(
                 ?: return@withContext Result.failure(Exception("Cannot open stream for URI: $uri"))
 
             val bufferedIn = BufferedInputStream(rawInputStream, 65536)
-            bufferedIn.mark(8)
+            bufferedIn.mark(16)
             val headerBytes = ByteArray(4)
             val bytesRead = bufferedIn.read(headerBytes, 0, 4)
             bufferedIn.reset()
@@ -58,8 +58,11 @@ class StreamingGlucoseImporter(
                 SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US),
                 SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.US),
                 SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.US),
+                SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.US),
+                SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.US),
                 SimpleDateFormat("MM/dd/yyyy hh:mm:ss a", Locale.US),
                 SimpleDateFormat("MM/dd/yyyy HH:mm", Locale.US),
+                SimpleDateFormat("MM-dd-yyyy HH:mm", Locale.US),
                 SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.US)
             )
 
@@ -122,8 +125,9 @@ class StreamingGlucoseImporter(
 
         var timestampCol = -1
         var valueCol = -1
-        var headerChecked = false
+        var fallbackValueCol = -1 // For LibreView (Historic vs Scan)
         var isMgDlHeader = false
+        var headerFound = false
 
         var line: String? = reader.readLine()
         while (line != null) {
@@ -141,46 +145,71 @@ class StreamingGlucoseImporter(
             }
             val parts = trimmed.split(delimiter).map { it.trim('\"', ' ', '\'') }
 
-            if (!headerChecked) {
-                headerChecked = true
+            // 1. Check if line is a table header
+            if (!headerFound) {
                 val headerLower = parts.map { it.lowercase() }
+                var tempTsCol = -1
+                var tempValCol = -1
+                var tempScanCol = -1
+                var tempIsMgDl = false
 
                 for (i in headerLower.indices) {
                     val h = headerLower[i]
-                    if (timestampCol == -1 && (h.contains("time") || h.contains("date") || h == "ts" || h == "timestamp" || h.contains("zeit") || h.contains("время") || h.contains("дата"))) {
-                        timestampCol = i
+                    if (tempTsCol == -1 && (h.contains("time") || h.contains("date") || h == "ts" || h == "timestamp" || h.contains("zeit") || h.contains("время") || h.contains("дата"))) {
+                        tempTsCol = i
                     }
-                    if (valueCol == -1 && (h.contains("glucose") || h.contains("glukose") || h.contains("sgv") || h.contains("value") || h.contains("bg") || h.contains("сахар") || h.contains("глюкоза") || h.contains("historic") || h.contains("scan"))) {
-                        valueCol = i
+                    if (h.contains("historic") || (tempValCol == -1 && (h.contains("glucose") || h.contains("glukose") || h.contains("sgv") || h.contains("value") || h.contains("bg") || h.contains("сахар") || h.contains("глюкоза")))) {
+                        tempValCol = i
                         if (h.contains("mg/dl") || h.contains("mgdl") || h.contains("mg")) {
-                            isMgDlHeader = true
+                            tempIsMgDl = true
                         }
                     }
-                }
-
-                // If no recognizable headers, check if row is already data (timestamp + value)
-                if (timestampCol == -1 || valueCol == -1) {
-                    timestampCol = 0
-                    valueCol = if (parts.size > 1) 1 else 0
-                    parseAndAddReading(parts, timestampCol, valueCol, isMgDlHeader, dateFormats)?.let { entity ->
-                        chunk.add(entity)
-                        onTimestampParsed(entity.timestamp)
+                    if (h.contains("scan")) {
+                        tempScanCol = i
                     }
                 }
-                line = reader.readLine()
-                continue
+
+                if (tempTsCol != -1 && tempValCol != -1) {
+                    timestampCol = tempTsCol
+                    valueCol = tempValCol
+                    fallbackValueCol = tempScanCol
+                    isMgDlHeader = tempIsMgDl
+                    headerFound = true
+                    line = reader.readLine()
+                    continue
+                }
             }
 
-            parseAndAddReading(parts, timestampCol, valueCol, isMgDlHeader, dateFormats)?.let { entity ->
-                chunk.add(entity)
-                onTimestampParsed(entity.timestamp)
+            // 2. Try parsing reading with known columns
+            var reading: GlucoseReadingEntity? = null
+            if (timestampCol != -1 && valueCol != -1) {
+                reading = parseWithColumns(parts, timestampCol, valueCol, fallbackValueCol, isMgDlHeader, dateFormats)
             }
 
-            if (chunk.size >= CHUNK_SIZE) {
-                insertChunk(chunk)
-                importedInStream += chunk.size
-                chunk.clear()
-                onProgress(importedInStream)
+            // 3. Fallback heuristic: search any column for timestamp & glucose value
+            if (reading == null) {
+                val autoParsed = autoDetectAndParse(parts, dateFormats)
+                if (autoParsed != null) {
+                    val (entity, detectedTsCol, detectedValCol) = autoParsed
+                    reading = entity
+                    if (timestampCol == -1) {
+                        timestampCol = detectedTsCol
+                        valueCol = detectedValCol
+                        headerFound = true
+                    }
+                }
+            }
+
+            if (reading != null) {
+                chunk.add(reading)
+                onTimestampParsed(reading.timestamp)
+
+                if (chunk.size >= CHUNK_SIZE) {
+                    insertChunk(chunk)
+                    importedInStream += chunk.size
+                    chunk.clear()
+                    onProgress(importedInStream)
+                }
             }
 
             line = reader.readLine()
@@ -193,25 +222,27 @@ class StreamingGlucoseImporter(
         database.glucoseReadingDao().insertBatch(chunk)
     }
 
-    private fun parseAndAddReading(
+    private fun parseWithColumns(
         parts: List<String>,
         timestampCol: Int,
         valueCol: Int,
+        fallbackCol: Int,
         isMgDlHeader: Boolean,
         dateFormats: List<SimpleDateFormat>
     ): GlucoseReadingEntity? {
         if (timestampCol >= parts.size) return null
-        val valCol = if (valueCol < parts.size) valueCol else parts.size - 1
 
         val rawTime = parts[timestampCol]
-        val rawVal = parts[valCol].replace(',', '.')
+        var rawVal = if (valueCol < parts.size) parts[valueCol].replace(',', '.') else ""
+        if (rawVal.isEmpty() && fallbackCol != -1 && fallbackCol < parts.size) {
+            rawVal = parts[fallbackCol].replace(',', '.')
+        }
 
         val glucoseVal = rawVal.toDoubleOrNull() ?: return null
         if (glucoseVal <= 0.0 || glucoseVal > 1000.0) return null
 
         val timestamp = parseTimestamp(rawTime, dateFormats) ?: return null
 
-        // Convert mg/dL to mmol/L if needed (values > 35 are mg/dL)
         val valueMmol = if (isMgDlHeader || glucoseVal > 35.0) {
             glucoseVal / 18.0182
         } else {
@@ -224,12 +255,51 @@ class StreamingGlucoseImporter(
         )
     }
 
+    private fun autoDetectAndParse(
+        parts: List<String>,
+        dateFormats: List<SimpleDateFormat>
+    ): Triple<GlucoseReadingEntity, Int, Int>? {
+        var foundTs: Long? = null
+        var foundTsCol = -1
+        var foundVal: Double? = null
+        var foundValCol = -1
+
+        for (i in parts.indices) {
+            val cell = parts[i]
+            if (foundTs == null) {
+                val ts = parseTimestamp(cell, dateFormats)
+                if (ts != null && ts > 946684800000L) { // after year 2000
+                    foundTs = ts
+                    foundTsCol = i
+                    continue
+                }
+            }
+
+            if (foundVal == null) {
+                val clean = cell.replace(',', '.')
+                val num = clean.toDoubleOrNull()
+                if (num != null && num in 1.0..600.0) {
+                    foundVal = num
+                    foundValCol = i
+                }
+            }
+        }
+
+        if (foundTs != null && foundVal != null) {
+            val valueMmol = if (foundVal > 35.0) foundVal / 18.0182 else foundVal
+            val entity = GlucoseReadingEntity(timestamp = foundTs, valueMmol = valueMmol)
+            return Triple(entity, foundTsCol, foundValCol)
+        }
+        return null
+    }
+
     private fun parseTimestamp(raw: String, formats: List<SimpleDateFormat>): Long? {
+        val trimmed = raw.trim()
         // Try epoch millis or seconds
-        raw.toLongOrNull()?.let { num ->
+        trimmed.toLongOrNull()?.let { num ->
             return when {
                 num > 100_000_000_000L -> num // epoch millis
-                num > 100_000_000L -> num * 1000L // epoch seconds
+                num > 900_000_000L -> num * 1000L // epoch seconds
                 else -> null
             }
         }
@@ -238,7 +308,7 @@ class StreamingGlucoseImporter(
         for (format in formats) {
             try {
                 format.timeZone = TimeZone.getDefault()
-                val date = format.parse(raw)
+                val date = format.parse(trimmed)
                 if (date != null) return date.time
             } catch (_: Exception) {}
         }
