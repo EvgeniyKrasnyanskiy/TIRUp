@@ -66,7 +66,7 @@ class MainActivity : ComponentActivity() {
 
         val focusViewModel = FocusViewModel(glucoseRepo, settingsRepo)
         val trendsViewModel = TrendsViewModel(glucoseRepo, settingsRepo)
-        val reportsViewModel = ReportsViewModel(this, glucoseRepo, settingsRepo)
+        val reportsViewModel = ReportsViewModel(this, glucoseRepo, settingsRepo, importer)
         val settingsViewModel = SettingsViewModel(settingsRepo, glucoseRepo, importer)
 
         setContent {

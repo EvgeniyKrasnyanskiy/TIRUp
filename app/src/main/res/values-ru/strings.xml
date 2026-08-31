@@ -55,7 +55,11 @@
     <!-- Reports -->
     <string name="reports_title">Стандартный AGP медицинский отчёт</string>
     <string name="reports_subtitle">Одностраничный стандартизированный бланк А4</string>
-    <string name="generate_pdf">Сформировать и отправить PDF</string>
+    <string name="report_period_title">Период для отчёта</string>
+    <string name="generate_pdf">Поделиться / Отправить PDF</string>
+    <string name="save_pdf_downloads">Сохранить PDF в Загрузки</string>
+    <string name="import_and_report">Импортировать файл для отчёта</string>
+    <string name="pdf_saved_toast">Отчёт сохранён: %s</string>
     <string name="export_success">Медицинский отчёт успешно создан</string>
     <string name="export_error">Ошибка создания отчёта: %s</string>
     <string name="share_report">Поделиться бланком AGP</string>
