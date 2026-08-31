@@ -139,7 +139,8 @@ class ReportsViewModel(
             val result = pdfGenerator.generateAgpReport(
                 readings = currentState.readings,
                 statistics = currentState.statistics,
-                userSettings = currentState.userSettings
+                userSettings = currentState.userSettings,
+                selectedPeriod = _selectedPeriod.value
             )
 
             result.onSuccess { pdfFile ->
@@ -179,7 +180,8 @@ class ReportsViewModel(
             val result = pdfGenerator.generateAgpReport(
                 readings = currentState.readings,
                 statistics = currentState.statistics,
-                userSettings = currentState.userSettings
+                userSettings = currentState.userSettings,
+                selectedPeriod = _selectedPeriod.value
             )
 
             result.onSuccess { pdfFile ->

@@ -10,6 +10,7 @@ import com.tirup.app.domain.calculator.AGPPercentilesCalculator
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseStatistics
 import com.tirup.app.domain.model.UserSettings
+import com.tirup.app.presentation.trends.TrendPeriod
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -24,7 +25,7 @@ class AgpPdfGenerator(private val context: Context) {
         readings: List<GlucoseReading>,
         statistics: GlucoseStatistics,
         userSettings: UserSettings,
-        patientName: String = "TIRUp Profile"
+        selectedPeriod: TrendPeriod = TrendPeriod.PERIOD_14D
     ): Result<File> = withContext(Dispatchers.IO) {
         val document = PdfDocument()
         val isRu = userSettings.language.equals("RU", ignoreCase = true)
@@ -62,23 +63,44 @@ class AgpPdfGenerator(private val context: Context) {
             val margin = 36f
             val contentWidth = 595f - (2 * margin)
 
+            // Calculate date range of readings
+            val minTs = readings.minOfOrNull { it.timestamp } ?: System.currentTimeMillis()
+            val maxTs = readings.maxOfOrNull { it.timestamp } ?: System.currentTimeMillis()
+            val dateRangeFmt = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+            val dateRangeStr = "${dateRangeFmt.format(Date(minTs))} — ${dateRangeFmt.format(Date(maxTs))}"
+
+            val periodName = when (selectedPeriod) {
+                TrendPeriod.PERIOD_7D -> if (isRu) "7 Дней" else "7 Days"
+                TrendPeriod.PERIOD_14D -> if (isRu) "14 Дней (Стандарт AGP)" else "14 Days (Standard AGP)"
+                TrendPeriod.PERIOD_30D -> if (isRu) "30 Дней" else "30 Days"
+                TrendPeriod.PERIOD_90D -> if (isRu) "90 Дней" else "90 Days"
+                TrendPeriod.PERIOD_YEAR -> if (isRu) "1 Год" else "1 Year"
+                TrendPeriod.PERIOD_ALL -> if (isRu) "Всё время" else "All Time"
+            }
+
             // 1. Header Banner
-            canvas.drawRoundRect(RectF(margin, 30f, 595f - margin, 90f), 8f, 8f, headerBgPaint)
-            canvas.drawRoundRect(RectF(margin, 30f, 595f - margin, 90f), 8f, 8f, borderPaint)
+            canvas.drawRoundRect(RectF(margin, 26f, 595f - margin, 96f), 8f, 8f, headerBgPaint)
+            canvas.drawRoundRect(RectF(margin, 26f, 595f - margin, 96f), 8f, 8f, borderPaint)
 
             val headerTitle = if (isRu) "АМБУЛАТОРНЫЙ ГЛЮКОЗНЫЙ ПРОФИЛЬ (AGP)" else "AMBULATORY GLUCOSE PROFILE (AGP) REPORT"
-            canvas.drawText(headerTitle, margin + 14f, 54f, titlePaint)
+            canvas.drawText(headerTitle, margin + 14f, 48f, titlePaint)
 
-            val dateFormat = SimpleDateFormat(if (isRu) "dd MMMM yyyy" else "dd MMM yyyy", if (isRu) Locale("ru") else Locale.US)
-            val dateStr = if (isRu) {
-                "Сформировано: ${dateFormat.format(Date())} | Локальный оффлайн-движок TIRUp"
+            val metaLine1 = if (isRu) {
+                "Период отчёта: $periodName ($dateRangeStr) • Активных дней: ${statistics.daysCount} • Всего точек: ${statistics.totalCount}"
             } else {
-                "Report Generated: ${dateFormat.format(Date())} | Local Offline Engine"
+                "Report Period: $periodName ($dateRangeStr) • Active Days: ${statistics.daysCount} • Total Points: ${statistics.totalCount}"
             }
-            canvas.drawText(dateStr, margin + 14f, 74f, subTextPaint)
+            canvas.drawText(metaLine1, margin + 14f, 68f, subTextPaint)
+
+            val metaLine2 = if (isRu) {
+                "Сформировано: ${SimpleDateFormat("dd MMMM yyyy HH:mm", Locale("ru")).format(Date())} | Локальный оффлайн-движок TIRUp"
+            } else {
+                "Generated: ${SimpleDateFormat("dd MMM yyyy HH:mm", Locale.US).format(Date())} | Local Offline Engine TIRUp"
+            }
+            canvas.drawText(metaLine2, margin + 14f, 84f, subTextPaint)
 
             // 2. Metrics & Targets Panel (Left: TIR Breakdown, Right: Summary Numbers)
-            val panelTop = 104f
+            val panelTop = 108f
             val panelHeight = 220f
             val col1Width = contentWidth * 0.45f
             val col2Width = contentWidth * 0.52f
@@ -172,14 +194,22 @@ class AgpPdfGenerator(private val context: Context) {
             }
 
             // 3. AGP 24-Hour Modal Percentile Plot (Chart Canvas)
-            val chartTop = 340f
+            val chartTop = 344f
             val chartHeight = 240f
             val chartBox = RectF(margin, chartTop, 595f - margin, chartTop + chartHeight)
             canvas.drawRoundRect(chartBox, 8f, 8f, headerBgPaint)
             canvas.drawRoundRect(chartBox, 8f, 8f, borderPaint)
 
-            val agpChartTitle = if (isRu) "24-ЧАСОВОЙ ПРОФИЛЬ AGP (МОДАЛЬНЫЙ ДЕНЬ)" else "24-HOUR AMBULATORY GLUCOSE PROFILE (MODAL DAY)"
-            val agpChartSub = if (isRu) "Медиана 50%, диапазоны 25-75% и 10-90% перцентилей" else "50% Median curve with 25-75% and 10-90% percentile cloud"
+            val agpChartTitle = if (isRu) {
+                "СВОДНЫЙ СУТОЧНЫЙ ПРОФИЛЬ AGP (НАЛОЖЕНИЕ ${statistics.daysCount} ДНЕЙ ЗА 24 ЧАСА)"
+            } else {
+                "COMPOSITE 24-HOUR AGP MODAL PROFILE (${statistics.daysCount} DAYS SUPERIMPOSED)"
+            }
+            val agpChartSub = if (isRu) {
+                "Медиана 50% (зелёная линия), 25–75% межквартильный диапазон и 10–90% перцентильное облако"
+            } else {
+                "50% Median curve (green), 25–75% interquartile band, and 10–90% percentile cloud"
+            }
             canvas.drawText(agpChartTitle, margin + 12f, chartTop + 22f, boxTitlePaint)
             canvas.drawText(agpChartSub, margin + 12f, chartTop + 36f, subTextPaint)
 
