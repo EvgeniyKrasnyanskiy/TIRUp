@@ -1,0 +1,88 @@
+<resources>
+    <string name="app_name">TIRUp</string>
+    <string name="nav_focus">Focus</string>
+    <string name="nav_trends">Trends &amp; AGP</string>
+    <string name="nav_reports">Medical Reports</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Focus Screen -->
+    <string name="focus_title">Daily Focus</string>
+    <string name="current_glucose">Current Glucose</string>
+    <string name="unit_mmol">mmol/L</string>
+    <string name="unit_mgdl">mg/dL</string>
+    <string name="streak_days">%d Days Streak</string>
+    <string name="mode_tir">TIR (Standard)</string>
+    <string name="mode_ting">TING (Tight)</string>
+    <string name="target_label">Target: ≥%d%%</string>
+    <string name="current_label">Current: %.1f%%</string>
+    <string name="compensator_title">Target Compensator</string>
+    <string name="compensator_desc_reach">To hit your %1$s target of %2$d%% by end of period, maintain ≥%3$.1f%% for the remaining %4$d days.</string>
+    <string name="compensator_desc_exceeding">Great pace! You are currently exceeding your target. Maintain ≥%1$.1f%% to keep your goal.</string>
+    <string name="compensator_desc_impossible">Target unreachable within current window (%1$.1f%% needed). Adjust your period or target in settings.</string>
+    <string name="card_mean">Mean Glucose</string>
+    <string name="card_cv">Variability (%CV)</string>
+    <string name="card_gmi">Est. A1c (GMI)</string>
+    <string name="card_night">Night Stability (00:00–06:00)</string>
+    <string name="night_stable">Stable night profile</string>
+    <string name="night_unstable">Night fluctuations detected</string>
+    <string name="no_data">No data available. Waiting for readings or import a dataset.</string>
+    <string name="last_reading">Last reading: %s</string>
+    <string name="minutes_ago">%d min ago</string>
+    <string name="just_now">Just now</string>
+
+    <!-- Trends & AGP -->
+    <string name="trends_title">Trends &amp; AGP Analysis</string>
+    <string name="period_7d">7D</string>
+    <string name="period_14d">14D (Std)</string>
+    <string name="period_30d">30D</string>
+    <string name="period_90d">90D</string>
+    <string name="period_year">1 Year</string>
+    <string name="period_all">All Time</string>
+    <string name="agp_curve_title">Ambulatory Glucose Profile (AGP)</string>
+    <string name="agp_median">50% Median</string>
+    <string name="agp_interquartile">25–75% Range</string>
+    <string name="agp_outer">10–90% Range</string>
+    <string name="agp_target_range">Target Range (%1$.1f - %2$.1f)</string>
+    <string name="heatmap_title">24-Hour Glucose Heatmap</string>
+    <string name="tir_breakdown">Ranges Breakdown</string>
+    <string name="range_very_low">Very Low (&lt;3.0)</string>
+    <string name="range_low">Low (3.0–3.8)</string>
+    <string name="range_in_range">In Range (3.9–10.0)</string>
+    <string name="range_tight">Tight Range (3.9–7.8)</string>
+    <string name="range_high">High (10.1–13.9)</string>
+    <string name="range_very_high">Very High (≥14.0)</string>
+
+    <!-- Reports -->
+    <string name="reports_title">Standard AGP Medical Report</string>
+    <string name="reports_subtitle">Single-page standardized A4 clinical document</string>
+    <string name="generate_pdf">Generate &amp; Share PDF Report</string>
+    <string name="export_success">Report generated successfully</string>
+    <string name="export_error">Error generating report: %s</string>
+    <string name="share_report">Share Medical AGP Sheet</string>
+    <string name="report_patient">Patient Report</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="section_preferences">Preferences</string>
+    <string name="pref_language">Language</string>
+    <string name="pref_language_en">English</string>
+    <string name="pref_language_ru">Русский</string>
+    <string name="pref_unit">Glucose Unit</string>
+    <string name="section_targets">Clinical Target Thresholds</string>
+    <string name="target_tir_low">TIR Lower Limit</string>
+    <string name="target_tir_high">TIR Upper Limit</string>
+    <string name="target_ting_high">TING (Tight) Upper Limit</string>
+    <string name="target_tir_percent">TIR Goal Target (%)</string>
+    <string name="target_ting_percent">TING Goal Target (%)</string>
+    <string name="section_import">Historical Data Import</string>
+    <string name="import_csv_sqlite">Import CSV / SQLite Dataset</string>
+    <string name="import_desc">Streaming ingestion of xDrip+ or Juggluco multi-year datasets (1,000,000+ points).</string>
+    <string name="import_in_progress">Importing readings… %d processed</string>
+    <string name="import_complete">Import completed: %d readings saved.</string>
+    <string name="import_error">Import failed: %s</string>
+    <string name="clear_data">Clear All Data</string>
+    <string name="clear_data_confirm">Are you sure you want to delete all stored readings and summaries?</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_confirm">Confirm</string>
+    <string name="offline_badge">100% Local &amp; Private (No Internet)</string>
+</resources>

@@ -1,0 +1,88 @@
+<resources>
+    <string name="app_name">TIRUp</string>
+    <string name="nav_focus">Фокус</string>
+    <string name="nav_trends">Тренды и AGP</string>
+    <string name="nav_reports">Медицинский отчёт</string>
+    <string name="nav_settings">Настройки</string>
+
+    <!-- Focus Screen -->
+    <string name="focus_title">Дневной фокус</string>
+    <string name="current_glucose">Текущий сахар</string>
+    <string name="unit_mmol">ммоль/л</string>
+    <string name="unit_mgdl">мг/дл</string>
+    <string name="streak_days">%d дн. серия</string>
+    <string name="mode_tir">TIR (Стандартный)</string>
+    <string name="mode_ting">TING (Узкий)</string>
+    <string name="target_label">Цель: ≥%d%%</string>
+    <string name="current_label">Текущий: %.1f%%</string>
+    <string name="compensator_title">Компенсатор цели</string>
+    <string name="compensator_desc_reach">Чтобы достичь цели %1$s в %2$d%% к концу периода, удерживайте ≥%3$.1f%% в оставшиеся %4$d дн.</string>
+    <string name="compensator_desc_exceeding">Отличный темп! Вы опережаете цель. Поддерживайте ≥%1$.1f%% для закрепления результата.</string>
+    <string name="compensator_desc_impossible">Цель недостижима в текущем окне (требуется %1$.1f%%). Скорректируйте период или порог в настройках.</string>
+    <string name="card_mean">Средний сахар</string>
+    <string name="card_cv">Вариабельность (%CV)</string>
+    <string name="card_gmi">Расчётный A1c (GMI)</string>
+    <string name="card_night">Ночной профиль (00:00–06:00)</string>
+    <string name="night_stable">Стабильный ночной профиль</string>
+    <string name="night_unstable">Обнаружены ночные колебания</string>
+    <string name="no_data">Нет данных. Ожидание сигналов или импортируйте датасет.</string>
+    <string name="last_reading">Последнее измерение: %s</string>
+    <string name="minutes_ago">%d мин назад</string>
+    <string name="just_now">Только что</string>
+
+    <!-- Trends & AGP -->
+    <string name="trends_title">Анализ трендов и AGP</string>
+    <string name="period_7d">7Д</string>
+    <string name="period_14d">14Д (Станд)</string>
+    <string name="period_30d">30Д</string>
+    <string name="period_90d">90Д</string>
+    <string name="period_year">1 Год</string>
+    <string name="period_all">Всё время</string>
+    <string name="agp_curve_title">Амбулаторный профиль глюкозы (AGP)</string>
+    <string name="agp_median">50% Медиана</string>
+    <string name="agp_interquartile">25–75% Диапазон</string>
+    <string name="agp_outer">10–90% Диапазон</string>
+    <string name="agp_target_range">Целевой диапазон (%1$.1f - %2$.1f)</string>
+    <string name="heatmap_title">Суточная тепловая карта (24ч)</string>
+    <string name="tir_breakdown">Распределение по диапазонам</string>
+    <string name="range_very_low">Очень низкий (&lt;3.0)</string>
+    <string name="range_low">Низкий (3.0–3.8)</string>
+    <string name="range_in_range">В диапазоне (3.9–10.0)</string>
+    <string name="range_tight">В узком диапазоне (3.9–7.8)</string>
+    <string name="range_high">Высокий (10.1–13.9)</string>
+    <string name="range_very_high">Очень высокий (≥14.0)</string>
+
+    <!-- Reports -->
+    <string name="reports_title">Стандартный AGP медицинский отчёт</string>
+    <string name="reports_subtitle">Одностраничный стандартизированный бланк А4</string>
+    <string name="generate_pdf">Сформировать и отправить PDF</string>
+    <string name="export_success">Медицинский отчёт успешно создан</string>
+    <string name="export_error">Ошибка создания отчёта: %s</string>
+    <string name="share_report">Поделиться бланком AGP</string>
+    <string name="report_patient">Медицинский профиль пациента</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Настройки</string>
+    <string name="section_preferences">Параметры отображения</string>
+    <string name="pref_language">Язык интерфейса</string>
+    <string name="pref_language_en">English</string>
+    <string name="pref_language_ru">Русский</string>
+    <string name="pref_unit">Единицы измерения</string>
+    <string name="section_targets">Клинические целевые пороги</string>
+    <string name="target_tir_low">Нижняя граница TIR</string>
+    <string name="target_tir_high">Верхняя граница TIR</string>
+    <string name="target_ting_high">Верхняя граница TING (Узкий)</string>
+    <string name="target_tir_percent">Цель TIR (%)</string>
+    <string name="target_ting_percent">Цель TING (%)</string>
+    <string name="section_import">Импорт исторических данных</string>
+    <string name="import_csv_sqlite">Импорт CSV / SQLite датасета</string>
+    <string name="import_desc">Потоковый импорт многолетних архивов xDrip+ или Juggluco (1 000 000+ записей).</string>
+    <string name="import_in_progress">Импорт записей… Обработано %d</string>
+    <string name="import_complete">Импорт завершён: сохранено %d записей.</string>
+    <string name="import_error">Сбой импорта: %s</string>
+    <string name="clear_data">Очистить все данные</string>
+    <string name="clear_data_confirm">Вы уверены, что хотите удалить все сохранённые измерения и сводки?</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_confirm">Подтвердить</string>
+    <string name="offline_badge">100% Локально и безопасно (без интернета)</string>
+</resources>
