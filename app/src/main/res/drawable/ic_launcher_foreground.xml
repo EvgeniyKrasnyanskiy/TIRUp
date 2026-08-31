@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Pulse & Arrow Motif -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M54,24 L68,44 L58,44 L58,68 L50,68 L50,44 L40,44 Z" />
+    <path
+        android:fillColor="#34D399"
+        android:pathData="M24,76 L38,76 L46,62 L54,76 L62,62 L70,76 L84,76 L84,82 L24,82 Z" />
+</vector>
