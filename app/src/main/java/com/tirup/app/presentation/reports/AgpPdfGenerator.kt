@@ -347,12 +347,16 @@ class AgpPdfGenerator(private val context: Context) {
                 isFakeBoldText = true
             }
 
-            val items = statistics.clinicalSummary.evaluatedMetrics
-            val midPoint = (items.size + 1) / 2
+            val allItems = statistics.clinicalSummary.evaluatedMetrics
+            // Separate night stability (wide descriptive metric) from numeric items
+            val gridItems = allItems.filter { !it.title.contains("Ночной", ignoreCase = true) && !it.title.contains("Night", ignoreCase = true) }
+            val wideItems = allItems.filter { it.title.contains("Ночной", ignoreCase = true) || it.title.contains("Night", ignoreCase = true) }
+
+            val midPoint = (gridItems.size + 1) / 2
             val col1X = margin + 12f
             val col2X = margin + 12f + (contentWidth / 2f)
 
-            items.forEachIndexed { index, item ->
+            gridItems.forEachIndexed { index, item ->
                 val pnt = if (item.isMet) passPaint else if (item.isWarning) warnPaint else failPaint
                 val isCol2 = index >= midPoint
                 val x = if (isCol2) col2X else col1X
@@ -363,11 +367,19 @@ class AgpPdfGenerator(private val context: Context) {
                 canvas.drawText(line, x, y, pnt)
             }
 
-            val bottomSectionY = notesTop + 32f + (midPoint * 13f) + 6f
+            var nextY = notesTop + 32f + (midPoint * 13f) + 4f
+            wideItems.forEach { wideItem ->
+                val pnt = if (wideItem.isMet) passPaint else if (wideItem.isWarning) warnPaint else failPaint
+                val line = "${wideItem.symbol} ${wideItem.title}: ${wideItem.valueStr} (${wideItem.targetStr})"
+                canvas.drawText(line, margin + 12f, nextY, pnt)
+                nextY += 13f
+            }
+
+            nextY += 2f
             val conclPrefix = if (isRu) "• Заключение: " else "• Conclusion: "
             val recPrefix = if (isRu) "• Рекомендация: " else "• Recommendation: "
-            canvas.drawText("$conclPrefix${statistics.clinicalSummary.overallStatus}", margin + 12f, bottomSectionY, textPaint)
-            canvas.drawText("$recPrefix${statistics.clinicalSummary.recommendation}", margin + 12f, bottomSectionY + 13f, subTextPaint)
+            canvas.drawText("$conclPrefix${statistics.clinicalSummary.overallStatus}", margin + 12f, nextY, textPaint)
+            canvas.drawText("$recPrefix${statistics.clinicalSummary.recommendation}", margin + 12f, nextY + 13f, subTextPaint)
 
             // Footer with telegram channel link
             val footerText = if (isRu) {

@@ -49,23 +49,25 @@ class StreamingGlucoseImporter(
             val chunk = ArrayList<HistoricalReadingEntity>(CHUNK_SIZE)
 
             val dateFormats = listOf(
-                SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US),
-                SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.US),
-                SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US),
-                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US),
-                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US),
-                SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.US),
-                SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.US),
-                SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.US),
-                SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.US),
-                SimpleDateFormat("MM/dd/yyyy hh:mm:ss a", Locale.US),
-                SimpleDateFormat("MM/dd/yyyy HH:mm", Locale.US),
-                SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.US)
+                SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.US).apply { isLenient = false },
+                SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.US).apply { isLenient = false },
+                SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).apply { isLenient = false },
+                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).apply { isLenient = false },
+                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { isLenient = false },
+                SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.US).apply { isLenient = false },
+                SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.US).apply { isLenient = false },
+                SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.US).apply { isLenient = false },
+                SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.US).apply { isLenient = false },
+                SimpleDateFormat("MM/dd/yyyy hh:mm:ss a", Locale.US).apply { isLenient = false },
+                SimpleDateFormat("MM/dd/yyyy HH:mm", Locale.US).apply { isLenient = false },
+                SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.US).apply { isLenient = false },
+                SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.US).apply { isLenient = false }
             )
 
+            val seenTimestamps = HashSet<Long>()
+
             if (isZip) {
-                Log.d(TAG, "Detected ZIP archive. Scanning for primary glucose CSV...")
-                // In xDrip ZIP archives, extract to temp or process the main glucose stream
+                Log.d(TAG, "Detected ZIP archive. Scanning for glucose CSVs...")
                 val tempZipFile = java.io.File.createTempFile("xdrip_import", ".zip", context.cacheDir)
                 java.io.FileOutputStream(tempZipFile).use { out ->
                     bufferedIn.copyTo(out)
@@ -75,21 +77,17 @@ class StreamingGlucoseImporter(
                 val entries = zipFile.entries().asSequence().filter { !it.isDirectory }.toList()
                 val csvEntries = entries.filter {
                     val n = it.name.lowercase()
-                    n.endsWith(".csv") || n.endsWith(".tsv") || n.endsWith(".txt")
+                    (n.endsWith(".csv") || n.endsWith(".tsv") || n.endsWith(".txt")) &&
+                            !n.contains("treatment") && !n.contains("calibrat")
                 }
 
-                // Prefer main glucose file over calibrations/treatments
-                val primaryEntry = csvEntries.firstOrNull {
-                    val n = it.name.lowercase()
-                    (n.contains("glucose") || n.contains("cgms") || n.contains("merged") || n.contains("batch") || n.contains("report")) &&
-                            !n.contains("treatment") && !n.contains("calibrat")
-                } ?: csvEntries.maxByOrNull { it.size } ?: csvEntries.firstOrNull()
-
-                if (primaryEntry != null) {
-                    Log.d(TAG, "Selected primary CSV entry: ${primaryEntry.name} (size: ${primaryEntry.size})")
-                    zipFile.getInputStream(primaryEntry).use { entryStream ->
-                        val count = processCsvStream(entryStream, chunk, dateFormats, onProgress)
-                        totalImported += count
+                if (csvEntries.isNotEmpty()) {
+                    for (entry in csvEntries) {
+                        Log.d(TAG, "Processing CSV entry: ${entry.name} (size: ${entry.size})")
+                        zipFile.getInputStream(entry).use { entryStream ->
+                            val count = processCsvStream(entryStream, chunk, dateFormats, seenTimestamps, onProgress)
+                            totalImported += count
+                        }
                     }
                 } else {
                     Log.w(TAG, "No valid CSV found in ZIP archive.")
@@ -99,7 +97,7 @@ class StreamingGlucoseImporter(
                 tempZipFile.delete()
             } else {
                 Log.d(TAG, "Processing CSV/Text stream...")
-                val count = processCsvStream(bufferedIn, chunk, dateFormats, onProgress)
+                val count = processCsvStream(bufferedIn, chunk, dateFormats, seenTimestamps, onProgress)
                 totalImported += count
             }
 
@@ -123,6 +121,7 @@ class StreamingGlucoseImporter(
         inputStream: InputStream,
         chunk: ArrayList<HistoricalReadingEntity>,
         dateFormats: List<SimpleDateFormat>,
+        seenTimestamps: HashSet<Long>,
         onProgress: (Int) -> Unit
     ): Int {
         var importedInStream = 0
@@ -132,8 +131,6 @@ class StreamingGlucoseImporter(
         var timeCol = -1
         var singleTsCol = -1
         var valueCol = -1
-        var fallbackValueCol = -1
-        var isMgDlHeader = false
         var headerFound = false
 
         var line: String? = reader.readLine()
@@ -159,8 +156,6 @@ class StreamingGlucoseImporter(
                 var tempTime = -1
                 var tempSingleTs = -1
                 var tempVal = -1
-                var tempFallbackVal = -1
-                var tempIsMgDl = false
 
                 for (i in headerLower.indices) {
                     val h = headerLower[i]
@@ -174,19 +169,11 @@ class StreamingGlucoseImporter(
                         tempSingleTs = i
                     }
 
-                    if (h == "udt_cgms" || h.contains("historic") || h == "glucose" || h == "sgv" || h == "bg_level" || h == "bg" || h.contains("glukose") || h.contains("сахар") || h.contains("глюкоза") || h == "value") {
-                        if (tempVal == -1) {
-                            tempVal = i
-                        } else if (tempFallbackVal == -1) {
-                            tempFallbackVal = i
-                        }
-                        if (h.contains("mg/dl") || h.contains("mgdl") || h.contains("mg") || h == "udt_cgms") {
-                            tempIsMgDl = true
-                        }
-                    }
-
-                    if (h.contains("scan")) {
-                        tempFallbackVal = i
+                    // Strict CGM columns only (ignore bg_level, bolus, carbs which are events/treatments)
+                    if (h == "udt_cgms") {
+                        tempVal = i
+                    } else if (tempVal == -1 && (h.contains("historic") || h == "glucose" || h == "sgv" || h.contains("glukose") || h.contains("сахар") || h.contains("глюкоза") || h == "value")) {
+                        tempVal = i
                     }
                 }
 
@@ -195,8 +182,6 @@ class StreamingGlucoseImporter(
                     dayCol = tempDay
                     timeCol = tempTime
                     valueCol = tempVal
-                    fallbackValueCol = tempFallbackVal
-                    isMgDlHeader = tempIsMgDl
                     headerFound = true
                     line = reader.readLine()
                     continue
@@ -208,50 +193,59 @@ class StreamingGlucoseImporter(
 
             // A. Separate DAY and TIME columns (xDrip export format)
             if (dayCol != -1 && timeCol != -1 && valueCol != -1 && dayCol < parts.size && timeCol < parts.size) {
-                val combinedDateTime = "${parts[dayCol]} ${parts[timeCol]}"
-                val ts = parseTimestamp(combinedDateTime, dateFormats)
-                var rawVal = if (valueCol < parts.size) parts[valueCol].replace(',', '.') else ""
-                if (rawVal.isEmpty() && fallbackValueCol != -1 && fallbackValueCol < parts.size) {
-                    rawVal = parts[fallbackValueCol].replace(',', '.')
-                }
-                val gVal = rawVal.toDoubleOrNull()
-                if (ts != null && gVal != null && gVal > 0.0) {
-                    // Match glycemia_processor.py is_probably_mmol heuristic: if <= 30.0 -> mmol/L, else mg/dL
-                    val valueMmol = if (gVal <= 30.0) gVal else gVal / 18.0182
-                    if (valueMmol * 18.0182 >= 38.0) {
-                        reading = HistoricalReadingEntity(timestamp = ts, valueMmol = valueMmol)
+                val rawVal = if (valueCol < parts.size) parts[valueCol].replace(',', '.').trim() else ""
+                // Skip rows without sensor glucose (calibrations, bolus, carbs, NaN)
+                if (rawVal.isNotEmpty() && !rawVal.equals("nan", ignoreCase = true)) {
+                    val gVal = rawVal.toDoubleOrNull()
+                    if (gVal != null && gVal > 0.0) {
+                        val combinedDateTime = "${parts[dayCol]} ${parts[timeCol]}"
+                        val ts = parseTimestamp(combinedDateTime, dateFormats)
+                        if (ts != null) {
+                            // Match glycemia_processor.py is_probably_mmol heuristic: if <= 30.0 -> mmol/L, else mg/dL
+                            val valueMmol = if (gVal <= 30.0) gVal else gVal / 18.0182
+                            // xDrip CUTOFF filter (> 38.0 mg/dL ~ 2.109 mmol/L)
+                            if (valueMmol * 18.0182 > 38.0) {
+                                // Deduplicate by timestamp (matching DiaKiaBot drop_duplicates)
+                                if (seenTimestamps.add(ts)) {
+                                    reading = HistoricalReadingEntity(timestamp = ts, valueMmol = valueMmol)
+                                }
+                            }
+                        }
                     }
                 }
             }
 
             // B. Single Timestamp Column (Juggluco, LibreView, Dexcom)
             if (reading == null && singleTsCol != -1 && valueCol != -1 && singleTsCol < parts.size) {
-                val rawTime = parts[singleTsCol]
-                val ts = parseTimestamp(rawTime, dateFormats)
-                var rawVal = if (valueCol < parts.size) parts[valueCol].replace(',', '.') else ""
-                if (rawVal.isEmpty() && fallbackValueCol != -1 && fallbackValueCol < parts.size) {
-                    rawVal = parts[fallbackValueCol].replace(',', '.')
-                }
-                val gVal = rawVal.toDoubleOrNull()
-                if (ts != null && gVal != null && gVal > 0.0) {
-                    val valueMmol = if (gVal <= 30.0) gVal else gVal / 18.0182
-                    if (valueMmol * 18.0182 >= 38.0) {
-                        reading = HistoricalReadingEntity(timestamp = ts, valueMmol = valueMmol)
+                val rawVal = if (valueCol < parts.size) parts[valueCol].replace(',', '.').trim() else ""
+                if (rawVal.isNotEmpty() && !rawVal.equals("nan", ignoreCase = true)) {
+                    val gVal = rawVal.toDoubleOrNull()
+                    if (gVal != null && gVal > 0.0) {
+                        val rawTime = parts[singleTsCol]
+                        val ts = parseTimestamp(rawTime, dateFormats)
+                        if (ts != null) {
+                            val valueMmol = if (gVal <= 30.0) gVal else gVal / 18.0182
+                            if (valueMmol * 18.0182 > 38.0) {
+                                if (seenTimestamps.add(ts)) {
+                                    reading = HistoricalReadingEntity(timestamp = ts, valueMmol = valueMmol)
+                                }
+                            }
+                        }
                     }
                 }
             }
 
-            // C. Auto-detection fallback
-            if (reading == null) {
+            // C. Auto-detection fallback (ONLY if no header was found)
+            if (reading == null && !headerFound) {
                 val auto = autoDetectRow(parts, dateFormats)
                 if (auto != null) {
-                    reading = auto.first
-                    if (!headerFound) {
-                        dayCol = auto.second
-                        timeCol = auto.third
-                        valueCol = auto.fourth
-                        headerFound = true
+                    if (seenTimestamps.add(auto.first.timestamp)) {
+                        reading = auto.first
                     }
+                    dayCol = auto.second
+                    timeCol = auto.third
+                    valueCol = auto.fourth
+                    headerFound = true
                 }
             }
 

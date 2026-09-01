@@ -458,15 +458,18 @@ object GlucoseMetricsCalculator {
         if (!cvMet) issuesList.add("%CV")
 
         // 12. SD
+        val sdMet = sdMmol <= 3.0
+        val sdWarn = sdMmol in 3.01..3.5
         evalItems.add(
             ClinicalMetricStatus(
                 title = if (isRu) "SD (стандартное отклонение)" else "SD (standard deviation)",
                 valueStr = String.format(Locale.US, "%.2f %s", sdMmol, if (isRu) "ммоль/л" else "mmol/L"),
-                targetStr = if (isRu) "норма ≤2.5" else "normal ≤2.5",
-                isMet = sdMmol <= 2.5,
-                isWarning = sdMmol in 2.51..3.0
+                targetStr = if (isRu) "цель ≤3.0" else "target ≤3.0",
+                isMet = sdMet,
+                isWarning = sdWarn
             )
         )
+        if (!sdMet) issuesList.add("SD")
 
         // 13. GRI (Target ≤ 40.0)
         val griMet = gri <= 40.0
