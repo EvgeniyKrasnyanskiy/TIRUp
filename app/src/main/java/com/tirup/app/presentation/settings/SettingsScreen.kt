@@ -62,6 +62,8 @@ import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.domain.model.TargetRanges
 import com.tirup.app.domain.model.UserSettings
+import com.tirup.app.domain.model.localizeDiabetesType
+import com.tirup.app.domain.model.localizeTherapyType
 import com.tirup.app.presentation.components.BentoCard
 import com.tirup.app.presentation.components.HelpAndDisclaimerDialog
 import com.tirup.app.presentation.theme.ActionBlue
@@ -122,7 +124,7 @@ fun SettingsScreen(
                             Text(
                                 text = if (isRu) "Настройки сохраняются автоматически" else "Settings are saved automatically",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.outline
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -191,7 +193,7 @@ fun SettingsScreen(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalArrangement = Arrangement.Center
                             ) {
-                                Text(if (isRu) "Возраст" else "Age", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                Text(if (isRu) "Возраст" else "Age", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text("${profile.calculatedAge} ${if (isRu) "лет" else "y.o."}", style = MaterialTheme.typography.bodyMedium, color = PrimaryEmerald, fontWeight = FontWeight.Bold)
                             }
                         }
@@ -229,7 +231,7 @@ fun SettingsScreen(
                     ) {
                         DropdownChoiceSelector(
                             label = if (isRu) "Тип диабета" else "Diabetes Type",
-                            selectedOption = profile.diabetesType,
+                            selectedOption = localizeDiabetesType(profile.diabetesType, isRu),
                             options = if (isRu) listOf("СД1", "СД2", "LADA", "MODY", "ГСД") else listOf("T1D", "T2D", "LADA", "MODY", "GDM"),
                             modifier = Modifier.weight(1f),
                             onOptionSelected = { newType ->
@@ -251,7 +253,7 @@ fun SettingsScreen(
                     // 5. Therapy Type Dropdown
                     DropdownChoiceSelector(
                         label = if (isRu) "Вид терапии" else "Therapy Type",
-                        selectedOption = profile.therapyType,
+                        selectedOption = localizeTherapyType(profile.therapyType, isRu),
                         options = if (isRu) listOf(
                             "Инсулиновая помпа",
                             "Шприц-ручки (МДИ)",
@@ -750,14 +752,14 @@ fun LanguageChip(
 ) {
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = if (isSelected) PrimaryEmerald else MaterialTheme.colorScheme.surfaceVariant,
-        border = BorderStroke(1.dp, if (isSelected) PrimaryEmerald else MaterialTheme.colorScheme.outline),
+        color = if (isSelected) ActionBlue else MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, if (isSelected) ActionBlue else MaterialTheme.colorScheme.outline),
         modifier = Modifier.clickable { onClick() }
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
         )

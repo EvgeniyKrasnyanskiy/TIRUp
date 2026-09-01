@@ -43,3 +43,25 @@ data class UserSettings(
     val patientProfile: PatientProfile = PatientProfile(),
     val hasSeenOnboarding: Boolean = false
 )
+
+fun localizeTherapyType(therapy: String, isRu: Boolean): String {
+    return when (therapy.trim()) {
+        "Инсулиновая помпа", "Insulin Pump" -> if (isRu) "Инсулиновая помпа" else "Insulin Pump"
+        "Шприц-ручки (МДИ)", "Multiple Daily Injections (MDI)" -> if (isRu) "Шприц-ручки (МДИ)" else "Multiple Daily Injections (MDI)"
+        "Пероральные препараты (Таблетки)", "Oral Medication (Pills)" -> if (isRu) "Пероральные препараты (Таблетки)" else "Oral Medication (Pills)"
+        "Диетотерапия", "Diet Therapy" -> if (isRu) "Диетотерапия" else "Diet Therapy"
+        else -> therapy
+    }
+}
+
+fun localizeDiabetesType(diabetes: String, isRu: Boolean): String {
+    return when (diabetes.trim()) {
+        "СД1", "T1D" -> if (isRu) "СД1" else "T1D"
+        "СД2", "T2D" -> if (isRu) "СД2" else "T2D"
+        "ГСД", "GDM" -> if (isRu) "ГСД" else "GDM"
+        "LADA" -> "LADA"
+        "MODY" -> "MODY"
+        else -> diabetes
+    }
+}
+

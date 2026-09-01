@@ -280,17 +280,25 @@ fun FocusScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                val sdVal = state.statistics.sdMmol
+                val sdValStr = if (sdVal > 0.0) {
+                    if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", sdVal)
+                    else "${(sdVal * 18.0182).toInt()}"
+                } else "--"
+                val isSdGood = sdVal in 0.01..(if (targetMode == TargetMode.TING) 1.5 else 2.0)
+
                 BentoMetricSmall(
-                    title = if (isRu) "Точек за сегодня" else "Readings Today",
-                    value = "${state.recentReadings.size}",
-                    unit = if (isRu) "изм." else "pts",
-                    valueColor = PrimaryEmerald,
+                    title = if (isRu) "Разброс (SD)" else "Standard Dev (SD)",
+                    value = sdValStr,
+                    unit = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL"),
+                    valueColor = if (isSdGood) PrimaryEmerald else ColorHigh,
                     modifier = Modifier.weight(1f),
                     onClick = {
+                        val targetSdStr = if (unit == GlucoseUnit.MMOL_L) "≤2.0 ммоль/л" else "≤36 мг/дл"
                         detailDialogInfo = Pair(
-                            if (isRu) "Точек за сегодня" else "Readings Today",
-                            if (isRu) "Всего получено измерений за текущие сутки: ${state.recentReadings.size} точек.\nПокрытие сенсора: ${String.format(Locale.US, "%.1f%%", state.statistics.activeTimePercent)}"
-                            else "Total readings received today: ${state.recentReadings.size} readings.\nSensor coverage: ${String.format(Locale.US, "%.1f%%", state.statistics.activeTimePercent)}"
+                            if (isRu) "Стандартное отклонение (SD)" else "Standard Deviation (SD)",
+                            if (isRu) "Стандартное отклонение сахара (SD) показывает степень колебания гликемии относительно среднего значения за сутки.\n\nТекущее значение: $sdValStr ${if (unit == GlucoseUnit.MMOL_L) "ммоль/л" else "мг/дл"}.\nКлиническая цель: $targetSdStr (для стабильного профиля)."
+                            else "Standard deviation (SD) measures the dispersion of glucose levels around the daily mean.\n\nCurrent value: $sdValStr ${if (unit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL"}.\nClinical target: $targetSdStr (for stable glycemia)."
                         )
                     }
                 )

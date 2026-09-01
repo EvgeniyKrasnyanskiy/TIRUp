@@ -43,8 +43,23 @@
   3. Показывать диалог автоматически при первом запуске (`!hasSeenOnboarding`).
   4. Добавить иконку `?` (`HelpOutline`) в шапку экрана настроек `SettingsScreen.kt` для вызова этой справки в любой момент.
 
-## 5. Документация и синхронизация с Git
+## 5. Документация и синхронизация с Git [Completed]
 - **Задачи**:
-  1. Подготовить подробный файл `README.md` (описание приложения, ключевые фичи, стек, скриншоты/структура, инструкция по настройке интеграции с xDrip+).
-  2. Настроить remote репозиторий: `git@github.com:EvgeniyKrasnyanskiy/TIRUp.git`.
-  3. Закоммитить изменения и выполнить `git push -u origin main`.
+  1. [x] Подготовить подробный файл `README.md`.
+  2. [x] Настроить remote репозиторий: `git@github.com:EvgeniyKrasnyanskiy/TIRUp.git`.
+  3. [x] Закоммитить изменения и выполнить `git push -u origin main`.
+
+## 6. Доработка интерфейса, контрастности и синхронизации локализации
+- **Задачи**:
+  1. **Локализация вида терапии и типа диабета**:
+     - Добавить функции `localizeTherapyType(therapy, isRu)` и `localizeDiabetesType(diabetes, isRu)`.
+     - Применить в `SettingsScreen.kt`, `AgpSheetPreviewModal.kt` и `AgpPdfGenerator.kt`.
+  2. **Цвета и контрастность**:
+     - В `SettingsScreen.kt` сделать `LanguageChip` синим (`ActionBlue`).
+     - В `AgpSheetPreviewModal.kt` сделать тулбар адаптивным под светлую тему.
+     - В `Theme.kt` усилить контрастность `onSurfaceVariant` (`#334155` светлая, `#CBD5E1` тёмная).
+  3. **UI экранов Focus и Trends**:
+     - `FocusScreen.kt`: заменить дублирующийся показатель «Точек за сегодня» на «Разброс (SD)».
+     - `TrendsScreen.kt`: перенести TING/TIR цель на новую строку; переделать 3 карточки по Варианту А (1 широкая + 2 средние).
+  4. **Нижняя панель управления**:
+     - В `MainActivity.kt` перенести форму в `Surface(shape = RoundedCornerShape(22.dp))` с чёткой окантовкой, увеличить кнопки до `28.dp` и добавить подсветку активной вкладки.

@@ -210,10 +210,9 @@ fun TrendsScreen(
                     }
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
                             text = if (isRu) "Распределение по диапазонам" else "Time in Ranges Distribution",
@@ -269,32 +268,77 @@ fun TrendsScreen(
             }
         }
 
-        // Summary 3-Column Metrics (Mean BG, %CV, eA1c)
+        // Summary Metrics: Variant A (Apple Health Style: 1 Full-Width Card + 2 Equal Column Cards)
+        // 1. Mean Glucose (Full Width Hero Bento Card)
+        item {
+            val meanValStr = if (isMmol) String.format(Locale.US, "%.1f", state.statistics.meanMmol)
+                             else String.format(Locale.US, "%d", (state.statistics.meanMmol * 18.0182).toInt())
+            val unitStr = if (isMmol) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL")
+            val isMeanGood = state.statistics.meanMmol in 3.9..7.8
+
+            BentoCard(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    val valStr = if (isMmol) "${String.format(Locale.US, "%.1f", state.statistics.meanMmol)} ${if (isRu) "ммоль/л" else "mmol/L"}"
+                                 else "${(state.statistics.meanMmol * 18.0182).toInt()} ${if (isRu) "мг/дл" else "mg/dL"}"
+                    val targetVal = if (isMmol) "≤7.8 ${if (isRu) "ммоль/л" else "mmol/L"}" else "≤140 ${if (isRu) "мг/дл" else "mg/dL"}"
+                    detailDialogInfo = Pair(
+                        if (isRu) "Средний сахар (Mean)" else "Average Glucose (Mean)",
+                        if (isRu) "Средний уровень сахара за выбранный период: $valStr. Клиническая цель: $targetVal."
+                        else "Average glucose over the selected period: $valStr. Clinical target: $targetVal."
+                    )
+                }
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = if (isRu) "Средний сахар за период" else "Mean Glucose for Period",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = onSurfaceVariant
+                        )
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(
+                                text = meanValStr,
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = if (isMeanGood) PrimaryEmerald else ColorHigh,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = unitStr,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = (if (isMeanGood) PrimaryEmerald else ColorHigh).copy(alpha = 0.14f)
+                    ) {
+                        Text(
+                            text = if (isMeanGood) (if (isRu) "В норме" else "In Target") else (if (isRu) "Выше цели" else "Above Target"),
+                            color = if (isMeanGood) PrimaryEmerald else ColorHigh,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        // 2. Variability (%CV) & Estimated eA1c (Two Half-Width Bento Cards)
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                val meanValStr = if (isMmol) String.format(Locale.US, "%.1f", state.statistics.meanMmol)
-                                 else String.format(Locale.US, "%d", (state.statistics.meanMmol * 18.0182).toInt())
-                TrendSummaryCard(
-                    title = if (isRu) "Средний сахар" else "Mean Glucose",
-                    value = meanValStr,
-                    unit = if (isMmol) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL"),
-                    valueColor = if (state.statistics.meanMmol in 3.9..7.8) PrimaryEmerald else ColorHigh,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        val valStr = if (isMmol) "${String.format(Locale.US, "%.1f", state.statistics.meanMmol)} ${if (isRu) "ммоль/л" else "mmol/L"}"
-                                     else "${(state.statistics.meanMmol * 18.0182).toInt()} ${if (isRu) "мг/дл" else "mg/dL"}"
-                        val targetVal = if (isMmol) "≤7.8 ${if (isRu) "ммоль/л" else "mmol/L"}" else "≤140 ${if (isRu) "мг/дл" else "mg/dL"}"
-                        detailDialogInfo = Pair(
-                            if (isRu) "Средний сахар (Mean)" else "Average Glucose (Mean)",
-                            if (isRu) "Средний уровень сахара за выбранный период: $valStr. Клиническая цель: $targetVal."
-                            else "Average glucose over the selected period: $valStr. Clinical target: $targetVal."
-                        )
-                    }
-                )
-
                 TrendSummaryCard(
                     title = if (isRu) "Вариабельность (%CV)" else "Variability (%CV)",
                     value = String.format(Locale.US, "%.1f%%", state.statistics.cvPercent),

@@ -12,6 +12,8 @@ import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseStatistics
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.UserSettings
+import com.tirup.app.domain.model.localizeDiabetesType
+import com.tirup.app.domain.model.localizeTherapyType
 import com.tirup.app.presentation.trends.TrendPeriod
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -92,17 +94,17 @@ class AgpPdfGenerator(private val context: Context) {
 
             // Patient details line
             val pName = if (patient.fullName.isNotBlank()) patient.fullName else "___________________________________"
-            val pAge = if (patient.fullName.isNotBlank() || patient.birthYear != 1990) "${patient.calculatedAge} лет" else "_______"
-            val pWeight = if (patient.weightKg.isNotBlank()) "${patient.weightKg} кг" else "_______"
-            val pHeight = if (patient.heightCm.isNotBlank()) "${patient.heightCm} см" else "_______"
-            val pType = patient.diabetesType
-            val pDur = "${patient.calculatedDuration} лет"
-            val pTherapy = patient.therapyType
+            val pAge = if (patient.fullName.isNotBlank() || patient.birthYear != 1990) (if (isRu) "${patient.calculatedAge} лет" else "${patient.calculatedAge} y.o.") else "_______"
+            val pWeight = if (patient.weightKg.isNotBlank()) (if (isRu) "${patient.weightKg} кг" else "${patient.weightKg} kg") else "_______"
+            val pHeight = if (patient.heightCm.isNotBlank()) (if (isRu) "${patient.heightCm} см" else "${patient.heightCm} cm") else "_______"
+            val pType = localizeDiabetesType(patient.diabetesType, isRu)
+            val pDur = if (isRu) "${patient.calculatedDuration} лет" else "${patient.calculatedDuration} yrs"
+            val pTherapy = localizeTherapyType(patient.therapyType, isRu)
 
             val patientLine = if (isRu) {
                 "Пациент: $pName • Возраст: $pAge • Вес: $pWeight • Рост: $pHeight • $pType (стаж $pDur) • $pTherapy"
             } else {
-                "Patient: $pName • Age: $pAge • Weight: $pWeight • Height: $pHeight • $pType ($pDur) • $pTherapy"
+                "Patient: $pName • Age: $pAge • Weight: $pWeight • Height: $pHeight • $pType (duration $pDur) • $pTherapy"
             }
             canvas.drawText(patientLine, margin + 12f, 55f, subTextPaint)
 

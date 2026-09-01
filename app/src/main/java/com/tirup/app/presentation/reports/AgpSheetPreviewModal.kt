@@ -44,6 +44,8 @@ import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseStatistics
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.UserSettings
+import com.tirup.app.domain.model.localizeDiabetesType
+import com.tirup.app.domain.model.localizeTherapyType
 import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.PrimaryEmerald
 import com.tirup.app.presentation.trends.AgpChart
@@ -82,23 +84,27 @@ fun AgpSheetPreviewModal(
             shadowElevation = 12.dp
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Modal Top Toolbar
+                // Modal Top Toolbar (Theme adaptive)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF0F172A))
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = if (isRu) "Предпросмотр бланка AGP" else "AGP Report Sheet Preview",
                         style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 }
 
@@ -129,9 +135,9 @@ fun AgpSheetPreviewModal(
                                 val pAge = if (patient.fullName.isNotBlank() || patient.birthYear != 1990) "${patient.calculatedAge} ${if (isRu) "лет" else "y.o."}" else "_______"
                                 val pWeight = if (patient.weightKg.isNotBlank()) "${patient.weightKg} ${if (isRu) "кг" else "kg"}" else "_______"
                                 val pHeight = if (patient.heightCm.isNotBlank()) "${patient.heightCm} ${if (isRu) "см" else "cm"}" else "_______"
-                                val pType = patient.diabetesType
+                                val pType = localizeDiabetesType(patient.diabetesType, isRu)
                                 val pDur = "${patient.calculatedDuration} ${if (isRu) "лет" else "yrs"}"
-                                val pTherapy = patient.therapyType
+                                val pTherapy = localizeTherapyType(patient.therapyType, isRu)
 
                                 val patientLine = if (isRu) {
                                     "Пациент: $pName • Возраст: $pAge • Вес: $pWeight • Рост: $pHeight • $pType ($pDur) • $pTherapy"

@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.Adjust
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -215,15 +217,15 @@ fun MainPagerScaffold(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .clip(RoundedCornerShape(20.dp)),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                shape = RoundedCornerShape(24.dp),
                 color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)),
                 shadowElevation = 8.dp
             ) {
                 NavigationBar(
                     containerColor = Color.Transparent,
-                    modifier = Modifier.height(64.dp)
+                    modifier = Modifier.height(72.dp)
                 ) {
                     tabs.forEachIndexed { index, item ->
                         val selected = pagerState.currentPage == index
@@ -235,16 +237,24 @@ fun MainPagerScaffold(
                                 }
                             },
                             icon = {
-                                Icon(
-                                    imageVector = item.icon,
-                                    contentDescription = item.title,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(width = 58.dp, height = 38.dp)
+                                        .clip(RoundedCornerShape(19.dp))
+                                        .background(if (selected) ActionBlue.copy(alpha = 0.16f) else Color.Transparent),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = item.icon,
+                                        contentDescription = item.title,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
                             },
                             label = null,
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = ActionBlue,
-                                unselectedIconColor = MaterialTheme.colorScheme.outline,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
                                 indicatorColor = Color.Transparent
                             )
                         )
