@@ -108,7 +108,7 @@ object GlucoseMetricsCalculator {
         val highMgdl = 180.0                 // 180.0 mg/dL (~10.0 mmol/L)
         val tightHighMgdl = 140.0            // 140.0 mg/dL (~7.8 mmol/L)
         val tbr30Mgdl = 54.0                 // 54.0 mg/dL (~3.0 mmol/L)
-        val tar139Mgdl = 250.0               // 250.0 mg/dL (~13.9 mmol/L)
+        val tar139Mgdl = 13.9 * MGDL_FACTOR  // ~250.45 mg/dL (~13.9 mmol/L)
 
         // Диапазон [Low, High) - High исключается
         val inRangeCount = rawMgdl.count { it >= lowMgdl && it < highMgdl }
@@ -117,7 +117,8 @@ object GlucoseMetricsCalculator {
 
         val tightCount = rawMgdl.count { it >= lowMgdl && it < tightHighMgdl }
         val below30Count = rawMgdl.count { it < tbr30Mgdl }
-        val above139Count = rawMgdl.count { it >= tar139Mgdl }
+        // TAR > 13.9: строго выше 13.9 (точки = 13.9 остаются в диапазоне High 10.1-13.9)
+        val above139Count = rawMgdl.count { it > tar139Mgdl }
 
         val nightReadings = mutableListOf<GlucoseReading>()
         val calendar = Calendar.getInstance(TimeZone.getDefault())
@@ -163,13 +164,31 @@ object GlucoseMetricsCalculator {
         val griHighLowerMgdl = 10.1 * MGDL_FACTOR
         val griLowCount = rawMgdl.count { it >= tbr30Mgdl && it < griLowUpperMgdl }
         val griLowPct = (griLowCount.toDouble() / totalCount) * 100.0
-        val griHighCount = rawMgdl.count { it >= griHighLowerMgdl && it < tar139Mgdl }
+        val griHighCount = rawMgdl.count { it >= griHighLowerMgdl && it <= tar139Mgdl }
         val griHighPct = (griHighCount.toDouble() / totalCount) * 100.0
 
         val hypoComponent = tbrVeryLowPercent + (0.8 * griLowPct)
         val hyperComponent = tarVeryHighPercent + (0.5 * griHighPct)
         val rawGri = (3.0 * hypoComponent) + (1.6 * hyperComponent)
         val gri = min(((rawGri * 10.0).roundToInt() / 10.0), 100.0)
+
+        // GRI 14-day slice (matching DiaKiaBot)
+        val maxTs = validReadings.last().timestamp
+        val start14d = maxTs - (14L * 86400000L)
+        val readings14d = validReadings.filter { it.timestamp > start14d }
+        val gri14dStr = if (readings14d.size >= 1330) {
+            val total14d = readings14d.size.toDouble()
+            val rawMgdl14d = readings14d.map { it.valueMmol * MGDL_FACTOR }
+            val vlow14d = (rawMgdl14d.count { it < tbr30Mgdl } / total14d) * 100.0
+            val low14d = (rawMgdl14d.count { it >= tbr30Mgdl && it < griLowUpperMgdl } / total14d) * 100.0
+            val high14d = (rawMgdl14d.count { it >= griHighLowerMgdl && it <= tar139Mgdl } / total14d) * 100.0
+            val vhigh14d = (rawMgdl14d.count { it > tar139Mgdl } / total14d) * 100.0
+            val hypo14d = vlow14d + (0.8 * low14d)
+            val hyper14d = vhigh14d + (0.5 * high14d)
+            val rawGri14d = (3.0 * hypo14d) + (1.6 * hyper14d)
+            val g14 = min(((rawGri14d * 10.0).roundToInt() / 10.0), 100.0)
+            String.format(Locale.US, "%.1f", g14)
+        } else ""
 
         val isRu = language.equals("RU", ignoreCase = true)
         val (griZone, griLabel) = when {
@@ -217,6 +236,7 @@ object GlucoseMetricsCalculator {
             cvPercent = cv,
             sdMmol = sd,
             gri = gri,
+            gri14dStr = gri14dStr,
             griLabel = griLabel,
             nightStability = nightStability,
             language = language
@@ -295,6 +315,7 @@ object GlucoseMetricsCalculator {
         cvPercent: Double,
         sdMmol: Double,
         gri: Double,
+        gri14dStr: String = "",
         griLabel: String,
         nightStability: NightStability,
         language: String
@@ -359,13 +380,13 @@ object GlucoseMetricsCalculator {
         )
         if (!tingMet) issuesList.add("TING")
 
-        // 5. TBR < 3.9 (Target < 4%)
+        // 5. TBR < 3.9 (Target < 4%) - integer percent like DiaKiaBot summary
         val tbrMet = tbrTotalPercent <= 4.0
         val tbrWarn = tbrTotalPercent in 4.1..6.0
         evalItems.add(
             ClinicalMetricStatus(
                 title = if (isRu) "TBR < 3.9 ммоль/л" else "TBR < 3.9 mmol/L",
-                valueStr = String.format(Locale.US, "%.1f%%", tbrTotalPercent),
+                valueStr = "${tbrTotalPercent.roundToInt()}%",
                 targetStr = if (isRu) "цель <4%" else "target <4%",
                 isMet = tbrMet,
                 isWarning = tbrWarn
@@ -376,10 +397,11 @@ object GlucoseMetricsCalculator {
         // 6. TBR < 3.0 (Target < 1%)
         val tbr30Met = tbrVeryLowPercent <= 1.0
         val tbr30Warn = tbrVeryLowPercent in 1.1..2.0
+        val tbr30Str = if (tbrVeryLowPercent < 0.05) "0.0%" else String.format(Locale.US, "%.1f%%", tbrVeryLowPercent)
         evalItems.add(
             ClinicalMetricStatus(
                 title = if (isRu) "TBR < 3.0 ммоль/л" else "TBR < 3.0 mmol/L",
-                valueStr = String.format(Locale.US, "%.1f%%", tbrVeryLowPercent),
+                valueStr = tbr30Str,
                 targetStr = if (isRu) "цель <1%" else "target <1%",
                 isMet = tbr30Met,
                 isWarning = tbr30Warn
@@ -474,10 +496,11 @@ object GlucoseMetricsCalculator {
         // 13. GRI (Target ≤ 40.0)
         val griMet = gri <= 40.0
         val griWarn = gri in 40.1..60.0
+        val gri14dPart = if (gri14dStr.isNotEmpty()) " (14дн: $gri14dStr)" else ""
         evalItems.add(
             ClinicalMetricStatus(
                 title = if (isRu) "GRI (индекс риска)" else "GRI (glycemia risk)",
-                valueStr = String.format(Locale.US, "%.1f (%s)", gri, griLabel),
+                valueStr = String.format(Locale.US, "%.1f%s (%s)", gri, gri14dPart, griLabel),
                 targetStr = if (isRu) "цель ≤40.0" else "target ≤40.0",
                 isMet = griMet,
                 isWarning = griWarn
