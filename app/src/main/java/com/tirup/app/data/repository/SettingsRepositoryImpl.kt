@@ -3,6 +3,7 @@ package com.tirup.app.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 import com.tirup.app.domain.model.GlucoseUnit
+import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.domain.model.TargetRanges
 import com.tirup.app.domain.model.UserSettings
@@ -33,6 +34,15 @@ class SettingsRepositoryImpl(
             .putInt(KEY_TIR_GOAL, settings.targetRanges.tirGoalPercent)
             .putInt(KEY_TING_GOAL, settings.targetRanges.tingGoalPercent)
             .putInt(KEY_PERIOD_DAYS, settings.periodDays)
+            .putInt(KEY_NIGHT_START, settings.nightStartHour)
+            .putInt(KEY_NIGHT_END, settings.nightEndHour)
+            .putString(KEY_PATIENT_NAME, settings.patientProfile.fullName)
+            .putString(KEY_PATIENT_AGE, settings.patientProfile.age)
+            .putString(KEY_PATIENT_HEIGHT, settings.patientProfile.heightCm)
+            .putString(KEY_PATIENT_WEIGHT, settings.patientProfile.weightKg)
+            .putString(KEY_DIABETES_TYPE, settings.patientProfile.diabetesType)
+            .putString(KEY_DIABETES_DURATION, settings.patientProfile.diabetesDurationYears)
+            .putString(KEY_THERAPY_TYPE, settings.patientProfile.therapyType)
             .apply()
 
         _settingsFlow.value = settings
@@ -60,6 +70,18 @@ class SettingsRepositoryImpl(
         val tirGoal = prefs.getInt(KEY_TIR_GOAL, 70)
         val tingGoal = prefs.getInt(KEY_TING_GOAL, 50)
         val periodDays = prefs.getInt(KEY_PERIOD_DAYS, 14)
+        val nightStart = prefs.getInt(KEY_NIGHT_START, 0)
+        val nightEnd = prefs.getInt(KEY_NIGHT_END, 6)
+
+        val profile = PatientProfile(
+            fullName = prefs.getString(KEY_PATIENT_NAME, "") ?: "",
+            age = prefs.getString(KEY_PATIENT_AGE, "") ?: "",
+            heightCm = prefs.getString(KEY_PATIENT_HEIGHT, "") ?: "",
+            weightKg = prefs.getString(KEY_PATIENT_WEIGHT, "") ?: "",
+            diabetesType = prefs.getString(KEY_DIABETES_TYPE, "") ?: "",
+            diabetesDurationYears = prefs.getString(KEY_DIABETES_DURATION, "") ?: "",
+            therapyType = prefs.getString(KEY_THERAPY_TYPE, "") ?: ""
+        )
 
         return UserSettings(
             language = lang,
@@ -72,7 +94,10 @@ class SettingsRepositoryImpl(
                 tirGoalPercent = tirGoal,
                 tingGoalPercent = tingGoal
             ),
-            periodDays = periodDays
+            periodDays = periodDays,
+            nightStartHour = nightStart,
+            nightEndHour = nightEnd,
+            patientProfile = profile
         )
     }
 
@@ -86,5 +111,14 @@ class SettingsRepositoryImpl(
         private const val KEY_TIR_GOAL = "key_tir_goal"
         private const val KEY_TING_GOAL = "key_ting_goal"
         private const val KEY_PERIOD_DAYS = "key_period_days"
+        private const val KEY_NIGHT_START = "key_night_start"
+        private const val KEY_NIGHT_END = "key_night_end"
+        private const val KEY_PATIENT_NAME = "key_patient_name"
+        private const val KEY_PATIENT_AGE = "key_patient_age"
+        private const val KEY_PATIENT_HEIGHT = "key_patient_height"
+        private const val KEY_PATIENT_WEIGHT = "key_patient_weight"
+        private const val KEY_DIABETES_TYPE = "key_diabetes_type"
+        private const val KEY_DIABETES_DURATION = "key_diabetes_duration"
+        private const val KEY_THERAPY_TYPE = "key_therapy_type"
     }
 }

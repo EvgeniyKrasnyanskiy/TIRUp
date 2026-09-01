@@ -26,7 +26,8 @@ import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,7 +35,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -56,7 +56,6 @@ import com.tirup.app.presentation.components.RangeDistributionBar
 import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
-import com.tirup.app.presentation.theme.ColorVeryLow
 import com.tirup.app.presentation.theme.DarkBorder
 import com.tirup.app.presentation.theme.DarkSurfaceElevated
 import com.tirup.app.presentation.theme.PrimaryEmerald
@@ -64,7 +63,10 @@ import com.tirup.app.presentation.theme.TextMutedDark
 import com.tirup.app.presentation.theme.TextPrimaryDark
 import com.tirup.app.presentation.theme.TextSecondaryDark
 import com.tirup.app.presentation.trends.CompactPeriodSelector
+import com.tirup.app.presentation.trends.TrendPeriod
 import kotlinx.coroutines.flow.collectLatest
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -158,27 +160,48 @@ fun ReportsScreen(
         item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 
-    // Live Report Detail Dialog
+    // Live Report AGP Sheet Preview Modal
     if (state.showLiveDetailDialog) {
-        ReportSummaryDialog(
+        val minTs = state.liveReadings.minOfOrNull { it.timestamp } ?: System.currentTimeMillis()
+        val maxTs = state.liveReadings.maxOfOrNull { it.timestamp } ?: System.currentTimeMillis()
+        val fmt = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+        val dateRangeStr = "${fmt.format(Date(minTs))} — ${fmt.format(Date(maxTs))}"
+        val periodName = when (state.livePeriod) {
+            TrendPeriod.PERIOD_7D -> "7 Дней"
+            TrendPeriod.PERIOD_14D -> "14 Дней (AGP)"
+            TrendPeriod.PERIOD_30D -> "30 Дней"
+            TrendPeriod.PERIOD_90D -> "90 Дней"
+            TrendPeriod.PERIOD_YEAR -> "1 Год"
+            TrendPeriod.PERIOD_ALL -> "Всё время"
+        }
+
+        AgpSheetPreviewModal(
             title = stringResource(R.string.report_live_title),
-            stats = state.liveStatistics,
-            unit = state.userSettings.unit,
-            tirGoal = state.userSettings.targetRanges.tirGoalPercent,
-            tingGoal = state.userSettings.targetRanges.tingGoalPercent,
+            periodLabel = periodName,
+            dateRangeStr = dateRangeStr,
+            readings = state.liveReadings,
+            statistics = state.liveStatistics,
+            userSettings = state.userSettings,
+            isGenerating = state.isGeneratingLive,
+            onSavePdf = { viewModel.saveLivePdfToDownloads() },
+            onSharePdf = { viewModel.generateAndShareLivePdf() },
             onDismiss = { viewModel.showLiveDetails(false) }
         )
     }
 
-    // Historical Report Detail Dialog
+    // Historical Report AGP Sheet Preview Modal
     if (state.showHistoricalDetailDialog) {
-        ReportSummaryDialog(
+        val hist = state.historicalReport
+        AgpSheetPreviewModal(
             title = stringResource(R.string.report_historical_title),
-            stats = state.historicalReport.statistics,
-            unit = state.userSettings.unit,
-            dateRange = state.historicalReport.dateRangeStr,
-            tirGoal = state.userSettings.targetRanges.tirGoalPercent,
-            tingGoal = state.userSettings.targetRanges.tingGoalPercent,
+            periodLabel = "Исторический отчёт",
+            dateRangeStr = hist.dateRangeStr,
+            readings = hist.readings,
+            statistics = hist.statistics,
+            userSettings = state.userSettings,
+            isGenerating = state.isGeneratingHistorical,
+            onSavePdf = { viewModel.saveHistoricalPdfToDownloads() },
+            onSharePdf = { viewModel.generateAndShareHistoricalPdf() },
             onDismiss = { viewModel.showHistoricalDetails(false) }
         )
     }
@@ -229,7 +252,7 @@ private fun LiveReportCard(
                             color = TextPrimaryDark
                         )
                         Text(
-                            text = "${state.liveReadings.size} точек • ${stats.daysCount} дн.",
+                            text = "${state.liveReadings.size} точек • ${stats.daysCount} дн. (нажмите для превью)",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextMutedDark
                         )
@@ -337,7 +360,7 @@ private fun HistoricalReportCard(
                             color = TextPrimaryDark
                         )
                         Text(
-                            text = if (hist.hasData) "${hist.readings.size} точек • ${hist.dateRangeStr}" else "xDrip CSV или ZIP файл",
+                            text = if (hist.hasData) "${hist.readings.size} точек • ${hist.dateRangeStr} (превью)" else "xDrip CSV или ZIP файл",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextMutedDark
                         )
@@ -357,20 +380,6 @@ private fun HistoricalReportCard(
                                 imageVector = Icons.Default.FileUpload,
                                 contentDescription = "Replace File",
                                 tint = Color(0xFF818CF8)
-                            )
-                        }
-                        IconButton(onClick = { viewModel.saveHistoricalPdfToDownloads() }) {
-                            Icon(
-                                imageVector = Icons.Default.Download,
-                                contentDescription = "Save PDF",
-                                tint = PrimaryEmerald
-                            )
-                        }
-                        IconButton(onClick = { viewModel.generateAndShareHistoricalPdf() }) {
-                            Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = "Share PDF",
-                                tint = PrimaryEmerald
                             )
                         }
                         IconButton(onClick = { viewModel.clearHistoricalReport() }) {
@@ -398,19 +407,58 @@ private fun HistoricalReportCard(
                 // Metrics line by line
                 ReportMetricsColumn(stats = hist.statistics, unit = state.userSettings.unit)
 
-                // Upload another file button
-                OutlinedButton(
-                    onClick = onPickFile,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(38.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, DarkBorder),
-                    enabled = !state.isImporting
+                // Action Buttons Row (Save PDF, Share, and Load File)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(imageVector = Icons.Default.FileUpload, contentDescription = null, tint = Color(0xFF818CF8), modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = "Загрузить другой файл", color = TextSecondaryDark, fontSize = 13.sp)
+                    Button(
+                        onClick = { viewModel.saveHistoricalPdfToDownloads() },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = PrimaryEmerald,
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "Сохранить PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = { viewModel.generateAndShareHistoricalPdf() },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, PrimaryEmerald),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = PrimaryEmerald
+                        )
+                    ) {
+                        Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "Поделиться", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = onPickFile,
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .height(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, DarkBorder),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = TextSecondaryDark
+                        )
+                    ) {
+                        Icon(imageVector = Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF818CF8))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "Загрузить файл", fontSize = 12.sp)
+                    }
                 }
             } else {
                 OutlinedButton(
@@ -434,7 +482,7 @@ private fun HistoricalReportCard(
                         Spacer(modifier = Modifier.width(8.dp))
                     }
                     Text(
-                        text = stringResource(R.string.import_and_report),
+                        text = "Загрузить файл",
                         color = TextPrimaryDark,
                         fontWeight = FontWeight.Medium
                     )
@@ -486,6 +534,8 @@ private fun ReportMetricsColumn(
         else -> ColorVeryHigh
     }
 
+    val griColor = if (stats.gri <= 40.0) PrimaryEmerald else ColorHigh
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -495,7 +545,8 @@ private fun ReportMetricsColumn(
         ReportMetricRow(label = "TIR в целевом (3.9–10.0)", target = "Цель: ≥70%", value = String.format(Locale.US, "%.1f%%", stats.tirPercent), valueColor = tirColor)
         ReportMetricRow(label = "Средний сахар (Mean)", target = "Цель: ≤7.0", value = meanVal, valueColor = meanColor)
         ReportMetricRow(label = "Вариабельность (%CV)", target = "Цель: ≤36.0%", value = String.format(Locale.US, "%.1f%%", stats.cvPercent), valueColor = cvColor)
-        ReportMetricRow(label = "Расчётный HbA1c (GMI)", target = "Цель: ≤6.5%", value = String.format(Locale.US, "%.1f%%", stats.gmiPercent), valueColor = gmiColor)
+        ReportMetricRow(label = "Расчётный HbA1c (eA1c)", target = "Цель: ≤6.5%", value = String.format(Locale.US, "%.1f%%", stats.gmiPercent), valueColor = gmiColor)
+        ReportMetricRow(label = "Индекс риска GRI", target = "Цель: ≤40.0", value = String.format(Locale.US, "%.1f (%s)", stats.gri, stats.griLabel), valueColor = griColor)
     }
 }
 
@@ -538,80 +589,5 @@ private fun ReportMetricRow(
             fontWeight = FontWeight.Bold,
             color = valueColor
         )
-    }
-}
-
-@Composable
-private fun ReportSummaryDialog(
-    title: String,
-    stats: GlucoseStatistics,
-    unit: GlucoseUnit,
-    dateRange: String = "",
-    tirGoal: Int = 70,
-    tingGoal: Int = 50,
-    onDismiss: () -> Unit
-) {
-    val isMmol = unit == GlucoseUnit.MMOL_L
-    val meanVal = if (isMmol) String.format(Locale.US, "%.1f mmol/L", stats.meanMmol) else String.format(Locale.US, "%d mg/dL", (stats.meanMmol * 18.0182).toInt())
-    val meanColor = when {
-        stats.meanMmol <= 0.0 -> TextPrimaryDark
-        stats.meanMmol <= 7.0 -> ColorTight
-        stats.meanMmol <= 8.5 -> ColorHigh
-        else -> ColorVeryHigh
-    }
-
-    val cvColor = if (stats.cvPercent <= 36.0) PrimaryEmerald else ColorHigh
-    val gmiColor = when {
-        stats.gmiPercent <= 6.5 -> PrimaryEmerald
-        stats.gmiPercent <= 7.0 -> ColorHigh
-        else -> ColorVeryHigh
-    }
-    val tirColor = if (stats.tirPercent >= tirGoal) PrimaryEmerald else if (stats.tirPercent >= 50.0) ColorHigh else ColorVeryHigh
-    val tingColor = if (stats.tingPercent >= tingGoal) ColorTight else ColorHigh
-    val tbrColor = if ((stats.tbrLowPercent + stats.tbrVeryLowPercent) < 4.0) PrimaryEmerald else ColorVeryLow
-    val severeHypoColor = if (stats.tbrVeryLowPercent < 1.0) PrimaryEmerald else ColorVeryLow
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = title, fontWeight = FontWeight.Bold, color = TextPrimaryDark) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (dateRange.isNotEmpty()) {
-                    Text(text = "Период: $dateRange", style = MaterialTheme.typography.bodyMedium, color = TextMutedDark)
-                }
-                Text(text = "Точек данных: ${stats.totalCount} (дней: ${stats.daysCount})", style = MaterialTheme.typography.bodyMedium, color = TextPrimaryDark)
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                DialogTargetRow(label = "TIR в целевом (3.9–10.0):", value = String.format(Locale.US, "%.1f%% (цель ≥%d%%)", stats.tirPercent, tirGoal), color = tirColor)
-                DialogTargetRow(label = "TING в узком (3.9–7.8):", value = String.format(Locale.US, "%.1f%% (цель ≥%d%%)", stats.tingPercent, tingGoal), color = tingColor)
-                DialogTargetRow(label = "Средний сахар (Mean):", value = "$meanVal (цель ≤7.0)", color = meanColor)
-                DialogTargetRow(label = "Вариабельность (%CV):", value = "${String.format(Locale.US, "%.1f%%", stats.cvPercent)} (цель ≤36.0%)", color = cvColor)
-                DialogTargetRow(label = "Расчётный HbA1c (GMI):", value = "${String.format(Locale.US, "%.1f%%", stats.gmiPercent)} (цель ≤6.5%)", color = gmiColor)
-                DialogTargetRow(label = "Гипогликемии (TBR <3.9):", value = "${String.format(Locale.US, "%.1f%%", stats.tbrLowPercent + stats.tbrVeryLowPercent)} (норма <4.0%)", color = tbrColor)
-                DialogTargetRow(label = "Тяжёлая гипогликемия (<3.0):", value = "${String.format(Locale.US, "%.1f%%", stats.tbrVeryLowPercent)} (норма <1.0%)", color = severeHypoColor)
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(text = stringResource(R.string.action_close), color = PrimaryEmerald, fontWeight = FontWeight.Bold)
-            }
-        }
-    )
-}
-
-@Composable
-private fun DialogTargetRow(
-    label: String,
-    value: String,
-    color: Color
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = label, style = MaterialTheme.typography.bodySmall, color = TextSecondaryDark)
-        Text(text = value, style = MaterialTheme.typography.bodySmall, color = color, fontWeight = FontWeight.Bold)
     }
 }

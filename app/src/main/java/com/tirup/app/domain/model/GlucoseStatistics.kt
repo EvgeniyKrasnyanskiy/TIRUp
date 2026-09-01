@@ -2,18 +2,37 @@ package com.tirup.app.domain.model
 
 data class GlucoseStatistics(
     val meanMmol: Double = 0.0,
+    val medianMmol: Double = 0.0,
     val sdMmol: Double = 0.0,
     val cvPercent: Double = 0.0,
     val gmiPercent: Double = 0.0,
+    val hba1cMmolMol: Int = 0,
     val tirPercent: Double = 0.0,
     val tingPercent: Double = 0.0,
     val tbrVeryLowPercent: Double = 0.0,
     val tbrLowPercent: Double = 0.0,
     val tarHighPercent: Double = 0.0,
     val tarVeryHighPercent: Double = 0.0,
+    val gvi: Double = 1.0,
+    val pgs: Double = 0.0,
+    val gri: Double = 0.0,
+    val griZone: Int = 1,
+    val griLabel: String = "Очень низкий риск",
+    val activeTimePercent: Double = 100.0,
     val totalCount: Int = 0,
     val daysCount: Int = 0,
-    val nightStability: NightStability = NightStability()
+    val nightStability: NightStability = NightStability(),
+    val clinicalSummary: ClinicalSummary = ClinicalSummary()
+)
+
+data class ClinicalSummary(
+    val overallStatus: String = "Все цели достигнуты. Отличный контроль!",
+    val isAllTargetsMet: Boolean = true,
+    val hyperIssues: List<String> = emptyList(),
+    val hypoIssues: List<String> = emptyList(),
+    val variabilityIssues: List<String> = emptyList(),
+    val rangeIssues: List<String> = emptyList(),
+    val recommendation: String = "Поддерживайте текущий режим питания и терапии."
 )
 
 data class NightStability(

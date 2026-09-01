@@ -16,10 +16,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tirup.app.R
 import com.tirup.app.domain.model.GlucoseUnit
+import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.presentation.components.BentoCard
 import com.tirup.app.presentation.theme.ColorVeryLow
 import com.tirup.app.presentation.theme.DarkBorder
@@ -93,7 +94,115 @@ fun SettingsScreen(
             }
         }
 
-        // Section 1: Preferences (Language & Unit)
+        // Section 1: Patient Profile (for Medical Reports)
+        item {
+            var fullName by remember(settings.patientProfile.fullName) { mutableStateOf(settings.patientProfile.fullName) }
+            var age by remember(settings.patientProfile.age) { mutableStateOf(settings.patientProfile.age) }
+            var heightCm by remember(settings.patientProfile.heightCm) { mutableStateOf(settings.patientProfile.heightCm) }
+            var weightKg by remember(settings.patientProfile.weightKg) { mutableStateOf(settings.patientProfile.weightKg) }
+            var diabetesType by remember(settings.patientProfile.diabetesType) { mutableStateOf(settings.patientProfile.diabetesType) }
+            var diabetesDuration by remember(settings.patientProfile.diabetesDurationYears) { mutableStateOf(settings.patientProfile.diabetesDurationYears) }
+            var therapyType by remember(settings.patientProfile.therapyType) { mutableStateOf(settings.patientProfile.therapyType) }
+
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(imageVector = Icons.Default.Person, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Профиль пациента (для отчётов)",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimaryDark
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = fullName,
+                        onValueChange = { fullName = it },
+                        label = { Text("ФИО пациента") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(
+                            value = age,
+                            onValueChange = { age = it },
+                            label = { Text("Возраст (лет)") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = weightKg,
+                            onValueChange = { weightKg = it },
+                            label = { Text("Вес (кг)") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = heightCm,
+                            onValueChange = { heightCm = it },
+                            label = { Text("Рост (см)") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                    }
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(
+                            value = diabetesType,
+                            onValueChange = { diabetesType = it },
+                            label = { Text("Тип (СД1, СД2)") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = diabetesDuration,
+                            onValueChange = { diabetesDuration = it },
+                            label = { Text("Стаж (лет)") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = therapyType,
+                        onValueChange = { therapyType = it },
+                        label = { Text("Терапия (Помпа / Шприц-ручки / Таблетки)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Button(
+                        onClick = {
+                            viewModel.updatePatientProfile(
+                                PatientProfile(
+                                    fullName = fullName.trim(),
+                                    age = age.trim(),
+                                    heightCm = heightCm.trim(),
+                                    weightKg = weightKg.trim(),
+                                    diabetesType = diabetesType.trim(),
+                                    diabetesDurationYears = diabetesDuration.trim(),
+                                    therapyType = therapyType.trim()
+                                )
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = PrimaryEmerald,
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        Icon(imageVector = Icons.Default.Check, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Сохранить профиль", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        // Section 2: Preferences (Language & Unit)
         item {
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -158,7 +267,7 @@ fun SettingsScreen(
             }
         }
 
-        // Section 2: Clinical Target Thresholds & Sleep Window
+        // Section 3: Clinical Target Thresholds & Sleep Window
         item {
             var tirLow by remember(settings.targetRanges.tirLowMmol) {
                 mutableStateOf(String.format(Locale.US, "%.1f", settings.targetRanges.tirLowMmol))
@@ -224,7 +333,7 @@ fun SettingsScreen(
                         )
                     }
 
-                    // Night Profile Hours (Sleep interval)
+                    // Night Profile Hours
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -274,7 +383,7 @@ fun SettingsScreen(
             }
         }
 
-        // Section 3: Data Management (Clear Data)
+        // Section 4: Data Management (Clear Data)
         item {
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

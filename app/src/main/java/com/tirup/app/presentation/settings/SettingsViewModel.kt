@@ -3,6 +3,7 @@ package com.tirup.app.presentation.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tirup.app.domain.model.GlucoseUnit
+import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.domain.model.TargetRanges
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.domain.repository.GlucoseRepository
@@ -75,6 +76,20 @@ class SettingsViewModel(
             )
             settingsRepository.updateSettings(updated)
             _uiState.update { it.copy(userSettings = updated) }
+        }
+    }
+
+    fun updatePatientProfile(profile: PatientProfile) {
+        viewModelScope.launch {
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            val updated = _uiState.value.userSettings.copy(patientProfile = profile)
+            settingsRepository.updateSettings(updated)
+            _uiState.update {
+                it.copy(
+                    userSettings = updated,
+                    infoMessage = if (isRu) "Профиль пациента сохранён." else "Patient profile saved."
+                )
+            }
         }
     }
 
