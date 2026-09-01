@@ -45,12 +45,7 @@ import com.tirup.app.presentation.theme.ColorTarget
 import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
 import com.tirup.app.presentation.theme.ColorVeryLow
-import com.tirup.app.presentation.theme.DarkBorder
-import com.tirup.app.presentation.theme.DarkSurface
 import com.tirup.app.presentation.theme.PrimaryEmerald
-import com.tirup.app.presentation.theme.TextMutedDark
-import com.tirup.app.presentation.theme.TextPrimaryDark
-import com.tirup.app.presentation.theme.TextSecondaryDark
 import java.util.Locale
 
 @Composable
@@ -108,14 +103,14 @@ fun GlucoseValueFormatted(
             text = displayValue,
             fontSize = fontSize.sp,
             fontWeight = FontWeight.Bold,
-            color = TextPrimaryDark
+            color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(modifier = Modifier.width(4.dp))
         Text(
             text = unit.label,
             fontSize = (fontSize / 2.5).toInt().sp,
             fontWeight = FontWeight.Medium,
-            color = TextSecondaryDark,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = (fontSize / 7).dp)
         )
     }
@@ -183,7 +178,7 @@ fun RangeDistributionBar(
                 .fillMaxWidth()
                 .height(height)
                 .clip(RoundedCornerShape(8.dp))
-                .background(DarkBorder)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
             if (tbrVeryLow > 0) {
                 Box(

@@ -56,12 +56,7 @@ import com.tirup.app.presentation.components.RangeDistributionBar
 import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
-import com.tirup.app.presentation.theme.DarkBorder
-import com.tirup.app.presentation.theme.DarkSurfaceElevated
 import com.tirup.app.presentation.theme.PrimaryEmerald
-import com.tirup.app.presentation.theme.TextMutedDark
-import com.tirup.app.presentation.theme.TextPrimaryDark
-import com.tirup.app.presentation.theme.TextSecondaryDark
 import com.tirup.app.presentation.trends.CompactPeriodSelector
 import com.tirup.app.presentation.trends.TrendPeriod
 import kotlinx.coroutines.flow.collectLatest
@@ -119,7 +114,7 @@ fun ReportsScreen(
                     Icon(
                         imageVector = Icons.Default.Menu,
                         contentDescription = "Settings Menu",
-                        tint = TextPrimaryDark
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Spacer(modifier = Modifier.width(4.dp))
@@ -127,12 +122,12 @@ fun ReportsScreen(
                     Text(
                         text = "Медицинский отчёт",
                         style = MaterialTheme.typography.headlineMedium,
-                        color = TextPrimaryDark
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = "Стандартизированный экспорт бланка AGP для врача",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextMutedDark
+                        color = MaterialTheme.colorScheme.outline
                     )
                 }
             }
@@ -220,7 +215,7 @@ private fun LiveReportCard(
             .fillMaxWidth()
             .clickable { onCardClick() },
         cornerRadius = 24.dp,
-        backgroundColor = DarkSurfaceElevated
+        backgroundColor = MaterialTheme.colorScheme.surfaceVariant
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             // Header Row: Title & PDF Icon
@@ -249,12 +244,12 @@ private fun LiveReportCard(
                         Text(
                             text = stringResource(R.string.report_live_title),
                             style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimaryDark
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "${state.liveReadings.size} точек • ${stats.daysCount} дн. (нажмите для бланка)",
                             style = MaterialTheme.typography.bodySmall,
-                            color = TextMutedDark
+                            color = MaterialTheme.colorScheme.outline
                         )
                     }
                 }
@@ -344,7 +339,7 @@ private fun HistoricalReportCard(
             .fillMaxWidth()
             .clickable(enabled = hist.hasData) { onCardClick() },
         cornerRadius = 24.dp,
-        backgroundColor = DarkSurfaceElevated
+        backgroundColor = MaterialTheme.colorScheme.surfaceVariant
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             // Header Row
@@ -373,12 +368,12 @@ private fun HistoricalReportCard(
                         Text(
                             text = stringResource(R.string.report_historical_title),
                             style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimaryDark
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = if (hist.hasData) "${hist.readings.size} точек • ${hist.dateRangeStr} (бланк)" else "Импорт из xDrip CSV / ZIP",
                             style = MaterialTheme.typography.bodySmall,
-                            color = TextMutedDark
+                            color = MaterialTheme.colorScheme.outline
                         )
                     }
                 }
@@ -484,9 +479,9 @@ private fun HistoricalReportCard(
                             .weight(1.1f)
                             .height(40.dp),
                         shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, DarkBorder),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = TextSecondaryDark
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     ) {
                         Icon(imageVector = Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF818CF8))
@@ -501,7 +496,7 @@ private fun HistoricalReportCard(
                         .fillMaxWidth()
                         .height(46.dp),
                     shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, DarkBorder),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     enabled = !state.isImporting
                 ) {
                     if (state.isImporting) {
@@ -517,7 +512,7 @@ private fun HistoricalReportCard(
                     }
                     Text(
                         text = "Загрузить файл",
-                        color = TextPrimaryDark,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -541,28 +536,29 @@ private fun ReportMetricsColumn(
 ) {
     val isMmol = unit == GlucoseUnit.MMOL_L
     val meanVal = if (isMmol) String.format(Locale.US, "%.1f mmol/L", stats.meanMmol) else String.format(Locale.US, "%d mg/dL", (stats.meanMmol * 18.0182).toInt())
+    val onSurface = MaterialTheme.colorScheme.onSurface
     val meanColor = when {
-        stats.meanMmol <= 0.0 -> TextPrimaryDark
+        stats.meanMmol <= 0.0 -> onSurface
         stats.meanMmol <= 7.0 -> ColorTight
         stats.meanMmol <= 8.5 -> ColorHigh
         else -> ColorVeryHigh
     }
 
     val cvColor = when {
-        stats.cvPercent <= 0.0 -> TextPrimaryDark
+        stats.cvPercent <= 0.0 -> onSurface
         stats.cvPercent <= 36.0 -> PrimaryEmerald
         else -> ColorHigh
     }
 
     val gmiColor = when {
-        stats.gmiPercent <= 0.0 -> TextPrimaryDark
+        stats.gmiPercent <= 0.0 -> onSurface
         stats.gmiPercent <= 6.5 -> PrimaryEmerald
         stats.gmiPercent <= 7.0 -> ColorHigh
         else -> ColorVeryHigh
     }
 
     val tirColor = when {
-        stats.tirPercent <= 0.0 -> TextPrimaryDark
+        stats.tirPercent <= 0.0 -> onSurface
         stats.tirPercent >= 70.0 -> PrimaryEmerald
         stats.tirPercent >= 50.0 -> ColorHigh
         else -> ColorVeryHigh
@@ -670,17 +666,17 @@ private fun ReportMetricRow(
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondaryDark
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.width(6.dp))
             Surface(
                 shape = RoundedCornerShape(4.dp),
-                color = DarkBorder.copy(alpha = 0.6f)
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
             ) {
                 Text(
                     text = target,
                     style = MaterialTheme.typography.labelSmall,
-                    color = TextMutedDark,
+                    color = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
                     fontSize = 10.sp
                 )

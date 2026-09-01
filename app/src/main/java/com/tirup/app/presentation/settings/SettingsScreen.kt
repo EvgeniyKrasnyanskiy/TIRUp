@@ -61,12 +61,7 @@ import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.presentation.components.BentoCard
 import com.tirup.app.presentation.theme.ColorVeryLow
-import com.tirup.app.presentation.theme.DarkBorder
-import com.tirup.app.presentation.theme.DarkSurfaceElevated
 import com.tirup.app.presentation.theme.PrimaryEmerald
-import com.tirup.app.presentation.theme.TextMutedDark
-import com.tirup.app.presentation.theme.TextPrimaryDark
-import com.tirup.app.presentation.theme.TextSecondaryDark
 import java.util.Calendar
 import java.util.Locale
 
@@ -97,7 +92,7 @@ fun SettingsScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = TextPrimaryDark
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Spacer(modifier = Modifier.width(4.dp))
@@ -105,7 +100,7 @@ fun SettingsScreen(
                     Text(
                         text = stringResource(R.string.settings_title),
                         style = MaterialTheme.typography.headlineMedium,
-                        color = TextPrimaryDark
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(12.dp))
@@ -113,7 +108,7 @@ fun SettingsScreen(
                         Text(
                             text = "Настройки сохраняются автоматически",
                             style = MaterialTheme.typography.labelSmall,
-                            color = TextMutedDark
+                            color = MaterialTheme.colorScheme.outline
                         )
                     }
                 }
@@ -130,7 +125,7 @@ fun SettingsScreen(
                         Text(
                             text = "Профиль пациента (для мед. отчётов)",
                             style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimaryDark
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
@@ -162,8 +157,8 @@ fun SettingsScreen(
 
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = DarkSurfaceElevated,
-                            border = BorderStroke(1.dp, DarkBorder),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                             modifier = Modifier
                                 .weight(1f)
                                 .height(56.dp)
@@ -172,7 +167,7 @@ fun SettingsScreen(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalArrangement = Arrangement.Center
                             ) {
-                                Text("Возраст", style = MaterialTheme.typography.labelSmall, color = TextMutedDark)
+                                Text("Возраст", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                                 Text("${profile.calculatedAge} лет", style = MaterialTheme.typography.bodyMedium, color = PrimaryEmerald, fontWeight = FontWeight.Bold)
                             }
                         }
@@ -255,7 +250,7 @@ fun SettingsScreen(
                     Text(
                         text = stringResource(R.string.section_preferences),
                         style = MaterialTheme.typography.titleMedium,
-                        color = TextPrimaryDark
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     // Language Selector
@@ -267,7 +262,7 @@ fun SettingsScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(imageVector = Icons.Default.Language, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = stringResource(R.string.pref_language), style = MaterialTheme.typography.bodyMedium, color = TextSecondaryDark)
+                            Text(text = stringResource(R.string.pref_language), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
 
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -293,7 +288,7 @@ fun SettingsScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(imageVector = Icons.Default.Tune, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = stringResource(R.string.pref_unit), style = MaterialTheme.typography.bodyMedium, color = TextSecondaryDark)
+                            Text(text = stringResource(R.string.pref_unit), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
 
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -319,7 +314,7 @@ fun SettingsScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(imageVector = Icons.Default.Brightness4, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = "Тема", style = MaterialTheme.typography.bodyMedium, color = TextSecondaryDark)
+                            Text(text = "Тема", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
 
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -372,7 +367,7 @@ fun SettingsScreen(
                     Text(
                         text = stringResource(R.string.section_targets),
                         style = MaterialTheme.typography.titleMedium,
-                        color = TextPrimaryDark
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -471,13 +466,13 @@ fun SettingsScreen(
                     Text(
                         text = stringResource(R.string.clear_data),
                         style = MaterialTheme.typography.titleMedium,
-                        color = TextPrimaryDark
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     Text(
                         text = stringResource(R.string.clear_data_confirm),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextMutedDark
+                        color = MaterialTheme.colorScheme.outline
                     )
 
                     OutlinedButton(
@@ -719,14 +714,14 @@ fun LanguageChip(
 ) {
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = if (isSelected) PrimaryEmerald else DarkSurfaceElevated,
-        border = BorderStroke(1.dp, if (isSelected) PrimaryEmerald else DarkBorder),
+        color = if (isSelected) PrimaryEmerald else MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, if (isSelected) PrimaryEmerald else MaterialTheme.colorScheme.outline),
         modifier = Modifier.clickable { onClick() }
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = if (isSelected) Color.Black else TextSecondaryDark,
+            color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
         )

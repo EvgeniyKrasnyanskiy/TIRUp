@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Adjust
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -53,12 +54,8 @@ import com.tirup.app.presentation.reports.ReportsScreen
 import com.tirup.app.presentation.reports.ReportsViewModel
 import com.tirup.app.presentation.settings.SettingsScreen
 import com.tirup.app.presentation.settings.SettingsViewModel
-import com.tirup.app.presentation.theme.DarkBg
-import com.tirup.app.presentation.theme.DarkBorder
-import com.tirup.app.presentation.theme.DarkSurface
 import com.tirup.app.presentation.theme.PrimaryEmerald
 import com.tirup.app.presentation.theme.TIRUpTheme
-import com.tirup.app.presentation.theme.TextMutedDark
 import com.tirup.app.presentation.trends.TrendsScreen
 import com.tirup.app.presentation.trends.TrendsViewModel
 import kotlinx.coroutines.launch
@@ -202,8 +199,8 @@ fun MainPagerScaffold(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
                     .clip(RoundedCornerShape(20.dp)),
-                color = DarkSurface,
-                border = BorderStroke(1.dp, DarkBorder),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 shadowElevation = 8.dp
             ) {
                 NavigationBar(
@@ -229,7 +226,7 @@ fun MainPagerScaffold(
                             label = null,
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = PrimaryEmerald,
-                                unselectedIconColor = TextMutedDark,
+                                unselectedIconColor = MaterialTheme.colorScheme.outline,
                                 indicatorColor = Color.Transparent
                             )
                         )

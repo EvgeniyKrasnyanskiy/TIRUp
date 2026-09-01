@@ -26,10 +26,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tirup.app.domain.model.HeatmapCell
 import com.tirup.app.presentation.components.RangeCategoryColor
-import com.tirup.app.presentation.theme.DarkBorder
-import com.tirup.app.presentation.theme.DarkSurfaceElevated
-import com.tirup.app.presentation.theme.TextMutedDark
-import com.tirup.app.presentation.theme.TextSecondaryDark
 
 @Composable
 fun HeatmapChart(
@@ -42,7 +38,7 @@ fun HeatmapChart(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(DarkSurfaceElevated)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(14.dp)
     ) {
         // Hour labels header (00, 06, 12, 18, 23)
@@ -50,11 +46,11 @@ fun HeatmapChart(
             modifier = Modifier.fillMaxWidth().padding(start = 56.dp, end = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = "00:00", style = MaterialTheme.typography.labelSmall, color = TextMutedDark)
-            Text(text = "06:00", style = MaterialTheme.typography.labelSmall, color = TextMutedDark)
-            Text(text = "12:00", style = MaterialTheme.typography.labelSmall, color = TextMutedDark)
-            Text(text = "18:00", style = MaterialTheme.typography.labelSmall, color = TextMutedDark)
-            Text(text = "23:00", style = MaterialTheme.typography.labelSmall, color = TextMutedDark)
+            Text(text = "00:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+            Text(text = "06:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+            Text(text = "12:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+            Text(text = "18:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+            Text(text = "23:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -72,7 +68,7 @@ fun HeatmapChart(
                 Text(
                     text = dayLabel,
                     style = MaterialTheme.typography.labelSmall,
-                    color = TextSecondaryDark,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 10.sp,
                     modifier = Modifier.width(52.dp)
                 )
@@ -86,7 +82,7 @@ fun HeatmapChart(
                         val cellColor = if (cell.rangeCategory != null) {
                             RangeCategoryColor(cell.rangeCategory)
                         } else {
-                            DarkBorder.copy(alpha = 0.4f)
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
                         }
 
                         Box(
