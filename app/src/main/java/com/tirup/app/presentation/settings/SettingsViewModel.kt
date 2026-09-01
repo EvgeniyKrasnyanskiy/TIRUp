@@ -56,6 +56,13 @@ class SettingsViewModel(
         viewModelScope.launch {
             val updated = _uiState.value.userSettings.copy(themeMode = mode)
             settingsRepository.updateSettings(updated)
+        }
+    }
+
+    fun setHasSeenOnboarding(hasSeen: Boolean) {
+        viewModelScope.launch {
+            val updated = _uiState.value.userSettings.copy(hasSeenOnboarding = hasSeen)
+            settingsRepository.updateSettings(updated)
             _uiState.update { it.copy(userSettings = updated) }
         }
     }

@@ -10,6 +10,7 @@ import android.graphics.pdf.PdfDocument
 import com.tirup.app.domain.calculator.AGPPercentilesCalculator
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseStatistics
+import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.presentation.trends.TrendPeriod
 import kotlinx.coroutines.Dispatchers
@@ -140,13 +141,14 @@ class AgpPdfGenerator(private val context: Context) {
             val tirBoxTitle = if (isRu) "ВРЕМЯ В ДИАПАЗОНАХ (TIR / TING)" else "TIME IN RANGES (TIR / TING)"
             canvas.drawText(tirBoxTitle, margin + 12f, panelTop + 18f, boxTitlePaint)
 
+            val isMmol = userSettings.unit == GlucoseUnit.MMOL_L
             val ranges = listOf(
-                Pair(if (isRu) "Очень высокий (≥14.0 ммоль/л)" else "Very High (≥14.0 mmol/L)", Pair(statistics.tarVeryHighPercent, Color.rgb(239, 68, 68))),
-                Pair(if (isRu) "Высокий (10.1 - 13.9 ммоль/л)" else "High (10.1 - 13.9 mmol/L)", Pair(statistics.tarHighPercent, Color.rgb(245, 158, 11))),
-                Pair(if (isRu) "В целевом диапазоне (3.9 - 10.0)" else "Target Range (3.9 - 10.0)", Pair(statistics.tirPercent, Color.rgb(16, 185, 129))),
-                Pair(if (isRu) "В узком диапазоне (3.9 - 7.8)" else "Tight Range (3.9 - 7.8)", Pair(statistics.tingPercent, Color.rgb(20, 184, 166))),
-                Pair(if (isRu) "Низкий (3.0 - 3.8 ммоль/л)" else "Low (3.0 - 3.8 mmol/L)", Pair(statistics.tbrLowPercent, Color.rgb(245, 158, 11))),
-                Pair(if (isRu) "Очень низкий (<3.0 ммоль/л)" else "Very Low (<3.0 mmol/L)", Pair(statistics.tbrVeryLowPercent, Color.rgb(239, 68, 68)))
+                Pair(if (isMmol) (if (isRu) "Очень высокий (≥14.0 ммоль/л)" else "Very High (≥14.0 mmol/L)") else (if (isRu) "Очень высокий (≥250 мг/дл)" else "Very High (≥250 mg/dL)"), Pair(statistics.tarVeryHighPercent, Color.rgb(239, 68, 68))),
+                Pair(if (isMmol) (if (isRu) "Высокий (10.1 - 13.9 ммоль/л)" else "High (10.1 - 13.9 mmol/L)") else (if (isRu) "Высокий (180 - 250 мг/дл)" else "High (180 - 250 mg/dL)"), Pair(statistics.tarHighPercent, Color.rgb(245, 158, 11))),
+                Pair(if (isMmol) (if (isRu) "В целевом диапазоне (3.9 - 10.0)" else "Target Range (3.9 - 10.0)") else (if (isRu) "В целевом диапазоне (70 - 180)" else "Target Range (70 - 180)"), Pair(statistics.tirPercent, Color.rgb(16, 185, 129))),
+                Pair(if (isMmol) (if (isRu) "В узком диапазоне (3.9 - 7.8)" else "Tight Range (3.9 - 7.8)") else (if (isRu) "В узком диапазоне (70 - 140)" else "Tight Range (70 - 140)"), Pair(statistics.tingPercent, Color.rgb(20, 184, 166))),
+                Pair(if (isMmol) (if (isRu) "Низкий (3.0 - 3.8 ммоль/л)" else "Low (3.0 - 3.8 mmol/L)") else (if (isRu) "Низкий (54 - 69 мг/дл)" else "Low (54 - 69 mg/dL)"), Pair(statistics.tbrLowPercent, Color.rgb(245, 158, 11))),
+                Pair(if (isMmol) (if (isRu) "Очень низкий (<3.0 ммоль/л)" else "Very Low (<3.0 mmol/L)") else (if (isRu) "Очень низкий (<54 мг/дл)" else "Very Low (<54 mg/dL)"), Pair(statistics.tbrVeryLowPercent, Color.rgb(239, 68, 68)))
             )
 
             var rowY = panelTop + 36f
@@ -182,10 +184,21 @@ class AgpPdfGenerator(private val context: Context) {
                 else "Fluctuations (TIR ${String.format(Locale.US, "%.1f", statistics.nightStability.tirPercent)}%)"
             }
 
+            val meanStr = if (isMmol) {
+                String.format(Locale.US, "%.1f %s (%s %.1f)", statistics.meanMmol, if (isRu) "ммоль/л" else "mmol/L", if (isRu) "Медиана" else "Median", statistics.medianMmol)
+            } else {
+                String.format(Locale.US, "%d %s (%s %d)", (statistics.meanMmol * 18.0182).toInt(), if (isRu) "мг/дл" else "mg/dL", if (isRu) "Медиана" else "Median", (statistics.medianMmol * 18.0182).toInt())
+            }
+            val sdStr = if (isMmol) {
+                String.format(Locale.US, "%.2f", statistics.sdMmol)
+            } else {
+                String.format(Locale.US, "%d", (statistics.sdMmol * 18.0182).toInt())
+            }
+
             val statRows = if (isRu) {
                 listOf(
-                    Pair("Средний сахар (Mean):", String.format(Locale.US, "%.1f ммоль/л (Медиана %.1f)", statistics.meanMmol, statistics.medianMmol)),
-                    Pair("Вариабельность глюкозы (%CV):", String.format(Locale.US, "%.1f%% (Цель ≤36.0%%) • SD: %.2f", statistics.cvPercent, statistics.sdMmol)),
+                    Pair("Средний сахар (Mean):", meanStr),
+                    Pair("Вариабельность глюкозы (%CV):", String.format(Locale.US, "%.1f%% (Цель ≤36.0%%) • SD: %s", statistics.cvPercent, sdStr)),
                     Pair("Расчётный eA1c (ADAG):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)),
                     Pair("Индекс риска GRI (Klonoff 2022):", String.format(Locale.US, "%.1f (%s, цель ≤40.0)", statistics.gri, statistics.griLabel)),
                     Pair("Индексы GVI / PGS:", String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs)),
@@ -193,8 +206,8 @@ class AgpPdfGenerator(private val context: Context) {
                 )
             } else {
                 listOf(
-                    Pair("Average Glucose (Mean):", String.format(Locale.US, "%.1f mmol/L (Median %.1f)", statistics.meanMmol, statistics.medianMmol)),
-                    Pair("Glucose Variability (%CV):", String.format(Locale.US, "%.1f%% (Target ≤36.0%%) • SD: %.2f", statistics.cvPercent, statistics.sdMmol)),
+                    Pair("Average Glucose (Mean):", meanStr),
+                    Pair("Glucose Variability (%CV):", String.format(Locale.US, "%.1f%% (Target ≤36.0%%) • SD: %s", statistics.cvPercent, sdStr)),
                     Pair("Estimated A1c (eA1c):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)),
                     Pair("Glycemia Risk Index (GRI):", String.format(Locale.US, "%.1f (%s, target ≤40.0)", statistics.gri, statistics.griLabel)),
                     Pair("Variability Indexes (GVI/PGS):", String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs)),
@@ -354,7 +367,7 @@ class AgpPdfGenerator(private val context: Context) {
 
             val midPoint = (gridItems.size + 1) / 2
             val col1X = margin + 12f
-            val col2X = margin + 12f + (contentWidth / 2f)
+            val col2X = margin + 12f + 205f
 
             gridItems.forEachIndexed { index, item ->
                 val pnt = if (item.isMet) passPaint else if (item.isWarning) warnPaint else failPaint

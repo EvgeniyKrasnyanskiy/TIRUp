@@ -46,6 +46,7 @@ class SettingsRepositoryImpl(
             .putString(KEY_DIABETES_TYPE, settings.patientProfile.diabetesType)
             .putInt(KEY_DIAGNOSIS_YEAR, settings.patientProfile.diagnosisYear)
             .putString(KEY_THERAPY_TYPE, settings.patientProfile.therapyType)
+            .putBoolean(KEY_HAS_SEEN_ONBOARDING, settings.hasSeenOnboarding)
             .apply()
 
         _settingsFlow.value = settings
@@ -82,6 +83,7 @@ class SettingsRepositoryImpl(
         val periodDays = prefs.getInt(KEY_PERIOD_DAYS, 14)
         val nightStart = prefs.getInt(KEY_NIGHT_START, 0)
         val nightEnd = prefs.getInt(KEY_NIGHT_END, 6)
+        val hasSeenOnboarding = prefs.getBoolean(KEY_HAS_SEEN_ONBOARDING, false)
 
         val profile = PatientProfile(
             fullName = prefs.getString(KEY_PATIENT_NAME, "") ?: "",
@@ -109,7 +111,8 @@ class SettingsRepositoryImpl(
             nightStartHour = nightStart,
             nightEndHour = nightEnd,
             themeMode = themeMode,
-            patientProfile = profile
+            patientProfile = profile,
+            hasSeenOnboarding = hasSeenOnboarding
         )
     }
 
@@ -134,5 +137,6 @@ class SettingsRepositoryImpl(
         private const val KEY_DIABETES_TYPE = "key_diabetes_type"
         private const val KEY_DIAGNOSIS_YEAR = "key_diagnosis_year"
         private const val KEY_THERAPY_TYPE = "key_therapy_type"
+        private const val KEY_HAS_SEEN_ONBOARDING = "key_has_seen_onboarding"
     }
 }

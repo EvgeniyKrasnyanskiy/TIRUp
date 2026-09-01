@@ -39,7 +39,8 @@ class FocusViewModel(
                     targetRanges = settings.targetRanges,
                     nightStartHour = settings.nightStartHour,
                     nightEndHour = settings.nightEndHour,
-                    language = settings.language
+                    language = settings.language,
+                    unit = settings.unit
                 )
 
                 // Calculate compensator for selected mode (e.g. 7-day or 14-day window)

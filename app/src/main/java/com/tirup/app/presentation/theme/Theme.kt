@@ -19,6 +19,7 @@ val PrimaryEmerald = Color(0xFF10B981)
 val PrimaryEmeraldDark = Color(0xFF059669)
 val SecondaryTeal = Color(0xFF14B8A6)
 val AccentCyan = Color(0xFF06B6D4)
+val ActionBlue = Color(0xFF0284C7)
 
 // Range Colors (consistent across themes)
 val ColorVeryLow = Color(0xFFEF4444)      // Urgent Red < 3.0

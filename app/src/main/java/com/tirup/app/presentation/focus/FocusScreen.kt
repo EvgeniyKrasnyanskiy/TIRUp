@@ -71,6 +71,7 @@ fun FocusScreen(
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val userSettings = state.userSettings
+    val isRu = userSettings.language.equals("RU", ignoreCase = true)
     val targetMode = userSettings.targetMode
     val unit = userSettings.unit
     val goal = state.compensatorGoal
@@ -110,8 +111,9 @@ fun FocusScreen(
                     streakDays = state.streakDays,
                     onClick = {
                         detailDialogInfo = Pair(
-                            "Серия дней в целевом диапазоне (Стрик)",
-                            "Текущая серия: ${state.streakDays} дн.\n\nКаждый день, когда суточный TIR удерживается выше целевого уровня (≥70%), увеличивает серию. Непрерывный контроль помогает закрепить стабильные привычки и защищает сосудистую систему."
+                            if (isRu) "Серия дней в целевом диапазоне (Стрик)" else "Target Range Day Streak",
+                            if (isRu) "Текущая серия: ${state.streakDays} дн.\n\nКаждый день, когда суточный TIR удерживается выше целевого уровня (≥70%), увеличивает серию. Непрерывный контроль помогает закрепить стабильные привычки и защищает сосудистую систему."
+                            else "Current streak: ${state.streakDays} days.\n\nEvery day when daily TIR stays above the target level (≥70%), your streak increases. Continuous control helps build consistent habits and protects vascular health."
                         )
                     }
                 )
@@ -125,13 +127,17 @@ fun FocusScreen(
                 unit = unit,
                 targetMode = targetMode,
                 todayPointsCount = state.recentReadings.size,
+                isRu = isRu,
                 onModeChange = { mode -> viewModel.setTargetMode(mode) },
                 onClick = {
                     val r = state.latestReading
                     if (r != null) {
+                        val rVal = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", r.valueMmol)} ${if (isRu) "ммоль/л" else "mmol/L"}"
+                                   else "${(r.valueMmol * 18.0182).toInt()} ${if (isRu) "мг/дл" else "mg/dL"}"
                         detailDialogInfo = Pair(
-                            "Текущий уровень сахара",
-                            "Значение: ${String.format(Locale.US, "%.1f", r.valueMmol)} ммоль/л\nНаправление тренда: ${r.trendArrow}\nВремя измерения: ${DateUtils.getRelativeTimeSpanString(r.timestamp)}\nВсего точек за сегодня: ${state.recentReadings.size}"
+                            if (isRu) "Текущий уровень сахара" else "Current Glucose Level",
+                            if (isRu) "Значение: $rVal\nНаправление тренда: ${r.trendArrow}\nВремя измерения: ${DateUtils.getRelativeTimeSpanString(r.timestamp)}\nВсего точек за сегодня: ${state.recentReadings.size}"
+                            else "Value: $rVal\nTrend direction: ${r.trendArrow}\nTime: ${DateUtils.getRelativeTimeSpanString(r.timestamp)}\nTotal readings today: ${state.recentReadings.size}"
                         )
                     }
                 }
@@ -143,10 +149,18 @@ fun FocusScreen(
             val currentScore = if (targetMode == TargetMode.TIR) state.statistics.tirPercent else state.statistics.tingPercent
             val targetGoal = if (targetMode == TargetMode.TIR) userSettings.targetRanges.tirGoalPercent else userSettings.targetRanges.tingGoalPercent
 
-            val compMessage = when (goal.status) {
-                CompensatorStatus.EXCEEDING -> "Отличный темп! Вы опережаете цель. Поддерживайте ≥${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)} в оставшиеся ${goal.remainingDays} дн."
-                CompensatorStatus.REACHABLE -> "Для достижения цели удерживайте ${goal.targetMode.name} ≥${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)} в оставшиеся ${goal.remainingDays} дн."
-                CompensatorStatus.UNREALISTIC -> "Цель периода труднодостижима (${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)}). Сфокусируйтесь на сегодняшнем дне."
+            val compMessage = if (isRu) {
+                when (goal.status) {
+                    CompensatorStatus.EXCEEDING -> "Отличный темп! Вы опережаете цель. Поддерживайте ≥${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)} в оставшиеся ${goal.remainingDays} дн."
+                    CompensatorStatus.REACHABLE -> "Для достижения цели удерживайте ${goal.targetMode.name} ≥${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)} в оставшиеся ${goal.remainingDays} дн."
+                    CompensatorStatus.UNREALISTIC -> "Цель периода труднодостижима (${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)}). Сфокусируйтесь на сегодняшнем дне."
+                }
+            } else {
+                when (goal.status) {
+                    CompensatorStatus.EXCEEDING -> "Great pace! You are ahead of target. Maintain ≥${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)} over remaining ${goal.remainingDays} days."
+                    CompensatorStatus.REACHABLE -> "To reach goal, keep ${goal.targetMode.name} ≥${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)} over remaining ${goal.remainingDays} days."
+                    CompensatorStatus.UNREALISTIC -> "Period goal is difficult to reach (${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)}). Focus on today."
+                }
             }
 
             TargetCompensatorCard(
@@ -155,10 +169,12 @@ fun FocusScreen(
                 targetGoal = targetGoal,
                 targetMode = targetMode,
                 remainingDays = goal.remainingDays,
+                isRu = isRu,
                 onClick = {
                     detailDialogInfo = Pair(
-                        "Компенсатор цели",
-                        "Текущий показатель: ${String.format(Locale.US, "%.1f%%", currentScore)}\nЦелевой порог: ≥$targetGoal%\nСтатус: $compMessage\nОсталось дней в окне: ${goal.remainingDays} дн."
+                        if (isRu) "Компенсатор цели" else "Goal Compensator",
+                        if (isRu) "Текущий показатель: ${String.format(Locale.US, "%.1f%%", currentScore)}\nЦелевой порог: ≥$targetGoal%\nСтатус: $compMessage\nОсталось дней в окне: ${goal.remainingDays} дн."
+                        else "Current score: ${String.format(Locale.US, "%.1f%%", currentScore)}\nTarget goal: ≥$targetGoal%\nStatus: $compMessage\nDays remaining in window: ${goal.remainingDays} days."
                     )
                 }
             )
@@ -171,30 +187,38 @@ fun FocusScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    val meanValStr = if (state.statistics.meanMmol > 0.0) {
+                        if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", state.statistics.meanMmol)
+                        else String.format(Locale.US, "%d", (state.statistics.meanMmol * 18.0182).toInt())
+                    } else "--"
+
                     BentoMetricSmall(
-                        title = "Средний сахар",
-                        value = if (state.statistics.meanMmol > 0.0) String.format(Locale.US, "%.1f", state.statistics.meanMmol) else "--",
-                        unit = if (unit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL",
+                        title = if (isRu) "Средний сахар" else "Mean Glucose",
+                        value = meanValStr,
+                        unit = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL"),
                         valueColor = if (state.statistics.meanMmol in 3.9..7.8) PrimaryEmerald else ColorHigh,
                         modifier = Modifier.weight(1f),
                         onClick = {
+                            val targetVal = if (unit == GlucoseUnit.MMOL_L) "≤7.8 ${if (isRu) "ммоль/л" else "mmol/L"}" else "≤140 ${if (isRu) "мг/дл" else "mg/dL"}"
                             detailDialogInfo = Pair(
-                                "Средний сахар (Mean)",
-                                "Среднее арифметическое значение всех измерений за 24 часа. Целевое значение для устойчивой компенсации: ≤7.8 ммоль/л."
+                                if (isRu) "Средний сахар (Mean)" else "Average Glucose (Mean)",
+                                if (isRu) "Среднее арифметическое значение всех измерений за 24 часа. Целевое значение для устойчивой компенсации: $targetVal."
+                                else "Arithmetic average of all readings over 24 hours. Clinical target for stable management: $targetVal."
                             )
                         }
                     )
 
                     BentoMetricSmall(
-                        title = "Вариабельность (%CV)",
+                        title = if (isRu) "Вариабельность (%CV)" else "Variability (%CV)",
                         value = if (state.statistics.cvPercent > 0.0) String.format(Locale.US, "%.1f%%", state.statistics.cvPercent) else "--",
                         unit = "",
                         valueColor = if (state.statistics.cvPercent <= 36.0) PrimaryEmerald else ColorHigh,
                         modifier = Modifier.weight(1f),
                         onClick = {
                             detailDialogInfo = Pair(
-                                "Вариабельность (%CV)",
-                                "Коэффициент вариации глюкозы (%CV = SD / Mean * 100%). Норма по международным консенсусам: ≤36.0%. Показывает стабильность сахара без резких скачков."
+                                if (isRu) "Вариабельность (%CV)" else "Glucose Variability (%CV)",
+                                if (isRu) "Коэффициент вариации глюкозы (%CV = SD / Mean * 100%). Норма по международным консенсусам: ≤36.0%. Показывает стабильность сахара без резких скачков."
+                                else "Coefficient of variation (%CV = SD / Mean * 100%). International consensus target: ≤36.0%. Measures glucose stability without sharp fluctuations."
                             )
                         }
                     )
@@ -205,30 +229,42 @@ fun FocusScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     BentoMetricSmall(
-                        title = "Расчётный eA1c",
+                        title = if (isRu) "Расчётный eA1c" else "Estimated eA1c",
                         value = if (state.statistics.gmiPercent > 0.0) String.format(Locale.US, "%.1f%%", state.statistics.gmiPercent) else "--",
                         unit = "",
                         valueColor = if (state.statistics.gmiPercent <= 7.0) PrimaryEmerald else ColorHigh,
                         modifier = Modifier.weight(1f),
                         onClick = {
                             detailDialogInfo = Pair(
-                                "Расчётный гликированный гемоглобин (eA1c)",
-                                "Оценка гликированного гемоглобина по формуле ADAG: (Mean + 2.59) / 1.59. Международный ориентир: ≤7.0%."
+                                if (isRu) "Расчётный гликированный гемоглобин (eA1c)" else "Estimated Glycated Hemoglobin (eA1c)",
+                                if (isRu) "Оценка гликированного гемоглобина по формуле ADAG: (Mean + 2.59) / 1.59. Международный ориентир: ≤7.0%."
+                                else "Estimated glycated hemoglobin based on ADAG formula: (Mean + 2.59) / 1.59. International clinical target: ≤7.0%."
                             )
                         }
                     )
 
                     BentoMetricSmall(
-                        title = if (targetMode == TargetMode.TING) "TING (Узкий)" else "TIR (В диапазоне)",
+                        title = if (targetMode == TargetMode.TING) (if (isRu) "TING (Узкий)" else "TING (Tight)") else (if (isRu) "TIR (В диапазоне)" else "TIR (In Range)"),
                         value = String.format(Locale.US, "%.1f%%", if (targetMode == TargetMode.TING) state.statistics.tingPercent else state.statistics.tirPercent),
                         unit = "",
                         valueColor = PrimaryEmerald,
                         modifier = Modifier.weight(1f),
                         onClick = {
-                            detailDialogInfo = Pair(
-                                if (targetMode == TargetMode.TING) "TING (3.9–7.8 ммоль/л)" else "TIR (3.9–10.0 ммоль/л)",
-                                if (targetMode == TargetMode.TING) "Процент времени в узком идеальном диапазоне 3.9–7.8 ммоль/л. Цель: ≥50%." else "Процент времени в стандартном целевом диапазоне 3.9–10.0 ммоль/л. Цель: ≥70%."
-                            )
+                            val rangeTitle = if (targetMode == TargetMode.TING) {
+                                if (unit == GlucoseUnit.MMOL_L) "TING (3.9–7.8 ${if (isRu) "ммоль/л" else "mmol/L"})"
+                                else "TING (70–140 ${if (isRu) "мг/дл" else "mg/dL"})"
+                            } else {
+                                if (unit == GlucoseUnit.MMOL_L) "TIR (3.9–10.0 ${if (isRu) "ммоль/л" else "mmol/L"})"
+                                else "TIR (70–180 ${if (isRu) "мг/дл" else "mg/dL"})"
+                            }
+                            val rangeDesc = if (targetMode == TargetMode.TING) {
+                                if (isRu) "Процент времени в узком идеальном диапазоне (${if (unit == GlucoseUnit.MMOL_L) "3.9–7.8 ммоль/л" else "70–140 мг/дл"}). Цель: ≥50%."
+                                else "Time in tight ideal range (${if (unit == GlucoseUnit.MMOL_L) "3.9–7.8 mmol/L" else "70–140 mg/dL"}). Target: ≥50%."
+                            } else {
+                                if (isRu) "Процент времени в стандартном целевом диапазоне (${if (unit == GlucoseUnit.MMOL_L) "3.9–10.0 ммоль/л" else "70–180 мг/дл"}). Цель: ≥70%."
+                                else "Time in standard target range (${if (unit == GlucoseUnit.MMOL_L) "3.9–10.0 mmol/L" else "70–180 mg/dL"}). Target: ≥70%."
+                            }
+                            detailDialogInfo = Pair(rangeTitle, rangeDesc)
                         }
                     )
                 }
@@ -245,29 +281,38 @@ fun FocusScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 BentoMetricSmall(
-                    title = "Точек за сегодня",
+                    title = if (isRu) "Точек за сегодня" else "Readings Today",
                     value = "${state.recentReadings.size}",
-                    unit = "изм.",
+                    unit = if (isRu) "изм." else "pts",
                     valueColor = PrimaryEmerald,
                     modifier = Modifier.weight(1f),
                     onClick = {
                         detailDialogInfo = Pair(
-                            "Точек за сегодня",
-                            "Всего получено измерений за текущие сутки: ${state.recentReadings.size} точек.\nПокрытие сенсора: ${String.format(Locale.US, "%.1f%%", state.statistics.activeTimePercent)}"
+                            if (isRu) "Точек за сегодня" else "Readings Today",
+                            if (isRu) "Всего получено измерений за текущие сутки: ${state.recentReadings.size} точек.\nПокрытие сенсора: ${String.format(Locale.US, "%.1f%%", state.statistics.activeTimePercent)}"
+                            else "Total readings received today: ${state.recentReadings.size} readings.\nSensor coverage: ${String.format(Locale.US, "%.1f%%", state.statistics.activeTimePercent)}"
                         )
                     }
                 )
 
+                val minMaxValStr = if (minVal > 0.0) {
+                    if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", minVal)} – ${String.format(Locale.US, "%.1f", maxVal)}"
+                    else "${(minVal * 18.0182).toInt()} – ${(maxVal * 18.0182).toInt()}"
+                } else "--"
+
                 BentoMetricSmall(
-                    title = "Мин / Макс за сутки",
-                    value = if (minVal > 0.0) "${String.format(Locale.US, "%.1f", minVal)} – ${String.format(Locale.US, "%.1f", maxVal)}" else "--",
-                    unit = if (unit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL",
+                    title = if (isRu) "Мин / Макс за сутки" else "Daily Min / Max",
+                    value = minMaxValStr,
+                    unit = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL"),
                     valueColor = if (maxVal <= 10.0 && minVal >= 3.9) PrimaryEmerald else ColorHigh,
                     modifier = Modifier.weight(1f),
                     onClick = {
+                        val minStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", minVal)} ${if (isRu) "ммоль/л" else "mmol/L"}" else "${(minVal * 18.0182).toInt()} ${if (isRu) "мг/дл" else "mg/dL"}"
+                        val maxStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", maxVal)} ${if (isRu) "ммоль/л" else "mmol/L"}" else "${(maxVal * 18.0182).toInt()} ${if (isRu) "мг/дл" else "mg/dL"}"
                         detailDialogInfo = Pair(
-                            "Суточный диапазон",
-                            "Минимальный сахар за сутки: ${String.format(Locale.US, "%.1f", minVal)} ммоль/л\nМаксимальный сахар за сутки: ${String.format(Locale.US, "%.1f", maxVal)} ммоль/л"
+                            if (isRu) "Суточный диапазон" else "Daily Glucose Range",
+                            if (isRu) "Минимальный сахар за сутки: $minStr\nМаксимальный сахар за сутки: $maxStr"
+                            else "Minimum glucose today: $minStr\nMaximum glucose today: $maxStr"
                         )
                     }
                 )
@@ -283,11 +328,14 @@ fun FocusScreen(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     detailDialogInfo = Pair(
-                        "Ночной профиль сна (${userSettings.nightStartHour}:00–${userSettings.nightEndHour}:00)",
+                        if (isRu) "Ночной профиль сна (${userSettings.nightStartHour}:00–${userSettings.nightEndHour}:00)" else "Night Sleep Profile (${userSettings.nightStartHour}:00–${userSettings.nightEndHour}:00)",
                         if (!hasNightData) {
-                            "Недостаточно ночных данных за текущие сутки (менее 30 минут измерений в ночное окно)."
+                            if (isRu) "Недостаточно ночных данных за текущие сутки (менее 30 минут измерений в ночное окно)." else "Insufficient night data today (less than 30 minutes of readings in night window)."
                         } else {
-                            "TIR за ночь: ${String.format(Locale.US, "%.1f%%", nightStability.tirPercent)}\nВариабельность (SD): ${String.format(Locale.US, "%.2f", nightStability.sdMmol)} ммоль/л\nКоличество ночных точек: ${nightStability.nightReadingsCount}"
+                            val sdStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.2f", nightStability.sdMmol)} ${if (isRu) "ммоль/л" else "mmol/L"}"
+                                        else "${(nightStability.sdMmol * 18.0182).toInt()} ${if (isRu) "мг/дл" else "mg/dL"}"
+                            if (isRu) "TIR за ночь: ${String.format(Locale.US, "%.1f%%", nightStability.tirPercent)}\nВариабельность (SD): $sdStr\nКоличество ночных точек: ${nightStability.nightReadingsCount}"
+                            else "Night TIR: ${String.format(Locale.US, "%.1f%%", nightStability.tirPercent)}\nVariability (SD): $sdStr\nNight readings count: ${nightStability.nightReadingsCount}"
                         }
                     )
                 }
@@ -307,16 +355,17 @@ fun FocusScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Ночной профиль (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)})",
+                                text = if (isRu) "Ночной профиль (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)})"
+                                       else "Night Sleep Profile (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)})",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = when {
-                                    !hasNightData -> "Недостаточно данных (<30 мин)"
-                                    nightStability.isStable -> "Стабильный ночной профиль"
-                                    else -> "Обнаружены ночные колебания"
+                                    !hasNightData -> if (isRu) "Недостаточно данных (<30 мин)" else "Insufficient data (<30 min)"
+                                    nightStability.isStable -> if (isRu) "Стабильный ночной профиль" else "Stable night profile"
+                                    else -> if (isRu) "Обнаружены ночные колебания" else "Night fluctuations detected"
                                 },
                                 style = MaterialTheme.typography.titleMedium,
                                 color = when {
@@ -361,7 +410,7 @@ fun FocusScreen(
             },
             confirmButton = {
                 TextButton(onClick = { detailDialogInfo = null }) {
-                    Text(text = "Понятно", color = PrimaryEmerald, fontWeight = FontWeight.Bold)
+                    Text(text = if (isRu) "Понятно" else "OK", color = PrimaryEmerald, fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -374,6 +423,7 @@ private fun HeroGlucoseCard(
     unit: GlucoseUnit,
     targetMode: TargetMode,
     todayPointsCount: Int,
+    isRu: Boolean,
     onModeChange: (TargetMode) -> Unit,
     onClick: () -> Unit
 ) {
@@ -404,13 +454,15 @@ private fun HeroGlucoseCard(
                         .padding(3.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    val tirTitle = if (unit == GlucoseUnit.MMOL_L) "TIR 3.9–10.0" else "TIR 70–180"
+                    val tingTitle = if (unit == GlucoseUnit.MMOL_L) "TING 3.9–7.8" else "TING 70–140"
                     TargetModeChip(
-                        title = "TIR 3.9–10.0",
+                        title = tirTitle,
                         selected = targetMode == TargetMode.TIR,
                         onClick = { onModeChange(TargetMode.TIR) }
                     )
                     TargetModeChip(
-                        title = "TING 3.9–7.8",
+                        title = tingTitle,
                         selected = targetMode == TargetMode.TING,
                         onClick = { onModeChange(TargetMode.TING) }
                     )
@@ -455,7 +507,7 @@ private fun HeroGlucoseCard(
 
                 Column {
                     Text(
-                        text = if (unit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL",
+                        text = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = onSurfaceVariant
                     )
@@ -479,12 +531,14 @@ private fun HeroGlucoseCard(
                     DateUtils.MINUTE_IN_MILLIS,
                     DateUtils.FORMAT_ABBREV_RELATIVE
                 ).toString()
-            } else "Нет данных трансляции"
+            } else if (isRu) "Нет данных трансляции" else "No broadcast data"
 
-            val pointsSubtitle = if (todayPointsCount > 0) " • Получено сегодня: $todayPointsCount точек" else ""
+            val pointsSubtitle = if (todayPointsCount > 0) {
+                if (isRu) " • Получено сегодня: $todayPointsCount точек" else " • Received today: $todayPointsCount readings"
+            } else ""
 
             Text(
-                text = "Последнее измерение: $timeStr$pointsSubtitle",
+                text = if (isRu) "Последнее измерение: $timeStr$pointsSubtitle" else "Latest reading: $timeStr$pointsSubtitle",
                 style = MaterialTheme.typography.bodySmall,
                 color = onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
@@ -524,6 +578,7 @@ private fun TargetCompensatorCard(
     targetGoal: Int,
     targetMode: TargetMode,
     remainingDays: Int,
+    isRu: Boolean,
     onClick: () -> Unit
 ) {
     val progress = (currentScore / 100.0).toFloat().coerceIn(0f, 1f)
@@ -551,30 +606,41 @@ private fun TargetCompensatorCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Компенсатор цели",
+                        text = if (isRu) "Компенсатор цели" else "Goal Compensator",
                         style = MaterialTheme.typography.titleMedium,
                         color = onSurface
                     )
                 }
 
                 Text(
-                    text = "${String.format(Locale.US, "%.0f%%", currentScore)} / Цель: ≥$targetGoal%",
+                    text = "${String.format(Locale.US, "%.0f%%", currentScore)} / ${if (isRu) "Цель:" else "Goal:"} ≥$targetGoal%",
                     style = MaterialTheme.typography.titleSmall,
                     color = progressColor,
                     fontWeight = FontWeight.Bold
                 )
             }
 
-            // Proportional Progress Bar (0..100% of the bar)
-            LinearProgressIndicator(
-                progress = { progress },
+            // Proportional Progress Bar (0..100% of the bar) - Wide, Vivid & Accented
+            val trackBg = if (isGoalMet) PrimaryEmerald.copy(alpha = 0.18f) else ColorHigh.copy(alpha = 0.18f)
+            val activeColor = if (isGoalMet) Color(0xFF10B981) else Color(0xFFF59E0B)
+
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(10.dp)
-                    .clip(RoundedCornerShape(5.dp)),
-                color = progressColor,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+                    .height(18.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(trackBg)
+            ) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(18.dp)
+                        .clip(RoundedCornerShape(9.dp)),
+                    color = activeColor,
+                    trackColor = Color.Transparent
+                )
+            }
 
             Text(
                 text = message,

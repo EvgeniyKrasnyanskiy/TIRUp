@@ -50,6 +50,8 @@ data class NightStability(
     val sdMmol: Double = 0.0,
     val cvPercent: Double = 0.0,
     val tirPercent: Double = 0.0,
+    val tbrPercent: Double = 0.0,
+    val tarPercent: Double = 0.0,
     val isStable: Boolean = true,
     val nightReadingsCount: Int = 0
 )

@@ -5,6 +5,7 @@ import com.tirup.app.domain.model.ClinicalSummary
 import com.tirup.app.domain.model.GlucoseRangeCategory
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseStatistics
+import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.NightStability
 import com.tirup.app.domain.model.TargetRanges
 import java.util.Calendar
@@ -57,7 +58,8 @@ object GlucoseMetricsCalculator {
         targetRanges: TargetRanges = TargetRanges(),
         nightStartHour: Int = 0,
         nightEndHour: Int = 6,
-        language: String = "RU"
+        language: String = "RU",
+        unit: GlucoseUnit = GlucoseUnit.MMOL_L
     ): GlucoseStatistics {
         if (readings.isEmpty()) {
             return GlucoseStatistics()
@@ -170,7 +172,7 @@ object GlucoseMetricsCalculator {
         val hypoComponent = tbrVeryLowPercent + (0.8 * griLowPct)
         val hyperComponent = tarVeryHighPercent + (0.5 * griHighPct)
         val rawGri = (3.0 * hypoComponent) + (1.6 * hyperComponent)
-        val gri = min(((rawGri * 10.0).roundToInt() / 10.0), 100.0)
+        val gri = min(pythonRound1(rawGri), 100.0)
 
         // GRI 14-day slice (matching DiaKiaBot)
         val maxTs = validReadings.last().timestamp
@@ -186,7 +188,7 @@ object GlucoseMetricsCalculator {
             val hypo14d = vlow14d + (0.8 * low14d)
             val hyper14d = vhigh14d + (0.5 * high14d)
             val rawGri14d = (3.0 * hypo14d) + (1.6 * hyper14d)
-            val g14 = min(((rawGri14d * 10.0).roundToInt() / 10.0), 100.0)
+            val g14 = min(pythonRound1(rawGri14d), 100.0)
             String.format(Locale.US, "%.1f", g14)
         } else ""
 
@@ -239,7 +241,8 @@ object GlucoseMetricsCalculator {
             gri14dStr = gri14dStr,
             griLabel = griLabel,
             nightStability = nightStability,
-            language = language
+            language = language,
+            unit = unit
         )
 
         return GlucoseStatistics(
@@ -299,7 +302,23 @@ object GlucoseMetricsCalculator {
     }
 
     /**
-     * Orders clinical evaluation items matching DiaKiaBot order with full bilingual support:
+     * Emulates Python 3 float round(v, 1) to match DiaKiaBot reference.
+     */
+    private fun pythonRound1(value: Double): Double {
+        val scaled = value * 10.0
+        val floor = floor(scaled)
+        val frac = scaled - floor
+        val rounded = if (abs(frac - 0.5) < 1e-9) {
+            if (floor.toLong() % 2L == 0L) floor else floor + 1.0
+        } else if (frac > 0.5) {
+            floor + 1.0
+        } else {
+            floor
+        }
+        return rounded / 10.0
+    }
+
+    /**
      */
     private fun generateClinicalSummary(
         meanMmol: Double,
@@ -318,25 +337,37 @@ object GlucoseMetricsCalculator {
         gri14dStr: String = "",
         griLabel: String,
         nightStability: NightStability,
-        language: String
+        language: String,
+        unit: GlucoseUnit = GlucoseUnit.MMOL_L
     ): ClinicalSummary {
         val isRu = language.equals("RU", ignoreCase = true)
+        val isMmol = unit == GlucoseUnit.MMOL_L
         val evalItems = mutableListOf<ClinicalMetricStatus>()
         val issuesList = mutableListOf<String>()
 
-        // 1. Mean BG (Target ≤ 7.8 mmol/L)
+        // 1. Mean BG (Target ≤ 7.8 mmol/L / ≤ 140 mg/dL)
         val meanMet = meanMmol <= 7.8
         val meanWarn = meanMmol in 7.9..8.5
+        val meanValueStr = if (isMmol) {
+            String.format(Locale.US, "%.1f %s", meanMmol, if (isRu) "ммоль/л" else "mmol/L")
+        } else {
+            String.format(Locale.US, "%d %s", (meanMmol * MGDL_FACTOR).roundToInt(), if (isRu) "мг/дл" else "mg/dL")
+        }
+        val meanTargetStr = if (isMmol) {
+            if (isRu) "цель ≤7.8" else "target ≤7.8"
+        } else {
+            if (isRu) "цель ≤140" else "target ≤140"
+        }
         evalItems.add(
             ClinicalMetricStatus(
                 title = if (isRu) "Mean BG (средний сахар)" else "Mean BG (average glucose)",
-                valueStr = String.format(Locale.US, "%.1f %s", meanMmol, if (isRu) "ммоль/л" else "mmol/L"),
-                targetStr = if (isRu) "цель ≤7.8" else "target ≤7.8",
+                valueStr = meanValueStr,
+                targetStr = meanTargetStr,
                 isMet = meanMet,
                 isWarning = meanWarn
             )
         )
-        if (!meanMet) issuesList.add(if (isRu) "Mean BG" else "Mean BG")
+        if (!meanMet) issuesList.add("Mean BG")
 
         // 2. eA1c (Target ≤ 7.0%)
         val a1cMet = ea1c <= 7.0
@@ -350,14 +381,19 @@ object GlucoseMetricsCalculator {
                 isWarning = a1cWarn
             )
         )
-        if (!a1cMet) issuesList.add(if (isRu) "eA1c" else "eA1c")
+        if (!a1cMet) issuesList.add("eA1c")
 
-        // 3. TIR (3.9–10.0, Target ≥ 70%)
+        // 3. TIR (3.9–10.0 mmol/L or 70–180 mg/dL, Target ≥ 70%)
         val tirMet = tirPercent >= 70.0
         val tirWarn = tirPercent in 60.0..69.9
+        val tirTitle = if (isMmol) {
+            if (isRu) "TIR (3.9–10.0 ммоль/л)" else "TIR (3.9–10.0 mmol/L)"
+        } else {
+            if (isRu) "TIR (70–180 мг/дл)" else "TIR (70–180 mg/dL)"
+        }
         evalItems.add(
             ClinicalMetricStatus(
-                title = if (isRu) "TIR (3.9–10.0 ммоль/л)" else "TIR (3.9–10.0 mmol/L)",
+                title = tirTitle,
                 valueStr = String.format(Locale.US, "%.0f%%", tirPercent),
                 targetStr = if (isRu) "цель ≥70%" else "target ≥70%",
                 isMet = tirMet,
@@ -366,12 +402,17 @@ object GlucoseMetricsCalculator {
         )
         if (!tirMet) issuesList.add("TIR")
 
-        // 4. TING (3.9–7.8, Target ≥ 50%)
+        // 4. TING (3.9–7.8 mmol/L or 70–140 mg/dL, Target ≥ 50%)
         val tingMet = tingPercent >= 50.0
         val tingWarn = tingPercent in 40.0..49.9
+        val tingTitle = if (isMmol) {
+            if (isRu) "TING (3.9–7.8 ммоль/л)" else "TING (3.9–7.8 mmol/L)"
+        } else {
+            if (isRu) "TING (70–140 мг/дл)" else "TING (70–140 mg/dL)"
+        }
         evalItems.add(
             ClinicalMetricStatus(
-                title = if (isRu) "TING (3.9–7.8 ммоль/л)" else "TING (3.9–7.8 mmol/L)",
+                title = tingTitle,
                 valueStr = String.format(Locale.US, "%.0f%%", tingPercent),
                 targetStr = if (isRu) "цель ≥50%" else "target ≥50%",
                 isMet = tingMet,
@@ -380,62 +421,82 @@ object GlucoseMetricsCalculator {
         )
         if (!tingMet) issuesList.add("TING")
 
-        // 5. TBR < 3.9 (Target < 4%) - integer percent like DiaKiaBot summary
+        // 5. TBR < 3.9 (or < 70, Target < 4%)
         val tbrMet = tbrTotalPercent <= 4.0
         val tbrWarn = tbrTotalPercent in 4.1..6.0
+        val tbrTitle = if (isMmol) {
+            if (isRu) "TBR < 3.9 ммоль/л" else "TBR < 3.9 mmol/L"
+        } else {
+            if (isRu) "TBR < 70 мг/дл" else "TBR < 70 mg/dL"
+        }
         evalItems.add(
             ClinicalMetricStatus(
-                title = if (isRu) "TBR < 3.9 ммоль/л" else "TBR < 3.9 mmol/L",
+                title = tbrTitle,
                 valueStr = "${tbrTotalPercent.roundToInt()}%",
                 targetStr = if (isRu) "цель <4%" else "target <4%",
                 isMet = tbrMet,
                 isWarning = tbrWarn
             )
         )
-        if (!tbrMet) issuesList.add(if (isRu) "TBR <3.9" else "TBR <3.9")
+        if (!tbrMet) issuesList.add(if (isMmol) "TBR <3.9" else "TBR <70")
 
-        // 6. TBR < 3.0 (Target < 1%)
+        // 6. TBR < 3.0 (or < 54, Target < 1%)
         val tbr30Met = tbrVeryLowPercent <= 1.0
         val tbr30Warn = tbrVeryLowPercent in 1.1..2.0
         val tbr30Str = if (tbrVeryLowPercent < 0.05) "0.0%" else String.format(Locale.US, "%.1f%%", tbrVeryLowPercent)
+        val tbr30Title = if (isMmol) {
+            if (isRu) "TBR < 3.0 ммоль/л" else "TBR < 3.0 mmol/L"
+        } else {
+            if (isRu) "TBR < 54 мг/дл" else "TBR < 54 mg/dL"
+        }
         evalItems.add(
             ClinicalMetricStatus(
-                title = if (isRu) "TBR < 3.0 ммоль/л" else "TBR < 3.0 mmol/L",
+                title = tbr30Title,
                 valueStr = tbr30Str,
                 targetStr = if (isRu) "цель <1%" else "target <1%",
                 isMet = tbr30Met,
                 isWarning = tbr30Warn
             )
         )
-        if (!tbr30Met) issuesList.add(if (isRu) "TBR <3.0" else "TBR <3.0")
+        if (!tbr30Met) issuesList.add(if (isMmol) "TBR <3.0" else "TBR <54")
 
-        // 7. TAR > 10.0 (Target < 25%)
+        // 7. TAR > 10.0 (or > 180, Target < 25%)
         val tarMet = tarTotalPercent <= 25.0
         val tarWarn = tarTotalPercent in 25.1..35.0
+        val tarTitle = if (isMmol) {
+            if (isRu) "TAR > 10.0 ммоль/л" else "TAR > 10.0 mmol/L"
+        } else {
+            if (isRu) "TAR > 180 мг/дл" else "TAR > 180 mg/dL"
+        }
         evalItems.add(
             ClinicalMetricStatus(
-                title = if (isRu) "TAR > 10.0 ммоль/л" else "TAR > 10.0 mmol/L",
+                title = tarTitle,
                 valueStr = String.format(Locale.US, "%.0f%%", tarTotalPercent),
                 targetStr = if (isRu) "цель <25%" else "target <25%",
                 isMet = tarMet,
                 isWarning = tarWarn
             )
         )
-        if (!tarMet) issuesList.add(if (isRu) "TAR >10.0" else "TAR >10.0")
+        if (!tarMet) issuesList.add(if (isMmol) "TAR >10.0" else "TAR >180")
 
-        // 8. TAR > 13.9 (Target < 5%)
+        // 8. TAR > 13.9 (or > 250, Target < 5%)
         val tar139Met = tarVeryHighPercent <= 5.0
         val tar139Warn = tarVeryHighPercent in 5.1..8.0
+        val tar139Title = if (isMmol) {
+            if (isRu) "TAR > 13.9 ммоль/л" else "TAR > 13.9 mmol/L"
+        } else {
+            if (isRu) "TAR > 250 мг/дл" else "TAR > 250 mg/dL"
+        }
         evalItems.add(
             ClinicalMetricStatus(
-                title = if (isRu) "TAR > 13.9 ммоль/л" else "TAR > 13.9 mmol/L",
+                title = tar139Title,
                 valueStr = String.format(Locale.US, "%.1f%%", tarVeryHighPercent),
                 targetStr = if (isRu) "цель <5%" else "target <5%",
                 isMet = tar139Met,
                 isWarning = tar139Warn
             )
         )
-        if (!tar139Met) issuesList.add(if (isRu) "TAR >13.9" else "TAR >13.9")
+        if (!tar139Met) issuesList.add(if (isMmol) "TAR >13.9" else "TAR >250")
 
         // 9. GVI (Target ≤ 1.20)
         val gviMet = gvi <= 1.20
@@ -482,11 +543,21 @@ object GlucoseMetricsCalculator {
         // 12. SD
         val sdMet = sdMmol <= 3.0
         val sdWarn = sdMmol in 3.01..3.5
+        val sdValueStr = if (isMmol) {
+            String.format(Locale.US, "%.2f %s", sdMmol, if (isRu) "ммоль/л" else "mmol/L")
+        } else {
+            String.format(Locale.US, "%d %s", (sdMmol * MGDL_FACTOR).roundToInt(), if (isRu) "мг/дл" else "mg/dL")
+        }
+        val sdTargetStr = if (isMmol) {
+            if (isRu) "цель ≤3.0" else "target ≤3.0"
+        } else {
+            if (isRu) "цель ≤54" else "target ≤54"
+        }
         evalItems.add(
             ClinicalMetricStatus(
                 title = if (isRu) "SD (стандартное отклонение)" else "SD (standard deviation)",
-                valueStr = String.format(Locale.US, "%.2f %s", sdMmol, if (isRu) "ммоль/л" else "mmol/L"),
-                targetStr = if (isRu) "цель ≤3.0" else "target ≤3.0",
+                valueStr = sdValueStr,
+                targetStr = sdTargetStr,
                 isMet = sdMet,
                 isWarning = sdWarn
             )
@@ -496,11 +567,15 @@ object GlucoseMetricsCalculator {
         // 13. GRI (Target ≤ 40.0)
         val griMet = gri <= 40.0
         val griWarn = gri in 40.1..60.0
-        val gri14dPart = if (gri14dStr.isNotEmpty()) " (14дн: $gri14dStr)" else ""
+        val griValueStr = if (gri14dStr.isNotEmpty()) {
+            String.format(Locale.US, "%.1f (%s: %s)", gri, if (isRu) "14дн" else "14d", gri14dStr)
+        } else {
+            String.format(Locale.US, "%.1f (%s)", gri, griLabel)
+        }
         evalItems.add(
             ClinicalMetricStatus(
                 title = if (isRu) "GRI (индекс риска)" else "GRI (glycemia risk)",
-                valueStr = String.format(Locale.US, "%.1f%s (%s)", gri, gri14dPart, griLabel),
+                valueStr = griValueStr,
                 targetStr = if (isRu) "цель ≤40.0" else "target ≤40.0",
                 isMet = griMet,
                 isWarning = griWarn
@@ -511,22 +586,77 @@ object GlucoseMetricsCalculator {
         // 14. Night Profile Stability
         val hasNightData = nightStability.nightReadingsCount >= 6
         val nightMet = hasNightData && nightStability.isStable
-        val nightValRu = when {
-            !hasNightData -> "Недостаточно данных (<30 мин)"
-            nightStability.isStable -> "Стабильный (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})"
-            else -> "Обнаружены колебания (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})"
+        val nightTir = nightStability.tirPercent
+        val nightSd = nightStability.sdMmol
+        val nightTbr = nightStability.tbrPercent
+        val nightTar = nightStability.tarPercent
+
+        val nightSdFormatted = if (isMmol) {
+            String.format(Locale.US, "%.1f %s", nightSd, if (isRu) "ммоль/л" else "mmol/L")
+        } else {
+            String.format(Locale.US, "%d %s", (nightSd * MGDL_FACTOR).roundToInt(), if (isRu) "мг/дл" else "mg/dL")
         }
-        val nightValEn = when {
-            !hasNightData -> "Insufficient night data (<30m)"
-            nightStability.isStable -> "Stable (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})"
-            else -> "Fluctuations detected (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})"
+        val nightSdTargetFormatted = if (isMmol) "SD ≤1.5" else "SD ≤27"
+
+        val (nightValRu, nightTargetRu) = when {
+            !hasNightData -> Pair(
+                "Недостаточно данных (<30 мин)",
+                "цель TIR ≥70%, $nightSdTargetFormatted"
+            )
+            nightStability.isStable -> Pair(
+                String.format(Locale.US, "Стабильный профиль: TIR %.0f%%, SD %s", nightTir, nightSdFormatted),
+                "цель TIR ≥70%, $nightSdTargetFormatted"
+            )
+            nightTbr > 1.0 -> Pair(
+                String.format(Locale.US, "Риск ночных гипо: TBR %.1f%%, TIR %.0f%%, SD %s", nightTbr, nightTir, nightSdFormatted),
+                "цель TBR <1%, TIR ≥70%"
+            )
+            nightTar > 25.0 -> Pair(
+                String.format(Locale.US, "Ночные подъёмы сахара: TAR %.0f%%, TIR %.0f%%, SD %s", nightTar, nightTir, nightSdFormatted),
+                "цель TAR <25%, TIR ≥70%"
+            )
+            nightSd > (if (isMmol) 1.5 else (1.5 * MGDL_FACTOR)) -> Pair(
+                String.format(Locale.US, "Повышена вариабельность: SD %s, TIR %.0f%%", nightSdFormatted, nightTir),
+                "цель $nightSdTargetFormatted, TIR ≥70%"
+            )
+            else -> Pair(
+                String.format(Locale.US, "TIR %.0f%%, SD %s", nightTir, nightSdFormatted),
+                "цель TIR ≥70%, $nightSdTargetFormatted"
+            )
+        }
+
+        val (nightValEn, nightTargetEn) = when {
+            !hasNightData -> Pair(
+                "Insufficient night data (<30m)",
+                "target TIR ≥70%, $nightSdTargetFormatted"
+            )
+            nightStability.isStable -> Pair(
+                String.format(Locale.US, "Stable profile: TIR %.0f%%, SD %s", nightTir, nightSdFormatted),
+                "target TIR ≥70%, $nightSdTargetFormatted"
+            )
+            nightTbr > 1.0 -> Pair(
+                String.format(Locale.US, "Nocturnal hypo risk: TBR %.1f%%, TIR %.0f%%, SD %s", nightTbr, nightTir, nightSdFormatted),
+                "target TBR <1%, TIR ≥70%"
+            )
+            nightTar > 25.0 -> Pair(
+                String.format(Locale.US, "Nocturnal spikes: TAR %.0f%%, TIR %.0f%%, SD %s", nightTar, nightTir, nightSdFormatted),
+                "target TAR <25%, TIR ≥70%"
+            )
+            nightSd > (if (isMmol) 1.5 else (1.5 * MGDL_FACTOR)) -> Pair(
+                String.format(Locale.US, "Elevated variability: SD %s, TIR %.0f%%", nightSdFormatted, nightTir),
+                "target $nightSdTargetFormatted, TIR ≥70%"
+            )
+            else -> Pair(
+                String.format(Locale.US, "TIR %.0f%%, SD %s", nightTir, nightSdFormatted),
+                "target TIR ≥70%, $nightSdTargetFormatted"
+            )
         }
 
         evalItems.add(
             ClinicalMetricStatus(
                 title = if (isRu) "Ночной профиль сна" else "Night Sleep Profile",
                 valueStr = if (isRu) nightValRu else nightValEn,
-                targetStr = if (isRu) "TIR ≥70% и SD ≤1.5" else "TIR ≥70% & SD ≤1.5",
+                targetStr = if (isRu) nightTargetRu else nightTargetEn,
                 isMet = nightMet || !hasNightData,
                 isWarning = hasNightData && !nightStability.isStable
             )
@@ -608,15 +738,22 @@ object GlucoseMetricsCalculator {
         val cv = if (mean > 0.0) (sd / mean) * 100.0 else 0.0
 
         var inRangeCount = 0
+        var belowCount = 0
+        var aboveCount = 0
         nightReadings.forEach { r ->
             val cat = targetRanges.categorize(r.valueMmol)
-            if (cat == GlucoseRangeCategory.TARGET || cat == GlucoseRangeCategory.TIGHT) {
-                inRangeCount++
+            when (cat) {
+                GlucoseRangeCategory.TARGET, GlucoseRangeCategory.TIGHT -> inRangeCount++
+                GlucoseRangeCategory.LOW, GlucoseRangeCategory.VERY_LOW -> belowCount++
+                GlucoseRangeCategory.HIGH, GlucoseRangeCategory.VERY_HIGH -> aboveCount++
+                else -> {}
             }
         }
 
         val tir = (inRangeCount.toDouble() / count) * 100.0
-        val isStable = sd <= 1.5 && tir >= 70.0
+        val tbr = (belowCount.toDouble() / count) * 100.0
+        val tar = (aboveCount.toDouble() / count) * 100.0
+        val isStable = sd <= 1.5 && tir >= 70.0 && tbr <= 1.0
 
         return NightStability(
             isStable = isStable,
@@ -624,6 +761,8 @@ object GlucoseMetricsCalculator {
             sdMmol = sd,
             cvPercent = cv,
             tirPercent = tir,
+            tbrPercent = tbr,
+            tarPercent = tar,
             nightReadingsCount = count
         )
     }

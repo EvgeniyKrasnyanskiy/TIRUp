@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.CheckCircle
@@ -59,7 +60,15 @@ import androidx.compose.ui.unit.sp
 import com.tirup.app.R
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.PatientProfile
+import com.tirup.app.domain.model.TargetRanges
+import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.presentation.components.BentoCard
+import com.tirup.app.presentation.components.HelpAndDisclaimerDialog
+import com.tirup.app.presentation.theme.ActionBlue
+import com.tirup.app.presentation.theme.ColorHigh
+import com.tirup.app.presentation.theme.ColorLow
+import com.tirup.app.presentation.theme.ColorTight
+import com.tirup.app.presentation.theme.ColorVeryHigh
 import com.tirup.app.presentation.theme.ColorVeryLow
 import com.tirup.app.presentation.theme.PrimaryEmerald
 import java.util.Calendar
@@ -74,6 +83,9 @@ fun SettingsScreen(
     val settings = state.userSettings
     val profile = settings.patientProfile
     val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+    var showHelpDialog by remember { mutableStateOf(false) }
+
+    val isRu = settings.language.equals("RU", ignoreCase = true)
 
     LazyColumn(
         modifier = Modifier
@@ -86,31 +98,43 @@ fun SettingsScreen(
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                Column {
-                    Text(
-                        text = stringResource(R.string.settings_title),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(12.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Настройки сохраняются автоматически",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.settings_title),
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(12.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isRu) "Настройки сохраняются автоматически" else "Settings are saved automatically",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
+                }
+
+                IconButton(onClick = { showHelpDialog = true }) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Help,
+                        contentDescription = "Help",
+                        tint = ActionBlue,
+                        modifier = Modifier.size(26.dp)
+                    )
                 }
             }
         }
@@ -123,7 +147,7 @@ fun SettingsScreen(
                         Icon(imageVector = Icons.Default.Person, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Профиль пациента (для мед. отчётов)",
+                            text = if (isRu) "Профиль пациента (для мед. отчётов)" else "Patient Profile (for medical reports)",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -135,7 +159,7 @@ fun SettingsScreen(
                         onValueChange = { newName ->
                             viewModel.autoUpdatePatientProfile(profile.copy(fullName = newName))
                         },
-                        label = { Text("ФИО пациента") },
+                        label = { Text(if (isRu) "ФИО пациента" else "Full Name") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -146,7 +170,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         DropdownYearSelector(
-                            label = "Год рождения",
+                            label = if (isRu) "Год рождения" else "Birth Year",
                             selectedYear = profile.birthYear,
                             yearRange = (currentYear - 100)..currentYear,
                             modifier = Modifier.weight(1f),
@@ -167,8 +191,8 @@ fun SettingsScreen(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalArrangement = Arrangement.Center
                             ) {
-                                Text("Возраст", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                                Text("${profile.calculatedAge} лет", style = MaterialTheme.typography.bodyMedium, color = PrimaryEmerald, fontWeight = FontWeight.Bold)
+                                Text(if (isRu) "Возраст" else "Age", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                Text("${profile.calculatedAge} ${if (isRu) "лет" else "y.o."}", style = MaterialTheme.typography.bodyMedium, color = PrimaryEmerald, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -183,7 +207,7 @@ fun SettingsScreen(
                             onValueChange = { newHeight ->
                                 viewModel.autoUpdatePatientProfile(profile.copy(heightCm = newHeight))
                             },
-                            label = { Text("Рост (см)") },
+                            label = { Text(if (isRu) "Рост (см)" else "Height (cm)") },
                             modifier = Modifier.weight(1f),
                             singleLine = true
                         )
@@ -192,7 +216,7 @@ fun SettingsScreen(
                             onValueChange = { newWeight ->
                                 viewModel.autoUpdatePatientProfile(profile.copy(weightKg = newWeight))
                             },
-                            label = { Text("Вес (кг)") },
+                            label = { Text(if (isRu) "Вес (кг)" else "Weight (kg)") },
                             modifier = Modifier.weight(1f),
                             singleLine = true
                         )
@@ -204,9 +228,9 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         DropdownChoiceSelector(
-                            label = "Тип диабета",
+                            label = if (isRu) "Тип диабета" else "Diabetes Type",
                             selectedOption = profile.diabetesType,
-                            options = listOf("СД1", "СД2", "LADA", "MODY", "ГСД"),
+                            options = if (isRu) listOf("СД1", "СД2", "LADA", "MODY", "ГСД") else listOf("T1D", "T2D", "LADA", "MODY", "GDM"),
                             modifier = Modifier.weight(1f),
                             onOptionSelected = { newType ->
                                 viewModel.autoUpdatePatientProfile(profile.copy(diabetesType = newType))
@@ -214,7 +238,7 @@ fun SettingsScreen(
                         )
 
                         DropdownYearSelector(
-                            label = "Диагноз с года",
+                            label = if (isRu) "Диагноз с года" else "Diagnosed Year",
                             selectedYear = profile.diagnosisYear,
                             yearRange = (currentYear - 60)..currentYear,
                             modifier = Modifier.weight(1f),
@@ -226,13 +250,18 @@ fun SettingsScreen(
 
                     // 5. Therapy Type Dropdown
                     DropdownChoiceSelector(
-                        label = "Вид терапии",
+                        label = if (isRu) "Вид терапии" else "Therapy Type",
                         selectedOption = profile.therapyType,
-                        options = listOf(
+                        options = if (isRu) listOf(
                             "Инсулиновая помпа",
                             "Шприц-ручки (МДИ)",
                             "Пероральные препараты (Таблетки)",
                             "Диетотерапия"
+                        ) else listOf(
+                            "Insulin Pump",
+                            "Multiple Daily Injections (MDI)",
+                            "Oral Medication (Pills)",
+                            "Diet Therapy"
                         ),
                         modifier = Modifier.fillMaxWidth(),
                         onOptionSelected = { newTherapy ->
@@ -314,22 +343,22 @@ fun SettingsScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(imageVector = Icons.Default.Brightness4, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = "Тема", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(text = if (isRu) "Тема" else "Theme", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
 
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             LanguageChip(
-                                label = "🌙 Тёмная",
+                                label = if (isRu) "🌙 Тёмная" else "🌙 Dark",
                                 isSelected = settings.themeMode == com.tirup.app.domain.model.ThemeMode.DARK,
                                 onClick = { viewModel.setThemeMode(com.tirup.app.domain.model.ThemeMode.DARK) }
                             )
                             LanguageChip(
-                                label = "☀️ Светлая",
+                                label = if (isRu) "☀️ Светлая" else "☀️ Light",
                                 isSelected = settings.themeMode == com.tirup.app.domain.model.ThemeMode.LIGHT,
                                 onClick = { viewModel.setThemeMode(com.tirup.app.domain.model.ThemeMode.LIGHT) }
                             )
                             LanguageChip(
-                                label = "⚙️ Авто",
+                                label = if (isRu) "⚙️ Авто" else "⚙️ Auto",
                                 isSelected = settings.themeMode == com.tirup.app.domain.model.ThemeMode.SYSTEM,
                                 onClick = { viewModel.setThemeMode(com.tirup.app.domain.model.ThemeMode.SYSTEM) }
                             )
@@ -400,7 +429,7 @@ fun SettingsScreen(
                                 tingHigh = it
                                 triggerThresholdUpdate()
                             },
-                            label = { Text("Верх TING (узкий)") },
+                            label = { Text(if (isRu) "Верх TING (узкий)" else "Upper TING (tight)") },
                             modifier = Modifier.weight(1f),
                             singleLine = true
                         )
@@ -422,7 +451,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         DropdownHourSelector(
-                            label = "Начало сна",
+                            label = if (isRu) "Начало сна" else "Sleep Start",
                             selectedHour = settings.nightStartHour,
                             modifier = Modifier.weight(1f),
                             onHourSelected = { newStart ->
@@ -439,7 +468,7 @@ fun SettingsScreen(
                         )
 
                         DropdownHourSelector(
-                            label = "Конец сна",
+                            label = if (isRu) "Конец сна" else "Sleep End",
                             selectedHour = settings.nightEndHour,
                             modifier = Modifier.weight(1f),
                             onHourSelected = { newEnd ->
@@ -510,7 +539,7 @@ fun SettingsScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Telegram-канал проекта — @diakia",
+                    text = if (isRu) "Telegram-канал проекта — @diakia" else "Project Telegram channel — @diakia",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF0284C7),
@@ -534,8 +563,8 @@ fun SettingsScreen(
                     .height(48.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = PrimaryEmerald,
-                    contentColor = Color.Black
+                    containerColor = ActionBlue,
+                    contentColor = Color.White
                 )
             ) {
                 Icon(
@@ -545,7 +574,7 @@ fun SettingsScreen(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Назад",
+                    text = if (isRu) "Назад" else "Back",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -553,6 +582,13 @@ fun SettingsScreen(
         }
 
         item { Spacer(modifier = Modifier.height(28.dp)) }
+    }
+
+    if (showHelpDialog) {
+        HelpAndDisclaimerDialog(
+            isRu = isRu,
+            onDismiss = { showHelpDialog = false }
+        )
     }
 
     if (state.showClearDialog) {

@@ -47,6 +47,7 @@ import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.presentation.components.BentoCard
 import com.tirup.app.presentation.components.RangeDistributionBar
+import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
@@ -148,6 +149,9 @@ fun TrendsScreen(
             )
         }
 
+        val isRu = state.userSettings.language.equals("RU", ignoreCase = true)
+        val isMmol = state.userSettings.unit == GlucoseUnit.MMOL_L
+
         // AGP 24h Modal Day Chart
         item {
             BentoCard(
@@ -155,8 +159,9 @@ fun TrendsScreen(
                     .fillMaxWidth()
                     .clickable {
                         detailDialogInfo = Pair(
-                            "Амбулаторный профиль глюкозы (AGP)",
-                            "Международный стандарт визуализации CGM: суточные профили за все дни накладываются на 24 часа. Сплошная линия — медиана 50%, тёмная полоса — 25-75% размах, светлое облако — 10-90% перцентили."
+                            if (isRu) "Амбулаторный профиль глюкозы (AGP)" else "Ambulatory Glucose Profile (AGP)",
+                            if (isRu) "Международный стандарт визуализации CGM: суточные профили за все дни накладываются на 24 часа. Сплошная линия — медиана 50%, тёмная полоса — 25-75% размах, светлое облако — 10-90% перцентили."
+                            else "International CGM visualization standard: daily profiles from all days overlaid across 24 hours. Solid line is 50% median, darker band is 25-75% IQR, light cloud is 10-90% percentiles."
                         )
                     },
                 cornerRadius = 24.dp
@@ -198,8 +203,9 @@ fun TrendsScreen(
                     .fillMaxWidth()
                     .clickable {
                         detailDialogInfo = Pair(
-                            "Распределение времени в диапазонах",
-                            "Целевой диапазон (TIR 3.9-10.0 ммоль/л): норма ≥70%.\nУзкий (TING 3.9-7.8 ммоль/л): норма ≥50%.\nНизкий (TBR <3.9 ммоль/л): норма <4%.\nВысокий (TAR >10.0 ммоль/л): норма <25%."
+                            if (isRu) "Распределение времени в диапазонах" else "Time in Ranges Breakdown",
+                            if (isRu) "Целевой диапазон (TIR): норма ≥70%.\nУзкий (TING): норма ≥50%.\nНизкий (TBR): норма <4%.\nВысокий (TAR): норма <25%."
+                            else "Target range (TIR): target ≥70%.\nTight (TING): target ≥50%.\nLow (TBR): target <4%.\nHigh (TAR): target <25%."
                         )
                     }
             ) {
@@ -210,16 +216,18 @@ fun TrendsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Распределение по диапазонам",
+                            text = if (isRu) "Распределение по диапазонам" else "Time in Ranges Distribution",
                             style = MaterialTheme.typography.titleMedium,
                             color = onSurface
                         )
 
                         Text(
                             text = if (targetMode == TargetMode.TING) {
-                                String.format(Locale.US, "%.1f%% TING (цель ≥50%%)", stats.tingPercent)
+                                if (isRu) String.format(Locale.US, "%.1f%% TING (цель ≥50%%)", stats.tingPercent)
+                                else String.format(Locale.US, "%.1f%% TING (goal ≥50%%)", stats.tingPercent)
                             } else {
-                                String.format(Locale.US, "%.1f%% TIR (цель ≥70%%)", stats.tirPercent)
+                                if (isRu) String.format(Locale.US, "%.1f%% TIR (цель ≥70%%)", stats.tirPercent)
+                                else String.format(Locale.US, "%.1f%% TIR (goal ≥70%%)", stats.tirPercent)
                             },
                             style = MaterialTheme.typography.titleSmall,
                             color = PrimaryEmerald,
@@ -267,44 +275,52 @@ fun TrendsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                val meanValStr = if (isMmol) String.format(Locale.US, "%.1f", state.statistics.meanMmol)
+                                 else String.format(Locale.US, "%d", (state.statistics.meanMmol * 18.0182).toInt())
                 TrendSummaryCard(
-                    title = "Средний сахар",
-                    value = String.format(Locale.US, "%.1f", state.statistics.meanMmol),
-                    unit = if (state.userSettings.unit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL",
+                    title = if (isRu) "Средний сахар" else "Mean Glucose",
+                    value = meanValStr,
+                    unit = if (isMmol) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL"),
                     valueColor = if (state.statistics.meanMmol in 3.9..7.8) PrimaryEmerald else ColorHigh,
                     modifier = Modifier.weight(1f),
                     onClick = {
+                        val valStr = if (isMmol) "${String.format(Locale.US, "%.1f", state.statistics.meanMmol)} ${if (isRu) "ммоль/л" else "mmol/L"}"
+                                     else "${(state.statistics.meanMmol * 18.0182).toInt()} ${if (isRu) "мг/дл" else "mg/dL"}"
+                        val targetVal = if (isMmol) "≤7.8 ${if (isRu) "ммоль/л" else "mmol/L"}" else "≤140 ${if (isRu) "мг/дл" else "mg/dL"}"
                         detailDialogInfo = Pair(
-                            "Средний сахар (Mean)",
-                            "Средний уровень сахара за выбранный период: ${String.format(Locale.US, "%.1f", state.statistics.meanMmol)} ммоль/л. Клиническая цель: ≤7.8 ммоль/л."
+                            if (isRu) "Средний сахар (Mean)" else "Average Glucose (Mean)",
+                            if (isRu) "Средний уровень сахара за выбранный период: $valStr. Клиническая цель: $targetVal."
+                            else "Average glucose over the selected period: $valStr. Clinical target: $targetVal."
                         )
                     }
                 )
 
                 TrendSummaryCard(
-                    title = "Вариабельность (%CV)",
+                    title = if (isRu) "Вариабельность (%CV)" else "Variability (%CV)",
                     value = String.format(Locale.US, "%.1f%%", state.statistics.cvPercent),
                     unit = "",
                     valueColor = if (state.statistics.cvPercent <= 36.0) PrimaryEmerald else ColorHigh,
                     modifier = Modifier.weight(1f),
                     onClick = {
                         detailDialogInfo = Pair(
-                            "Вариабельность (%CV)",
-                            "Коэффициент вариабельности: ${String.format(Locale.US, "%.1f%%", state.statistics.cvPercent)}. Норма: ≤36.0%. Меньшее значение означает более стабильную гликемию."
+                            if (isRu) "Вариабельность (%CV)" else "Glucose Variability (%CV)",
+                            if (isRu) "Коэффициент вариабельности: ${String.format(Locale.US, "%.1f%%", state.statistics.cvPercent)}. Норма: ≤36.0%. Меньшее значение означает более стабильную гликемию."
+                            else "Coefficient of variation: ${String.format(Locale.US, "%.1f%%", state.statistics.cvPercent)}. Target: ≤36.0%. Lower value indicates more stable glycemia."
                         )
                     }
                 )
 
                 TrendSummaryCard(
-                    title = "Расчётный eA1c",
+                    title = if (isRu) "Расчётный eA1c" else "Estimated eA1c",
                     value = String.format(Locale.US, "%.1f%%", state.statistics.gmiPercent),
                     unit = "",
                     valueColor = if (state.statistics.gmiPercent <= 7.0) PrimaryEmerald else ColorHigh,
                     modifier = Modifier.weight(1f),
                     onClick = {
                         detailDialogInfo = Pair(
-                            "Расчётный HbA1c (ADAG)",
-                            "Расчётный гликированный гемоглобин: ${String.format(Locale.US, "%.1f%%", state.statistics.gmiPercent)} (${state.statistics.hba1cMmolMol} mmol/mol). Цель: ≤7.0%."
+                            if (isRu) "Расчётный HbA1c (ADAG)" else "Estimated HbA1c (ADAG)",
+                            if (isRu) "Расчётный гликированный гемоглобин: ${String.format(Locale.US, "%.1f%%", state.statistics.gmiPercent)} (${state.statistics.hba1cMmolMol} mmol/mol). Цель: ≤7.0%."
+                            else "Estimated glycated hemoglobin: ${String.format(Locale.US, "%.1f%%", state.statistics.gmiPercent)} (${state.statistics.hba1cMmolMol} mmol/mol). Target: ≤7.0%."
                         )
                     }
                 )
@@ -316,6 +332,7 @@ fun TrendsScreen(
 
     // Detail Popups
     if (detailDialogInfo != null) {
+        val isRu = state.userSettings.language.equals("RU", ignoreCase = true)
         AlertDialog(
             onDismissRequest = { detailDialogInfo = null },
             title = {
@@ -334,7 +351,7 @@ fun TrendsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { detailDialogInfo = null }) {
-                    Text(text = "Понятно", color = PrimaryEmerald, fontWeight = FontWeight.Bold)
+                    Text(text = if (isRu) "Понятно" else "OK", color = PrimaryEmerald, fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -365,10 +382,10 @@ fun CompactPeriodSelector(
             val isSelected = selectedPeriod == period
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = if (isSelected) PrimaryEmerald else MaterialTheme.colorScheme.surfaceVariant,
+                color = if (isSelected) ActionBlue else MaterialTheme.colorScheme.surfaceVariant,
                 border = BorderStroke(
                     1.dp,
-                    if (isSelected) PrimaryEmerald else MaterialTheme.colorScheme.outline
+                    if (isSelected) ActionBlue else MaterialTheme.colorScheme.outline
                 ),
                 modifier = Modifier
                     .weight(1f)
@@ -381,7 +398,7 @@ fun CompactPeriodSelector(
                     Text(
                         text = stringResource(period.stringResId),
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface,
+                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                         fontSize = 11.5.sp
                     )
@@ -393,10 +410,10 @@ fun CompactPeriodSelector(
         Box(modifier = Modifier.weight(0.7f)) {
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = if (isDropdownSelected) PrimaryEmerald else MaterialTheme.colorScheme.surfaceVariant,
+                color = if (isDropdownSelected) ActionBlue else MaterialTheme.colorScheme.surfaceVariant,
                 border = BorderStroke(
                     1.dp,
-                    if (isDropdownSelected) PrimaryEmerald else MaterialTheme.colorScheme.outline
+                    if (isDropdownSelected) ActionBlue else MaterialTheme.colorScheme.outline
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -410,7 +427,7 @@ fun CompactPeriodSelector(
                         Text(
                             text = if (isDropdownSelected) stringResource(selectedPeriod.stringResId) else "•••",
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (isDropdownSelected) Color.Black else MaterialTheme.colorScheme.onSurface,
+                            color = if (isDropdownSelected) Color.White else MaterialTheme.colorScheme.onSurface,
                             fontWeight = if (isDropdownSelected) FontWeight.Bold else FontWeight.Medium,
                             fontSize = 11.5.sp
                         )

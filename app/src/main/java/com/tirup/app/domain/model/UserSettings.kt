@@ -40,5 +40,6 @@ data class UserSettings(
     val nightStartHour: Int = 0,
     val nightEndHour: Int = 6,
     val themeMode: ThemeMode = ThemeMode.DARK,
-    val patientProfile: PatientProfile = PatientProfile()
+    val patientProfile: PatientProfile = PatientProfile(),
+    val hasSeenOnboarding: Boolean = false
 )

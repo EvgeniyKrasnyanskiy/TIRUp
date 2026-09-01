@@ -64,7 +64,8 @@ class TrendsViewModel(
                         targetRanges = latestSettings.targetRanges,
                         nightStartHour = latestSettings.nightStartHour,
                         nightEndHour = latestSettings.nightEndHour,
-                        language = latestSettings.language
+                        language = latestSettings.language,
+                        unit = latestSettings.unit
                     )
                     val agpBins = AGPPercentilesCalculator.calculatePercentiles(readings, binsCount = 48)
                     val heatmap = AGPPercentilesCalculator.calculateHeatmap(

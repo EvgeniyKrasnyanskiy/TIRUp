@@ -177,8 +177,10 @@ fun AgpChart(
             }
 
             // Y-axis target labels
-            drawContext.canvas.nativeCanvas.drawText("10.0", 6f, yTirHigh - 4f, labelPaint)
-            drawContext.canvas.nativeCanvas.drawText("3.9", 6f, yTirLow - 4f, labelPaint)
+            val highLabel = if (unit == GlucoseUnit.MMOL_L) "10.0" else "180"
+            val lowLabel = if (unit == GlucoseUnit.MMOL_L) "3.9" else "70"
+            drawContext.canvas.nativeCanvas.drawText(highLabel, 6f, yTirHigh - 4f, labelPaint)
+            drawContext.canvas.nativeCanvas.drawText(lowLabel, 6f, yTirLow - 4f, labelPaint)
         }
     }
 }

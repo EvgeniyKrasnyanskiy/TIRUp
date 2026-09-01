@@ -48,12 +48,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.tirup.app.TirupApplication
 import com.tirup.app.domain.model.ThemeMode
+import com.tirup.app.presentation.components.HelpAndDisclaimerDialog
 import com.tirup.app.presentation.focus.FocusScreen
 import com.tirup.app.presentation.focus.FocusViewModel
 import com.tirup.app.presentation.reports.ReportsScreen
 import com.tirup.app.presentation.reports.ReportsViewModel
 import com.tirup.app.presentation.settings.SettingsScreen
 import com.tirup.app.presentation.settings.SettingsViewModel
+import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.PrimaryEmerald
 import com.tirup.app.presentation.theme.TIRUpTheme
 import com.tirup.app.presentation.trends.TrendsScreen
@@ -147,6 +149,17 @@ fun AppNavigationRoot(
     settingsViewModel: SettingsViewModel
 ) {
     val navController = rememberNavController()
+    val settingsState by settingsViewModel.uiState.collectAsState()
+
+    if (!settingsState.userSettings.hasSeenOnboarding) {
+        val isRu = settingsState.userSettings.language.equals("RU", ignoreCase = true)
+        HelpAndDisclaimerDialog(
+            isRu = isRu,
+            onDismiss = {
+                settingsViewModel.setHasSeenOnboarding(true)
+            }
+        )
+    }
 
     NavHost(
         navController = navController,
@@ -230,7 +243,7 @@ fun MainPagerScaffold(
                             },
                             label = null,
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = PrimaryEmerald,
+                                selectedIconColor = ActionBlue,
                                 unselectedIconColor = MaterialTheme.colorScheme.outline,
                                 indicatorColor = Color.Transparent
                             )

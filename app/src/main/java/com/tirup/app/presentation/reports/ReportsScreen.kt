@@ -54,6 +54,7 @@ import com.tirup.app.domain.model.GlucoseStatistics
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.presentation.components.BentoCard
 import com.tirup.app.presentation.components.RangeDistributionBar
+import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
@@ -121,12 +122,12 @@ fun ReportsScreen(
                 Spacer(modifier = Modifier.width(4.dp))
                 Column {
                     Text(
-                        text = "Медицинский отчёт",
+                        text = stringResource(R.string.reports_title),
                         style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Стандартизированный экспорт бланка AGP для врача",
+                        text = stringResource(R.string.reports_subtitle),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -156,6 +157,8 @@ fun ReportsScreen(
         item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 
+    val isRu = state.userSettings.language.equals("RU", ignoreCase = true)
+
     // Live Report AGP Sheet Preview Modal
     if (state.showLiveDetailDialog) {
         val minTs = state.liveReadings.minOfOrNull { it.timestamp } ?: System.currentTimeMillis()
@@ -163,12 +166,12 @@ fun ReportsScreen(
         val fmt = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
         val dateRangeStr = "${fmt.format(Date(minTs))} — ${fmt.format(Date(maxTs))}"
         val periodName = when (state.livePeriod) {
-            TrendPeriod.PERIOD_7D -> "7 Дней"
-            TrendPeriod.PERIOD_14D -> "14 Дней (AGP)"
-            TrendPeriod.PERIOD_30D -> "30 Дней"
-            TrendPeriod.PERIOD_90D -> "90 Дней"
-            TrendPeriod.PERIOD_YEAR -> "1 Год"
-            TrendPeriod.PERIOD_ALL -> "Всё время"
+            TrendPeriod.PERIOD_7D -> if (isRu) "7 Дней" else "7 Days"
+            TrendPeriod.PERIOD_14D -> if (isRu) "14 Дней (AGP)" else "14 Days (AGP)"
+            TrendPeriod.PERIOD_30D -> if (isRu) "30 Дней" else "30 Days"
+            TrendPeriod.PERIOD_90D -> if (isRu) "90 Дней" else "90 Days"
+            TrendPeriod.PERIOD_YEAR -> if (isRu) "1 Год" else "1 Year"
+            TrendPeriod.PERIOD_ALL -> if (isRu) "Всё время" else "All Time"
         }
 
         AgpSheetPreviewModal(
@@ -190,7 +193,7 @@ fun ReportsScreen(
         val hist = state.historicalReport
         AgpSheetPreviewModal(
             title = stringResource(R.string.report_historical_title),
-            periodLabel = "Исторический отчёт",
+            periodLabel = if (isRu) "Исторический отчёт" else "Historical Report",
             dateRangeStr = hist.dateRangeStr,
             readings = hist.readings,
             statistics = hist.statistics,
@@ -210,6 +213,7 @@ private fun LiveReportCard(
     onCardClick: () -> Unit
 ) {
     val stats = state.liveStatistics
+    val isRu = state.userSettings.language.equals("RU", ignoreCase = true)
 
     BentoCard(
         modifier = Modifier
@@ -248,7 +252,8 @@ private fun LiveReportCard(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "${state.liveReadings.size} точек • ${stats.daysCount} дн. (нажмите для бланка)",
+                            text = if (isRu) "${state.liveReadings.size} точек • ${stats.daysCount} дн. (нажмите для бланка)"
+                                   else "${state.liveReadings.size} readings • ${stats.daysCount} days (tap to preview)",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -281,7 +286,7 @@ private fun LiveReportCard(
             )
 
             // Parameters with Active Time at the very TOP
-            ReportMetricsColumn(stats = stats, unit = state.userSettings.unit)
+            ReportMetricsColumn(stats = stats, unit = state.userSettings.unit, language = state.userSettings.language)
 
             // Bottom Buttons Row (Save PDF & Share)
             Row(
@@ -295,14 +300,14 @@ private fun LiveReportCard(
                         .height(40.dp),
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = PrimaryEmerald,
-                        contentColor = Color.Black
+                        containerColor = ActionBlue,
+                        contentColor = Color.White
                     ),
                     enabled = state.liveReadings.isNotEmpty() && !state.isGeneratingLive
                 ) {
                     Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "Сохранить PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(text = if (isRu) "Сохранить PDF" else "Save PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
 
                 OutlinedButton(
@@ -311,15 +316,15 @@ private fun LiveReportCard(
                         .weight(1f)
                         .height(40.dp),
                     shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, PrimaryEmerald),
+                    border = BorderStroke(1.dp, ActionBlue),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = PrimaryEmerald
+                        contentColor = ActionBlue
                     ),
                     enabled = state.liveReadings.isNotEmpty() && !state.isGeneratingLive
                 ) {
                     Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "Поделиться", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(text = if (isRu) "Поделиться" else "Share", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -334,6 +339,7 @@ private fun HistoricalReportCard(
     onCardClick: () -> Unit
 ) {
     val hist = state.historicalReport
+    val isRu = state.userSettings.language.equals("RU", ignoreCase = true)
 
     BentoCard(
         modifier = Modifier
@@ -377,7 +383,12 @@ private fun HistoricalReportCard(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = if (hist.hasData) "${hist.readings.size} точек • ${hist.dateRangeStr} (бланк)" else "Импорт из xDrip CSV / ZIP",
+                            text = if (hist.hasData) {
+                                if (isRu) "${hist.readings.size} точек • ${hist.dateRangeStr} (бланк)"
+                                else "${hist.readings.size} readings • ${hist.dateRangeStr} (preview)"
+                            } else {
+                                if (isRu) "Импорт из xDrip CSV / ZIP" else "Import from xDrip CSV / ZIP"
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -427,7 +438,7 @@ private fun HistoricalReportCard(
                         color = PrimaryEmerald
                     )
                     Text(
-                        text = "Импорт и обработка данных...",
+                        text = if (isRu) "Импорт и обработка данных..." else "Importing and processing data...",
                         style = MaterialTheme.typography.bodySmall,
                         color = PrimaryEmerald,
                         fontWeight = FontWeight.SemiBold
@@ -447,7 +458,7 @@ private fun HistoricalReportCard(
                 )
 
                 // Parameters with Active Time at the very TOP
-                ReportMetricsColumn(stats = hist.statistics, unit = state.userSettings.unit)
+                ReportMetricsColumn(stats = hist.statistics, unit = state.userSettings.unit, language = state.userSettings.language)
 
                 // Action Buttons Row (Save PDF, Share, and Load File)
                 Row(
@@ -461,13 +472,13 @@ private fun HistoricalReportCard(
                             .height(40.dp),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = PrimaryEmerald,
-                            contentColor = Color.Black
+                            containerColor = ActionBlue,
+                            contentColor = Color.White
                         )
                     ) {
                         Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "Сохранить PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(text = if (isRu) "Сохранить PDF" else "Save PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
 
                     OutlinedButton(
@@ -476,14 +487,14 @@ private fun HistoricalReportCard(
                             .weight(1f)
                             .height(40.dp),
                         shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, PrimaryEmerald),
+                        border = BorderStroke(1.dp, ActionBlue),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = PrimaryEmerald
+                            contentColor = ActionBlue
                         )
                     ) {
                         Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "Поделиться", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(text = if (isRu) "Поделиться" else "Share", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
 
                     OutlinedButton(
@@ -492,14 +503,14 @@ private fun HistoricalReportCard(
                             .weight(1.1f)
                             .height(40.dp),
                         shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.5f)),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            contentColor = ActionBlue
                         )
                     ) {
-                        Icon(imageVector = Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF818CF8))
+                        Icon(imageVector = Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp), tint = ActionBlue)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "Загрузить файл", fontSize = 12.sp)
+                        Text(text = if (isRu) "Загрузить файл" else "Import File", fontSize = 12.sp)
                     }
                 }
             } else {
@@ -509,23 +520,26 @@ private fun HistoricalReportCard(
                         .fillMaxWidth()
                         .height(46.dp),
                     shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, ActionBlue),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = ActionBlue
+                    ),
                     enabled = !state.isImporting
                 ) {
                     if (state.isImporting) {
                         CircularProgressIndicator(
-                            color = PrimaryEmerald,
+                            color = ActionBlue,
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     } else {
-                        Icon(imageVector = Icons.Default.FileUpload, contentDescription = null, tint = PrimaryEmerald)
+                        Icon(imageVector = Icons.Default.FileUpload, contentDescription = null, tint = ActionBlue)
                         Spacer(modifier = Modifier.width(8.dp))
                     }
                     Text(
-                        text = "Загрузить файл",
-                        color = MaterialTheme.colorScheme.onSurface,
+                        text = if (isRu) "Загрузить файл" else "Import File",
+                        color = ActionBlue,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -545,8 +559,10 @@ private fun HistoricalReportCard(
 @Composable
 private fun ReportMetricsColumn(
     stats: GlucoseStatistics,
-    unit: GlucoseUnit
+    unit: GlucoseUnit,
+    language: String = "RU"
 ) {
+    val isRu = language.equals("RU", ignoreCase = true)
     val isMmol = unit == GlucoseUnit.MMOL_L
     val meanVal = if (isMmol) String.format(Locale.US, "%.1f mmol/L", stats.meanMmol) else String.format(Locale.US, "%d mg/dL", (stats.meanMmol * 18.0182).toInt())
     val onSurface = MaterialTheme.colorScheme.onSurface
@@ -593,70 +609,90 @@ private fun ReportMetricsColumn(
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         ReportMetricRow(
-            label = "$atEmoji Активное время сенсора",
-            target = "Цель: ≥70.0%",
+            label = if (isRu) "$atEmoji Активное время сенсора" else "$atEmoji Active CGM Time",
+            target = if (isRu) "Цель: ≥70.0%" else "Target: ≥70.0%",
             value = String.format(Locale.US, "%.1f%%", stats.activeTimePercent),
             valueColor = atColor
         )
         ReportMetricRow(
-            label = "Mean BG (средний сахар)",
-            target = "Цель: ≤7.8",
+            label = if (isRu) "Mean BG (средний сахар)" else "Mean BG (average glucose)",
+            target = if (isMmol) (if (isRu) "Цель: ≤7.8" else "Target: ≤7.8") else (if (isRu) "Цель: ≤140" else "Target: ≤140"),
             value = meanVal,
             valueColor = meanColor
         )
         ReportMetricRow(
-            label = "eA1c (расчётный ГГ)",
-            target = "Цель: ≤7.0%",
+            label = if (isRu) "eA1c (расчётный ГГ)" else "eA1c (estimated A1c)",
+            target = if (isRu) "Цель: ≤7.0%" else "Target: ≤7.0%",
             value = String.format(Locale.US, "%.1f%%", stats.gmiPercent),
             valueColor = gmiColor
         )
+        val tirLabel = if (isMmol) {
+            if (isRu) "TIR (3.9–10.0 ммоль/л)" else "TIR (3.9–10.0 mmol/L)"
+        } else {
+            if (isRu) "TIR (70–180 мг/дл)" else "TIR (70–180 mg/dL)"
+        }
         ReportMetricRow(
-            label = "TIR (3.9–10.0 ммоль/л)",
-            target = "Цель: ≥70%",
+            label = tirLabel,
+            target = if (isRu) "Цель: ≥70%" else "Target: ≥70%",
             value = String.format(Locale.US, "%.0f%%", stats.tirPercent),
             valueColor = tirColor
         )
+        val tingLabel = if (isMmol) {
+            if (isRu) "TING (3.9–7.8 ммоль/л)" else "TING (3.9–7.8 mmol/L)"
+        } else {
+            if (isRu) "TING (70–140 мг/дл)" else "TING (70–140 mg/dL)"
+        }
         ReportMetricRow(
-            label = "TING (3.9–7.8 ммоль/л)",
-            target = "Цель: ≥50%",
+            label = tingLabel,
+            target = if (isRu) "Цель: ≥50%" else "Target: ≥50%",
             value = String.format(Locale.US, "%.0f%%", stats.tingPercent),
             valueColor = if (stats.tingPercent >= 50.0) PrimaryEmerald else ColorHigh
         )
         val tbrTotal = stats.tbrLowPercent + stats.tbrVeryLowPercent
+        val tbrLabel = if (isMmol) {
+            if (isRu) "TBR < 3.9 ммоль/л" else "TBR < 3.9 mmol/L"
+        } else {
+            if (isRu) "TBR < 70 мг/дл" else "TBR < 70 mg/dL"
+        }
         ReportMetricRow(
-            label = "TBR < 3.9 ммоль/л",
-            target = "Цель: <4%",
+            label = tbrLabel,
+            target = if (isRu) "Цель: <4%" else "Target: <4%",
             value = String.format(Locale.US, "%.1f%%", tbrTotal),
             valueColor = if (tbrTotal <= 4.0) PrimaryEmerald else ColorVeryHigh
         )
         val tarTotal = stats.tarHighPercent + stats.tarVeryHighPercent
+        val tarLabel = if (isMmol) {
+            if (isRu) "TAR > 10.0 ммоль/л" else "TAR > 10.0 mmol/L"
+        } else {
+            if (isRu) "TAR > 180 мг/дл" else "TAR > 180 mg/dL"
+        }
         ReportMetricRow(
-            label = "TAR > 10.0 ммоль/л",
-            target = "Цель: <25%",
+            label = tarLabel,
+            target = if (isRu) "Цель: <25%" else "Target: <25%",
             value = String.format(Locale.US, "%.0f%%", tarTotal),
             valueColor = if (tarTotal <= 25.0) PrimaryEmerald else ColorHigh
         )
         ReportMetricRow(
-            label = "GVI (лабильность)",
-            target = "Цель: ≤1.20",
+            label = if (isRu) "GVI (лабильность)" else "GVI (glycemic variability)",
+            target = if (isRu) "Цель: ≤1.20" else "Target: ≤1.20",
             value = String.format(Locale.US, "%.2f", stats.gvi),
             valueColor = if (stats.gvi <= 1.20) PrimaryEmerald else ColorHigh
         )
         ReportMetricRow(
-            label = "PGS (гликемический статус)",
-            target = "Цель: ≤35.0",
+            label = if (isRu) "PGS (гликемический статус)" else "PGS (patient status)",
+            target = if (isRu) "Цель: ≤35.0" else "Target: ≤35.0",
             value = String.format(Locale.US, "%.1f", stats.pgs),
             valueColor = if (stats.pgs <= 35.0) PrimaryEmerald else ColorHigh
         )
         ReportMetricRow(
-            label = "Вариабельность (%CV)",
-            target = "Цель: ≤36.0%",
+            label = if (isRu) "Вариабельность (%CV)" else "Variability (%CV)",
+            target = if (isRu) "Цель: ≤36.0%" else "Target: ≤36.0%",
             value = String.format(Locale.US, "%.1f%%", stats.cvPercent),
             valueColor = cvColor
         )
         ReportMetricRow(
-            label = "GRI (индекс риска)",
-            target = "Цель: ≤40.0",
+            label = if (isRu) "GRI (индекс риска)" else "GRI (glycemia risk)",
+            target = if (isRu) "Цель: ≤40.0" else "Target: ≤40.0",
             value = String.format(Locale.US, "%.1f (%s)", stats.gri, stats.griLabel),
             valueColor = griColor
         )

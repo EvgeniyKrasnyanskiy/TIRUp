@@ -116,15 +116,17 @@ class ReportsViewModel(
                         targetRanges = latestSettings.targetRanges,
                         nightStartHour = latestSettings.nightStartHour,
                         nightEndHour = latestSettings.nightEndHour,
-                        language = latestSettings.language
+                        language = latestSettings.language,
+                        unit = latestSettings.unit
                     )
-                    Pair(readings, stats)
+                    Triple(readings, stats, latestSettings)
                 }
-            }.collect { (readings, stats) ->
+            }.collect { (readings, stats, latestSettings) ->
                 _uiState.value = _uiState.value.copy(
                     livePeriod = _livePeriod.value,
                     liveReadings = readings,
-                    liveStatistics = stats
+                    liveStatistics = stats,
+                    userSettings = latestSettings
                 )
             }
         }
@@ -148,7 +150,8 @@ class ReportsViewModel(
                         targetRanges = settings.targetRanges,
                         nightStartHour = settings.nightStartHour,
                         nightEndHour = settings.nightEndHour,
-                        language = settings.language
+                        language = settings.language,
+                        unit = settings.unit
                     )
                     val minTs = readings.minOf { it.timestamp }
                     val maxTs = readings.maxOf { it.timestamp }
