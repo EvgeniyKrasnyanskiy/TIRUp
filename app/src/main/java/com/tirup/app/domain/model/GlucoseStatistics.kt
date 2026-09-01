@@ -65,12 +65,23 @@ enum class CompensatorStatus {
 data class CompensatorGoal(
     val targetMode: TargetMode = TargetMode.TIR,
     val targetGoalPercent: Double = 70.0,
-    val totalDays: Int = 7,
-    val pastDays: Int = 4,
-    val remainingDays: Int = 3,
+    val totalDays: Int = 1,
+    val pastDays: Int = 1,
+    val remainingDays: Int = 0,
     val pastAveragePercent: Double = 65.0,
-    val neededRemainingPercent: Double = 76.7,
-    val status: CompensatorStatus = CompensatorStatus.REACHABLE
+    val neededRemainingPercent: Double = 70.0,
+    val status: CompensatorStatus = CompensatorStatus.REACHABLE,
+    val currentScore: Double = 0.0,
+    val inRangeMinutes: Int = 0,
+    val outOfRangeMinutes: Int = 0,
+    val targetGoalMinutes: Int = 1008,
+    val allowedOutMinutes: Int = 432,
+    val remainingMinutesToday: Int = 0,
+    val neededMinutesToday: Int = 0,
+    val maxPossibleTir: Double = 100.0,
+    val isCurrentlyInRange: Boolean = true,
+    val recommendationRu: String = "",
+    val recommendationEn: String = ""
 )
 
 data class AGPPercentileBin(

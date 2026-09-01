@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tirup.app.R
+import com.tirup.app.domain.calculator.TargetCompensatorCalculator
 import com.tirup.app.domain.model.CompensatorStatus
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseUnit
@@ -144,23 +145,17 @@ fun FocusScreen(
             )
         }
 
-        // 2. Goal Compensator: dynamic progress bar reflecting % achieved
+        // 2. Goal Compensator: dynamic daily progress bar reflecting % achieved
         item {
             val currentScore = if (targetMode == TargetMode.TIR) state.statistics.tirPercent else state.statistics.tingPercent
             val targetGoal = if (targetMode == TargetMode.TIR) userSettings.targetRanges.tirGoalPercent else userSettings.targetRanges.tingGoalPercent
 
             val compMessage = if (isRu) {
-                when (goal.status) {
-                    CompensatorStatus.EXCEEDING -> "Отличный темп! Вы опережаете цель. Поддерживайте ≥${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)} в оставшиеся ${goal.remainingDays} дн."
-                    CompensatorStatus.REACHABLE -> "Для достижения цели удерживайте ${goal.targetMode.name} ≥${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)} в оставшиеся ${goal.remainingDays} дн."
-                    CompensatorStatus.UNREALISTIC -> "Цель периода труднодостижима (${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)}). Сфокусируйтесь на сегодняшнем дне."
-                }
+                if (goal.recommendationRu.isNotEmpty()) goal.recommendationRu
+                else "Удерживайте сахар в диапазоне для достижения цели."
             } else {
-                when (goal.status) {
-                    CompensatorStatus.EXCEEDING -> "Great pace! You are ahead of target. Maintain ≥${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)} over remaining ${goal.remainingDays} days."
-                    CompensatorStatus.REACHABLE -> "To reach goal, keep ${goal.targetMode.name} ≥${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)} over remaining ${goal.remainingDays} days."
-                    CompensatorStatus.UNREALISTIC -> "Period goal is difficult to reach (${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)}). Focus on today."
-                }
+                if (goal.recommendationEn.isNotEmpty()) goal.recommendationEn
+                else "Maintain glucose in target range to reach goal."
             }
 
             TargetCompensatorCard(
@@ -171,10 +166,29 @@ fun FocusScreen(
                 remainingDays = goal.remainingDays,
                 isRu = isRu,
                 onClick = {
+                    val inRangeStr = TargetCompensatorCalculator.formatHoursMins(goal.inRangeMinutes, isRu)
+                    val targetMinsStr = TargetCompensatorCalculator.formatHoursMins(goal.targetGoalMinutes, isRu)
+                    val outOfRangeStr = TargetCompensatorCalculator.formatHoursMins(goal.outOfRangeMinutes, isRu)
+                    val allowedOutStr = TargetCompensatorCalculator.formatHoursMins(goal.allowedOutMinutes, isRu)
+                    val remainingDayStr = TargetCompensatorCalculator.formatHoursMins(goal.remainingMinutesToday, isRu)
+
+                    val dialogBody = if (isRu) {
+                        "Текущий ${targetMode.name}: ${String.format(Locale.US, "%.1f%%", currentScore)} (Цель: ≥$targetGoal%)\n\n" +
+                        "• В диапазоне за сегодня: $inRangeStr (норма ≥$targetMinsStr)\n" +
+                        "• Вне диапазона за сегодня: $outOfRangeStr (допустимый лимит: $allowedOutStr)\n" +
+                        "• До конца суток осталось: $remainingDayStr\n\n" +
+                        "Рекомендация: $compMessage"
+                    } else {
+                        "Current ${targetMode.name}: ${String.format(Locale.US, "%.1f%%", currentScore)} (Target: ≥$targetGoal%)\n\n" +
+                        "• In range today: $inRangeStr (target ≥$targetMinsStr)\n" +
+                        "• Out of range today: $outOfRangeStr (allowed limit: $allowedOutStr)\n" +
+                        "• Remaining today: $remainingDayStr\n\n" +
+                        "Recommendation: $compMessage"
+                    }
+
                     detailDialogInfo = Pair(
-                        if (isRu) "Компенсатор цели" else "Goal Compensator",
-                        if (isRu) "Текущий показатель: ${String.format(Locale.US, "%.1f%%", currentScore)}\nЦелевой порог: ≥$targetGoal%\nСтатус: $compMessage\nОсталось дней в окне: ${goal.remainingDays} дн."
-                        else "Current score: ${String.format(Locale.US, "%.1f%%", currentScore)}\nTarget goal: ≥$targetGoal%\nStatus: $compMessage\nDays remaining in window: ${goal.remainingDays} days."
+                        if (isRu) "Суточный компенсатор цели" else "Daily Goal Compensator",
+                        dialogBody
                     )
                 }
             )
@@ -614,7 +628,7 @@ private fun TargetCompensatorCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (isRu) "Компенсатор цели" else "Goal Compensator",
+                        text = if (isRu) "Суточный компенсатор" else "Daily Goal Compensator",
                         style = MaterialTheme.typography.titleMedium,
                         color = onSurface
                     )

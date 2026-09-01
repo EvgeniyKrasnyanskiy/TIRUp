@@ -56,12 +56,13 @@ class FocusViewModel(
                     stats.tingPercent
                 }
 
-                val compensator = TargetCompensatorCalculator.calculateCompensator(
+                val compensator = TargetCompensatorCalculator.calculateDailyCompensator(
                     targetMode = settings.targetMode,
                     targetPercent = targetPercent,
-                    totalDays = settings.periodDays,
-                    pastDays = (settings.periodDays / 2).coerceAtLeast(1),
-                    pastAveragePercent = currentScore
+                    latestReading = latest,
+                    recentReadings = recent,
+                    targetRanges = settings.targetRanges,
+                    language = settings.language
                 )
 
                 FocusUiState(

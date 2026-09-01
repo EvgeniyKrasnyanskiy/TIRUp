@@ -74,4 +74,50 @@ class TargetCompensatorCalculatorTest {
         assertEquals(7, goal.remainingDays)
         assertEquals(70.0, goal.neededRemainingPercent, 0.01)
     }
+
+    @Test
+    fun testFormatHoursMins() {
+        assertEquals("3 ч 40 мин", TargetCompensatorCalculator.formatHoursMins(220, true))
+        assertEquals("3h 40m", TargetCompensatorCalculator.formatHoursMins(220, false))
+        assertEquals("2 ч", TargetCompensatorCalculator.formatHoursMins(120, true))
+        assertEquals("45 мин", TargetCompensatorCalculator.formatHoursMins(45, true))
+    }
+
+    @Test
+    fun testDailyCompensatorOutOfRange() {
+        val ranges = com.tirup.app.domain.model.TargetRanges()
+        val refTime = 1700000000000L // arbitrary fixed time
+        val calendar = java.util.Calendar.getInstance().apply {
+            timeInMillis = refTime
+            set(java.util.Calendar.HOUR_OF_DAY, 12)
+            set(java.util.Calendar.MINUTE, 0)
+        }
+        val noonTime = calendar.timeInMillis
+
+        // Readings around noon: some in range, latest out of range (high)
+        val latest = com.tirup.app.domain.model.GlucoseReading(
+            timestamp = noonTime,
+            valueMmol = 11.5,
+            trendArrow = "↑"
+        )
+        val readings = listOf(
+            com.tirup.app.domain.model.GlucoseReading(timestamp = noonTime - 3600000L, valueMmol = 6.0),
+            com.tirup.app.domain.model.GlucoseReading(timestamp = noonTime - 1800000L, valueMmol = 7.0),
+            latest
+        )
+
+        val goal = TargetCompensatorCalculator.calculateDailyCompensator(
+            targetMode = TargetMode.TIR,
+            targetPercent = 70.0,
+            latestReading = latest,
+            recentReadings = readings,
+            targetRanges = ranges,
+            language = "RU",
+            referenceTimestamp = noonTime
+        )
+
+        org.junit.Assert.assertFalse(goal.isCurrentlyInRange)
+        org.junit.Assert.assertTrue(goal.recommendationRu.contains("Сахар вне диапазона"))
+        org.junit.Assert.assertTrue(goal.recommendationRu.contains("Вернитесь в норму"))
+    }
 }
