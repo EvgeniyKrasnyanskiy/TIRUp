@@ -125,12 +125,12 @@ fun ReportsScreen(
                 Spacer(modifier = Modifier.width(4.dp))
                 Column {
                     Text(
-                        text = stringResource(R.string.reports_title),
+                        text = "Медицинский отчёт",
                         style = MaterialTheme.typography.headlineMedium,
                         color = TextPrimaryDark
                     )
                     Text(
-                        text = stringResource(R.string.reports_subtitle),
+                        text = "Стандартизированный экспорт бланка AGP для врача",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextMutedDark
                     )
@@ -223,7 +223,7 @@ private fun LiveReportCard(
         backgroundColor = DarkSurfaceElevated
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            // Header Row: Title & Action Icons
+            // Header Row: Title & PDF Icon
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -252,43 +252,19 @@ private fun LiveReportCard(
                             color = TextPrimaryDark
                         )
                         Text(
-                            text = "${state.liveReadings.size} точек • ${stats.daysCount} дн. (нажмите для превью)",
+                            text = "${state.liveReadings.size} точек • ${stats.daysCount} дн. (нажмите для бланка)",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextMutedDark
                         )
                     }
                 }
 
-                // Action Icons (Save & Share)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (state.isGeneratingLive) {
-                        CircularProgressIndicator(
-                            color = PrimaryEmerald,
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        IconButton(
-                            onClick = { viewModel.saveLivePdfToDownloads() },
-                            enabled = state.liveReadings.isNotEmpty()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Download,
-                                contentDescription = "Save PDF",
-                                tint = if (state.liveReadings.isNotEmpty()) PrimaryEmerald else TextMutedDark
-                            )
-                        }
-                        IconButton(
-                            onClick = { viewModel.generateAndShareLivePdf() },
-                            enabled = state.liveReadings.isNotEmpty()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = "Share PDF",
-                                tint = if (state.liveReadings.isNotEmpty()) PrimaryEmerald else TextMutedDark
-                            )
-                        }
-                    }
+                if (state.isGeneratingLive) {
+                    CircularProgressIndicator(
+                        color = PrimaryEmerald,
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp
+                    )
                 }
             }
 
@@ -308,8 +284,48 @@ private fun LiveReportCard(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Parameters listed line by line
+            // Parameters with Active Time at the very TOP
             ReportMetricsColumn(stats = stats, unit = state.userSettings.unit)
+
+            // Bottom Buttons Row (Save PDF & Share)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = { viewModel.saveLivePdfToDownloads() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PrimaryEmerald,
+                        contentColor = Color.Black
+                    ),
+                    enabled = state.liveReadings.isNotEmpty() && !state.isGeneratingLive
+                ) {
+                    Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "Сохранить PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = { viewModel.generateAndShareLivePdf() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, PrimaryEmerald),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = PrimaryEmerald
+                    ),
+                    enabled = state.liveReadings.isNotEmpty() && !state.isGeneratingLive
+                ) {
+                    Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "Поделиться", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }
@@ -346,7 +362,7 @@ private fun HistoricalReportCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.FileUpload,
+                            imageVector = Icons.Default.PictureAsPdf,
                             contentDescription = null,
                             tint = Color(0xFF818CF8),
                             modifier = Modifier.size(20.dp)
@@ -360,7 +376,7 @@ private fun HistoricalReportCard(
                             color = TextPrimaryDark
                         )
                         Text(
-                            text = if (hist.hasData) "${hist.readings.size} точек • ${hist.dateRangeStr} (превью)" else "xDrip CSV или ZIP файл",
+                            text = if (hist.hasData) "${hist.readings.size} точек • ${hist.dateRangeStr} (бланк)" else "Импорт из xDrip CSV / ZIP",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextMutedDark
                         )
@@ -375,13 +391,6 @@ private fun HistoricalReportCard(
                             strokeWidth = 2.dp
                         )
                     } else if (hist.hasData) {
-                        IconButton(onClick = onPickFile) {
-                            Icon(
-                                imageVector = Icons.Default.FileUpload,
-                                contentDescription = "Replace File",
-                                tint = Color(0xFF818CF8)
-                            )
-                        }
                         IconButton(onClick = { viewModel.clearHistoricalReport() }) {
                             Icon(
                                 imageVector = Icons.Default.DeleteOutline,
@@ -404,7 +413,7 @@ private fun HistoricalReportCard(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Metrics line by line
+                // Parameters with Active Time at the very TOP
                 ReportMetricsColumn(stats = hist.statistics, unit = state.userSettings.unit)
 
                 // Action Buttons Row (Save PDF, Share, and Load File)
@@ -536,17 +545,56 @@ private fun ReportMetricsColumn(
 
     val griColor = if (stats.gri <= 40.0) PrimaryEmerald else ColorHigh
 
+    val atColor = when {
+        stats.activeTimePercent >= 90.0 -> PrimaryEmerald
+        stats.activeTimePercent >= 70.0 -> ColorHigh
+        else -> ColorVeryHigh
+    }
+    val atEmoji = if (stats.activeTimePercent >= 90.0) "🟢" else if (stats.activeTimePercent >= 70.0) "🟡" else "🔴"
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        ReportMetricRow(label = "TIR в целевом (3.9–10.0)", target = "Цель: ≥70%", value = String.format(Locale.US, "%.1f%%", stats.tirPercent), valueColor = tirColor)
-        ReportMetricRow(label = "Средний сахар (Mean)", target = "Цель: ≤7.0", value = meanVal, valueColor = meanColor)
-        ReportMetricRow(label = "Вариабельность (%CV)", target = "Цель: ≤36.0%", value = String.format(Locale.US, "%.1f%%", stats.cvPercent), valueColor = cvColor)
-        ReportMetricRow(label = "Расчётный HbA1c (eA1c)", target = "Цель: ≤6.5%", value = String.format(Locale.US, "%.1f%%", stats.gmiPercent), valueColor = gmiColor)
-        ReportMetricRow(label = "Индекс риска GRI", target = "Цель: ≤40.0", value = String.format(Locale.US, "%.1f (%s)", stats.gri, stats.griLabel), valueColor = griColor)
+        // Active time at the very TOP
+        ReportMetricRow(
+            label = "$atEmoji Активное время сенсора",
+            target = "Валидность: ≥70%",
+            value = String.format(Locale.US, "%.1f%%", stats.activeTimePercent),
+            valueColor = atColor
+        )
+        ReportMetricRow(
+            label = "TIR в целевом (3.9–10.0)",
+            target = "Цель: ≥70%",
+            value = String.format(Locale.US, "%.1f%%", stats.tirPercent),
+            valueColor = tirColor
+        )
+        ReportMetricRow(
+            label = "Средний сахар (Mean)",
+            target = "Цель: ≤7.0",
+            value = meanVal,
+            valueColor = meanColor
+        )
+        ReportMetricRow(
+            label = "Вариабельность (%CV)",
+            target = "Цель: ≤36.0%",
+            value = String.format(Locale.US, "%.1f%%", stats.cvPercent),
+            valueColor = cvColor
+        )
+        ReportMetricRow(
+            label = "Расчётный HbA1c (eA1c)",
+            target = "Цель: ≤6.5%",
+            value = String.format(Locale.US, "%.1f%%", stats.gmiPercent),
+            valueColor = gmiColor
+        )
+        ReportMetricRow(
+            label = "Индекс риска GRI",
+            target = "Цель: ≤40.0",
+            value = String.format(Locale.US, "%.1f (%s)", stats.gri, stats.griLabel),
+            valueColor = griColor
+        )
     }
 }
 

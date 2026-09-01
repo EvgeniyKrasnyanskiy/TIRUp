@@ -31,30 +31,30 @@
     <string name="just_now">Just now</string>
 
     <!-- Trends & AGP -->
-    <string name="trends_title">Trends &amp; AGP Analytics</string>
+    <string name="trends_title">Trends Analytics</string>
     <string name="period_7d">7D</string>
-    <string name="period_14d">14D (Std)</string>
+    <string name="period_14d">14D (AGP)</string>
     <string name="period_30d">30D</string>
     <string name="period_90d">90D</string>
     <string name="period_year">1 Year</string>
     <string name="period_all">All Time</string>
-    <string name="period_more">More</string>
+    <string name="period_more">...</string>
     <string name="agp_curve_title">Ambulatory Glucose Profile (AGP)</string>
     <string name="agp_median">50% Median</string>
-    <string name="agp_interquartile">25–75% Range</string>
-    <string name="agp_outer">10–90% Range</string>
+    <string name="agp_interquartile">25–75% Interquartile</string>
+    <string name="agp_outer">10–90% Percentiles</string>
     <string name="agp_target_range">Target Range (%1$.1f - %2$.1f)</string>
-    <string name="tir_breakdown">Time in Ranges Breakdown</string>
+    <string name="tir_breakdown">Time in Ranges</string>
     <string name="range_very_low">Very Low (&lt;3.0)</string>
     <string name="range_low">Low (3.0–3.8)</string>
-    <string name="range_in_range">In Range (3.9–10.0)</string>
-    <string name="range_tight">Tight Range (3.9–7.8)</string>
+    <string name="range_in_range">Target (3.9–10.0)</string>
+    <string name="range_tight">Tight (3.9–7.8)</string>
     <string name="range_high">High (10.1–13.9)</string>
     <string name="range_very_high">Very High (≥14.0)</string>
 
     <!-- Reports -->
-    <string name="reports_title">Medical Report (AGP)</string>
-    <string name="reports_subtitle">Single-page standardized clinical document</string>
+    <string name="reports_title">Medical Report</string>
+    <string name="reports_subtitle">Standardized AGP Sheet for Physician</string>
     <string name="report_live_title">Current Report (Live Broadcast)</string>
     <string name="report_historical_title">Historical Report (from xDrip file)</string>
     <string name="report_period_title">Report Period</string>

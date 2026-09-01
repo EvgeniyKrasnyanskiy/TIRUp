@@ -43,10 +43,6 @@ import com.tirup.app.domain.calculator.AGPPercentilesCalculator
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseStatistics
 import com.tirup.app.domain.model.UserSettings
-import com.tirup.app.presentation.theme.ColorHigh
-import com.tirup.app.presentation.theme.ColorTight
-import com.tirup.app.presentation.theme.ColorVeryHigh
-import com.tirup.app.presentation.theme.ColorVeryLow
 import com.tirup.app.presentation.theme.PrimaryEmerald
 import com.tirup.app.presentation.trends.AgpChart
 import java.text.SimpleDateFormat
@@ -69,6 +65,11 @@ fun AgpSheetPreviewModal(
     val patient = userSettings.patientProfile
     val agpBins = AGPPercentilesCalculator.calculatePercentiles(readings, binsCount = 48)
 
+    val tirOk = statistics.tirPercent >= 70.0
+    val hypoOk = (statistics.tbrLowPercent + statistics.tbrVeryLowPercent) <= 4.0
+    val cvOk = statistics.cvPercent <= 36.0
+    val griOk = statistics.gri <= 40.0
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -76,9 +77,9 @@ fun AgpSheetPreviewModal(
         Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 10.dp, vertical = 16.dp),
+                .padding(horizontal = 10.dp, vertical = 14.dp),
             shape = RoundedCornerShape(20.dp),
-            color = Color(0xFFF8FAFC), // Clean white-slate medical sheet
+            color = Color(0xFFF8FAFC),
             shadowElevation = 12.dp
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -87,12 +88,12 @@ fun AgpSheetPreviewModal(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color(0xFF0F172A))
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Предпросмотр бланка отчёта",
+                        text = "Предпросмотр бланка AGP",
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White,
                         fontWeight = FontWeight.Bold
@@ -106,8 +107,8 @@ fun AgpSheetPreviewModal(
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // 1. Header Banner
                     item {
@@ -117,38 +118,38 @@ fun AgpSheetPreviewModal(
                             border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Text(
                                     text = "АМБУЛАТОРНЫЙ ГЛЮКОЗНЫЙ ПРОФИЛЬ (AGP)",
-                                    fontSize = 16.sp,
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF0F172A)
                                 )
 
-                                val pName = if (patient.fullName.isNotBlank()) patient.fullName else "____________________"
-                                val pAge = if (patient.age.isNotBlank()) "${patient.age} л." else "____"
-                                val pWeight = if (patient.weightKg.isNotBlank()) "${patient.weightKg} кг" else "____"
-                                val pHeight = if (patient.heightCm.isNotBlank()) "${patient.heightCm} см" else "____"
-                                val pType = if (patient.diabetesType.isNotBlank()) patient.diabetesType else "____"
-                                val pDur = if (patient.diabetesDurationYears.isNotBlank()) "(${patient.diabetesDurationYears} л.)" else ""
+                                val pName = if (patient.fullName.isNotBlank()) patient.fullName else "___________________________________"
+                                val pAge = if (patient.fullName.isNotBlank() || patient.birthYear != 1990) "${patient.calculatedAge} лет" else "_______"
+                                val pWeight = if (patient.weightKg.isNotBlank()) "${patient.weightKg} кг" else "_______"
+                                val pHeight = if (patient.heightCm.isNotBlank()) "${patient.heightCm} см" else "_______"
+                                val pType = patient.diabetesType
+                                val pDur = "${patient.calculatedDuration} лет"
+                                val pTherapy = patient.therapyType
 
                                 Text(
-                                    text = "Пациент: $pName • Возраст: $pAge • Вес: $pWeight • Рост: $pHeight • Тип: $pType $pDur",
-                                    fontSize = 11.sp,
+                                    text = "Пациент: $pName • Возраст: $pAge • Вес: $pWeight • Рост: $pHeight • $pType ($pDur) • $pTherapy",
+                                    fontSize = 10.5.sp,
                                     color = Color(0xFF475569)
                                 )
 
                                 val atEmoji = if (statistics.activeTimePercent >= 90.0) "🟢" else if (statistics.activeTimePercent >= 70.0) "🟡" else "🔴"
-
                                 Text(
                                     text = "Период: $periodLabel ($dateRangeStr) • $atEmoji Активное время: ${String.format(Locale.US, "%.1f%%", statistics.activeTimePercent)} • Дней: ${statistics.daysCount} • Точек: ${statistics.totalCount}",
-                                    fontSize = 11.sp,
+                                    fontSize = 10.5.sp,
                                     color = Color(0xFF475569)
                                 )
 
                                 Text(
                                     text = "Сформировано: ${SimpleDateFormat("dd MMMM yyyy HH:mm", Locale("ru")).format(Date())} | Движок TIRUp",
-                                    fontSize = 10.sp,
+                                    fontSize = 9.5.sp,
                                     color = Color(0xFF94A3B8)
                                 )
                             }
@@ -159,7 +160,7 @@ fun AgpSheetPreviewModal(
                     item {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             // Left Box: Time in Ranges
                             Surface(
@@ -168,10 +169,10 @@ fun AgpSheetPreviewModal(
                                 border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                     Text(
                                         text = "ВРЕМЯ В ДИАПАЗОНАХ (TIR/TING)",
-                                        fontSize = 11.sp,
+                                        fontSize = 10.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF0F172A)
                                     )
@@ -192,19 +193,20 @@ fun AgpSheetPreviewModal(
                                 border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
                                 modifier = Modifier.weight(1.15f)
                             ) {
-                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                     Text(
                                         text = "СТАТИСТИКА ГЛЮКОЗЫ И ЦЕЛИ",
-                                        fontSize = 11.sp,
+                                        fontSize = 10.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF0F172A)
                                     )
 
+                                    ReportStatLine("Активное время сенсора:", String.format(Locale.US, "%.1f%% (Цель ≥70.0%%)", statistics.activeTimePercent))
                                     ReportStatLine("Средний сахар (Mean):", String.format(Locale.US, "%.1f ммоль/л (Медиана %.1f)", statistics.meanMmol, statistics.medianMmol))
                                     ReportStatLine("Вариабельность (%CV):", String.format(Locale.US, "%.1f%% (Цель ≤36.0%%) • SD: %.2f", statistics.cvPercent, statistics.sdMmol))
                                     ReportStatLine("Расчётный eA1c (GMI):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol))
-                                    ReportStatLine("Индекс риска GRI:", String.format(Locale.US, "%.1f (%s)", statistics.gri, statistics.griLabel))
-                                    ReportStatLine("Индексы GVI / PGS:", String.format(Locale.US, "GVI %.2f • PGS %.1f", statistics.gvi, statistics.pgs))
+                                    ReportStatLine("Индекс риска GRI:", String.format(Locale.US, "%.1f (%s, цель ≤40.0)", statistics.gri, statistics.griLabel))
+                                    ReportStatLine("Индексы GVI / PGS:", String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs))
                                     val nStart = userSettings.nightStartHour
                                     val nEnd = userSettings.nightEndHour
                                     val nightStr = if (statistics.nightStability.isStable) "Стабильный (TIR ${String.format(Locale.US, "%.0f%%", statistics.nightStability.tirPercent)})" else "Колебания"
@@ -222,16 +224,16 @@ fun AgpSheetPreviewModal(
                             border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(
                                     text = "СВОДНЫЙ СУТОЧНЫЙ ПРОФИЛЬ AGP (НАЛОЖЕНИЕ ${statistics.daysCount} ДНЕЙ ЗА 24 ЧАСА)",
-                                    fontSize = 12.sp,
+                                    fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF0F172A)
                                 )
                                 Text(
-                                    text = "Медиана 50% (зелёная линия), 25–75% межквартильный диапазон и 10–90% перцентильное облако",
-                                    fontSize = 10.sp,
+                                    text = "Медиана 50% (зелёная линия), 25–75% диапазон и 10–90% перцентильное облако",
+                                    fontSize = 9.5.sp,
                                     color = Color(0xFF64748B)
                                 )
 
@@ -241,13 +243,13 @@ fun AgpSheetPreviewModal(
                                     unit = userSettings.unit,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(180.dp)
+                                        .height(175.dp)
                                 )
                             }
                         }
                     }
 
-                    // 4. Clinical Assessment & Notes
+                    // 4. Clinical Assessment & Notes with Status Icons
                     item {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
@@ -255,51 +257,51 @@ fun AgpSheetPreviewModal(
                             border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(
                                     text = "КЛИНИЧЕСКАЯ ОЦЕНКА И ПРИМЕЧАНИЯ ВРАЧА",
-                                    fontSize = 12.sp,
+                                    fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF0F172A)
                                 )
 
                                 Text(
-                                    text = "• Целевой диапазон TIR (≥70% в 3.9–10.0 ммоль/л): " + if (statistics.tirPercent >= 70.0) "ДОСТИГНУТ (${String.format(Locale.US, "%.1f%%", statistics.tirPercent)})" else "НИЖЕ ЦЕЛИ (${String.format(Locale.US, "%.1f%%", statistics.tirPercent)})",
-                                    fontSize = 11.sp,
-                                    color = if (statistics.tirPercent >= 70.0) Color(0xFF059669) else Color(0xFFDC2626),
+                                    text = (if (tirOk) "✔ " else "✘ ") + "Целевой диапазон TIR (≥70% в 3.9–10.0): " + (if (tirOk) "ДОСТИГНУТ (${String.format(Locale.US, "%.1f%%", statistics.tirPercent)})" else "НИЖЕ ЦЕЛИ (${String.format(Locale.US, "%.1f%%", statistics.tirPercent)})"),
+                                    fontSize = 10.5.sp,
+                                    color = if (tirOk) Color(0xFF059669) else Color(0xFFDC2626),
                                     fontWeight = FontWeight.SemiBold
                                 )
 
                                 Text(
-                                    text = "• Риск гипогликемий (<3.9 ммоль/л TBR, норма <4%): " + if ((statistics.tbrLowPercent + statistics.tbrVeryLowPercent) <= 4.0) "БЕЗОПАСНО (${String.format(Locale.US, "%.1f%%", statistics.tbrLowPercent + statistics.tbrVeryLowPercent)})" else "ПОВЫШЕННЫЙ РИСК (${String.format(Locale.US, "%.1f%%", statistics.tbrLowPercent + statistics.tbrVeryLowPercent)})",
-                                    fontSize = 11.sp,
-                                    color = if ((statistics.tbrLowPercent + statistics.tbrVeryLowPercent) <= 4.0) Color(0xFF059669) else Color(0xFFDC2626),
+                                    text = (if (hypoOk) "✔ " else "✘ ") + "Риск гипогликемий (<3.9 ммоль/л TBR, норма <4%): " + (if (hypoOk) "БЕЗОПАСНО (${String.format(Locale.US, "%.1f%%", statistics.tbrLowPercent + statistics.tbrVeryLowPercent)})" else "ПОВЫШЕННЫЙ РИСК (${String.format(Locale.US, "%.1f%%", statistics.tbrLowPercent + statistics.tbrVeryLowPercent)})"),
+                                    fontSize = 10.5.sp,
+                                    color = if (hypoOk) Color(0xFF059669) else Color(0xFFDC2626),
                                     fontWeight = FontWeight.SemiBold
                                 )
 
                                 Text(
-                                    text = "• Вариабельность сахара (%CV, норма ≤36.0%): " + if (statistics.cvPercent <= 36.0) "СТАБИЛЬНЫЙ (${String.format(Locale.US, "%.1f%%", statistics.cvPercent)})" else "ВЫСОКИЕ КОЛЕБАНИЯ (${String.format(Locale.US, "%.1f%%", statistics.cvPercent)})",
-                                    fontSize = 11.sp,
-                                    color = if (statistics.cvPercent <= 36.0) Color(0xFF059669) else Color(0xFFD97706),
+                                    text = (if (cvOk) "✔ " else "⚠️ ") + "Вариабельность сахара (%CV, норма ≤36.0%): " + (if (cvOk) "СТАБИЛЬНЫЙ (${String.format(Locale.US, "%.1f%%", statistics.cvPercent)})" else "ВЫСОКИЕ КОЛЕБАНИЯ (${String.format(Locale.US, "%.1f%%", statistics.cvPercent)})"),
+                                    fontSize = 10.5.sp,
+                                    color = if (cvOk) Color(0xFF059669) else Color(0xFFD97706),
                                     fontWeight = FontWeight.SemiBold
                                 )
 
                                 Text(
-                                    text = "• Индекс риска гликемии GRI (цель ≤40.0): ${String.format(Locale.US, "%.1f", statistics.gri)} (${statistics.griLabel})",
-                                    fontSize = 11.sp,
-                                    color = if (statistics.gri <= 40.0) Color(0xFF059669) else Color(0xFFD97706),
+                                    text = (if (griOk) "✔ " else "⚠️ ") + "Индекс риска гликемии GRI (цель ≤40.0): ${String.format(Locale.US, "%.1f", statistics.gri)} (${statistics.griLabel})",
+                                    fontSize = 10.5.sp,
+                                    color = if (griOk) Color(0xFF059669) else Color(0xFFD97706),
                                     fontWeight = FontWeight.SemiBold
                                 )
 
                                 Text(
                                     text = "• Заключение: ${statistics.clinicalSummary.overallStatus}",
-                                    fontSize = 11.sp,
+                                    fontSize = 10.5.sp,
                                     color = Color(0xFF334155)
                                 )
 
                                 Text(
                                     text = "• Рекомендация: ${statistics.clinicalSummary.recommendation}",
-                                    fontSize = 11.sp,
+                                    fontSize = 10.sp,
                                     color = Color(0xFF64748B)
                                 )
                             }
@@ -316,14 +318,14 @@ fun AgpSheetPreviewModal(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(14.dp),
+                            .padding(12.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Button(
                             onClick = onSavePdf,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(46.dp),
+                                .height(44.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = PrimaryEmerald,
@@ -344,7 +346,7 @@ fun AgpSheetPreviewModal(
                             onClick = onSharePdf,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(46.dp),
+                                .height(44.dp),
                             shape = RoundedCornerShape(12.dp),
                             border = BorderStroke(1.dp, PrimaryEmerald),
                             colors = ButtonDefaults.outlinedButtonColors(
@@ -401,7 +403,7 @@ private fun ReportStatLine(
     value: String
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(text = title, fontSize = 9.sp, color = Color(0xFF64748B))
-        Text(text = value, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
+        Text(text = title, fontSize = 8.5.sp, color = Color(0xFF64748B))
+        Text(text = value, fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
     }
 }

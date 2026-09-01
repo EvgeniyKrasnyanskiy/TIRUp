@@ -209,20 +209,44 @@ private fun CurrentGlucoseHeroCard(
                     color = TextSecondaryDark
                 )
 
-                // Mode toggle (TIR vs TING)
+                // Horizontal Segmented Switch for TIR vs TING (Active filled in blue)
                 Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = PrimaryEmerald.copy(alpha = 0.12f),
-                    border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.3f)),
-                    onClick = onToggleTargetMode
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF0F172A),
+                    border = BorderStroke(1.dp, DarkBorder)
                 ) {
-                    Text(
-                        text = if (targetMode == TargetMode.TIR) stringResource(R.string.mode_tir) else stringResource(R.string.mode_ting),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = PrimaryEmerald,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
+                    Row(
+                        modifier = Modifier.padding(3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(9.dp),
+                            color = if (targetMode == TargetMode.TIR) Color(0xFF2563EB) else Color.Transparent,
+                            modifier = Modifier.clickable { if (targetMode != TargetMode.TIR) onToggleTargetMode() }
+                        ) {
+                            Text(
+                                text = "TIR 3.9–10.0",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (targetMode == TargetMode.TIR) FontWeight.Bold else FontWeight.Normal,
+                                color = if (targetMode == TargetMode.TIR) Color.White else TextMutedDark,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(9.dp),
+                            color = if (targetMode == TargetMode.TING) Color(0xFF2563EB) else Color.Transparent,
+                            modifier = Modifier.clickable { if (targetMode != TargetMode.TING) onToggleTargetMode() }
+                        ) {
+                            Text(
+                                text = "TING 3.9–7.8",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (targetMode == TargetMode.TING) FontWeight.Bold else FontWeight.Normal,
+                                color = if (targetMode == TargetMode.TING) Color.White else TextMutedDark,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
                 }
             }
 

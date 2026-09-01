@@ -31,7 +31,7 @@
     <string name="just_now">Только что</string>
 
     <!-- Trends & AGP -->
-    <string name="trends_title">Тренды и AGP</string>
+    <string name="trends_title">Аналитика трендов</string>
     <string name="period_7d">7Д</string>
     <string name="period_14d">14Д (AGP)</string>
     <string name="period_30d">30Д</string>
@@ -53,8 +53,8 @@
     <string name="range_very_high">Очень высокий (≥14.0)</string>
 
     <!-- Reports -->
-    <string name="reports_title">Медицинский отчёт (AGP)</string>
-    <string name="reports_subtitle">Стандартизированный клинический бланк А4</string>
+    <string name="reports_title">Медицинский отчёт</string>
+    <string name="reports_subtitle">Стандартизированный бланк AGP для врача</string>
     <string name="report_live_title">Текущий отчёт (Трансляция)</string>
     <string name="report_historical_title">Исторический отчёт (из файла xDrip)</string>
     <string name="report_period_title">Период для отчёта</string>

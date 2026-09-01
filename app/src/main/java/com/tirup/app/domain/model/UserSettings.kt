@@ -1,14 +1,29 @@
 package com.tirup.app.domain.model
 
+import java.util.Calendar
+
 data class PatientProfile(
     val fullName: String = "",
-    val age: String = "",
+    val birthYear: Int = 1990,
+    val birthMonth: Int = 1,
     val heightCm: String = "",
     val weightKg: String = "",
-    val diabetesType: String = "", // e.g. "СД1", "СД2", "LADA", "MODY"
-    val diabetesDurationYears: String = "",
-    val therapyType: String = "" // e.g. "Помпа", "Шприц-ручки", "Таблетки"
-)
+    val diabetesType: String = "СД1", // "СД1", "СД2", "LADA", "MODY", "ГСД"
+    val diagnosisYear: Int = 2018,
+    val therapyType: String = "Инсулиновая помпа" // "Инсулиновая помпа", "Шприц-ручки (МДИ)", "Таблетки", "Диета"
+) {
+    val calculatedAge: Int
+        get() {
+            val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+            return (currentYear - birthYear).coerceAtLeast(0)
+        }
+
+    val calculatedDuration: Int
+        get() {
+            val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+            return (currentYear - diagnosisYear).coerceAtLeast(0)
+        }
+}
 
 data class UserSettings(
     val language: String = "RU", // "RU" or "EN"

@@ -52,7 +52,7 @@ class SettingsViewModel(
         }
     }
 
-    fun updateThresholds(
+    fun autoUpdateThresholds(
         tirLow: Double,
         tirHigh: Double,
         tingHigh: Double,
@@ -79,17 +79,11 @@ class SettingsViewModel(
         }
     }
 
-    fun updatePatientProfile(profile: PatientProfile) {
+    fun autoUpdatePatientProfile(profile: PatientProfile) {
         viewModelScope.launch {
-            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
             val updated = _uiState.value.userSettings.copy(patientProfile = profile)
             settingsRepository.updateSettings(updated)
-            _uiState.update {
-                it.copy(
-                    userSettings = updated,
-                    infoMessage = if (isRu) "Профиль пациента сохранён." else "Patient profile saved."
-                )
-            }
+            _uiState.update { it.copy(userSettings = updated) }
         }
     }
 

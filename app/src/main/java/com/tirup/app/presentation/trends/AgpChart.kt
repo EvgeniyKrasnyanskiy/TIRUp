@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Fill
@@ -21,6 +22,7 @@ import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.TargetRanges
 import com.tirup.app.presentation.theme.ColorLow
 import com.tirup.app.presentation.theme.ColorTight
+import com.tirup.app.presentation.theme.DarkBorder
 import com.tirup.app.presentation.theme.DarkSurfaceElevated
 import com.tirup.app.presentation.theme.PrimaryEmerald
 
@@ -67,39 +69,52 @@ fun AgpChart(
                 size = androidx.compose.ui.geometry.Size(width, yTirLow - yTirHigh)
             )
 
-            // Dashed line for 3.9
-            val dashEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+            val dashEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f), 0f)
+
+            // Horizontal target guides
             drawLine(
-                color = ColorLow.copy(alpha = 0.5f),
+                color = ColorLow.copy(alpha = 0.4f),
                 start = Offset(0f, yTirLow),
                 end = Offset(width, yTirLow),
                 strokeWidth = 1.5f,
                 pathEffect = dashEffect
             )
 
-            // Dashed line for 10.0
             drawLine(
-                color = ColorLow.copy(alpha = 0.5f),
+                color = ColorLow.copy(alpha = 0.4f),
                 start = Offset(0f, yTirHigh),
                 end = Offset(width, yTirHigh),
                 strokeWidth = 1.5f,
                 pathEffect = dashEffect
             )
 
-            // Dashed line for tight 7.8
             drawLine(
-                color = ColorTight.copy(alpha = 0.35f),
+                color = ColorTight.copy(alpha = 0.3f),
                 start = Offset(0f, yTingHigh),
                 end = Offset(width, yTingHigh),
-                strokeWidth = 1.5f,
+                strokeWidth = 1f,
                 pathEffect = dashEffect
             )
+
+            // Vertical 3-Hour Perpendiculars (Grid: 00, 03, 06, 09, 12, 15, 18, 21, 24)
+            val vDashEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f)
+            val hours = listOf(0, 3, 6, 9, 12, 15, 18, 21, 24)
+            hours.forEach { hr ->
+                val xPos = (hr.toFloat() / 24f) * width
+                drawLine(
+                    color = DarkBorder.copy(alpha = 0.7f),
+                    start = Offset(xPos, 0f),
+                    end = Offset(xPos, height),
+                    strokeWidth = 1f,
+                    pathEffect = vDashEffect
+                )
+            }
 
             // Filter valid bins with readings
             val validBins = bins.filter { it.readingsCount > 0 }
             if (validBins.size < 2) return@Canvas
 
-            // 1. Draw 10-90th percentile outer cloud across valid bins
+            // 1. Draw 10-90th percentile outer cloud
             val path1090 = Path()
             path1090.moveTo(xForBin(validBins.first().binIndex), yForMmol(validBins.first().p90))
             validBins.forEach { bin ->

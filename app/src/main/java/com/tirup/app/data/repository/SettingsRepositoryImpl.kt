@@ -37,11 +37,12 @@ class SettingsRepositoryImpl(
             .putInt(KEY_NIGHT_START, settings.nightStartHour)
             .putInt(KEY_NIGHT_END, settings.nightEndHour)
             .putString(KEY_PATIENT_NAME, settings.patientProfile.fullName)
-            .putString(KEY_PATIENT_AGE, settings.patientProfile.age)
+            .putInt(KEY_PATIENT_BIRTH_YEAR, settings.patientProfile.birthYear)
+            .putInt(KEY_PATIENT_BIRTH_MONTH, settings.patientProfile.birthMonth)
             .putString(KEY_PATIENT_HEIGHT, settings.patientProfile.heightCm)
             .putString(KEY_PATIENT_WEIGHT, settings.patientProfile.weightKg)
             .putString(KEY_DIABETES_TYPE, settings.patientProfile.diabetesType)
-            .putString(KEY_DIABETES_DURATION, settings.patientProfile.diabetesDurationYears)
+            .putInt(KEY_DIAGNOSIS_YEAR, settings.patientProfile.diagnosisYear)
             .putString(KEY_THERAPY_TYPE, settings.patientProfile.therapyType)
             .apply()
 
@@ -75,12 +76,13 @@ class SettingsRepositoryImpl(
 
         val profile = PatientProfile(
             fullName = prefs.getString(KEY_PATIENT_NAME, "") ?: "",
-            age = prefs.getString(KEY_PATIENT_AGE, "") ?: "",
+            birthYear = prefs.getInt(KEY_PATIENT_BIRTH_YEAR, 1990),
+            birthMonth = prefs.getInt(KEY_PATIENT_BIRTH_MONTH, 1),
             heightCm = prefs.getString(KEY_PATIENT_HEIGHT, "") ?: "",
             weightKg = prefs.getString(KEY_PATIENT_WEIGHT, "") ?: "",
-            diabetesType = prefs.getString(KEY_DIABETES_TYPE, "") ?: "",
-            diabetesDurationYears = prefs.getString(KEY_DIABETES_DURATION, "") ?: "",
-            therapyType = prefs.getString(KEY_THERAPY_TYPE, "") ?: ""
+            diabetesType = prefs.getString(KEY_DIABETES_TYPE, "СД1") ?: "СД1",
+            diagnosisYear = prefs.getInt(KEY_DIAGNOSIS_YEAR, 2018),
+            therapyType = prefs.getString(KEY_THERAPY_TYPE, "Инсулиновая помпа") ?: "Инсулиновая помпа"
         )
 
         return UserSettings(
@@ -114,11 +116,12 @@ class SettingsRepositoryImpl(
         private const val KEY_NIGHT_START = "key_night_start"
         private const val KEY_NIGHT_END = "key_night_end"
         private const val KEY_PATIENT_NAME = "key_patient_name"
-        private const val KEY_PATIENT_AGE = "key_patient_age"
+        private const val KEY_PATIENT_BIRTH_YEAR = "key_patient_birth_year"
+        private const val KEY_PATIENT_BIRTH_MONTH = "key_patient_birth_month"
         private const val KEY_PATIENT_HEIGHT = "key_patient_height"
         private const val KEY_PATIENT_WEIGHT = "key_patient_weight"
         private const val KEY_DIABETES_TYPE = "key_diabetes_type"
-        private const val KEY_DIABETES_DURATION = "key_diabetes_duration"
+        private const val KEY_DIAGNOSIS_YEAR = "key_diagnosis_year"
         private const val KEY_THERAPY_TYPE = "key_therapy_type"
     }
 }
