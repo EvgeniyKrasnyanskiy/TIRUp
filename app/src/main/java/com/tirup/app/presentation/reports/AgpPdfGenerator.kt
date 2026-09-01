@@ -175,19 +175,32 @@ class AgpPdfGenerator(private val context: Context) {
             canvas.drawText(summaryTitle, col2Left + 12f, panelTop + 18f, boxTitlePaint)
 
             val nightStr = if (statistics.nightStability.isStable) {
-                "Стабильный (TIR ${String.format(Locale.US, "%.1f", statistics.nightStability.tirPercent)}%)"
+                if (isRu) "Стабильный (TIR ${String.format(Locale.US, "%.1f", statistics.nightStability.tirPercent)}%)"
+                else "Stable (TIR ${String.format(Locale.US, "%.1f", statistics.nightStability.tirPercent)}%)"
             } else {
-                "Колебания (TIR ${String.format(Locale.US, "%.1f", statistics.nightStability.tirPercent)}%)"
+                if (isRu) "Колебания (TIR ${String.format(Locale.US, "%.1f", statistics.nightStability.tirPercent)}%)"
+                else "Fluctuations (TIR ${String.format(Locale.US, "%.1f", statistics.nightStability.tirPercent)}%)"
             }
 
-            val statRows = listOf(
-                Pair("Средний сахар (Mean):", String.format(Locale.US, "%.1f ммоль/л (Медиана %.1f)", statistics.meanMmol, statistics.medianMmol)),
-                Pair("Вариабельность глюкозы (%CV):", String.format(Locale.US, "%.1f%% (Цель ≤36.0%%) • SD: %.2f", statistics.cvPercent, statistics.sdMmol)),
-                Pair("Расчётный eA1c (GMI):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)),
-                Pair("Индекс риска GRI (Klonoff 2022):", String.format(Locale.US, "%.1f (%s, цель ≤40.0)", statistics.gri, statistics.griLabel)),
-                Pair("Индексы GVI / PGS:", String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs)),
-                Pair("Ночной профиль (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)}):", nightStr)
-            )
+            val statRows = if (isRu) {
+                listOf(
+                    Pair("Средний сахар (Mean):", String.format(Locale.US, "%.1f ммоль/л (Медиана %.1f)", statistics.meanMmol, statistics.medianMmol)),
+                    Pair("Вариабельность глюкозы (%CV):", String.format(Locale.US, "%.1f%% (Цель ≤36.0%%) • SD: %.2f", statistics.cvPercent, statistics.sdMmol)),
+                    Pair("Расчётный eA1c (ADAG):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)),
+                    Pair("Индекс риска GRI (Klonoff 2022):", String.format(Locale.US, "%.1f (%s, цель ≤40.0)", statistics.gri, statistics.griLabel)),
+                    Pair("Индексы GVI / PGS:", String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs)),
+                    Pair("Ночной профиль (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)}):", nightStr)
+                )
+            } else {
+                listOf(
+                    Pair("Average Glucose (Mean):", String.format(Locale.US, "%.1f mmol/L (Median %.1f)", statistics.meanMmol, statistics.medianMmol)),
+                    Pair("Glucose Variability (%CV):", String.format(Locale.US, "%.1f%% (Target ≤36.0%%) • SD: %.2f", statistics.cvPercent, statistics.sdMmol)),
+                    Pair("Estimated A1c (eA1c):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)),
+                    Pair("Glycemia Risk Index (GRI):", String.format(Locale.US, "%.1f (%s, target ≤40.0)", statistics.gri, statistics.griLabel)),
+                    Pair("Variability Indexes (GVI/PGS):", String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs)),
+                    Pair("Night Sleep Profile (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)}):", nightStr)
+                )
+            }
 
             var statY = panelTop + 38f
             statRows.forEach { (title, value) ->
@@ -343,12 +356,18 @@ class AgpPdfGenerator(private val context: Context) {
             }
 
             noteY += 2f
-            canvas.drawText("• Заключение: ${statistics.clinicalSummary.overallStatus}", margin + 12f, noteY, textPaint)
+            val conclPrefix = if (isRu) "• Заключение: " else "• Conclusion: "
+            val recPrefix = if (isRu) "• Рекомендация: " else "• Recommendation: "
+            canvas.drawText("$conclPrefix${statistics.clinicalSummary.overallStatus}", margin + 12f, noteY, textPaint)
             noteY += 15f
-            canvas.drawText("• Рекомендация: ${statistics.clinicalSummary.recommendation}", margin + 12f, noteY, subTextPaint)
+            canvas.drawText("$recPrefix${statistics.clinicalSummary.recommendation}", margin + 12f, noteY, subTextPaint)
 
             // Footer with telegram channel link
-            val footerText = "TIRUp Ambulatory Glucose Profile Report • Сгенерировано для медицинских консультаций и самоконтроля • Telegram: @diakia"
+            val footerText = if (isRu) {
+                "TIRUp Ambulatory Glucose Profile Report • Сгенерировано для медицинских консультаций и самоконтроля • Telegram: @diakia"
+            } else {
+                "TIRUp Ambulatory Glucose Profile Report • Generated for clinical consultations and self-monitoring • Telegram: @diakia"
+            }
             canvas.drawText(footerText, margin, 814f, subTextPaint)
 
             document.finishPage(page)

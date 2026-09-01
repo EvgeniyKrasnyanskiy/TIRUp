@@ -50,13 +50,14 @@ object GlucoseMetricsCalculator {
      * Calculates complete clinical statistics from a list of glucose readings,
      * matching xDrip+ and DiaKiaBot algorithms:
      * Mean, Median, SD, %CV, ADAG eA1c, GMI, IFCC HbA1c, TIR, TING, TBR, TAR, GVI, PGS, GRI (Klonoff 2022),
-     * Night Stability, and Automated Doctor's Clinical Summary.
+     * Night Stability, and Automated Doctor's Clinical Summary with language support.
      */
     fun calculateStatistics(
         readings: List<GlucoseReading>,
         targetRanges: TargetRanges = TargetRanges(),
         nightStartHour: Int = 0,
-        nightEndHour: Int = 6
+        nightEndHour: Int = 6,
+        language: String = "RU"
     ): GlucoseStatistics {
         if (readings.isEmpty()) {
             return GlucoseStatistics()
@@ -93,8 +94,6 @@ object GlucoseMetricsCalculator {
 
         // eA1c: ADAG Clinical formula as in DiaKiaBot: (Mean + 2.59) / 1.59
         val ea1cAdag = (mean + 2.59) / 1.59
-        // GMI formula: 3.31 + (0.431 * Mean)
-        val gmi = 3.31 + (0.431 * mean)
         // IFCC mmol/mol: (eA1c% - 2.15) * 10.929
         val hba1cMmolMol = ((ea1cAdag - 2.15) * 10.929).roundToInt().coerceAtLeast(0)
 
@@ -171,12 +170,13 @@ object GlucoseMetricsCalculator {
         val rawGri = (3.0 * hypoComponent) + (1.6 * hyperComponent)
         val gri = min((rawGri * 10.0).roundToInt() / 10.0, 100.0)
 
+        val isRu = language.equals("RU", ignoreCase = true)
         val (griZone, griLabel) = when {
-            gri <= 20.0 -> Pair(1, "Очень низкий риск")
-            gri <= 40.0 -> Pair(2, "Низкий риск")
-            gri <= 60.0 -> Pair(3, "Средний риск")
-            gri <= 80.0 -> Pair(4, "Высокий риск")
-            else -> Pair(5, "Очень высокий риск")
+            gri <= 20.0 -> Pair(1, if (isRu) "Очень низкий риск" else "Very Low Risk")
+            gri <= 40.0 -> Pair(2, if (isRu) "Низкий риск" else "Low Risk")
+            gri <= 60.0 -> Pair(3, if (isRu) "Средний риск" else "Moderate Risk")
+            gri <= 80.0 -> Pair(4, if (isRu) "Высокий риск" else "High Risk")
+            else -> Pair(5, if (isRu) "Очень высокий риск" else "Very High Risk")
         }
 
         // 6. Active Time (CGM coverage)
@@ -201,7 +201,7 @@ object GlucoseMetricsCalculator {
             100.0
         }
 
-        // 7. Clinical Summary with exact ordered metrics
+        // 7. Clinical Summary with exact ordered metrics & language support
         val clinicalSummary = generateClinicalSummary(
             meanMmol = mean,
             ea1c = ea1cAdag,
@@ -217,7 +217,8 @@ object GlucoseMetricsCalculator {
             sdMmol = sd,
             gri = gri,
             griLabel = griLabel,
-            nightStability = nightStability
+            nightStability = nightStability,
+            language = language
         )
 
         return GlucoseStatistics(
@@ -277,21 +278,7 @@ object GlucoseMetricsCalculator {
     }
 
     /**
-     * Orders clinical evaluation items exactly matching DiaKiaBot order:
-     * 1. Mean BG
-     * 2. eA1c
-     * 3. TIR (3.9-10)
-     * 4. TING (3.9-7.8)
-     * 5. TBR < 3.9
-     * 6. TBR < 3.0
-     * 7. TAR > 10.0
-     * 8. TAR > 13.9
-     * 9. GVI
-     * 10. PGS
-     * 11. %CV
-     * 12. SD
-     * 13. GRI
-     * 14. Night Profile
+     * Orders clinical evaluation items matching DiaKiaBot order with full bilingual support:
      */
     private fun generateClinicalSummary(
         meanMmol: Double,
@@ -308,8 +295,10 @@ object GlucoseMetricsCalculator {
         sdMmol: Double,
         gri: Double,
         griLabel: String,
-        nightStability: NightStability
+        nightStability: NightStability,
+        language: String
     ): ClinicalSummary {
+        val isRu = language.equals("RU", ignoreCase = true)
         val evalItems = mutableListOf<ClinicalMetricStatus>()
         val issuesList = mutableListOf<String>()
 
@@ -318,37 +307,37 @@ object GlucoseMetricsCalculator {
         val meanWarn = meanMmol in 7.9..8.5
         evalItems.add(
             ClinicalMetricStatus(
-                title = "Mean BG",
-                valueStr = String.format(Locale.US, "%.1f ммоль/л", meanMmol),
-                targetStr = "цель ≤7.8",
+                title = if (isRu) "Mean BG (средний сахар)" else "Mean BG (average glucose)",
+                valueStr = String.format(Locale.US, "%.1f %s", meanMmol, if (isRu) "ммоль/л" else "mmol/L"),
+                targetStr = if (isRu) "цель ≤7.8" else "target ≤7.8",
                 isMet = meanMet,
                 isWarning = meanWarn
             )
         )
-        if (!meanMet) issuesList.add("Mean BG")
+        if (!meanMet) issuesList.add(if (isRu) "Mean BG" else "Mean BG")
 
         // 2. eA1c (Target ≤ 7.0%)
         val a1cMet = ea1c <= 7.0
         val a1cWarn = ea1c in 7.1..7.5
         evalItems.add(
             ClinicalMetricStatus(
-                title = "eA1c (расчёт ГГ)",
+                title = if (isRu) "eA1c (расчёт ГГ)" else "eA1c (estimated A1c)",
                 valueStr = String.format(Locale.US, "%.1f%%", ea1c),
-                targetStr = "цель ≤7.0%",
+                targetStr = if (isRu) "цель ≤7.0%" else "target ≤7.0%",
                 isMet = a1cMet,
                 isWarning = a1cWarn
             )
         )
-        if (!a1cMet) issuesList.add("eA1c")
+        if (!a1cMet) issuesList.add(if (isRu) "eA1c" else "eA1c")
 
         // 3. TIR (3.9–10.0, Target ≥ 70%)
         val tirMet = tirPercent >= 70.0
         val tirWarn = tirPercent in 60.0..69.9
         evalItems.add(
             ClinicalMetricStatus(
-                title = "TIR (3.9–10.0 ммоль/л)",
+                title = if (isRu) "TIR (3.9–10.0 ммоль/л)" else "TIR (3.9–10.0 mmol/L)",
                 valueStr = String.format(Locale.US, "%.0f%%", tirPercent),
-                targetStr = "цель ≥70%",
+                targetStr = if (isRu) "цель ≥70%" else "target ≥70%",
                 isMet = tirMet,
                 isWarning = tirWarn
             )
@@ -360,9 +349,9 @@ object GlucoseMetricsCalculator {
         val tingWarn = tingPercent in 40.0..49.9
         evalItems.add(
             ClinicalMetricStatus(
-                title = "TING (3.9–7.8 ммоль/л)",
+                title = if (isRu) "TING (3.9–7.8 ммоль/л)" else "TING (3.9–7.8 mmol/L)",
                 valueStr = String.format(Locale.US, "%.0f%%", tingPercent),
-                targetStr = "цель ≥50%",
+                targetStr = if (isRu) "цель ≥50%" else "target ≥50%",
                 isMet = tingMet,
                 isWarning = tingWarn
             )
@@ -374,65 +363,65 @@ object GlucoseMetricsCalculator {
         val tbrWarn = tbrTotalPercent in 4.1..6.0
         evalItems.add(
             ClinicalMetricStatus(
-                title = "TBR < 3.9 ммоль/л",
+                title = if (isRu) "TBR < 3.9 ммоль/л" else "TBR < 3.9 mmol/L",
                 valueStr = String.format(Locale.US, "%.1f%%", tbrTotalPercent),
-                targetStr = "цель <4%",
+                targetStr = if (isRu) "цель <4%" else "target <4%",
                 isMet = tbrMet,
                 isWarning = tbrWarn
             )
         )
-        if (!tbrMet) issuesList.add("TBR <3.9")
+        if (!tbrMet) issuesList.add(if (isRu) "TBR <3.9" else "TBR <3.9")
 
         // 6. TBR < 3.0 (Target < 1%)
         val tbr30Met = tbrVeryLowPercent <= 1.0
         val tbr30Warn = tbrVeryLowPercent in 1.1..2.0
         evalItems.add(
             ClinicalMetricStatus(
-                title = "TBR < 3.0 ммоль/л",
+                title = if (isRu) "TBR < 3.0 ммоль/л" else "TBR < 3.0 mmol/L",
                 valueStr = String.format(Locale.US, "%.1f%%", tbrVeryLowPercent),
-                targetStr = "цель <1%",
+                targetStr = if (isRu) "цель <1%" else "target <1%",
                 isMet = tbr30Met,
                 isWarning = tbr30Warn
             )
         )
-        if (!tbr30Met) issuesList.add("TBR <3.0")
+        if (!tbr30Met) issuesList.add(if (isRu) "TBR <3.0" else "TBR <3.0")
 
         // 7. TAR > 10.0 (Target < 25%)
         val tarMet = tarTotalPercent <= 25.0
         val tarWarn = tarTotalPercent in 25.1..35.0
         evalItems.add(
             ClinicalMetricStatus(
-                title = "TAR > 10.0 ммоль/л",
+                title = if (isRu) "TAR > 10.0 ммоль/л" else "TAR > 10.0 mmol/L",
                 valueStr = String.format(Locale.US, "%.0f%%", tarTotalPercent),
-                targetStr = "цель <25%",
+                targetStr = if (isRu) "цель <25%" else "target <25%",
                 isMet = tarMet,
                 isWarning = tarWarn
             )
         )
-        if (!tarMet) issuesList.add("TAR >10.0")
+        if (!tarMet) issuesList.add(if (isRu) "TAR >10.0" else "TAR >10.0")
 
         // 8. TAR > 13.9 (Target < 5%)
         val tar139Met = tarVeryHighPercent <= 5.0
         val tar139Warn = tarVeryHighPercent in 5.1..8.0
         evalItems.add(
             ClinicalMetricStatus(
-                title = "TAR > 13.9 ммоль/л",
+                title = if (isRu) "TAR > 13.9 ммоль/л" else "TAR > 13.9 mmol/L",
                 valueStr = String.format(Locale.US, "%.1f%%", tarVeryHighPercent),
-                targetStr = "цель <5%",
+                targetStr = if (isRu) "цель <5%" else "target <5%",
                 isMet = tar139Met,
                 isWarning = tar139Warn
             )
         )
-        if (!tar139Met) issuesList.add("TAR >13.9")
+        if (!tar139Met) issuesList.add(if (isRu) "TAR >13.9" else "TAR >13.9")
 
         // 9. GVI (Target ≤ 1.20)
         val gviMet = gvi <= 1.20
         val gviWarn = gvi in 1.21..1.40
         evalItems.add(
             ClinicalMetricStatus(
-                title = "GVI (лабильность)",
+                title = if (isRu) "GVI (лабильность)" else "GVI (variability index)",
                 valueStr = String.format(Locale.US, "%.2f", gvi),
-                targetStr = "цель ≤1.20",
+                targetStr = if (isRu) "цель ≤1.20" else "target ≤1.20",
                 isMet = gviMet,
                 isWarning = gviWarn
             )
@@ -444,9 +433,9 @@ object GlucoseMetricsCalculator {
         val pgsWarn = pgs in 35.1..45.0
         evalItems.add(
             ClinicalMetricStatus(
-                title = "PGS (гликемический статус)",
+                title = if (isRu) "PGS (гликемический статус)" else "PGS (patient status)",
                 valueStr = String.format(Locale.US, "%.1f", pgs),
-                targetStr = "цель ≤35.0",
+                targetStr = if (isRu) "цель ≤35.0" else "target ≤35.0",
                 isMet = pgsMet,
                 isWarning = pgsWarn
             )
@@ -458,9 +447,9 @@ object GlucoseMetricsCalculator {
         val cvWarn = cvPercent in 36.1..40.0
         evalItems.add(
             ClinicalMetricStatus(
-                title = "Вариабельность (%CV)",
+                title = if (isRu) "Вариабельность (%CV)" else "Variability (%CV)",
                 valueStr = String.format(Locale.US, "%.1f%%", cvPercent),
-                targetStr = "цель ≤36.0%",
+                targetStr = if (isRu) "цель ≤36.0%" else "target ≤36.0%",
                 isMet = cvMet,
                 isWarning = cvWarn
             )
@@ -470,9 +459,9 @@ object GlucoseMetricsCalculator {
         // 12. SD
         evalItems.add(
             ClinicalMetricStatus(
-                title = "SD (стандартное отклонение)",
-                valueStr = String.format(Locale.US, "%.2f ммоль/л", sdMmol),
-                targetStr = "норма ≤2.5",
+                title = if (isRu) "SD (стандартное отклонение)" else "SD (standard deviation)",
+                valueStr = String.format(Locale.US, "%.2f %s", sdMmol, if (isRu) "ммоль/л" else "mmol/L"),
+                targetStr = if (isRu) "норма ≤2.5" else "normal ≤2.5",
                 isMet = sdMmol <= 2.5,
                 isWarning = sdMmol in 2.51..3.0
             )
@@ -483,9 +472,9 @@ object GlucoseMetricsCalculator {
         val griWarn = gri in 40.1..60.0
         evalItems.add(
             ClinicalMetricStatus(
-                title = "GRI (индекс риска)",
+                title = if (isRu) "GRI (индекс риска)" else "GRI (glycemia risk)",
                 valueStr = String.format(Locale.US, "%.1f (%s)", gri, griLabel),
-                targetStr = "цель ≤40.0",
+                targetStr = if (isRu) "цель ≤40.0" else "target ≤40.0",
                 isMet = griMet,
                 isWarning = griWarn
             )
@@ -494,37 +483,40 @@ object GlucoseMetricsCalculator {
 
         // 14. Night Profile Stability
         val nightMet = nightStability.isStable
+        val nightValRu = if (nightMet) "Стабильный (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})" else "Обнаружены колебания (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})"
+        val nightValEn = if (nightMet) "Stable (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})" else "Fluctuations detected (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})"
+
         evalItems.add(
             ClinicalMetricStatus(
-                title = "Ночной профиль сна",
-                valueStr = if (nightMet) "Стабильный (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})" else "Обнаружены колебания (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})",
-                targetStr = "TIR ≥70% и SD ≤1.5",
+                title = if (isRu) "Ночной профиль сна" else "Night Sleep Profile",
+                valueStr = if (isRu) nightValRu else nightValEn,
+                targetStr = if (isRu) "TIR ≥70% и SD ≤1.5" else "TIR ≥70% & SD ≤1.5",
                 isMet = nightMet,
                 isWarning = !nightMet
             )
         )
-        if (!nightMet) issuesList.add("Ночной сон")
+        if (!nightMet) issuesList.add(if (isRu) "Ночной сон" else "Night sleep")
 
         val (status, isAllMet, rec) = when {
             issuesList.isEmpty() -> Triple(
-                "Все цели достигнуты. Отличный контроль!",
+                if (isRu) "Все цели достигнуты. Отличный контроль!" else "All clinical targets achieved. Excellent glycemic control!",
                 true,
-                "Поддерживайте текущий режим питания и терапии."
+                if (isRu) "Поддерживайте текущий режим питания и терапии." else "Maintain current nutrition and insulin therapy regimen."
             )
             issuesList.size <= 2 -> {
                 val names = issuesList.joinToString(", ")
                 Triple(
-                    "Есть небольшие отклонения по параметрам: $names.",
+                    if (isRu) "Есть небольшие отклонения по параметрам: $names." else "Minor deviations noted in: $names.",
                     false,
-                    "Рекомендуется обратить внимание на отмеченные параметры и обсудить с лечащим врачом."
+                    if (isRu) "Рекомендуется обратить внимание на отмеченные параметры и обсудить с лечащим врачом." else "Recommended to review highlighted parameters with your healthcare provider."
                 )
             }
             else -> {
                 val names = issuesList.take(3).joinToString(", ")
                 Triple(
-                    "Имеются отклонения по параметрам: $names и др.",
+                    if (isRu) "Имеются отклонения по параметрам: $names и др." else "Deviations detected in: $names and others.",
                     false,
-                    "Рекомендуется консультация эндокринолога для возможной корректировки доз или схемы терапии."
+                    if (isRu) "Рекомендуется консультация эндокринолога для возможной корректировки доз или схемы терапии." else "Consultation with an endocrinologist is advised to evaluate therapy adjustments."
                 )
             }
         }

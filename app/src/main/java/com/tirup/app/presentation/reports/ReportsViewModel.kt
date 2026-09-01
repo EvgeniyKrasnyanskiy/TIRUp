@@ -115,7 +115,8 @@ class ReportsViewModel(
                         readings = readings,
                         targetRanges = latestSettings.targetRanges,
                         nightStartHour = latestSettings.nightStartHour,
-                        nightEndHour = latestSettings.nightEndHour
+                        nightEndHour = latestSettings.nightEndHour,
+                        language = latestSettings.language
                     )
                     Pair(readings, stats)
                 }
@@ -146,7 +147,8 @@ class ReportsViewModel(
                         readings = readings,
                         targetRanges = settings.targetRanges,
                         nightStartHour = settings.nightStartHour,
-                        nightEndHour = settings.nightEndHour
+                        nightEndHour = settings.nightEndHour,
+                        language = settings.language
                     )
                     val minTs = readings.minOf { it.timestamp }
                     val maxTs = readings.maxOf { it.timestamp }

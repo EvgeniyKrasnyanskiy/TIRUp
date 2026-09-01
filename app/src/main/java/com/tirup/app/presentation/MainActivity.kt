@@ -29,6 +29,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -109,10 +110,8 @@ class MainActivity : ComponentActivity() {
         languageCode: String,
         content: @Composable () -> Unit
     ) {
-        val baseContext = LocalContext.current
-        val currentConfiguration = LocalConfiguration.current
-
         val targetLocale = if (languageCode.equals("EN", ignoreCase = true)) Locale.ENGLISH else Locale("ru")
+        val currentConfiguration = LocalConfiguration.current
 
         val localizedConfiguration = remember(languageCode, currentConfiguration) {
             Configuration(currentConfiguration).apply {
@@ -121,18 +120,17 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        val localizedContext = remember(languageCode, baseContext) {
+        LaunchedEffect(languageCode) {
             Locale.setDefault(targetLocale)
             @Suppress("DEPRECATION")
-            baseContext.resources.updateConfiguration(localizedConfiguration, baseContext.resources.displayMetrics)
-            baseContext.createConfigurationContext(localizedConfiguration)
+            resources.updateConfiguration(localizedConfiguration, resources.displayMetrics)
         }
 
-        CompositionLocalProvider(
-            LocalConfiguration provides localizedConfiguration,
-            LocalContext provides localizedContext
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.ui.platform.LocalConfiguration provides localizedConfiguration,
+            androidx.activity.compose.LocalActivityResultRegistryOwner provides this@MainActivity
         ) {
-            key(languageCode) {
+            androidx.compose.runtime.key(languageCode) {
                 content()
             }
         }
