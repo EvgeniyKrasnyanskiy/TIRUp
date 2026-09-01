@@ -56,7 +56,9 @@ class SettingsViewModel(
         tirHigh: Double,
         tingHigh: Double,
         tirGoal: Int,
-        tingGoal: Int
+        tingGoal: Int,
+        nightStart: Int,
+        nightEnd: Int
     ) {
         viewModelScope.launch {
             val updatedRanges = TargetRanges(
@@ -66,7 +68,11 @@ class SettingsViewModel(
                 tirGoalPercent = tirGoal,
                 tingGoalPercent = tingGoal
             )
-            val updated = _uiState.value.userSettings.copy(targetRanges = updatedRanges)
+            val updated = _uiState.value.userSettings.copy(
+                targetRanges = updatedRanges,
+                nightStartHour = nightStart,
+                nightEndHour = nightEnd
+            )
             settingsRepository.updateSettings(updated)
             _uiState.update { it.copy(userSettings = updated) }
         }

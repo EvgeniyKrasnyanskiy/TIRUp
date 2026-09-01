@@ -5,5 +5,7 @@ data class UserSettings(
     val unit: GlucoseUnit = GlucoseUnit.MMOL_L,
     val targetMode: TargetMode = TargetMode.TIR,
     val targetRanges: TargetRanges = TargetRanges(),
-    val periodDays: Int = 14
+    val periodDays: Int = 14,
+    val nightStartHour: Int = 0,
+    val nightEndHour: Int = 6
 )

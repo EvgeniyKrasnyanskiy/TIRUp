@@ -17,7 +17,9 @@ object GlucoseMetricsCalculator {
      */
     fun calculateStatistics(
         readings: List<GlucoseReading>,
-        targetRanges: TargetRanges = TargetRanges()
+        targetRanges: TargetRanges = TargetRanges(),
+        nightStartHour: Int = 0,
+        nightEndHour: Int = 6
     ): GlucoseStatistics {
         if (readings.isEmpty()) {
             return GlucoseStatistics()
@@ -47,7 +49,6 @@ object GlucoseMetricsCalculator {
         var highCount = 0
         var veryHighCount = 0
 
-        // Night readings (00:00 - 05:59)
         val nightReadings = mutableListOf<GlucoseReading>()
         val calendar = Calendar.getInstance(TimeZone.getDefault())
 
@@ -77,7 +78,7 @@ object GlucoseMetricsCalculator {
 
             calendar.timeInMillis = reading.timestamp
             val hour = calendar.get(Calendar.HOUR_OF_DAY)
-            if (hour in 0..5) {
+            if (isNightHour(hour, nightStartHour, nightEndHour)) {
                 nightReadings.add(reading)
             }
         }
@@ -114,6 +115,14 @@ object GlucoseMetricsCalculator {
         )
     }
 
+    private fun isNightHour(hour: Int, startHour: Int, endHour: Int): Boolean {
+        return if (startHour < endHour) {
+            hour in startHour until endHour
+        } else {
+            hour >= startHour || hour < endHour
+        }
+    }
+
     /**
      * Glucose Management Indicator formula: GMI = 3.31 + (0.431 * Mean Glucose in mmol/L)
      */
@@ -123,7 +132,7 @@ object GlucoseMetricsCalculator {
     }
 
     /**
-     * Night stability metrics (00:00 - 06:00).
+     * Night stability metrics.
      */
     private fun calculateNightStability(
         nightReadings: List<GlucoseReading>,
@@ -138,23 +147,27 @@ object GlucoseMetricsCalculator {
         val mean = sum / count
         val variance = if (count > 1) {
             nightReadings.sumOf { (it.valueMmol - mean) * (it.valueMmol - mean) } / (count - 1)
-        } else 0.0
+        } else {
+            0.0
+        }
         val sd = sqrt(variance)
-        val cv = if (mean > 0.0) (sd / mean) * 100.0 else 0.0
 
-        val inTirCount = nightReadings.count { targetRanges.isInTir(it.valueMmol) }
-        val tirPercent = (inTirCount.toDouble() / count) * 100.0
+        var inRangeCount = 0
+        nightReadings.forEach { r ->
+            val cat = targetRanges.categorize(r.valueMmol)
+            if (cat == GlucoseRangeCategory.TARGET || cat == GlucoseRangeCategory.TIGHT) {
+                inRangeCount++
+            }
+        }
 
-        // Stable if CV <= 36% and Night TIR >= 70%
-        val isStable = cv <= 36.0 && tirPercent >= 70.0
+        val tir = (inRangeCount.toDouble() / count) * 100.0
+        val isStable = sd <= 1.5 && tir >= 70.0
 
         return NightStability(
+            isStable = isStable,
             meanMmol = mean,
             sdMmol = sd,
-            cvPercent = cv,
-            tirPercent = tirPercent,
-            isStable = isStable,
-            nightReadingsCount = count
+            tirPercent = tir
         )
     }
 }

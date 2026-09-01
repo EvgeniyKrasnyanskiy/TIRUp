@@ -59,7 +59,12 @@ class TrendsViewModel(
                 glucoseRepository.getReadingsBetween(startTime, endTime).combine(
                     settingsRepository.getSettings()
                 ) { readings, latestSettings ->
-                    val stats = GlucoseMetricsCalculator.calculateStatistics(readings, latestSettings.targetRanges)
+                    val stats = GlucoseMetricsCalculator.calculateStatistics(
+                        readings = readings,
+                        targetRanges = latestSettings.targetRanges,
+                        nightStartHour = latestSettings.nightStartHour,
+                        nightEndHour = latestSettings.nightEndHour
+                    )
                     val agpBins = AGPPercentilesCalculator.calculatePercentiles(readings, binsCount = 48)
                     val heatmap = AGPPercentilesCalculator.calculateHeatmap(
                         readings = readings,

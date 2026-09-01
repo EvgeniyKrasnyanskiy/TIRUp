@@ -34,7 +34,12 @@ class FocusViewModel(
                 glucoseRepository.getStreakDays(),
                 settingsRepository.getSettings()
             ) { latest, recent, streak, settings ->
-                val stats = GlucoseMetricsCalculator.calculateStatistics(recent, settings.targetRanges)
+                val stats = GlucoseMetricsCalculator.calculateStatistics(
+                    readings = recent,
+                    targetRanges = settings.targetRanges,
+                    nightStartHour = settings.nightStartHour,
+                    nightEndHour = settings.nightEndHour
+                )
 
                 // Calculate compensator for selected mode (e.g. 7-day or 14-day window)
                 val targetPercent = if (settings.targetMode == TargetMode.TIR) {

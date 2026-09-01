@@ -615,8 +615,12 @@ private fun NightStabilityCard(
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
+                    val nStart = state.userSettings.nightStartHour
+                    val nEnd = state.userSettings.nightEndHour
+                    val nightTitle = "Ночной профиль (${String.format(Locale.US, "%02d:00", nStart)}–${String.format(Locale.US, "%02d:00", nEnd)})"
+
                     Text(
-                        text = stringResource(R.string.card_night),
+                        text = nightTitle,
                         style = MaterialTheme.typography.titleSmall,
                         color = TextPrimaryDark
                     )

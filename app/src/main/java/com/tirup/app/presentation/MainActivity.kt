@@ -26,7 +26,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -34,7 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -77,27 +77,31 @@ class MainActivity : ComponentActivity() {
             val settingsState by settingsViewModel.uiState.collectAsState()
             val languageCode = settingsState.userSettings.language
 
-            val localizedContext = createLocalizedContext(this, languageCode)
+            // Dynamically update locale without breaking Activity Context for ActivityResultLauncher
+            UpdateLocale(this, languageCode)
 
-            CompositionLocalProvider(LocalContext provides localizedContext) {
-                TIRUpTheme {
-                    AppNavigationRoot(
-                        focusViewModel = focusViewModel,
-                        trendsViewModel = trendsViewModel,
-                        reportsViewModel = reportsViewModel,
-                        settingsViewModel = settingsViewModel
-                    )
-                }
+            TIRUpTheme {
+                AppNavigationRoot(
+                    focusViewModel = focusViewModel,
+                    trendsViewModel = trendsViewModel,
+                    reportsViewModel = reportsViewModel,
+                    settingsViewModel = settingsViewModel
+                )
             }
         }
     }
 
-    private fun createLocalizedContext(context: Context, languageCode: String): Context {
-        val targetLocale = if (languageCode.equals("EN", ignoreCase = true)) Locale.ENGLISH else Locale("ru")
-        Locale.setDefault(targetLocale)
-        val config = Configuration(context.resources.configuration)
-        config.setLocale(targetLocale)
-        return context.createConfigurationContext(config)
+    @Composable
+    private fun UpdateLocale(context: Context, languageCode: String) {
+        val configuration = LocalConfiguration.current
+        LaunchedEffect(languageCode) {
+            val targetLocale = if (languageCode.equals("EN", ignoreCase = true)) Locale.ENGLISH else Locale("ru")
+            Locale.setDefault(targetLocale)
+            val config = Configuration(configuration)
+            config.setLocale(targetLocale)
+            @Suppress("DEPRECATION")
+            context.resources.updateConfiguration(config, context.resources.displayMetrics)
+        }
     }
 }
 

@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Language
@@ -43,7 +44,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.tirup.app.R
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.presentation.components.BentoCard
@@ -54,6 +54,7 @@ import com.tirup.app.presentation.theme.PrimaryEmerald
 import com.tirup.app.presentation.theme.TextMutedDark
 import com.tirup.app.presentation.theme.TextPrimaryDark
 import com.tirup.app.presentation.theme.TextSecondaryDark
+import java.util.Locale
 
 @Composable
 fun SettingsScreen(
@@ -157,13 +158,29 @@ fun SettingsScreen(
             }
         }
 
-        // Section 2: Clinical Target Thresholds
+        // Section 2: Clinical Target Thresholds & Sleep Window
         item {
-            var tirLow by remember(settings.targetRanges.tirLowMmol) { mutableStateOf(settings.targetRanges.tirLowMmol.toString()) }
-            var tirHigh by remember(settings.targetRanges.tirHighMmol) { mutableStateOf(settings.targetRanges.tirHighMmol.toString()) }
-            var tingHigh by remember(settings.targetRanges.tingHighMmol) { mutableStateOf(settings.targetRanges.tingHighMmol.toString()) }
-            var tirGoal by remember(settings.targetRanges.tirGoalPercent) { mutableStateOf(settings.targetRanges.tirGoalPercent.toString()) }
-            var tingGoal by remember(settings.targetRanges.tingGoalPercent) { mutableStateOf(settings.targetRanges.tingGoalPercent.toString()) }
+            var tirLow by remember(settings.targetRanges.tirLowMmol) {
+                mutableStateOf(String.format(Locale.US, "%.1f", settings.targetRanges.tirLowMmol))
+            }
+            var tirHigh by remember(settings.targetRanges.tirHighMmol) {
+                mutableStateOf(String.format(Locale.US, "%.1f", settings.targetRanges.tirHighMmol))
+            }
+            var tingHigh by remember(settings.targetRanges.tingHighMmol) {
+                mutableStateOf(String.format(Locale.US, "%.1f", settings.targetRanges.tingHighMmol))
+            }
+            var tirGoal by remember(settings.targetRanges.tirGoalPercent) {
+                mutableStateOf(settings.targetRanges.tirGoalPercent.toString())
+            }
+            var tingGoal by remember(settings.targetRanges.tingGoalPercent) {
+                mutableStateOf(settings.targetRanges.tingGoalPercent.toString())
+            }
+            var nightStart by remember(settings.nightStartHour) {
+                mutableStateOf(String.format(Locale.US, "%02d:00", settings.nightStartHour))
+            }
+            var nightEnd by remember(settings.nightEndHour) {
+                mutableStateOf(String.format(Locale.US, "%02d:00", settings.nightEndHour))
+            }
 
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -207,6 +224,28 @@ fun SettingsScreen(
                         )
                     }
 
+                    // Night Profile Hours (Sleep interval)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = nightStart,
+                            onValueChange = { nightStart = it },
+                            label = { Text("Начало ночи (сон)") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = nightEnd,
+                            onValueChange = { nightEnd = it },
+                            label = { Text("Конец ночи") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                    }
+
                     Button(
                         onClick = {
                             val low = tirLow.toDoubleOrNull() ?: 3.9
@@ -214,7 +253,11 @@ fun SettingsScreen(
                             val tHigh = tingHigh.toDoubleOrNull() ?: 7.8
                             val goal = tirGoal.toIntOrNull() ?: 70
                             val tGoal = tingGoal.toIntOrNull() ?: 50
-                            viewModel.updateThresholds(low, high, tHigh, goal, tGoal)
+
+                            val nStart = nightStart.replace(":00", "").trim().toIntOrNull() ?: 0
+                            val nEnd = nightEnd.replace(":00", "").trim().toIntOrNull() ?: 6
+
+                            viewModel.updateThresholds(low, high, tHigh, goal, tGoal, nStart.coerceIn(0, 23), nEnd.coerceIn(0, 23))
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),

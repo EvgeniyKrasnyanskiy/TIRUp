@@ -111,7 +111,12 @@ class ReportsViewModel(
                 glucoseRepository.getReadingsBetween(startTime, endTime).combine(
                     settingsRepository.getSettings()
                 ) { readings, latestSettings ->
-                    val stats = GlucoseMetricsCalculator.calculateStatistics(readings, latestSettings.targetRanges)
+                    val stats = GlucoseMetricsCalculator.calculateStatistics(
+                        readings = readings,
+                        targetRanges = latestSettings.targetRanges,
+                        nightStartHour = latestSettings.nightStartHour,
+                        nightEndHour = latestSettings.nightEndHour
+                    )
                     Pair(readings, stats)
                 }
             }.collect { (readings, stats) ->
@@ -137,7 +142,12 @@ class ReportsViewModel(
                 if (readings.isEmpty()) {
                     HistoricalReportData(hasData = false)
                 } else {
-                    val stats = GlucoseMetricsCalculator.calculateStatistics(readings, settings.targetRanges)
+                    val stats = GlucoseMetricsCalculator.calculateStatistics(
+                        readings = readings,
+                        targetRanges = settings.targetRanges,
+                        nightStartHour = settings.nightStartHour,
+                        nightEndHour = settings.nightEndHour
+                    )
                     val minTs = readings.minOf { it.timestamp }
                     val maxTs = readings.maxOf { it.timestamp }
                     val fmt = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
