@@ -46,11 +46,11 @@ fun HeatmapChart(
             modifier = Modifier.fillMaxWidth().padding(start = 56.dp, end = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = "00:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-            Text(text = "06:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-            Text(text = "12:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-            Text(text = "18:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-            Text(text = "23:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+            Text(text = "00:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = "06:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = "12:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = "18:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = "23:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         Spacer(modifier = Modifier.height(8.dp))

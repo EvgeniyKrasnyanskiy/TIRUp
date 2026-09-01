@@ -21,15 +21,43 @@ class StreamingGlucoseImporter(
     private val database: AppDatabase
 ) {
 
+    private class CountingInputStream(private val wrapped: InputStream) : InputStream() {
+        var bytesRead: Long = 0L
+            private set
+
+        override fun read(): Int {
+            val b = wrapped.read()
+            if (b != -1) bytesRead++
+            return b
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            val count = wrapped.read(b, off, len)
+            if (count > 0) bytesRead += count
+            return count
+        }
+
+        override fun close() = wrapped.close()
+    }
+
     suspend fun importHistoricalFromUri(
         uri: Uri,
-        onProgress: (importedCount: Int) -> Unit = {}
+        onProgress: (progress: Float, importedCount: Int) -> Unit = { _, _ -> }
     ): Result<Int> = withContext(Dispatchers.IO) {
         var totalImported = 0
 
         try {
             // Clear previous historical dataset so each upload is fresh and isolated
             database.historicalReadingDao().clearAll()
+            onProgress(0.02f, 0)
+
+            val totalBytes: Long = try {
+                context.contentResolver.openFileDescriptor(uri, "r")?.use {
+                    it.statSize
+                } ?: -1L
+            } catch (e: Exception) {
+                -1L
+            }
 
             val rawInputStream = context.contentResolver.openInputStream(uri)
                 ?: return@withContext Result.failure(Exception("Cannot open stream for URI: $uri"))
@@ -81,11 +109,26 @@ class StreamingGlucoseImporter(
                             !n.contains("treatment") && !n.contains("calibrat")
                 }
 
+                val totalUncompressed = csvEntries.sumOf { it.size }.coerceAtLeast(1L)
+                var bytesAccumulator = 0L
+
                 if (csvEntries.isNotEmpty()) {
                     for (entry in csvEntries) {
                         Log.d(TAG, "Processing CSV entry: ${entry.name} (size: ${entry.size})")
                         zipFile.getInputStream(entry).use { entryStream ->
-                            val count = processCsvStream(entryStream, chunk, dateFormats, seenTimestamps, onProgress)
+                            val countingStream = CountingInputStream(entryStream)
+                            val count = processCsvStream(
+                                inputStream = countingStream,
+                                chunk = chunk,
+                                dateFormats = dateFormats,
+                                seenTimestamps = seenTimestamps,
+                                onProgressUpdate = { inStreamCount ->
+                                    val currentBytes = bytesAccumulator + countingStream.bytesRead
+                                    val prog = (currentBytes.toFloat() / totalUncompressed.toFloat()).coerceIn(0.05f, 0.98f)
+                                    onProgress(prog, totalImported + inStreamCount)
+                                }
+                            )
+                            bytesAccumulator += entry.size
                             totalImported += count
                         }
                     }
@@ -97,7 +140,18 @@ class StreamingGlucoseImporter(
                 tempZipFile.delete()
             } else {
                 Log.d(TAG, "Processing CSV/Text stream...")
-                val count = processCsvStream(bufferedIn, chunk, dateFormats, seenTimestamps, onProgress)
+                val countingStream = CountingInputStream(bufferedIn)
+                val expectedBytes = if (totalBytes > 0) totalBytes else 1_000_000L
+                val count = processCsvStream(
+                    inputStream = countingStream,
+                    chunk = chunk,
+                    dateFormats = dateFormats,
+                    seenTimestamps = seenTimestamps,
+                    onProgressUpdate = { inStreamCount ->
+                        val prog = (countingStream.bytesRead.toFloat() / expectedBytes.toFloat()).coerceIn(0.05f, 0.98f)
+                        onProgress(prog, inStreamCount)
+                    }
+                )
                 totalImported += count
             }
 
@@ -106,8 +160,8 @@ class StreamingGlucoseImporter(
                 insertHistoricalChunk(chunk)
                 totalImported += chunk.size
                 chunk.clear()
-                onProgress(totalImported)
             }
+            onProgress(1.0f, totalImported)
 
             Log.d(TAG, "Historical import completed. Total points: $totalImported")
             Result.success(totalImported)
@@ -122,7 +176,7 @@ class StreamingGlucoseImporter(
         chunk: ArrayList<HistoricalReadingEntity>,
         dateFormats: List<SimpleDateFormat>,
         seenTimestamps: HashSet<Long>,
-        onProgress: (Int) -> Unit
+        onProgressUpdate: (Int) -> Unit
     ): Int {
         var importedInStream = 0
         val reader = BufferedReader(InputStreamReader(inputStream), 32768)
@@ -256,7 +310,7 @@ class StreamingGlucoseImporter(
                     insertHistoricalChunk(chunk)
                     importedInStream += chunk.size
                     chunk.clear()
-                    onProgress(importedInStream)
+                    onProgressUpdate(importedInStream)
                 }
             }
 

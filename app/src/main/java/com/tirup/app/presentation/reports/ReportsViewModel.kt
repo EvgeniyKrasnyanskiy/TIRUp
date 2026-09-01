@@ -54,6 +54,8 @@ data class ReportsUiState(
     val isGeneratingLive: Boolean = false,
     val isGeneratingHistorical: Boolean = false,
     val isImporting: Boolean = false,
+    val importProgress: Float = 0f,
+    val importedPointsCount: Int = 0,
     val importMessage: String? = null,
     val showLiveDetailDialog: Boolean = false,
     val showHistoricalDetailDialog: Boolean = false
@@ -177,20 +179,39 @@ class ReportsViewModel(
 
     fun importHistoricalFile(uri: Uri) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isImporting = true, importMessage = null)
+            _uiState.value = _uiState.value.copy(
+                isImporting = true,
+                importProgress = 0.03f,
+                importedPointsCount = 0,
+                importMessage = null
+            )
             val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
 
-            val result = streamingImporter.importHistoricalFromUri(uri)
+            val result = streamingImporter.importHistoricalFromUri(uri) { progress, count ->
+                _uiState.value = _uiState.value.copy(
+                    importProgress = progress,
+                    importedPointsCount = count
+                )
+            }
             result.onSuccess { total ->
                 val msg = if (total > 0) {
                     if (isRu) "Импортировано $total точек в исторический отчёт." else "Imported $total points to historical report."
                 } else {
                     if (isRu) "Файл не содержит распознанных точек сахара." else "No glucose points found in file."
                 }
-                _uiState.value = _uiState.value.copy(isImporting = false, importMessage = msg)
+                _uiState.value = _uiState.value.copy(
+                    isImporting = false,
+                    importProgress = 1f,
+                    importedPointsCount = total,
+                    importMessage = msg
+                )
             }.onFailure { err ->
                 val prefix = if (isRu) "Ошибка импорта: " else "Import error: "
-                _uiState.value = _uiState.value.copy(isImporting = false, importMessage = prefix + err.message)
+                _uiState.value = _uiState.value.copy(
+                    isImporting = false,
+                    importProgress = 0f,
+                    importMessage = prefix + err.message
+                )
             }
         }
     }

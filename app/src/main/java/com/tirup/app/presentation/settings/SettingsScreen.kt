@@ -503,7 +503,7 @@ fun SettingsScreen(
                     Text(
                         text = stringResource(R.string.clear_data_confirm),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     OutlinedButton(
@@ -596,20 +596,20 @@ fun SettingsScreen(
     if (state.showClearDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.showClearConfirm(false) },
-            title = { Text(text = stringResource(R.string.clear_data)) },
-            text = { Text(text = stringResource(R.string.clear_data_confirm)) },
+            title = { Text(text = stringResource(R.string.clear_data), color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text(text = stringResource(R.string.clear_data_confirm), color = MaterialTheme.colorScheme.onSurface) },
             confirmButton = {
                 TextButton(
                     onClick = { viewModel.clearAllData() }
                 ) {
-                    Text(text = stringResource(R.string.action_confirm), color = ColorVeryLow)
+                    Text(text = stringResource(R.string.action_confirm), color = ColorVeryLow, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = { viewModel.showClearConfirm(false) }
                 ) {
-                    Text(text = stringResource(R.string.action_cancel))
+                    Text(text = stringResource(R.string.action_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )

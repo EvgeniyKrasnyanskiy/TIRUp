@@ -35,8 +35,8 @@ val DarkSurface = Color(0xFF161E2E)
 val DarkSurfaceElevated = Color(0xFF1E293B)
 val DarkBorder = Color(0xFF334155)
 val TextPrimaryDark = Color(0xFFF8FAFC)
-val TextSecondaryDark = Color(0xFFCBD5E1) // High-contrast crisp silver
-val TextMutedDark = Color(0xFF94A3B8)
+val TextSecondaryDark = Color(0xFFE2E8F0) // High-contrast crisp silver-white
+val TextMutedDark = Color(0xFFCBD5E1)
 
 // Light Palette
 val LightBg = Color(0xFFF1F5F9)          // Clean slate background
@@ -44,8 +44,8 @@ val LightSurface = Color(0xFFFFFFFF)     // Crisp white cards
 val LightSurfaceElevated = Color(0xFFE2E8F0)
 val LightBorder = Color(0xFFCBD5E1)
 val TextPrimaryLight = Color(0xFF0F172A)  // Deep slate for high contrast
-val TextSecondaryLight = Color(0xFF334155) // High-contrast rich slate
-val TextMutedLight = Color(0xFF475569)
+val TextSecondaryLight = Color(0xFF1E293B) // High-contrast deep slate
+val TextMutedLight = Color(0xFF334155)
 
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryEmerald,

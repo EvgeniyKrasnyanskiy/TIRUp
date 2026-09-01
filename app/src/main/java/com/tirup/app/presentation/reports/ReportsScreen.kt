@@ -129,7 +129,7 @@ fun ReportsScreen(
                     Text(
                         text = stringResource(R.string.reports_subtitle),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -255,7 +255,7 @@ private fun LiveReportCard(
                             text = if (isRu) "${state.liveReadings.size} точек • ${stats.daysCount} дн. (нажмите для бланка)"
                                    else "${state.liveReadings.size} readings • ${stats.daysCount} days (tap to preview)",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -427,21 +427,42 @@ private fun HistoricalReportCard(
 
             if (state.isImporting) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val ptsStr = if (state.importedPointsCount > 0) {
+                            if (isRu) " (${state.importedPointsCount} точек)" else " (${state.importedPointsCount} pts)"
+                        } else ""
+                        Text(
+                            text = if (isRu) "Обработка и расчёт файла$ptsStr..." else "Processing and calculating$ptsStr...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Medium
+                        )
+                        val percentInt = (state.importProgress * 100).toInt().coerceIn(0, 100)
+                        Text(
+                            text = "$percentInt%",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = ActionBlue,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
                     androidx.compose.material3.LinearProgressIndicator(
+                        progress = { state.importProgress.coerceIn(0f, 1f) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp)),
-                        color = PrimaryEmerald
-                    )
-                    Text(
-                        text = if (isRu) "Импорт и обработка данных..." else "Importing and processing data...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = PrimaryEmerald,
-                        fontWeight = FontWeight.SemiBold
+                            .height(10.dp)
+                            .clip(RoundedCornerShape(5.dp)),
+                        color = ActionBlue,
+                        trackColor = ActionBlue.copy(alpha = 0.15f)
                     )
                 }
             }
