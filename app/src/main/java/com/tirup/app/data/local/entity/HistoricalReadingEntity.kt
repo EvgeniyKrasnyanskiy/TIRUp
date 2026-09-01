@@ -8,10 +8,13 @@ import com.tirup.app.domain.model.GlucoseReading
 
 @Entity(
     tableName = "historical_readings",
-    indices = [Index(value = ["timestamp"], unique = true)]
+    indices = [Index(value = ["timestamp"])]
 )
 data class HistoricalReadingEntity(
-    @PrimaryKey
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
+    val id: Long = 0,
+
     @ColumnInfo(name = "timestamp")
     val timestamp: Long,
 

@@ -322,45 +322,52 @@ class AgpPdfGenerator(private val context: Context) {
                 canvas.drawText(lbl, x - 10f, graphBottom + 13f, subTextPaint)
             }
 
-            // 4. Clinical Assessment
+            // 4. Clinical Assessment in 2 Columns
             val notesTop = 570f
-            val notesBox = RectF(margin, notesTop, 595f - margin, 796f)
+            val notesBox = RectF(margin, notesTop, 595f - margin, 742f)
             canvas.drawRoundRect(notesBox, 8f, 8f, headerBgPaint)
             canvas.drawRoundRect(notesBox, 8f, 8f, borderPaint)
 
             val notesTitle = if (isRu) "КЛИНИЧЕСКАЯ ОЦЕНКА" else "CLINICAL ASSESSMENT"
-            canvas.drawText(notesTitle, margin + 12f, notesTop + 18f, boxTitlePaint)
+            canvas.drawText(notesTitle, margin + 12f, notesTop + 17f, boxTitlePaint)
 
             val passPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(5, 150, 105)
-                textSize = 9f
+                textSize = 8.5f
                 isFakeBoldText = true
             }
             val warnPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(217, 119, 6)
-                textSize = 9f
+                textSize = 8.5f
                 isFakeBoldText = true
             }
             val failPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(220, 38, 38)
-                textSize = 9f
+                textSize = 8.5f
                 isFakeBoldText = true
             }
 
-            var noteY = notesTop + 34f
-            statistics.clinicalSummary.evaluatedMetrics.forEach { item ->
+            val items = statistics.clinicalSummary.evaluatedMetrics
+            val midPoint = (items.size + 1) / 2
+            val col1X = margin + 12f
+            val col2X = margin + 12f + (contentWidth / 2f)
+
+            items.forEachIndexed { index, item ->
                 val pnt = if (item.isMet) passPaint else if (item.isWarning) warnPaint else failPaint
+                val isCol2 = index >= midPoint
+                val x = if (isCol2) col2X else col1X
+                val rowInCol = if (isCol2) index - midPoint else index
+                val y = notesTop + 32f + (rowInCol * 13f)
+
                 val line = "${item.symbol} ${item.title}: ${item.valueStr} (${item.targetStr})"
-                canvas.drawText(line, margin + 12f, noteY, pnt)
-                noteY += 15f
+                canvas.drawText(line, x, y, pnt)
             }
 
-            noteY += 2f
+            val bottomSectionY = notesTop + 32f + (midPoint * 13f) + 6f
             val conclPrefix = if (isRu) "• Заключение: " else "• Conclusion: "
             val recPrefix = if (isRu) "• Рекомендация: " else "• Recommendation: "
-            canvas.drawText("$conclPrefix${statistics.clinicalSummary.overallStatus}", margin + 12f, noteY, textPaint)
-            noteY += 15f
-            canvas.drawText("$recPrefix${statistics.clinicalSummary.recommendation}", margin + 12f, noteY, subTextPaint)
+            canvas.drawText("$conclPrefix${statistics.clinicalSummary.overallStatus}", margin + 12f, bottomSectionY, textPaint)
+            canvas.drawText("$recPrefix${statistics.clinicalSummary.recommendation}", margin + 12f, bottomSectionY + 13f, subTextPaint)
 
             // Footer with telegram channel link
             val footerText = if (isRu) {

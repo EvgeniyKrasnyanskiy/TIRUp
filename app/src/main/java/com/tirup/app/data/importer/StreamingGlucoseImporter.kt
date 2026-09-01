@@ -216,10 +216,10 @@ class StreamingGlucoseImporter(
                 }
                 val gVal = rawVal.toDoubleOrNull()
                 if (ts != null && gVal != null && gVal > 0.0) {
-                    val valueMmol = if (isMgDlHeader || gVal > 35.0) gVal / 18.0182 else gVal
-                    if (valueMmol >= 2.1) {
-                        val roundedTs = (ts / 300000L) * 300000L // Standard 5-min bin
-                        reading = HistoricalReadingEntity(timestamp = roundedTs, valueMmol = valueMmol)
+                    // Match glycemia_processor.py is_probably_mmol heuristic: if <= 30.0 -> mmol/L, else mg/dL
+                    val valueMmol = if (gVal <= 30.0) gVal else gVal / 18.0182
+                    if (valueMmol * 18.0182 >= 38.0) {
+                        reading = HistoricalReadingEntity(timestamp = ts, valueMmol = valueMmol)
                     }
                 }
             }
@@ -234,10 +234,9 @@ class StreamingGlucoseImporter(
                 }
                 val gVal = rawVal.toDoubleOrNull()
                 if (ts != null && gVal != null && gVal > 0.0) {
-                    val valueMmol = if (isMgDlHeader || gVal > 35.0) gVal / 18.0182 else gVal
-                    if (valueMmol >= 2.1) {
-                        val roundedTs = (ts / 300000L) * 300000L // Standard 5-min bin
-                        reading = HistoricalReadingEntity(timestamp = roundedTs, valueMmol = valueMmol)
+                    val valueMmol = if (gVal <= 30.0) gVal else gVal / 18.0182
+                    if (valueMmol * 18.0182 >= 38.0) {
+                        reading = HistoricalReadingEntity(timestamp = ts, valueMmol = valueMmol)
                     }
                 }
             }
@@ -292,10 +291,12 @@ class StreamingGlucoseImporter(
                             if (k != i && k != j) {
                                 val clean = parts[k].replace(',', '.')
                                 val gVal = clean.toDoubleOrNull()
-                                if (gVal != null && gVal in 1.0..600.0) {
-                                    val valueMmol = if (gVal > 35.0) gVal / 18.0182 else gVal
-                                    val entity = HistoricalReadingEntity(timestamp = ts, valueMmol = valueMmol)
-                                    return Quad(entity, i, j, k)
+                                if (gVal != null && gVal > 0.0) {
+                                    val valueMmol = if (gVal <= 30.0) gVal else gVal / 18.0182
+                                    if (valueMmol * 18.0182 >= 38.0) {
+                                        val entity = HistoricalReadingEntity(timestamp = ts, valueMmol = valueMmol)
+                                        return Quad(entity, i, j, k)
+                                    }
                                 }
                             }
                         }
@@ -312,10 +313,12 @@ class StreamingGlucoseImporter(
                     if (k != i) {
                         val clean = parts[k].replace(',', '.')
                         val gVal = clean.toDoubleOrNull()
-                        if (gVal != null && gVal in 1.0..600.0) {
-                            val valueMmol = if (gVal > 35.0) gVal / 18.0182 else gVal
-                            val entity = HistoricalReadingEntity(timestamp = ts, valueMmol = valueMmol)
-                            return Quad(entity, -1, -1, k)
+                        if (gVal != null && gVal > 0.0) {
+                            val valueMmol = if (gVal <= 30.0) gVal else gVal / 18.0182
+                            if (valueMmol * 18.0182 >= 38.0) {
+                                val entity = HistoricalReadingEntity(timestamp = ts, valueMmol = valueMmol)
+                                return Quad(entity, -1, -1, k)
+                            }
                         }
                     }
                 }

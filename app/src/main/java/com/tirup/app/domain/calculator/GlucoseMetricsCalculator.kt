@@ -63,18 +63,24 @@ object GlucoseMetricsCalculator {
             return GlucoseStatistics()
         }
 
-        // 1. Resample to standard 5-minute bins (xDrip / DiaKiaBot standard)
-        val clean5MinReadings = resampleTo5Minutes(readings)
-        if (clean5MinReadings.isEmpty()) {
+        // Filter by CUTOFF (38.0 mg/dL ~ 2.109 mmol/L) and sort chronologically
+        val validReadings = readings
+            .filter { (it.valueMmol * MGDL_FACTOR) > CUTOFF_MGDL }
+            .sortedBy { it.timestamp }
+
+        if (validReadings.isEmpty()) {
             return GlucoseStatistics()
         }
 
-        val totalCount = clean5MinReadings.size
-        val sumMmol = clean5MinReadings.sumOf { it.valueMmol }
+        val totalCount = validReadings.size
+        val rawMmoll = validReadings.map { it.valueMmol }
+        val rawMgdl = validReadings.map { it.valueMmol * MGDL_FACTOR }
+
+        val sumMmol = rawMmoll.sum()
         val mean = sumMmol / totalCount
 
         // Median
-        val sortedValues = clean5MinReadings.map { it.valueMmol }.sorted()
+        val sortedValues = rawMmoll.sorted()
         val median = if (totalCount % 2 == 0) {
             (sortedValues[totalCount / 2 - 1] + sortedValues[totalCount / 2]) / 2.0
         } else {
@@ -83,7 +89,7 @@ object GlucoseMetricsCalculator {
 
         // Standard Deviation — population SD (N), matching Python numpy.std() / xDrip default
         val variance = if (totalCount > 0) {
-            clean5MinReadings.sumOf { (it.valueMmol - mean) * (it.valueMmol - mean) } / totalCount
+            rawMmoll.sumOf { (it - mean) * (it - mean) } / totalCount
         } else {
             0.0
         }
@@ -97,33 +103,26 @@ object GlucoseMetricsCalculator {
         // IFCC mmol/mol: (eA1c% - 2.15) * 10.929
         val hba1cMmolMol = ((ea1cAdag - 2.15) * 10.929).roundToInt().coerceAtLeast(0)
 
-        // 2. Ranges counting in mg/dL (xDrip exact thresholds: Low 70.27 mg/dL, High 180.0 mg/dL, Tight High 140.0 mg/dL)
-        val lowMgdl = 3.9 * MGDL_FACTOR      // ~70.27
-        val highMgdl = 180.0                 // ~10.0 mmol/L
-        val tightHighMgdl = 140.0            // ~7.8 mmol/L
-        val tbr30Mgdl = 54.0                 // ~3.0 mmol/L
-        val tar139Mgdl = 250.0               // ~13.9 mmol/L
+        // 2. Ranges counting in mg/dL (exact thresholds matching glycemia_processor.py)
+        val lowMgdl = 3.9 * MGDL_FACTOR      // ~70.27 mg/dL
+        val highMgdl = 180.0                 // 180.0 mg/dL (~10.0 mmol/L)
+        val tightHighMgdl = 140.0            // 140.0 mg/dL (~7.8 mmol/L)
+        val tbr30Mgdl = 54.0                 // 54.0 mg/dL (~3.0 mmol/L)
+        val tar139Mgdl = 250.0               // 250.0 mg/dL (~13.9 mmol/L)
 
-        var belowCount = 0
-        var below30Count = 0
-        var inRangeCount = 0
-        var tightCount = 0
-        var aboveCount = 0
-        var above139Count = 0
+        // Диапазон [Low, High) - High исключается
+        val inRangeCount = rawMgdl.count { it >= lowMgdl && it < highMgdl }
+        val belowCount = rawMgdl.count { it < lowMgdl }
+        val aboveCount = rawMgdl.count { it >= highMgdl }
+
+        val tightCount = rawMgdl.count { it >= lowMgdl && it < tightHighMgdl }
+        val below30Count = rawMgdl.count { it < tbr30Mgdl }
+        val above139Count = rawMgdl.count { it >= tar139Mgdl }
 
         val nightReadings = mutableListOf<GlucoseReading>()
         val calendar = Calendar.getInstance(TimeZone.getDefault())
 
-        clean5MinReadings.forEach { reading ->
-            val mgdl = reading.valueMmol * MGDL_FACTOR
-
-            if (mgdl < tbr30Mgdl) below30Count++
-            if (mgdl < lowMgdl) belowCount++
-            if (mgdl >= lowMgdl && mgdl < highMgdl) inRangeCount++
-            if (mgdl >= lowMgdl && mgdl < tightHighMgdl) tightCount++
-            if (mgdl >= highMgdl) aboveCount++
-            if (mgdl >= tar139Mgdl) above139Count++
-
+        validReadings.forEach { reading ->
             calendar.timeInMillis = reading.timestamp
             val hour = calendar.get(Calendar.HOUR_OF_DAY)
             if (isNightHour(hour, nightStartHour, nightEndHour)) {
@@ -133,43 +132,44 @@ object GlucoseMetricsCalculator {
 
         val tirPercent = (inRangeCount.toDouble() / totalCount) * 100.0
         val tingPercent = (tightCount.toDouble() / totalCount) * 100.0
-        val tbrLowPercent = ((belowCount - below30Count).coerceAtLeast(0).toDouble() / totalCount) * 100.0
-        val tbrVeryLowPercent = (below30Count.toDouble() / totalCount) * 100.0
-        val tarHighPercent = ((aboveCount - above139Count).coerceAtLeast(0).toDouble() / totalCount) * 100.0
-        val tarVeryHighPercent = (above139Count.toDouble() / totalCount) * 100.0
-
         val tbrTotalPercent = (belowCount.toDouble() / totalCount) * 100.0
         val tarTotalPercent = (aboveCount.toDouble() / totalCount) * 100.0
 
+        val tbrVeryLowPercent = (below30Count.toDouble() / totalCount) * 100.0
+        val tbrLowPercent = (tbrTotalPercent - tbrVeryLowPercent).coerceAtLeast(0.0)
+        val tarVeryHighPercent = (above139Count.toDouble() / totalCount) * 100.0
+        val tarHighPercent = (tarTotalPercent - tarVeryHighPercent).coerceAtLeast(0.0)
+
         // Distinct active days
-        val distinctDays = clean5MinReadings.map {
+        val distinctDays = validReadings.map {
             calendar.timeInMillis = it.timestamp
             calendar.get(Calendar.YEAR) * 1000 + calendar.get(Calendar.DAY_OF_YEAR)
         }.distinct().size
 
         val nightStability = calculateNightStability(nightReadings, targetRanges)
 
-        // 3. GVI calculation — exact xDrip algorithm on 5-minute standard intervals in mg/dL.
-        //    xDrip step constant = 25 (dt = 5 min), timeComponent = usedRecords * 5
-        val clean5MinMgdl = clean5MinReadings.map { it.valueMmol * MGDL_FACTOR }
-        val gvi = computeGviXdripStyle(clean5MinMgdl)
+        // 3. GVI calculation on raw filtered mg/dL readings
+        val gvi = computeGviXdripStyle(rawMgdl)
 
         // 4. PGS calculation: GVI * floor(mean_mgdl) * (1 - floor(TIR)/100)
-        val meanMgdlFloored = floor(mean * MGDL_FACTOR)
-        val tirPercentInt = (inRangeCount * 100) / totalCount
-        val pgsRaw = gvi * meanMgdlFloored * (1.0 - (tirPercentInt / 100.0))
-        val pgsTruncated = (pgsRaw * 10.0).toInt() / 10.0
+        val glucoseTotal = rawMgdl.sum()
+        val glucoseMeanFloored = floor(glucoseTotal / totalCount)
+        val tirPercentIntForPgs = (inRangeCount * 100) / totalCount
+        val pgsRaw = gvi * glucoseMeanFloored * (1.0 - (tirPercentIntForPgs / 100.0))
+        val pgsTruncated = (floor(pgsRaw * 10.0) / 10.0)
 
         // 5. GRI calculation (Glycemia Risk Index - Klonoff et al. 2022)
-        val griLowCount = clean5MinReadings.count { (it.valueMmol * MGDL_FACTOR) in tbr30Mgdl..(3.8 * MGDL_FACTOR) }
+        val griLowUpperMgdl = 3.8 * MGDL_FACTOR
+        val griHighLowerMgdl = 10.1 * MGDL_FACTOR
+        val griLowCount = rawMgdl.count { it >= tbr30Mgdl && it < griLowUpperMgdl }
         val griLowPct = (griLowCount.toDouble() / totalCount) * 100.0
-        val griHighCount = clean5MinReadings.count { (it.valueMmol * MGDL_FACTOR) in (10.1 * MGDL_FACTOR)..tar139Mgdl }
+        val griHighCount = rawMgdl.count { it >= griHighLowerMgdl && it < tar139Mgdl }
         val griHighPct = (griHighCount.toDouble() / totalCount) * 100.0
 
         val hypoComponent = tbrVeryLowPercent + (0.8 * griLowPct)
         val hyperComponent = tarVeryHighPercent + (0.5 * griHighPct)
         val rawGri = (3.0 * hypoComponent) + (1.6 * hyperComponent)
-        val gri = min((rawGri * 10.0).roundToInt() / 10.0, 100.0)
+        val gri = min(((rawGri * 10.0).roundToInt() / 10.0), 100.0)
 
         val isRu = language.equals("RU", ignoreCase = true)
         val (griZone, griLabel) = when {
@@ -181,14 +181,14 @@ object GlucoseMetricsCalculator {
         }
 
         // 6. Active Time (CGM coverage)
-        val totalDurationMs = if (clean5MinReadings.size > 1) {
-            clean5MinReadings.last().timestamp - clean5MinReadings.first().timestamp
+        val totalDurationMs = if (validReadings.size > 1) {
+            validReadings.last().timestamp - validReadings.first().timestamp
         } else 0L
 
         var totalGapDurationMs = 0L
         val gapThresholdMs = 20 * 60 * 1000L // 20 min
-        for (i in 1 until clean5MinReadings.size) {
-            val diff = clean5MinReadings[i].timestamp - clean5MinReadings[i - 1].timestamp
+        for (i in 1 until validReadings.size) {
+            val diff = validReadings[i].timestamp - validReadings[i - 1].timestamp
             if (diff > gapThresholdMs) {
                 totalGapDurationMs += diff
             }
