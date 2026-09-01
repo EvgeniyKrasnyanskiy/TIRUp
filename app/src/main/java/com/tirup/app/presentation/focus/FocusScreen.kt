@@ -105,7 +105,15 @@ fun FocusScreen(
                     )
                 }
 
-                StreakBadge(streakDays = state.streakDays)
+                StreakBadge(
+                    streakDays = state.streakDays,
+                    onClick = {
+                        detailDialogInfo = Pair(
+                            "Серия дней в целевом диапазоне (Стрик)",
+                            "🔥 Текущая серия: ${state.streakDays} дн. подряд.\n\nКаждый день, в котором время в целевом диапазоне (TIR/TING) достигает установленной нормы (≥70%), серия продлевается. Непрерывное удержание сахара формирует стабильную компенсацию и надёжно защищает от сосудистых осложнений!"
+                        )
+                    }
+                )
             }
         }
 

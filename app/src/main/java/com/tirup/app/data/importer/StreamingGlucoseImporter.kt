@@ -64,19 +64,39 @@ class StreamingGlucoseImporter(
             )
 
             if (isZip) {
-                Log.d(TAG, "Detected ZIP archive. Processing entries...")
-                val zipIn = ZipInputStream(bufferedIn)
-                var entry = zipIn.nextEntry
-                while (entry != null) {
-                    val entryName = entry.name.lowercase()
-                    if (!entry.isDirectory && (entryName.endsWith(".csv") || entryName.endsWith(".tsv") || entryName.endsWith(".txt") || !entryName.contains("."))) {
-                        Log.d(TAG, "Processing CSV entry inside zip: ${entry.name}")
-                        val count = processCsvStream(zipIn, chunk, dateFormats, onProgress)
+                Log.d(TAG, "Detected ZIP archive. Scanning for primary glucose CSV...")
+                // In xDrip ZIP archives, extract to temp or process the main glucose stream
+                val tempZipFile = java.io.File.createTempFile("xdrip_import", ".zip", context.cacheDir)
+                java.io.FileOutputStream(tempZipFile).use { out ->
+                    bufferedIn.copyTo(out)
+                }
+
+                val zipFile = java.util.zip.ZipFile(tempZipFile)
+                val entries = zipFile.entries().asSequence().filter { !it.isDirectory }.toList()
+                val csvEntries = entries.filter {
+                    val n = it.name.lowercase()
+                    n.endsWith(".csv") || n.endsWith(".tsv") || n.endsWith(".txt")
+                }
+
+                // Prefer main glucose file over calibrations/treatments
+                val primaryEntry = csvEntries.firstOrNull {
+                    val n = it.name.lowercase()
+                    (n.contains("glucose") || n.contains("cgms") || n.contains("merged") || n.contains("batch") || n.contains("report")) &&
+                            !n.contains("treatment") && !n.contains("calibrat")
+                } ?: csvEntries.maxByOrNull { it.size } ?: csvEntries.firstOrNull()
+
+                if (primaryEntry != null) {
+                    Log.d(TAG, "Selected primary CSV entry: ${primaryEntry.name} (size: ${primaryEntry.size})")
+                    zipFile.getInputStream(primaryEntry).use { entryStream ->
+                        val count = processCsvStream(entryStream, chunk, dateFormats, onProgress)
                         totalImported += count
                     }
-                    zipIn.closeEntry()
-                    entry = zipIn.nextEntry
+                } else {
+                    Log.w(TAG, "No valid CSV found in ZIP archive.")
                 }
+
+                zipFile.close()
+                tempZipFile.delete()
             } else {
                 Log.d(TAG, "Processing CSV/Text stream...")
                 val count = processCsvStream(bufferedIn, chunk, dateFormats, onProgress)

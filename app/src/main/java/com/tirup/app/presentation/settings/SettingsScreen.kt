@@ -1,5 +1,7 @@
 package com.tirup.app.presentation.settings
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,10 +20,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -44,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -301,6 +306,37 @@ fun SettingsScreen(
                             )
                         }
                     }
+
+                    // Theme Mode Selector
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(imageVector = Icons.Default.Brightness4, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "Тема", style = MaterialTheme.typography.bodyMedium, color = TextSecondaryDark)
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            LanguageChip(
+                                label = "🌙 Тёмная",
+                                isSelected = settings.themeMode == com.tirup.app.domain.model.ThemeMode.DARK,
+                                onClick = { viewModel.setThemeMode(com.tirup.app.domain.model.ThemeMode.DARK) }
+                            )
+                            LanguageChip(
+                                label = "☀️ Светлая",
+                                isSelected = settings.themeMode == com.tirup.app.domain.model.ThemeMode.LIGHT,
+                                onClick = { viewModel.setThemeMode(com.tirup.app.domain.model.ThemeMode.LIGHT) }
+                            )
+                            LanguageChip(
+                                label = "⚙️ Авто",
+                                isSelected = settings.themeMode == com.tirup.app.domain.model.ThemeMode.SYSTEM,
+                                onClick = { viewModel.setThemeMode(com.tirup.app.domain.model.ThemeMode.SYSTEM) }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -462,6 +498,46 @@ fun SettingsScreen(
                             color = PrimaryEmerald
                         )
                     }
+                }
+            }
+        }
+
+        // Section 5: Community Telegram Link
+        item {
+            val context = LocalContext.current
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = DarkSurfaceElevated,
+                border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.4f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/diakia"))
+                            context.startActivity(intent)
+                        } catch (_: Exception) {}
+                    }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Send,
+                        contentDescription = null,
+                        tint = Color(0xFF38BDF8),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Telegram-канал проекта: @diakia",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF38BDF8)
+                    )
                 }
             }
         }

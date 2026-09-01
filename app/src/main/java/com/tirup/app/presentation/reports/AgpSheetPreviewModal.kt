@@ -281,6 +281,13 @@ fun AgpSheetPreviewModal(
                                     fontSize = 10.sp,
                                     color = Color(0xFF64748B)
                                 )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "TIRUp Ambulatory Glucose Profile Report • Сгенерировано для консультаций и самоконтроля • Telegram: @diakia",
+                                    fontSize = 8.5.sp,
+                                    color = Color(0xFF94A3B8)
+                                )
                             }
                         }
                     }

@@ -52,6 +52,14 @@ class SettingsViewModel(
         }
     }
 
+    fun setThemeMode(mode: com.tirup.app.domain.model.ThemeMode) {
+        viewModelScope.launch {
+            val updated = _uiState.value.userSettings.copy(themeMode = mode)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+        }
+    }
+
     fun autoUpdateThresholds(
         tirLow: Double,
         tirHigh: Double,

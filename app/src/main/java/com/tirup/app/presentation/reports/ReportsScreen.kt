@@ -556,26 +556,57 @@ private fun ReportMetricsColumn(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
-        // Active time at the very TOP
         ReportMetricRow(
-            label = "$atEmoji Активное время сенсора",
-            target = "Валидность: ≥70%",
-            value = String.format(Locale.US, "%.1f%%", stats.activeTimePercent),
-            valueColor = atColor
+            label = "Mean BG (средний сахар)",
+            target = "Цель: ≤7.8",
+            value = meanVal,
+            valueColor = meanColor
         )
         ReportMetricRow(
-            label = "TIR в целевом (3.9–10.0)",
+            label = "eA1c (расчётный ГГ)",
+            target = "Цель: ≤7.0%",
+            value = String.format(Locale.US, "%.1f%%", stats.gmiPercent),
+            valueColor = gmiColor
+        )
+        ReportMetricRow(
+            label = "TIR (3.9–10.0 ммоль/л)",
             target = "Цель: ≥70%",
-            value = String.format(Locale.US, "%.1f%%", stats.tirPercent),
+            value = String.format(Locale.US, "%.0f%%", stats.tirPercent),
             valueColor = tirColor
         )
         ReportMetricRow(
-            label = "Средний сахар (Mean)",
-            target = "Цель: ≤7.0",
-            value = meanVal,
-            valueColor = meanColor
+            label = "TING (3.9–7.8 ммоль/л)",
+            target = "Цель: ≥50%",
+            value = String.format(Locale.US, "%.0f%%", stats.tingPercent),
+            valueColor = if (stats.tingPercent >= 50.0) PrimaryEmerald else ColorHigh
+        )
+        val tbrTotal = stats.tbrLowPercent + stats.tbrVeryLowPercent
+        ReportMetricRow(
+            label = "TBR < 3.9 ммоль/л",
+            target = "Цель: <4%",
+            value = String.format(Locale.US, "%.1f%%", tbrTotal),
+            valueColor = if (tbrTotal <= 4.0) PrimaryEmerald else ColorVeryHigh
+        )
+        val tarTotal = stats.tarHighPercent + stats.tarVeryHighPercent
+        ReportMetricRow(
+            label = "TAR > 10.0 ммоль/л",
+            target = "Цель: <25%",
+            value = String.format(Locale.US, "%.0f%%", tarTotal),
+            valueColor = if (tarTotal <= 25.0) PrimaryEmerald else ColorHigh
+        )
+        ReportMetricRow(
+            label = "GVI (лабильность)",
+            target = "Цель: ≤1.20",
+            value = String.format(Locale.US, "%.2f", stats.gvi),
+            valueColor = if (stats.gvi <= 1.20) PrimaryEmerald else ColorHigh
+        )
+        ReportMetricRow(
+            label = "PGS (гликемический статус)",
+            target = "Цель: ≤35.0",
+            value = String.format(Locale.US, "%.1f", stats.pgs),
+            valueColor = if (stats.pgs <= 35.0) PrimaryEmerald else ColorHigh
         )
         ReportMetricRow(
             label = "Вариабельность (%CV)",
@@ -584,13 +615,7 @@ private fun ReportMetricsColumn(
             valueColor = cvColor
         )
         ReportMetricRow(
-            label = "Расчётный HbA1c (eA1c)",
-            target = "Цель: ≤6.5%",
-            value = String.format(Locale.US, "%.1f%%", stats.gmiPercent),
-            valueColor = gmiColor
-        )
-        ReportMetricRow(
-            label = "Индекс риска GRI",
+            label = "GRI (индекс риска)",
             target = "Цель: ≤40.0",
             value = String.format(Locale.US, "%.1f (%s)", stats.gri, stats.griLabel),
             valueColor = griColor

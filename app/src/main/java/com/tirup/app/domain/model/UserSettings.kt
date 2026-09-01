@@ -2,6 +2,12 @@ package com.tirup.app.domain.model
 
 import java.util.Calendar
 
+enum class ThemeMode {
+    DARK,
+    LIGHT,
+    SYSTEM
+}
+
 data class PatientProfile(
     val fullName: String = "",
     val birthYear: Int = 1990,
@@ -33,5 +39,6 @@ data class UserSettings(
     val periodDays: Int = 14,
     val nightStartHour: Int = 0,
     val nightEndHour: Int = 6,
+    val themeMode: ThemeMode = ThemeMode.DARK,
     val patientProfile: PatientProfile = PatientProfile()
 )

@@ -6,6 +6,7 @@ import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.domain.model.TargetRanges
+import com.tirup.app.domain.model.ThemeMode
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
@@ -36,6 +37,7 @@ class SettingsRepositoryImpl(
             .putInt(KEY_PERIOD_DAYS, settings.periodDays)
             .putInt(KEY_NIGHT_START, settings.nightStartHour)
             .putInt(KEY_NIGHT_END, settings.nightEndHour)
+            .putString(KEY_THEME_MODE, settings.themeMode.name)
             .putString(KEY_PATIENT_NAME, settings.patientProfile.fullName)
             .putInt(KEY_PATIENT_BIRTH_YEAR, settings.patientProfile.birthYear)
             .putInt(KEY_PATIENT_BIRTH_MONTH, settings.patientProfile.birthMonth)
@@ -63,6 +65,13 @@ class SettingsRepositoryImpl(
             TargetMode.valueOf(modeName)
         } catch (_: Exception) {
             TargetMode.TIR
+        }
+
+        val themeModeName = prefs.getString(KEY_THEME_MODE, ThemeMode.DARK.name) ?: ThemeMode.DARK.name
+        val themeMode = try {
+            ThemeMode.valueOf(themeModeName)
+        } catch (_: Exception) {
+            ThemeMode.DARK
         }
 
         val tirLow = prefs.getFloat(KEY_TIR_LOW, 3.9f).toDouble()
@@ -99,6 +108,7 @@ class SettingsRepositoryImpl(
             periodDays = periodDays,
             nightStartHour = nightStart,
             nightEndHour = nightEnd,
+            themeMode = themeMode,
             patientProfile = profile
         )
     }
@@ -115,6 +125,7 @@ class SettingsRepositoryImpl(
         private const val KEY_PERIOD_DAYS = "key_period_days"
         private const val KEY_NIGHT_START = "key_night_start"
         private const val KEY_NIGHT_END = "key_night_end"
+        private const val KEY_THEME_MODE = "key_theme_mode"
         private const val KEY_PATIENT_NAME = "key_patient_name"
         private const val KEY_PATIENT_BIRTH_YEAR = "key_patient_birth_year"
         private const val KEY_PATIENT_BIRTH_MONTH = "key_patient_birth_month"

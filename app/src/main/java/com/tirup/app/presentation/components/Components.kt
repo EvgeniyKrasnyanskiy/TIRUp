@@ -57,8 +57,8 @@ import java.util.Locale
 fun BentoCard(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 24.dp,
-    backgroundColor: Color = DarkSurface,
-    borderColor: Color = DarkBorder,
+    backgroundColor: Color = MaterialTheme.colorScheme.surface,
+    borderColor: Color = MaterialTheme.colorScheme.outline,
     borderWidth: Dp = 1.dp,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
@@ -134,11 +134,15 @@ fun RangeCategoryColor(category: GlucoseRangeCategory): Color {
 }
 
 @Composable
-fun StreakBadge(streakDays: Int) {
+fun StreakBadge(
+    streakDays: Int,
+    onClick: (() -> Unit)? = null
+) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = PrimaryEmerald.copy(alpha = 0.15f),
-        border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.4f))
+        border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.4f)),
+        modifier = if (onClick != null) Modifier.clickable { onClick() } else Modifier
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

@@ -7,8 +7,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -26,20 +28,24 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.tirup.app.TirupApplication
+import com.tirup.app.domain.model.ThemeMode
 import com.tirup.app.presentation.focus.FocusScreen
 import com.tirup.app.presentation.focus.FocusViewModel
 import com.tirup.app.presentation.reports.ReportsScreen
@@ -76,31 +82,59 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settingsState by settingsViewModel.uiState.collectAsState()
             val languageCode = settingsState.userSettings.language
+            val themeMode = settingsState.userSettings.themeMode
+            val systemDark = isSystemInDarkTheme()
 
-            // Dynamically update locale without breaking Activity Context for ActivityResultLauncher
-            UpdateLocale(this, languageCode)
+            val isDark = when (themeMode) {
+                ThemeMode.DARK -> true
+                ThemeMode.LIGHT -> false
+                ThemeMode.SYSTEM -> systemDark
+            }
 
-            TIRUpTheme {
-                AppNavigationRoot(
-                    focusViewModel = focusViewModel,
-                    trendsViewModel = trendsViewModel,
-                    reportsViewModel = reportsViewModel,
-                    settingsViewModel = settingsViewModel
-                )
+            ProvideLocalizedApp(languageCode = languageCode) {
+                TIRUpTheme(darkTheme = isDark) {
+                    AppNavigationRoot(
+                        focusViewModel = focusViewModel,
+                        trendsViewModel = trendsViewModel,
+                        reportsViewModel = reportsViewModel,
+                        settingsViewModel = settingsViewModel
+                    )
+                }
             }
         }
     }
 
     @Composable
-    private fun UpdateLocale(context: Context, languageCode: String) {
-        val configuration = LocalConfiguration.current
-        LaunchedEffect(languageCode) {
-            val targetLocale = if (languageCode.equals("EN", ignoreCase = true)) Locale.ENGLISH else Locale("ru")
+    private fun ProvideLocalizedApp(
+        languageCode: String,
+        content: @Composable () -> Unit
+    ) {
+        val baseContext = LocalContext.current
+        val currentConfiguration = LocalConfiguration.current
+
+        val targetLocale = if (languageCode.equals("EN", ignoreCase = true)) Locale.ENGLISH else Locale("ru")
+
+        val localizedConfiguration = remember(languageCode, currentConfiguration) {
+            Configuration(currentConfiguration).apply {
+                setLocale(targetLocale)
+                setLayoutDirection(targetLocale)
+            }
+        }
+
+        val localizedContext = remember(languageCode, baseContext) {
             Locale.setDefault(targetLocale)
-            val config = Configuration(configuration)
-            config.setLocale(targetLocale)
             @Suppress("DEPRECATION")
-            context.resources.updateConfiguration(config, context.resources.displayMetrics)
+            baseContext.resources.updateConfiguration(localizedConfiguration, baseContext.resources.displayMetrics)
+            baseContext.createConfigurationContext(localizedConfiguration)
+        }
+
+        CompositionLocalProvider(
+            LocalConfiguration provides localizedConfiguration,
+            LocalContext provides localizedContext
+        ) {
+            key(languageCode) {
+                content()
+            }
         }
     }
 }
@@ -116,92 +150,90 @@ fun AppNavigationRoot(
 
     NavHost(
         navController = navController,
-        startDestination = "main"
+        startDestination = "main_pager"
     ) {
-        composable("main") {
-            MainSwipeablePagerContent(
+        composable("main_pager") {
+            MainPagerScaffold(
                 focusViewModel = focusViewModel,
                 trendsViewModel = trendsViewModel,
                 reportsViewModel = reportsViewModel,
-                onOpenSettings = {
-                    navController.navigate("settings")
-                }
+                onOpenSettings = { navController.navigate("settings") }
             )
         }
+
         composable("settings") {
             SettingsScreen(
                 viewModel = settingsViewModel,
-                onNavigateBack = {
-                    navController.popBackStack()
-                }
+                onNavigateBack = { navController.popBackStack() }
             )
         }
     }
 }
 
-data class BottomNavTab(
-    val title: String,
-    val icon: ImageVector
-)
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MainSwipeablePagerContent(
+fun MainPagerScaffold(
     focusViewModel: FocusViewModel,
     trendsViewModel: TrendsViewModel,
     reportsViewModel: ReportsViewModel,
     onOpenSettings: () -> Unit
 ) {
-    val pagerState = rememberPagerState(pageCount = { 3 })
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })
     val coroutineScope = rememberCoroutineScope()
 
     val tabs = listOf(
-        BottomNavTab("Профиль", Icons.Default.Adjust),
-        BottomNavTab("Тренды", Icons.AutoMirrored.Filled.TrendingUp),
-        BottomNavTab("Отчёт", Icons.Default.Description)
+        NavigationItem(
+            title = androidx.compose.ui.res.stringResource(com.tirup.app.R.string.nav_focus),
+            icon = Icons.Default.Adjust
+        ),
+        NavigationItem(
+            title = androidx.compose.ui.res.stringResource(com.tirup.app.R.string.nav_trends),
+            icon = Icons.AutoMirrored.Filled.TrendingUp
+        ),
+        NavigationItem(
+            title = androidx.compose.ui.res.stringResource(com.tirup.app.R.string.nav_reports),
+            icon = Icons.Default.Description
+        )
     )
 
     Scaffold(
-        containerColor = DarkBg,
+        containerColor = Color.Transparent,
         bottomBar = {
             Surface(
                 modifier = Modifier
-                    .padding(horizontal = 24.dp, vertical = 10.dp)
-                    .height(56.dp)
-                    .clip(RoundedCornerShape(28.dp)),
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .clip(RoundedCornerShape(20.dp)),
                 color = DarkSurface,
-                border = BorderStroke(1.dp, DarkBorder)
+                border = BorderStroke(1.dp, DarkBorder),
+                shadowElevation = 8.dp
             ) {
                 NavigationBar(
                     containerColor = Color.Transparent,
-                    tonalElevation = 0.dp,
-                    modifier = Modifier.height(56.dp)
+                    modifier = Modifier.height(64.dp)
                 ) {
-                    tabs.forEachIndexed { index, tab ->
-                        val isSelected = pagerState.currentPage == index
+                    tabs.forEachIndexed { index, item ->
+                        val selected = pagerState.currentPage == index
                         NavigationBarItem(
+                            selected = selected,
+                            onClick = {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(index)
+                                }
+                            },
                             icon = {
                                 Icon(
-                                    imageVector = tab.icon,
-                                    contentDescription = tab.title,
+                                    imageVector = item.icon,
+                                    contentDescription = item.title,
                                     modifier = Modifier.size(24.dp)
                                 )
                             },
                             label = null,
-                            alwaysShowLabel = false,
-                            selected = isSelected,
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = PrimaryEmerald,
-                                indicatorColor = PrimaryEmerald.copy(alpha = 0.15f),
-                                unselectedIconColor = TextMutedDark
-                            ),
-                            onClick = {
-                                if (pagerState.currentPage != index) {
-                                    coroutineScope.launch {
-                                        pagerState.animateScrollToPage(index)
-                                    }
-                                }
-                            }
+                                unselectedIconColor = TextMutedDark,
+                                indicatorColor = Color.Transparent
+                            )
                         )
                     }
                 }
@@ -211,7 +243,7 @@ fun MainSwipeablePagerContent(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(bottom = innerPadding.calculateBottomPadding())
         ) {
             HorizontalPager(
                 state = pagerState,
@@ -226,3 +258,8 @@ fun MainSwipeablePagerContent(
         }
     }
 }
+
+data class NavigationItem(
+    val title: String,
+    val icon: ImageVector
+)

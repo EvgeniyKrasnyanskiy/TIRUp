@@ -347,8 +347,8 @@ class AgpPdfGenerator(private val context: Context) {
             noteY += 15f
             canvas.drawText("• Рекомендация: ${statistics.clinicalSummary.recommendation}", margin + 12f, noteY, subTextPaint)
 
-            // Footer
-            val footerText = "TIRUp Ambulatory Glucose Profile Report • Сгенерировано для медицинских консультаций и самоконтроля"
+            // Footer with telegram channel link
+            val footerText = "TIRUp Ambulatory Glucose Profile Report • Сгенерировано для медицинских консультаций и самоконтроля • Telegram: @diakia"
             canvas.drawText(footerText, margin, 814f, subTextPaint)
 
             document.finishPage(page)
