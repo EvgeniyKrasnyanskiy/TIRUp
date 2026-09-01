@@ -56,6 +56,7 @@ import com.tirup.app.presentation.components.RangeDistributionBar
 import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
+import com.tirup.app.presentation.theme.ColorVeryLow
 import com.tirup.app.presentation.theme.DarkBorder
 import com.tirup.app.presentation.theme.DarkSurfaceElevated
 import com.tirup.app.presentation.theme.PrimaryEmerald
@@ -72,7 +73,6 @@ fun ReportsScreen(
     onOpenSettings: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
-    val livePeriod by viewModel.livePeriod.collectAsState()
     val context = LocalContext.current
 
     val filePicker = rememberLauncherForActivityResult(
@@ -164,6 +164,8 @@ fun ReportsScreen(
             title = stringResource(R.string.report_live_title),
             stats = state.liveStatistics,
             unit = state.userSettings.unit,
+            tirGoal = state.userSettings.targetRanges.tirGoalPercent,
+            tingGoal = state.userSettings.targetRanges.tingGoalPercent,
             onDismiss = { viewModel.showLiveDetails(false) }
         )
     }
@@ -175,6 +177,8 @@ fun ReportsScreen(
             stats = state.historicalReport.statistics,
             unit = state.userSettings.unit,
             dateRange = state.historicalReport.dateRangeStr,
+            tirGoal = state.userSettings.targetRanges.tirGoalPercent,
+            tingGoal = state.userSettings.targetRanges.tingGoalPercent,
             onDismiss = { viewModel.showHistoricalDetails(false) }
         )
     }
@@ -195,7 +199,7 @@ private fun LiveReportCard(
         cornerRadius = 24.dp,
         backgroundColor = DarkSurfaceElevated
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             // Header Row: Title & Action Icons
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -205,7 +209,7 @@ private fun LiveReportCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(36.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .background(PrimaryEmerald.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
@@ -214,7 +218,7 @@ private fun LiveReportCard(
                             imageVector = Icons.Default.PictureAsPdf,
                             contentDescription = null,
                             tint = PrimaryEmerald,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(10.dp))
@@ -281,8 +285,8 @@ private fun LiveReportCard(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Stats row
-            ReportStatsRow(stats = stats, unit = state.userSettings.unit)
+            // Parameters listed line by line
+            ReportMetricsColumn(stats = stats, unit = state.userSettings.unit)
         }
     }
 }
@@ -303,7 +307,7 @@ private fun HistoricalReportCard(
         cornerRadius = 24.dp,
         backgroundColor = DarkSurfaceElevated
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             // Header Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -313,7 +317,7 @@ private fun HistoricalReportCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(36.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .background(Color(0xFF6366F1).copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
@@ -322,7 +326,7 @@ private fun HistoricalReportCard(
                             imageVector = Icons.Default.FileUpload,
                             contentDescription = null,
                             tint = Color(0xFF818CF8),
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(10.dp))
@@ -340,36 +344,41 @@ private fun HistoricalReportCard(
                     }
                 }
 
-                if (hist.hasData) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (state.isGeneratingHistorical) {
-                            CircularProgressIndicator(
-                                color = Color(0xFF818CF8),
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (state.isGeneratingHistorical) {
+                        CircularProgressIndicator(
+                            color = Color(0xFF818CF8),
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else if (hist.hasData) {
+                        IconButton(onClick = onPickFile) {
+                            Icon(
+                                imageVector = Icons.Default.FileUpload,
+                                contentDescription = "Replace File",
+                                tint = Color(0xFF818CF8)
                             )
-                        } else {
-                            IconButton(onClick = { viewModel.saveHistoricalPdfToDownloads() }) {
-                                Icon(
-                                    imageVector = Icons.Default.Download,
-                                    contentDescription = "Save PDF",
-                                    tint = PrimaryEmerald
-                                )
-                            }
-                            IconButton(onClick = { viewModel.generateAndShareHistoricalPdf() }) {
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Share PDF",
-                                    tint = PrimaryEmerald
-                                )
-                            }
-                            IconButton(onClick = { viewModel.clearHistoricalReport() }) {
-                                Icon(
-                                    imageVector = Icons.Default.DeleteOutline,
-                                    contentDescription = "Clear",
-                                    tint = ColorHigh
-                                )
-                            }
+                        }
+                        IconButton(onClick = { viewModel.saveHistoricalPdfToDownloads() }) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = "Save PDF",
+                                tint = PrimaryEmerald
+                            )
+                        }
+                        IconButton(onClick = { viewModel.generateAndShareHistoricalPdf() }) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Share PDF",
+                                tint = PrimaryEmerald
+                            )
+                        }
+                        IconButton(onClick = { viewModel.clearHistoricalReport() }) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = "Clear",
+                                tint = ColorHigh
+                            )
                         }
                     }
                 }
@@ -386,14 +395,29 @@ private fun HistoricalReportCard(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Stats row
-                ReportStatsRow(stats = hist.statistics, unit = state.userSettings.unit)
+                // Metrics line by line
+                ReportMetricsColumn(stats = hist.statistics, unit = state.userSettings.unit)
+
+                // Upload another file button
+                OutlinedButton(
+                    onClick = onPickFile,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(38.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, DarkBorder),
+                    enabled = !state.isImporting
+                ) {
+                    Icon(imageVector = Icons.Default.FileUpload, contentDescription = null, tint = Color(0xFF818CF8), modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "Загрузить другой файл", color = TextSecondaryDark, fontSize = 13.sp)
+                }
             } else {
                 OutlinedButton(
                     onClick = onPickFile,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
+                        .height(46.dp),
                     shape = RoundedCornerShape(14.dp),
                     border = BorderStroke(1.dp, DarkBorder),
                     enabled = !state.isImporting
@@ -429,66 +453,91 @@ private fun HistoricalReportCard(
 }
 
 @Composable
-private fun ReportStatsRow(
+private fun ReportMetricsColumn(
     stats: GlucoseStatistics,
     unit: GlucoseUnit
 ) {
     val isMmol = unit == GlucoseUnit.MMOL_L
+    val meanVal = if (isMmol) String.format(Locale.US, "%.1f mmol/L", stats.meanMmol) else String.format(Locale.US, "%d mg/dL", (stats.meanMmol * 18.0182).toInt())
     val meanColor = when {
         stats.meanMmol <= 0.0 -> TextPrimaryDark
         stats.meanMmol <= 7.0 -> ColorTight
         stats.meanMmol <= 8.5 -> ColorHigh
         else -> ColorVeryHigh
     }
+
     val cvColor = when {
         stats.cvPercent <= 0.0 -> TextPrimaryDark
         stats.cvPercent <= 36.0 -> PrimaryEmerald
         else -> ColorHigh
     }
 
+    val gmiColor = when {
+        stats.gmiPercent <= 0.0 -> TextPrimaryDark
+        stats.gmiPercent <= 6.5 -> PrimaryEmerald
+        stats.gmiPercent <= 7.0 -> ColorHigh
+        else -> ColorVeryHigh
+    }
+
+    val tirColor = when {
+        stats.tirPercent <= 0.0 -> TextPrimaryDark
+        stats.tirPercent >= 70.0 -> PrimaryEmerald
+        stats.tirPercent >= 50.0 -> ColorHigh
+        else -> ColorVeryHigh
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        ReportMetricRow(label = "TIR в целевом (3.9–10.0)", target = "Цель: ≥70%", value = String.format(Locale.US, "%.1f%%", stats.tirPercent), valueColor = tirColor)
+        ReportMetricRow(label = "Средний сахар (Mean)", target = "Цель: ≤7.0", value = meanVal, valueColor = meanColor)
+        ReportMetricRow(label = "Вариабельность (%CV)", target = "Цель: ≤36.0%", value = String.format(Locale.US, "%.1f%%", stats.cvPercent), valueColor = cvColor)
+        ReportMetricRow(label = "Расчётный HbA1c (GMI)", target = "Цель: ≤6.5%", value = String.format(Locale.US, "%.1f%%", stats.gmiPercent), valueColor = gmiColor)
+    }
+}
+
+@Composable
+private fun ReportMetricRow(
+    label: String,
+    target: String,
+    value: String,
+    valueColor: Color
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column {
-            Text(text = stringResource(R.string.card_mean), style = MaterialTheme.typography.bodySmall, color = TextMutedDark)
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = if (isMmol) String.format(Locale.US, "%.1f mmol/L", stats.meanMmol) else String.format(Locale.US, "%d mg/dL", (stats.meanMmol * 18.0182).toInt()),
-                style = MaterialTheme.typography.titleSmall,
-                color = meanColor,
-                fontWeight = FontWeight.Bold
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondaryDark
             )
+            Spacer(modifier = Modifier.width(6.dp))
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = DarkBorder.copy(alpha = 0.6f)
+            ) {
+                Text(
+                    text = target,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMutedDark,
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                    fontSize = 10.sp
+                )
+            }
         }
 
-        Column {
-            Text(text = stringResource(R.string.card_cv), style = MaterialTheme.typography.bodySmall, color = TextMutedDark)
-            Text(
-                text = String.format(Locale.US, "%.1f%%", stats.cvPercent),
-                style = MaterialTheme.typography.titleSmall,
-                color = cvColor,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        Column {
-            Text(text = stringResource(R.string.card_gmi), style = MaterialTheme.typography.bodySmall, color = TextMutedDark)
-            Text(
-                text = String.format(Locale.US, "%.1f%%", stats.gmiPercent),
-                style = MaterialTheme.typography.titleSmall,
-                color = if (stats.gmiPercent <= 6.5) PrimaryEmerald else ColorHigh,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        Column {
-            Text(text = "TIR (3.9–10.0)", style = MaterialTheme.typography.bodySmall, color = TextMutedDark)
-            Text(
-                text = String.format(Locale.US, "%.1f%%", stats.tirPercent),
-                style = MaterialTheme.typography.titleSmall,
-                color = if (stats.tirPercent >= 70.0) PrimaryEmerald else ColorHigh,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = valueColor
+        )
     }
 }
 
@@ -498,9 +547,29 @@ private fun ReportSummaryDialog(
     stats: GlucoseStatistics,
     unit: GlucoseUnit,
     dateRange: String = "",
+    tirGoal: Int = 70,
+    tingGoal: Int = 50,
     onDismiss: () -> Unit
 ) {
     val isMmol = unit == GlucoseUnit.MMOL_L
+    val meanVal = if (isMmol) String.format(Locale.US, "%.1f mmol/L", stats.meanMmol) else String.format(Locale.US, "%d mg/dL", (stats.meanMmol * 18.0182).toInt())
+    val meanColor = when {
+        stats.meanMmol <= 0.0 -> TextPrimaryDark
+        stats.meanMmol <= 7.0 -> ColorTight
+        stats.meanMmol <= 8.5 -> ColorHigh
+        else -> ColorVeryHigh
+    }
+
+    val cvColor = if (stats.cvPercent <= 36.0) PrimaryEmerald else ColorHigh
+    val gmiColor = when {
+        stats.gmiPercent <= 6.5 -> PrimaryEmerald
+        stats.gmiPercent <= 7.0 -> ColorHigh
+        else -> ColorVeryHigh
+    }
+    val tirColor = if (stats.tirPercent >= tirGoal) PrimaryEmerald else if (stats.tirPercent >= 50.0) ColorHigh else ColorVeryHigh
+    val tingColor = if (stats.tingPercent >= tingGoal) ColorTight else ColorHigh
+    val tbrColor = if ((stats.tbrLowPercent + stats.tbrVeryLowPercent) < 4.0) PrimaryEmerald else ColorVeryLow
+    val severeHypoColor = if (stats.tbrVeryLowPercent < 1.0) PrimaryEmerald else ColorVeryLow
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -511,12 +580,16 @@ private fun ReportSummaryDialog(
                     Text(text = "Период: $dateRange", style = MaterialTheme.typography.bodyMedium, color = TextMutedDark)
                 }
                 Text(text = "Точек данных: ${stats.totalCount} (дней: ${stats.daysCount})", style = MaterialTheme.typography.bodyMedium, color = TextPrimaryDark)
-                Text(text = "Средний сахар (Mean): ${if (isMmol) String.format(Locale.US, "%.1f mmol/L", stats.meanMmol) else String.format(Locale.US, "%d mg/dL", (stats.meanMmol * 18.0182).toInt())}", style = MaterialTheme.typography.bodyMedium, color = TextPrimaryDark)
-                Text(text = "Вариабельность (%CV): ${String.format(Locale.US, "%.1f%%", stats.cvPercent)} (норма ≤36.0%)", style = MaterialTheme.typography.bodyMedium, color = TextPrimaryDark)
-                Text(text = "Расчётный HbA1c (GMI): ${String.format(Locale.US, "%.1f%%", stats.gmiPercent)}", style = MaterialTheme.typography.bodyMedium, color = TextPrimaryDark)
-                Text(text = "Время в целевом (TIR): ${String.format(Locale.US, "%.1f%%", stats.tirPercent)} (цель ≥70%)", style = MaterialTheme.typography.bodyMedium, color = PrimaryEmerald, fontWeight = FontWeight.Bold)
-                Text(text = "Время в узком (TING): ${String.format(Locale.US, "%.1f%%", stats.tingPercent)} (цель ≥50%)", style = MaterialTheme.typography.bodyMedium, color = ColorTight)
-                Text(text = "Гипогликемии (TBR <3.9): ${String.format(Locale.US, "%.1f%%", stats.tbrLowPercent + stats.tbrVeryLowPercent)} (норма <4%)", style = MaterialTheme.typography.bodyMedium, color = TextPrimaryDark)
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                DialogTargetRow(label = "TIR в целевом (3.9–10.0):", value = String.format(Locale.US, "%.1f%% (цель ≥%d%%)", stats.tirPercent, tirGoal), color = tirColor)
+                DialogTargetRow(label = "TING в узком (3.9–7.8):", value = String.format(Locale.US, "%.1f%% (цель ≥%d%%)", stats.tingPercent, tingGoal), color = tingColor)
+                DialogTargetRow(label = "Средний сахар (Mean):", value = "$meanVal (цель ≤7.0)", color = meanColor)
+                DialogTargetRow(label = "Вариабельность (%CV):", value = "${String.format(Locale.US, "%.1f%%", stats.cvPercent)} (цель ≤36.0%)", color = cvColor)
+                DialogTargetRow(label = "Расчётный HbA1c (GMI):", value = "${String.format(Locale.US, "%.1f%%", stats.gmiPercent)} (цель ≤6.5%)", color = gmiColor)
+                DialogTargetRow(label = "Гипогликемии (TBR <3.9):", value = "${String.format(Locale.US, "%.1f%%", stats.tbrLowPercent + stats.tbrVeryLowPercent)} (норма <4.0%)", color = tbrColor)
+                DialogTargetRow(label = "Тяжёлая гипогликемия (<3.0):", value = "${String.format(Locale.US, "%.1f%%", stats.tbrVeryLowPercent)} (норма <1.0%)", color = severeHypoColor)
             }
         },
         confirmButton = {
@@ -525,4 +598,20 @@ private fun ReportSummaryDialog(
             }
         }
     )
+}
+
+@Composable
+private fun DialogTargetRow(
+    label: String,
+    value: String,
+    color: Color
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = label, style = MaterialTheme.typography.bodySmall, color = TextSecondaryDark)
+        Text(text = value, style = MaterialTheme.typography.bodySmall, color = color, fontWeight = FontWeight.Bold)
+    }
 }
