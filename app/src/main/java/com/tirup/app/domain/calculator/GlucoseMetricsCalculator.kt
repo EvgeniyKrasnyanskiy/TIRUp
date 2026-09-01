@@ -40,7 +40,7 @@ object GlucoseMetricsCalculator {
                 GlucoseReading(
                     timestamp = binKey * fiveMinMs,
                     valueMmol = avgMmol,
-                    trendArrow = binItems.last().trendArrow
+                    trendArrow = binItems.maxByOrNull { it.timestamp }?.trendArrow ?: ""
                 )
             }
             .sortedBy { it.timestamp }
@@ -81,9 +81,9 @@ object GlucoseMetricsCalculator {
             sortedValues[totalCount / 2]
         }
 
-        // Standard Deviation
-        val variance = if (totalCount > 1) {
-            clean5MinReadings.sumOf { (it.valueMmol - mean) * (it.valueMmol - mean) } / (totalCount - 1)
+        // Standard Deviation — population SD (N), matching Python numpy.std() / xDrip default
+        val variance = if (totalCount > 0) {
+            clean5MinReadings.sumOf { (it.valueMmol - mean) * (it.valueMmol - mean) } / totalCount
         } else {
             0.0
         }
@@ -149,9 +149,14 @@ object GlucoseMetricsCalculator {
 
         val nightStability = calculateNightStability(nightReadings, targetRanges)
 
-        // 3. GVI calculation (xDrip step-by-step algorithm in mg/dL on 5-min intervals)
-        val valuesMgdl = clean5MinReadings.map { it.valueMmol * MGDL_FACTOR }
-        val gvi = computeGviXdripStyle(valuesMgdl)
+        // 3. GVI calculation — on raw CUTOFF-filtered readings (matching Python/xDrip reference).
+        //    Python: gvi_exact = compute_gvi_xdrip_style(raw_mgdl_clean)
+        //    NOT on resampled 5-min data — resampling smooths the curve and lowers GVI artificially.
+        val rawFilteredMgdl = readings
+            .filter { it.valueMmol >= CUTOFF_MMOL }
+            .sortedBy { it.timestamp }
+            .map { it.valueMmol * MGDL_FACTOR }
+        val gvi = computeGviXdripStyle(rawFilteredMgdl)
 
         // 4. PGS calculation: GVI * floor(mean_mgdl) * (1 - floor(TIR)/100)
         val meanMgdlFloored = floor(mean * MGDL_FACTOR)
@@ -572,8 +577,8 @@ object GlucoseMetricsCalculator {
         val count = nightReadings.size
         val sum = nightReadings.sumOf { it.valueMmol }
         val mean = sum / count
-        val variance = if (count > 1) {
-            nightReadings.sumOf { (it.valueMmol - mean) * (it.valueMmol - mean) } / (count - 1)
+        val variance = if (count > 0) {
+            nightReadings.sumOf { (it.valueMmol - mean) * (it.valueMmol - mean) } / count
         } else {
             0.0
         }
