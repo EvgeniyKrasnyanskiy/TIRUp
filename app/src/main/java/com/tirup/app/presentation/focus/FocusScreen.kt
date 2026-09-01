@@ -1,9 +1,8 @@
 package com.tirup.app.presentation.focus
 
 import android.text.format.DateUtils
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,27 +15,27 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.TrendingUp
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedButton
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,8 +51,6 @@ import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.presentation.components.BentoCard
-import com.tirup.app.presentation.components.GlucoseValueFormatted
-import com.tirup.app.presentation.components.RangeCategoryColor
 import com.tirup.app.presentation.components.RangeDistributionBar
 import com.tirup.app.presentation.components.StreakBadge
 import com.tirup.app.presentation.theme.ColorHigh
@@ -72,49 +69,42 @@ import java.util.Locale
 @Composable
 fun FocusScreen(
     viewModel: FocusViewModel,
-    onNavigateToReports: () -> Unit = {}
+    onOpenSettings: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
+    var detailDialogInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item { Spacer(modifier = Modifier.height(8.dp)) }
+        item { Spacer(modifier = Modifier.height(4.dp)) }
 
-        // Top Header with Title & Streak
+        // Top Header with Menu Button, Title & Streak
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Settings Menu",
+                            tint = TextPrimaryDark
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = stringResource(R.string.focus_title),
                         style = MaterialTheme.typography.headlineMedium,
                         color = TextPrimaryDark
                     )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Shield,
-                            contentDescription = null,
-                            tint = PrimaryEmerald,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = stringResource(R.string.offline_badge),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = PrimaryEmerald
-                        )
-                    }
                 }
+
                 StreakBadge(streakDays = state.streakDays)
             }
         }
@@ -125,26 +115,67 @@ fun FocusScreen(
                 latest = state.latestReading,
                 unit = state.userSettings.unit,
                 targetMode = state.userSettings.targetMode,
-                onToggleTargetMode = { viewModel.toggleTargetMode() }
+                onToggleTargetMode = { viewModel.toggleTargetMode() },
+                onCardClick = {
+                    detailDialogInfo = Pair(
+                        "Текущий сахар",
+                        "Показывает последнее значение, полученное по локальной трансляции из xDrip+/Juggluco. Стрелка указывает скорость и направление изменения гликемии."
+                    )
+                }
             )
         }
 
         // Target Compensator Bento Card
         item {
-            TargetCompensatorCard(state = state)
+            TargetCompensatorCard(
+                state = state,
+                onCardClick = {
+                    detailDialogInfo = Pair(
+                        "Компенсатор цели",
+                        "Рассчитывает необходимый % времени в целевом диапазоне на оставшиеся дни, чтобы достичь и закрепить желаемый клинический результат."
+                    )
+                }
+            )
         }
 
         // 2x2 Bento Metrics Grid
         item {
-            BentoMetricsGrid(state = state)
+            BentoMetricsGrid(
+                state = state,
+                onMetricClick = { title, desc ->
+                    detailDialogInfo = Pair(title, desc)
+                }
+            )
         }
 
         // Night Stability Insight Card (00:00 - 06:00)
         item {
-            NightStabilityCard(state = state)
+            NightStabilityCard(
+                state = state,
+                onCardClick = {
+                    detailDialogInfo = Pair(
+                        "Ночной профиль",
+                        "Анализирует стабильность сахара в период с 00:00 до 06:00. Отсутствие ночных гипо- и гипергликемий является ключевым показателем правильности базального инсулина."
+                    )
+                }
+            )
         }
 
         item { Spacer(modifier = Modifier.height(24.dp)) }
+    }
+
+    // Interactive Clinical Info Dialog
+    detailDialogInfo?.let { (title, message) ->
+        AlertDialog(
+            onDismissRequest = { detailDialogInfo = null },
+            title = { Text(text = title, color = TextPrimaryDark, fontWeight = FontWeight.Bold) },
+            text = { Text(text = message, color = TextSecondaryDark, style = MaterialTheme.typography.bodyMedium) },
+            confirmButton = {
+                TextButton(onClick = { detailDialogInfo = null }) {
+                    Text(text = stringResource(R.string.action_close), color = PrimaryEmerald, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
     }
 }
 
@@ -153,10 +184,13 @@ private fun CurrentGlucoseHeroCard(
     latest: GlucoseReading?,
     unit: GlucoseUnit,
     targetMode: TargetMode,
-    onToggleTargetMode: () -> Unit
+    onToggleTargetMode: () -> Unit,
+    onCardClick: () -> Unit
 ) {
     BentoCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCardClick() },
         cornerRadius = 28.dp,
         backgroundColor = DarkSurfaceElevated
     ) {
@@ -195,22 +229,51 @@ private fun CurrentGlucoseHeroCard(
             Spacer(modifier = Modifier.height(16.dp))
 
             if (latest != null) {
+                val displayVal = if (unit == GlucoseUnit.MMOL_L) {
+                    String.format(Locale.US, "%.1f", latest.valueMmol)
+                } else {
+                    String.format(Locale.US, "%d", (latest.valueMmol * 18.0182).toInt())
+                }
+                val unitLabel = if (unit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL"
+
+                // Category color for hero number
+                val valColor = when {
+                    latest.valueMmol < 3.0 -> ColorVeryLow
+                    latest.valueMmol < 3.9 -> ColorLow
+                    latest.valueMmol <= 7.8 -> ColorTight
+                    latest.valueMmol <= 10.0 -> PrimaryEmerald
+                    latest.valueMmol <= 13.9 -> ColorHigh
+                    else -> ColorVeryHigh
+                }
+
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    GlucoseValueFormatted(
-                        valueMmol = latest.valueMmol,
-                        unit = unit,
-                        fontSize = 54
+                    Text(
+                        text = displayVal,
+                        fontSize = 54.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = valColor,
+                        lineHeight = 54.sp
                     )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = unitLabel,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextMutedDark,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
                     if (!latest.trendArrow.isNullOrEmpty()) {
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = latest.trendArrow,
                             fontSize = 38.sp,
                             fontWeight = FontWeight.Bold,
-                            color = PrimaryEmerald
+                            color = valColor,
+                            modifier = Modifier.padding(bottom = 2.dp)
                         )
                     }
                 }
@@ -242,7 +305,10 @@ private fun CurrentGlucoseHeroCard(
 }
 
 @Composable
-private fun TargetCompensatorCard(state: FocusUiState) {
+private fun TargetCompensatorCard(
+    state: FocusUiState,
+    onCardClick: () -> Unit
+) {
     val goal = state.compensatorGoal
     val isTir = goal.targetMode == TargetMode.TIR
     val modeName = if (isTir) stringResource(R.string.mode_tir) else stringResource(R.string.mode_ting)
@@ -251,7 +317,9 @@ private fun TargetCompensatorCard(state: FocusUiState) {
     val progress = (currentScore / goal.targetGoalPercent.coerceAtLeast(1.0)).toFloat().coerceIn(0f, 1f)
 
     BentoCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCardClick() },
         cornerRadius = 24.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -262,7 +330,7 @@ private fun TargetCompensatorCard(state: FocusUiState) {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.TrendingUp,
+                        imageVector = Icons.AutoMirrored.Filled.TrendingUp,
                         contentDescription = null,
                         tint = PrimaryEmerald,
                         modifier = Modifier.size(20.dp)
@@ -285,7 +353,6 @@ private fun TargetCompensatorCard(state: FocusUiState) {
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Progress bar
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
@@ -298,21 +365,20 @@ private fun TargetCompensatorCard(state: FocusUiState) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Compensator guidance message
             val guidanceText = when (goal.status) {
                 CompensatorStatus.EXCEEDING -> stringResource(
                     R.string.compensator_desc_exceeding,
-                    goal.neededRemainingPercent
+                    goal.neededRemainingPercent.coerceIn(0.0, 100.0),
+                    goal.remainingDays
                 )
                 CompensatorStatus.UNREALISTIC -> stringResource(
-                    R.string.compensator_desc_impossible,
-                    goal.neededRemainingPercent
+                    R.string.compensator_desc_impossible
                 )
                 CompensatorStatus.REACHABLE -> stringResource(
                     R.string.compensator_desc_reach,
                     modeName,
                     goal.targetGoalPercent.toInt(),
-                    goal.neededRemainingPercent,
+                    goal.neededRemainingPercent.coerceIn(0.0, 100.0),
                     goal.remainingDays
                 )
             }
@@ -328,131 +394,192 @@ private fun TargetCompensatorCard(state: FocusUiState) {
 }
 
 @Composable
-private fun BentoMetricsGrid(state: FocusUiState) {
+private fun BentoMetricsGrid(
+    state: FocusUiState,
+    onMetricClick: (String, String) -> Unit
+) {
     val stats = state.statistics
-    val unit = state.userSettings.unit
+    val isMmol = state.userSettings.unit == GlucoseUnit.MMOL_L
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    // Color logic
+    val meanColor = when {
+        stats.meanMmol <= 0.0 -> TextPrimaryDark
+        stats.meanMmol <= 7.0 -> ColorTight
+        stats.meanMmol <= 8.5 -> ColorHigh
+        else -> ColorVeryHigh
+    }
+
+    val cvColor = when {
+        stats.cvPercent <= 0.0 -> TextPrimaryDark
+        stats.cvPercent <= 36.0 -> PrimaryEmerald
+        else -> ColorHigh
+    }
+
+    val gmiColor = when {
+        stats.gmiPercent <= 0.0 -> TextPrimaryDark
+        stats.gmiPercent <= 6.5 -> PrimaryEmerald
+        stats.gmiPercent <= 7.0 -> ColorHigh
+        else -> ColorVeryHigh
+    }
+
+    val isTirMode = state.userSettings.targetMode == TargetMode.TIR
+    val tirScore = if (isTirMode) stats.tirPercent else stats.tingPercent
+    val tirGoal = if (isTirMode) state.userSettings.targetRanges.tirGoalPercent else state.userSettings.targetRanges.tingGoalPercent
+    val tirColor = when {
+        stats.totalCount == 0 -> TextPrimaryDark
+        tirScore >= tirGoal -> PrimaryEmerald
+        tirScore >= 50.0 -> ColorHigh
+        else -> ColorVeryHigh
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Row 1: Mean & %CV
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Card 1: Mean Glucose
+            // Mean
             BentoCard(
-                modifier = Modifier.weight(1f),
-                cornerRadius = 24.dp
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable {
+                        onMetricClick(
+                            "Средний сахар (Mean)",
+                            "Среднее значение уровня сахара за рассматриваемый период. Клиническая цель: ≤7.0 ммоль/л (≤126 мг/дл)."
+                        )
+                    }
             ) {
                 Column {
                     Text(
                         text = stringResource(R.string.card_mean),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondaryDark
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMutedDark
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    val displayMean = if (unit == GlucoseUnit.MMOL_L) {
-                        String.format(Locale.US, "%.1f", stats.meanMmol)
-                    } else {
-                        String.format(Locale.US, "%d", (stats.meanMmol * 18.0182).toInt())
-                    }
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "$displayMean ${unit.label}",
+                        text = if (isMmol) String.format(Locale.US, "%.1f mmol/L", stats.meanMmol) else String.format(Locale.US, "%d mg/dL", (stats.meanMmol * 18.0182).toInt()),
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimaryDark
+                        color = meanColor,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            // Card 2: Variability (%CV)
+            // %CV
             BentoCard(
-                modifier = Modifier.weight(1f),
-                cornerRadius = 24.dp
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable {
+                        onMetricClick(
+                            "Вариабельность (%CV)",
+                            "Коэффициент вариабельности глюкозы. Клинический консенсус рекомендует держать %CV ≤ 36.0% для снижения риска гипогликемий."
+                        )
+                    }
             ) {
                 Column {
                     Text(
                         text = stringResource(R.string.card_cv),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondaryDark
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMutedDark
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    val isCvGood = stats.cvPercent <= 36.0 && stats.cvPercent > 0
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = String.format(Locale.US, "%.1f%%", stats.cvPercent),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isCvGood) PrimaryEmerald else ColorLow
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = String.format(Locale.US, "%.1f%%", stats.cvPercent),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = cvColor,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
 
+        // Row 2: GMI & TIR
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Card 3: Est. A1c (GMI)
+            // GMI
             BentoCard(
-                modifier = Modifier.weight(1f),
-                cornerRadius = 24.dp
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable {
+                        onMetricClick(
+                            "Расчётный HbA1c (GMI)",
+                            "Glucose Management Indicator — расчётный гликированный гемоглобин по формуле консенсуса (3.31 + 0.431 * Mean). Цель: ≤6.5-7.0%."
+                        )
+                    }
             ) {
                 Column {
                     Text(
                         text = stringResource(R.string.card_gmi),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondaryDark
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMutedDark
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = String.format(Locale.US, "%.1f%%", stats.gmiPercent),
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimaryDark
+                        color = gmiColor,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            // Card 4: 24h TIR %
+            // TIR
             BentoCard(
-                modifier = Modifier.weight(1f),
-                cornerRadius = 24.dp
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable {
+                        onMetricClick(
+                            "Время в диапазоне",
+                            "Процент времени нахождения сахара в целевом диапазоне (3.9–10.0 ммоль/л для TIR, 3.9–7.8 ммоль/л для TING). Цель: ≥70%."
+                        )
+                    }
             ) {
                 Column {
                     Text(
-                        text = stringResource(R.string.mode_tir),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondaryDark
+                        text = if (isTirMode) stringResource(R.string.mode_tir) else stringResource(R.string.mode_ting),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMutedDark
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = String.format(Locale.US, "%.1f%%", stats.tirPercent),
+                        text = String.format(Locale.US, "%.1f%%", tirScore),
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = PrimaryEmerald
+                        color = tirColor,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
         }
 
-        // Breakdown distribution bar
+        // Range Distribution Bar
         BentoCard(
-            modifier = Modifier.fillMaxWidth(),
-            cornerRadius = 20.dp
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    onMetricClick(
+                        "Распределение по диапазонам",
+                        "Красный: Очень низкий (<3.0) и Очень высокий (≥14.0)\nЖёлтый: Низкий (3.0-3.8) и Высокий (10.1-13.9)\nЗелёный: Целевой диапазон (3.9-10.0)"
+                    )
+                }
         ) {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = stringResource(R.string.tir_breakdown),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextSecondaryDark
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextMutedDark
                 )
-                Spacer(modifier = Modifier.height(10.dp))
                 RangeDistributionBar(
                     tbrVeryLow = stats.tbrVeryLowPercent,
                     tbrLow = stats.tbrLowPercent,
                     tir = stats.tirPercent,
                     tarHigh = stats.tarHighPercent,
-                    tarVeryHigh = stats.tarVeryHighPercent
+                    tarVeryHigh = stats.tarVeryHighPercent,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
@@ -460,12 +587,16 @@ private fun BentoMetricsGrid(state: FocusUiState) {
 }
 
 @Composable
-private fun NightStabilityCard(state: FocusUiState) {
+private fun NightStabilityCard(
+    state: FocusUiState,
+    onCardClick: () -> Unit
+) {
     val night = state.statistics.nightStability
 
     BentoCard(
-        modifier = Modifier.fillMaxWidth(),
-        cornerRadius = 24.dp
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCardClick() }
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -476,43 +607,33 @@ private fun NightStabilityCard(state: FocusUiState) {
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(CircleShape)
-                        .background(PrimaryEmerald.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Bedtime,
-                        contentDescription = null,
-                        tint = PrimaryEmerald,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Bedtime,
+                    contentDescription = null,
+                    tint = if (night.isStable) PrimaryEmerald else ColorHigh,
+                    modifier = Modifier.size(22.dp)
+                )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
                         text = stringResource(R.string.card_night),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         color = TextPrimaryDark
                     )
                     Text(
                         text = if (night.isStable) stringResource(R.string.night_stable) else stringResource(R.string.night_unstable),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (night.isStable) PrimaryEmerald else ColorLow
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (night.isStable) PrimaryEmerald else ColorHigh
                     )
                 }
             }
 
-            if (night.nightReadingsCount > 0) {
-                Text(
-                    text = String.format(Locale.US, "%.1f%% TIR", night.tirPercent),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = PrimaryEmerald
-                )
-            }
+            Icon(
+                imageVector = if (night.isStable) Icons.Default.CheckCircle else Icons.Default.Info,
+                contentDescription = null,
+                tint = if (night.isStable) PrimaryEmerald else ColorHigh,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }

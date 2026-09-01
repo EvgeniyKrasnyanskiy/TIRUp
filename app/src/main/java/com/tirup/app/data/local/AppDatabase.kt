@@ -6,21 +6,25 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.tirup.app.data.local.dao.DailySummaryDao
 import com.tirup.app.data.local.dao.GlucoseReadingDao
+import com.tirup.app.data.local.dao.HistoricalReadingDao
 import com.tirup.app.data.local.entity.DailySummaryEntity
 import com.tirup.app.data.local.entity.GlucoseReadingEntity
+import com.tirup.app.data.local.entity.HistoricalReadingEntity
 
 @Database(
     entities = [
         GlucoseReadingEntity::class,
-        DailySummaryEntity::class
+        DailySummaryEntity::class,
+        HistoricalReadingEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun glucoseReadingDao(): GlucoseReadingDao
     abstract fun dailySummaryDao(): DailySummaryDao
+    abstract fun historicalReadingDao(): HistoricalReadingDao
 
     companion object {
         @Volatile

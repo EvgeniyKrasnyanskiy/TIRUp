@@ -35,7 +35,7 @@ class TirupApplication : Application() {
         database = AppDatabase.getInstance(this)
         glucoseRepository = GlucoseRepositoryImpl(database)
         settingsRepository = SettingsRepositoryImpl(this)
-        streamingImporter = StreamingGlucoseImporter(this, database, glucoseRepository)
+        streamingImporter = StreamingGlucoseImporter(this, database)
 
         registerDynamicReceivers()
     }

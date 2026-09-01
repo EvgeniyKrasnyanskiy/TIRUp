@@ -1,9 +1,7 @@
 package com.tirup.app.presentation.settings
 
-import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.tirup.app.data.importer.StreamingGlucoseImporter
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.TargetRanges
 import com.tirup.app.domain.model.UserSettings
@@ -17,16 +15,13 @@ import kotlinx.coroutines.launch
 
 data class SettingsUiState(
     val userSettings: UserSettings = UserSettings(),
-    val isImporting: Boolean = false,
-    val importedCount: Int = 0,
-    val importMessage: String? = null,
-    val showClearDialog: Boolean = false
+    val showClearDialog: Boolean = false,
+    val infoMessage: String? = null
 )
 
 class SettingsViewModel(
     private val settingsRepository: SettingsRepository,
-    private val glucoseRepository: GlucoseRepository,
-    private val streamingImporter: StreamingGlucoseImporter
+    private val glucoseRepository: GlucoseRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -44,6 +39,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             val updated = _uiState.value.userSettings.copy(language = language)
             settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
         }
     }
 
@@ -51,6 +47,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             val updated = _uiState.value.userSettings.copy(unit = unit)
             settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
         }
     }
 
@@ -71,29 +68,7 @@ class SettingsViewModel(
             )
             val updated = _uiState.value.userSettings.copy(targetRanges = updatedRanges)
             settingsRepository.updateSettings(updated)
-        }
-    }
-
-    fun importFile(uri: Uri) {
-        viewModelScope.launch {
-            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
-            _uiState.update { it.copy(isImporting = true, importedCount = 0, importMessage = null) }
-
-            val result = streamingImporter.importFromUri(uri) { count ->
-                _uiState.update { it.copy(importedCount = count) }
-            }
-
-            result.onSuccess { total ->
-                val msg = if (total > 0) {
-                    if (isRu) "Успешно импортировано $total записей." else "Successfully imported $total readings."
-                } else {
-                    if (isRu) "Записи сахара не найдены. Убедитесь, что внутри архива или CSV есть данные сахара." else "No glucose readings found in selected file."
-                }
-                _uiState.update { it.copy(isImporting = false, importMessage = msg) }
-            }.onFailure { error ->
-                val prefix = if (isRu) "Ошибка импорта: " else "Import error: "
-                _uiState.update { it.copy(isImporting = false, importMessage = prefix + (error.localizedMessage ?: error.message)) }
-            }
+            _uiState.update { it.copy(userSettings = updated) }
         }
     }
 
@@ -105,8 +80,8 @@ class SettingsViewModel(
         viewModelScope.launch {
             val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
             glucoseRepository.clearAllData()
-            val msg = if (isRu) "Все данные успешно очищены." else "All data successfully cleared."
-            _uiState.update { it.copy(showClearDialog = false, importMessage = msg) }
+            val msg = if (isRu) "Все данные трансляции успешно очищены." else "All broadcast data cleared."
+            _uiState.update { it.copy(showClearDialog = false, infoMessage = msg) }
         }
     }
 }
