@@ -1,5 +1,6 @@
 package com.tirup.app.domain.calculator
 
+import com.tirup.app.domain.model.ClinicalMetricStatus
 import com.tirup.app.domain.model.ClinicalSummary
 import com.tirup.app.domain.model.GlucoseRangeCategory
 import com.tirup.app.domain.model.GlucoseReading
@@ -7,6 +8,7 @@ import com.tirup.app.domain.model.GlucoseStatistics
 import com.tirup.app.domain.model.NightStability
 import com.tirup.app.domain.model.TargetRanges
 import java.util.Calendar
+import java.util.Locale
 import java.util.TimeZone
 import kotlin.math.abs
 import kotlin.math.floor
@@ -152,7 +154,7 @@ object GlucoseMetricsCalculator {
             100.0
         }
 
-        // Automated Doctor's Clinical Summary
+        // Automated Doctor's Clinical Summary with all evaluated metrics
         val clinicalSummary = generateClinicalSummary(
             meanMmol = mean,
             gmi = gmi,
@@ -164,7 +166,9 @@ object GlucoseMetricsCalculator {
             cvPercent = cv,
             gvi = gvi,
             pgs = pgsTruncated,
-            gri = gri
+            gri = gri,
+            griLabel = griLabel,
+            nightStability = nightStability
         )
 
         return GlucoseStatistics(
@@ -233,54 +237,128 @@ object GlucoseMetricsCalculator {
         cvPercent: Double,
         gvi: Double,
         pgs: Double,
-        gri: Double
+        gri: Double,
+        griLabel: String,
+        nightStability: NightStability
     ): ClinicalSummary {
+        val evalItems = mutableListOf<ClinicalMetricStatus>()
         val hyperIssues = mutableListOf<String>()
         val hypoIssues = mutableListOf<String>()
         val varIssues = mutableListOf<String>()
         val rangeIssues = mutableListOf<String>()
 
-        if (meanMmol > 7.8) hyperIssues.add("Средний сахар повышен: ${String.format("%.1f", meanMmol)} ммоль/л (цель ≤7.8)")
-        if (gmi > 7.0) hyperIssues.add("Расчётный eA1c: ${String.format("%.1f%%", gmi)} (цель ≤7.0%)")
-        if (tarVeryHigh > 5.0) hyperIssues.add("Эпизоды выраженной гипергликемии (≥14.0 ммоль/л): ${String.format("%.1f%%", tarVeryHigh)}")
+        // 1. TIR
+        val tirMet = tirPercent >= 70.0
+        val tirWarn = tirPercent in 60.0..69.9
+        evalItems.add(
+            ClinicalMetricStatus(
+                title = "Целевой диапазон TIR (3.9–10.0 ммоль/л)",
+                valueStr = String.format(Locale.US, "%.1f%%", tirPercent),
+                targetStr = "цель ≥70.0%",
+                isMet = tirMet,
+                isWarning = tirWarn
+            )
+        )
+        if (!tirMet) rangeIssues.add("TIR в диапазоне: ${String.format(Locale.US, "%.1f%%", tirPercent)} (цель ≥70%)")
 
-        if (tbrVeryLow > 1.0) hypoIssues.add("Опасные тяжёлые гипогликемии (<3.0 ммоль/л): ${String.format("%.1f%%", tbrVeryLow)} (норма <1%)")
-        if (tbrLowTotal > 4.0) hypoIssues.add("Повышенный риск гипогликемий (<3.9 ммоль/л): ${String.format("%.1f%%", tbrLowTotal)} (норма <4%)")
+        // 2. TBR Total (<3.9)
+        val tbrMet = tbrLowTotal <= 4.0
+        val tbrWarn = tbrLowTotal in 4.1..6.0
+        evalItems.add(
+            ClinicalMetricStatus(
+                title = "Риск гипогликемий (TBR <3.9 ммоль/л)",
+                valueStr = String.format(Locale.US, "%.1f%%", tbrLowTotal),
+                targetStr = "норма <4.0%",
+                isMet = tbrMet,
+                isWarning = tbrWarn
+            )
+        )
+        if (!tbrMet) hypoIssues.add("Повышен риск гипогликемий (<3.9): ${String.format(Locale.US, "%.1f%%", tbrLowTotal)} (норма <4%)")
 
-        if (cvPercent >= 36.0) varIssues.add("Вариабельность глюкозы (%CV): ${String.format("%.1f%%", cvPercent)} (цель ≤36.0%)")
-        if (gvi > 1.20) varIssues.add("Индекс лабильности GVI: ${String.format("%.2f", gvi)} (цель ≤1.20)")
+        // 3. %CV
+        val cvMet = cvPercent <= 36.0
+        val cvWarn = cvPercent in 36.1..40.0
+        evalItems.add(
+            ClinicalMetricStatus(
+                title = "Вариабельность сахара (%CV)",
+                valueStr = String.format(Locale.US, "%.1f%%", cvPercent),
+                targetStr = "цель ≤36.0%",
+                isMet = cvMet,
+                isWarning = cvWarn
+            )
+        )
+        if (!cvMet) varIssues.add("Вариабельность глюкозы (%CV): ${String.format(Locale.US, "%.1f%%", cvPercent)} (цель ≤36%)")
 
-        if (tirPercent < 70.0) rangeIssues.add("TIR в диапазоне: ${String.format("%.1f%%", tirPercent)} (цель ≥70%)")
-        if (tingPercent < 50.0) rangeIssues.add("TING в узком диапазоне: ${String.format("%.1f%%", tingPercent)} (цель ≥50%)")
+        // 4. GRI
+        val griMet = gri <= 40.0
+        val griWarn = gri in 40.1..60.0
+        evalItems.add(
+            ClinicalMetricStatus(
+                title = "Индекс риска гликемии (GRI Klonoff)",
+                valueStr = String.format(Locale.US, "%.1f (%s)", gri, griLabel),
+                targetStr = "цель ≤40.0",
+                isMet = griMet,
+                isWarning = griWarn
+            )
+        )
 
-        val totalIssuesCount = hyperIssues.size + hypoIssues.size + varIssues.size + rangeIssues.size
+        // 5. GVI
+        val gviMet = gvi <= 1.20
+        val gviWarn = gvi in 1.21..1.40
+        evalItems.add(
+            ClinicalMetricStatus(
+                title = "Индекс лабильности (GVI)",
+                valueStr = String.format(Locale.US, "%.2f", gvi),
+                targetStr = "цель ≤1.20",
+                isMet = gviMet,
+                isWarning = gviWarn
+            )
+        )
+        if (!gviMet) varIssues.add("Индекс лабильности GVI: ${String.format(Locale.US, "%.2f", gvi)} (цель ≤1.20)")
+
+        // 6. Night Profile Stability
+        val nightMet = nightStability.isStable
+        evalItems.add(
+            ClinicalMetricStatus(
+                title = "Ночной профиль сна",
+                valueStr = if (nightMet) "Стабильный (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})" else "Обнаружены колебания (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})",
+                targetStr = "TIR ≥70% и SD ≤1.5",
+                isMet = nightMet,
+                isWarning = !nightMet
+            )
+        )
+        if (!nightMet) varIssues.add("Ночные колебания гликемии")
+
+        val failedCount = evalItems.count { !it.isMet }
 
         val (status, isAllMet, rec) = when {
-            totalIssuesCount == 0 -> Triple(
+            failedCount == 0 -> Triple(
                 "Все цели достигнуты. Отличный контроль гликемии!",
                 true,
                 "Поддерживайте текущий режим питания и терапии."
             )
-            totalIssuesCount <= 2 -> Triple(
-                "Есть небольшие отклонения от целевых диапазонов.",
-                false,
-                "Рекомендуется обратить внимание на отмеченные параметры и обсудить с лечащим врачом."
-            )
-            totalIssuesCount <= 4 -> Triple(
-                "Контроль гликемии нестабильный. Требуется внимание.",
-                false,
-                "Рекомендуется консультация с врачом для возможной корректировки коэффициентов или доз."
-            )
-            else -> Triple(
-                "Имеются выраженные отклонения гликемического профиля.",
-                false,
-                "Рекомендуется очная консультация эндокринолога для пересмотра схемы инсулинотерапии!"
-            )
+            failedCount <= 2 -> {
+                val issueNames = evalItems.filter { !it.isMet }.joinToString(", ") { it.title.substringBefore(" (") }
+                Triple(
+                    "Есть отклонения по параметрам: $issueNames.",
+                    false,
+                    "Рекомендуется обратить внимание на отмеченные параметры и обсудить с лечащим врачом."
+                )
+            }
+            else -> {
+                val issueNames = evalItems.filter { !it.isMet }.take(3).joinToString(", ") { it.title.substringBefore(" (") }
+                Triple(
+                    "Имеются выраженные отклонения ($issueNames и др.).",
+                    false,
+                    "Рекомендуется консультация эндокринолога для возможной корректировки доз или схемы терапии."
+                )
+            }
         }
 
         return ClinicalSummary(
             overallStatus = status,
             isAllTargetsMet = isAllMet,
+            evaluatedMetrics = evalItems,
             hyperIssues = hyperIssues,
             hypoIssues = hypoIssues,
             variabilityIssues = varIssues,

@@ -89,7 +89,7 @@ class AgpPdfGenerator(private val context: Context) {
             val headerTitle = if (isRu) "АМБУЛАТОРНЫЙ ГЛЮКОЗНЫЙ ПРОФИЛЬ (AGP)" else "AMBULATORY GLUCOSE PROFILE (AGP) REPORT"
             canvas.drawText(headerTitle, margin + 12f, 38f, titlePaint)
 
-            // Patient details line (with longer doctor fill-in lines if empty)
+            // Patient details line
             val pName = if (patient.fullName.isNotBlank()) patient.fullName else "___________________________________"
             val pAge = if (patient.fullName.isNotBlank() || patient.birthYear != 1990) "${patient.calculatedAge} лет" else "_______"
             val pWeight = if (patient.weightKg.isNotBlank()) "${patient.weightKg} кг" else "_______"
@@ -166,7 +166,7 @@ class AgpPdfGenerator(private val context: Context) {
                 rowY += 27f
             }
 
-            // Right: Summary Statistics Box
+            // Right: Summary Statistics Box (Without duplicated Active Time)
             val summaryBox = RectF(col2Left, panelTop, col2Left + col2Width, panelTop + panelHeight)
             canvas.drawRoundRect(summaryBox, 8f, 8f, headerBgPaint)
             canvas.drawRoundRect(summaryBox, 8f, 8f, borderPaint)
@@ -181,7 +181,6 @@ class AgpPdfGenerator(private val context: Context) {
             }
 
             val statRows = listOf(
-                Pair("Активное время сенсора (CGM):", String.format(Locale.US, "%.1f%% (Цель ≥70.0%%)", statistics.activeTimePercent)),
                 Pair("Средний сахар (Mean):", String.format(Locale.US, "%.1f ммоль/л (Медиана %.1f)", statistics.meanMmol, statistics.medianMmol)),
                 Pair("Вариабельность глюкозы (%CV):", String.format(Locale.US, "%.1f%% (Цель ≤36.0%%) • SD: %.2f", statistics.cvPercent, statistics.sdMmol)),
                 Pair("Расчётный eA1c (GMI):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)),
@@ -190,11 +189,11 @@ class AgpPdfGenerator(private val context: Context) {
                 Pair("Ночной профиль (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)}):", nightStr)
             )
 
-            var statY = panelTop + 36f
+            var statY = panelTop + 38f
             statRows.forEach { (title, value) ->
                 canvas.drawText(title, col2Left + 12f, statY, subTextPaint)
-                canvas.drawText(value, col2Left + 12f, statY + 11f, textPaint)
-                statY += 24f
+                canvas.drawText(value, col2Left + 12f, statY + 12f, textPaint)
+                statY += 26f
             }
 
             // 3. AGP 24-Hour Modal Day Chart with 3-Hour Perpendiculars
@@ -310,77 +309,46 @@ class AgpPdfGenerator(private val context: Context) {
                 canvas.drawText(lbl, x - 10f, graphBottom + 13f, subTextPaint)
             }
 
-            // 4. Clinical Assessment & Doctor Notes
+            // 4. Clinical Assessment
             val notesTop = 570f
             val notesBox = RectF(margin, notesTop, 595f - margin, 796f)
             canvas.drawRoundRect(notesBox, 8f, 8f, headerBgPaint)
             canvas.drawRoundRect(notesBox, 8f, 8f, borderPaint)
 
-            val notesTitle = if (isRu) "КЛИНИЧЕСКАЯ ОЦЕНКА И ПРИМЕЧАНИЯ ВРАЧА" else "CLINICAL ASSESSMENT & PHYSICIAN NOTES"
+            val notesTitle = if (isRu) "КЛИНИЧЕСКАЯ ОЦЕНКА" else "CLINICAL ASSESSMENT"
             canvas.drawText(notesTitle, margin + 12f, notesTop + 18f, boxTitlePaint)
 
             val passPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(5, 150, 105)
-                textSize = 9.5f
+                textSize = 9f
                 isFakeBoldText = true
             }
             val warnPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(217, 119, 6)
-                textSize = 9.5f
+                textSize = 9f
                 isFakeBoldText = true
             }
             val failPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(220, 38, 38)
-                textSize = 9.5f
+                textSize = 9f
                 isFakeBoldText = true
             }
 
-            val tirOk = statistics.tirPercent >= 70.0
-            val hypoOk = (statistics.tbrLowPercent + statistics.tbrVeryLowPercent) <= 4.0
-            val cvOk = statistics.cvPercent <= 36.0
-            val griOk = statistics.gri <= 40.0
-
-            val notesItems = listOf(
-                Triple(
-                    (if (tirOk) "✔ " else "✘ ") + "Целевой диапазон TIR (≥70% в 3.9–10.0 ммоль/л): " + (if (tirOk) "ДОСТИГНУТ (${String.format(Locale.US, "%.1f%%", statistics.tirPercent)})" else "НИЖЕ ЦЕЛИ (${String.format(Locale.US, "%.1f%%", statistics.tirPercent)})"),
-                    if (tirOk) passPaint else failPaint,
-                    ""
-                ),
-                Triple(
-                    (if (hypoOk) "✔ " else "✘ ") + "Риск гипогликемий (<3.9 ммоль/л TBR, норма <4%): " + (if (hypoOk) "БЕЗОПАСНО (${String.format(Locale.US, "%.1f%%", statistics.tbrLowPercent + statistics.tbrVeryLowPercent)})" else "ПОВЫШЕННЫЙ РИСК (${String.format(Locale.US, "%.1f%%", statistics.tbrLowPercent + statistics.tbrVeryLowPercent)})"),
-                    if (hypoOk) passPaint else failPaint,
-                    ""
-                ),
-                Triple(
-                    (if (cvOk) "✔ " else "⚠️ ") + "Вариабельность сахара (%CV, норма ≤36.0%): " + (if (cvOk) "СТАБИЛЬНЫЙ (${String.format(Locale.US, "%.1f%%", statistics.cvPercent)})" else "ВЫСОКИЕ КОЛЕБАНИЯ (${String.format(Locale.US, "%.1f%%", statistics.cvPercent)})"),
-                    if (cvOk) passPaint else warnPaint,
-                    ""
-                ),
-                Triple(
-                    (if (griOk) "✔ " else "⚠️ ") + "Индекс риска гликемии GRI (цель ≤40.0): ${String.format(Locale.US, "%.1f", statistics.gri)} (${statistics.griLabel})",
-                    if (griOk) passPaint else warnPaint,
-                    ""
-                ),
-                Triple(
-                    "• Заключение: ${statistics.clinicalSummary.overallStatus}",
-                    textPaint,
-                    ""
-                ),
-                Triple(
-                    "• Рекомендация: ${statistics.clinicalSummary.recommendation}",
-                    subTextPaint,
-                    ""
-                )
-            )
-
-            var noteY = notesTop + 36f
-            notesItems.forEach { (text, pnt, _) ->
-                canvas.drawText(text, margin + 12f, noteY, pnt)
-                noteY += 17f
+            var noteY = notesTop + 34f
+            statistics.clinicalSummary.evaluatedMetrics.forEach { item ->
+                val pnt = if (item.isMet) passPaint else if (item.isWarning) warnPaint else failPaint
+                val line = "${item.symbol} ${item.title}: ${item.valueStr} (${item.targetStr})"
+                canvas.drawText(line, margin + 12f, noteY, pnt)
+                noteY += 15f
             }
 
+            noteY += 2f
+            canvas.drawText("• Заключение: ${statistics.clinicalSummary.overallStatus}", margin + 12f, noteY, textPaint)
+            noteY += 15f
+            canvas.drawText("• Рекомендация: ${statistics.clinicalSummary.recommendation}", margin + 12f, noteY, subTextPaint)
+
             // Footer
-            val footerText = "TIRUp Ambulatory Glucose Profile Report • Сгенерировано для медицинских консультаций"
+            val footerText = "TIRUp Ambulatory Glucose Profile Report • Сгенерировано для медицинских консультаций и самоконтроля"
             canvas.drawText(footerText, margin, 814f, subTextPaint)
 
             document.finishPage(page)

@@ -1,5 +1,25 @@
 package com.tirup.app.domain.model
 
+data class ClinicalMetricStatus(
+    val title: String,
+    val valueStr: String,
+    val targetStr: String,
+    val isMet: Boolean,
+    val isWarning: Boolean,
+    val symbol: String = if (isMet) "✔" else if (isWarning) "⚠️" else "✘"
+)
+
+data class ClinicalSummary(
+    val overallStatus: String = "Все цели достигнуты. Отличный контроль!",
+    val isAllTargetsMet: Boolean = true,
+    val evaluatedMetrics: List<ClinicalMetricStatus> = emptyList(),
+    val hyperIssues: List<String> = emptyList(),
+    val hypoIssues: List<String> = emptyList(),
+    val variabilityIssues: List<String> = emptyList(),
+    val rangeIssues: List<String> = emptyList(),
+    val recommendation: String = "Поддерживайте текущий режим питания и терапии."
+)
+
 data class GlucoseStatistics(
     val meanMmol: Double = 0.0,
     val medianMmol: Double = 0.0,
@@ -23,16 +43,6 @@ data class GlucoseStatistics(
     val daysCount: Int = 0,
     val nightStability: NightStability = NightStability(),
     val clinicalSummary: ClinicalSummary = ClinicalSummary()
-)
-
-data class ClinicalSummary(
-    val overallStatus: String = "Все цели достигнуты. Отличный контроль!",
-    val isAllTargetsMet: Boolean = true,
-    val hyperIssues: List<String> = emptyList(),
-    val hypoIssues: List<String> = emptyList(),
-    val variabilityIssues: List<String> = emptyList(),
-    val rangeIssues: List<String> = emptyList(),
-    val recommendation: String = "Поддерживайте текущий режим питания и терапии."
 )
 
 data class NightStability(

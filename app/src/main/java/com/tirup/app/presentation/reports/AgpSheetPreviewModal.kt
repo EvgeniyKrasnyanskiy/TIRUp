@@ -65,11 +65,6 @@ fun AgpSheetPreviewModal(
     val patient = userSettings.patientProfile
     val agpBins = AGPPercentilesCalculator.calculatePercentiles(readings, binsCount = 48)
 
-    val tirOk = statistics.tirPercent >= 70.0
-    val hypoOk = (statistics.tbrLowPercent + statistics.tbrVeryLowPercent) <= 4.0
-    val cvOk = statistics.cvPercent <= 36.0
-    val griOk = statistics.gri <= 40.0
-
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -186,7 +181,7 @@ fun AgpSheetPreviewModal(
                                 }
                             }
 
-                            // Right Box: Statistics
+                            // Right Box: Statistics (Without duplicated Active Time)
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
                                 color = Color(0xFFF1F5F9),
@@ -201,7 +196,6 @@ fun AgpSheetPreviewModal(
                                         color = Color(0xFF0F172A)
                                     )
 
-                                    ReportStatLine("Активное время сенсора:", String.format(Locale.US, "%.1f%% (Цель ≥70.0%%)", statistics.activeTimePercent))
                                     ReportStatLine("Средний сахар (Mean):", String.format(Locale.US, "%.1f ммоль/л (Медиана %.1f)", statistics.meanMmol, statistics.medianMmol))
                                     ReportStatLine("Вариабельность (%CV):", String.format(Locale.US, "%.1f%% (Цель ≤36.0%%) • SD: %.2f", statistics.cvPercent, statistics.sdMmol))
                                     ReportStatLine("Расчётный eA1c (GMI):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol))
@@ -259,40 +253,23 @@ fun AgpSheetPreviewModal(
                         ) {
                             Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(
-                                    text = "КЛИНИЧЕСКАЯ ОЦЕНКА И ПРИМЕЧАНИЯ ВРАЧА",
+                                    text = "КЛИНИЧЕСКАЯ ОЦЕНКА",
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF0F172A)
                                 )
 
-                                Text(
-                                    text = (if (tirOk) "✔ " else "✘ ") + "Целевой диапазон TIR (≥70% в 3.9–10.0): " + (if (tirOk) "ДОСТИГНУТ (${String.format(Locale.US, "%.1f%%", statistics.tirPercent)})" else "НИЖЕ ЦЕЛИ (${String.format(Locale.US, "%.1f%%", statistics.tirPercent)})"),
-                                    fontSize = 10.5.sp,
-                                    color = if (tirOk) Color(0xFF059669) else Color(0xFFDC2626),
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                                statistics.clinicalSummary.evaluatedMetrics.forEach { item ->
+                                    val itemColor = if (item.isMet) Color(0xFF059669) else if (item.isWarning) Color(0xFFD97706) else Color(0xFFDC2626)
+                                    Text(
+                                        text = "${item.symbol} ${item.title}: ${item.valueStr} (${item.targetStr})",
+                                        fontSize = 10.5.sp,
+                                        color = itemColor,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
 
-                                Text(
-                                    text = (if (hypoOk) "✔ " else "✘ ") + "Риск гипогликемий (<3.9 ммоль/л TBR, норма <4%): " + (if (hypoOk) "БЕЗОПАСНО (${String.format(Locale.US, "%.1f%%", statistics.tbrLowPercent + statistics.tbrVeryLowPercent)})" else "ПОВЫШЕННЫЙ РИСК (${String.format(Locale.US, "%.1f%%", statistics.tbrLowPercent + statistics.tbrVeryLowPercent)})"),
-                                    fontSize = 10.5.sp,
-                                    color = if (hypoOk) Color(0xFF059669) else Color(0xFFDC2626),
-                                    fontWeight = FontWeight.SemiBold
-                                )
-
-                                Text(
-                                    text = (if (cvOk) "✔ " else "⚠️ ") + "Вариабельность сахара (%CV, норма ≤36.0%): " + (if (cvOk) "СТАБИЛЬНЫЙ (${String.format(Locale.US, "%.1f%%", statistics.cvPercent)})" else "ВЫСОКИЕ КОЛЕБАНИЯ (${String.format(Locale.US, "%.1f%%", statistics.cvPercent)})"),
-                                    fontSize = 10.5.sp,
-                                    color = if (cvOk) Color(0xFF059669) else Color(0xFFD97706),
-                                    fontWeight = FontWeight.SemiBold
-                                )
-
-                                Text(
-                                    text = (if (griOk) "✔ " else "⚠️ ") + "Индекс риска гликемии GRI (цель ≤40.0): ${String.format(Locale.US, "%.1f", statistics.gri)} (${statistics.griLabel})",
-                                    fontSize = 10.5.sp,
-                                    color = if (griOk) Color(0xFF059669) else Color(0xFFD97706),
-                                    fontWeight = FontWeight.SemiBold
-                                )
-
+                                Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "• Заключение: ${statistics.clinicalSummary.overallStatus}",
                                     fontSize = 10.5.sp,
