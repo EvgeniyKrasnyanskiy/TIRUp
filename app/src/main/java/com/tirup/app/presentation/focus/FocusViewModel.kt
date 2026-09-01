@@ -89,4 +89,11 @@ class FocusViewModel(
             settingsRepository.updateSettings(currentSettings.copy(targetMode = newMode))
         }
     }
+
+    fun setTargetMode(mode: TargetMode) {
+        val currentSettings = _uiState.value.userSettings
+        viewModelScope.launch {
+            settingsRepository.updateSettings(currentSettings.copy(targetMode = mode))
+        }
+    }
 }

@@ -1,7 +1,7 @@
 package com.tirup.app.presentation.focus
 
 import android.text.format.DateUtils
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,19 +51,13 @@ import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.presentation.components.BentoCard
-import com.tirup.app.presentation.components.RangeDistributionBar
 import com.tirup.app.presentation.components.StreakBadge
 import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorLow
 import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
 import com.tirup.app.presentation.theme.ColorVeryLow
-import com.tirup.app.presentation.theme.DarkBorder
-import com.tirup.app.presentation.theme.DarkSurfaceElevated
 import com.tirup.app.presentation.theme.PrimaryEmerald
-import com.tirup.app.presentation.theme.TextMutedDark
-import com.tirup.app.presentation.theme.TextPrimaryDark
-import com.tirup.app.presentation.theme.TextSecondaryDark
 import java.util.Locale
 
 @Composable
@@ -73,6 +67,13 @@ fun FocusScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     var detailDialogInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
+
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val userSettings = state.userSettings
+    val targetMode = userSettings.targetMode
+    val unit = userSettings.unit
+    val goal = state.compensatorGoal
 
     LazyColumn(
         modifier = Modifier
@@ -94,14 +95,14 @@ fun FocusScreen(
                         Icon(
                             imageVector = Icons.Default.Menu,
                             contentDescription = "Settings Menu",
-                            tint = TextPrimaryDark
+                            tint = onSurface
                         )
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = stringResource(R.string.focus_title),
                         style = MaterialTheme.typography.headlineMedium,
-                        color = TextPrimaryDark
+                        color = onSurface
                     )
                 }
 
@@ -110,77 +111,257 @@ fun FocusScreen(
                     onClick = {
                         detailDialogInfo = Pair(
                             "Серия дней в целевом диапазоне (Стрик)",
-                            "🔥 Текущая серия: ${state.streakDays} дн. подряд.\n\nКаждый день, в котором время в целевом диапазоне (TIR/TING) достигает установленной нормы (≥70%), серия продлевается. Непрерывное удержание сахара формирует стабильную компенсацию и надёжно защищает от сосудистых осложнений!"
+                            "Текущая серия: ${state.streakDays} дн.\n\nКаждый день, когда суточный TIR удерживается выше целевого уровня (≥70%), увеличивает серию. Непрерывный контроль помогает закрепить стабильные привычки и защищает сосудистую систему."
                         )
                     }
                 )
             }
         }
 
-        // Hero Card: Current Glucose
+        // 1. Hero Card: Current Glucose + Mode Switcher (TIR/TING) + Today's Points Count
         item {
-            CurrentGlucoseHeroCard(
-                latest = state.latestReading,
-                unit = state.userSettings.unit,
-                targetMode = state.userSettings.targetMode,
-                onToggleTargetMode = { viewModel.toggleTargetMode() },
-                onCardClick = {
-                    detailDialogInfo = Pair(
-                        "Текущий сахар",
-                        "Показывает последнее значение, полученное по локальной трансляции из xDrip+/Juggluco. Стрелка указывает скорость и направление изменения гликемии."
-                    )
+            HeroGlucoseCard(
+                latestReading = state.latestReading,
+                unit = unit,
+                targetMode = targetMode,
+                todayPointsCount = state.recentReadings.size,
+                onModeChange = { mode -> viewModel.setTargetMode(mode) },
+                onClick = {
+                    val r = state.latestReading
+                    if (r != null) {
+                        detailDialogInfo = Pair(
+                            "Текущий уровень сахара",
+                            "Значение: ${String.format(Locale.US, "%.1f", r.valueMmol)} ммоль/л\nНаправление тренда: ${r.trendArrow}\nВремя измерения: ${DateUtils.getRelativeTimeSpanString(r.timestamp)}\nВсего точек за сегодня: ${state.recentReadings.size}"
+                        )
+                    }
                 }
             )
         }
 
-        // Target Compensator Bento Card
+        // 2. Goal Compensator: dynamic progress bar reflecting % achieved
         item {
+            val currentScore = if (targetMode == TargetMode.TIR) state.statistics.tirPercent else state.statistics.tingPercent
+            val targetGoal = if (targetMode == TargetMode.TIR) userSettings.targetRanges.tirGoalPercent else userSettings.targetRanges.tingGoalPercent
+
+            val compMessage = when (goal.status) {
+                CompensatorStatus.EXCEEDING -> "Отличный темп! Вы опережаете цель. Поддерживайте ≥${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)} в оставшиеся ${goal.remainingDays} дн."
+                CompensatorStatus.REACHABLE -> "Для достижения цели удерживайте ${goal.targetMode.name} ≥${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)} в оставшиеся ${goal.remainingDays} дн."
+                CompensatorStatus.UNREALISTIC -> "Цель периода труднодостижима (${String.format(Locale.US, "%.0f%%", goal.neededRemainingPercent)}). Сфокусируйтесь на сегодняшнем дне."
+            }
+
             TargetCompensatorCard(
-                state = state,
-                onCardClick = {
+                message = compMessage,
+                currentScore = currentScore,
+                targetGoal = targetGoal,
+                targetMode = targetMode,
+                remainingDays = goal.remainingDays,
+                onClick = {
                     detailDialogInfo = Pair(
                         "Компенсатор цели",
-                        "Рассчитывает необходимый % времени в целевом диапазоне на оставшиеся дни, чтобы достичь и закрепить желаемый клинический результат."
+                        "Текущий показатель: ${String.format(Locale.US, "%.1f%%", currentScore)}\nЦелевой порог: ≥$targetGoal%\nСтатус: $compMessage\nОсталось дней в окне: ${goal.remainingDays} дн."
                     )
                 }
             )
         }
 
-        // 2x2 Bento Metrics Grid
+        // 3. 2x2 Bento Metrics Grid
         item {
-            BentoMetricsGrid(
-                state = state,
-                onMetricClick = { title, desc ->
-                    detailDialogInfo = Pair(title, desc)
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    BentoMetricSmall(
+                        title = "Средний сахар",
+                        value = if (state.statistics.meanMmol > 0.0) String.format(Locale.US, "%.1f", state.statistics.meanMmol) else "--",
+                        unit = if (unit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL",
+                        valueColor = if (state.statistics.meanMmol in 3.9..7.8) PrimaryEmerald else ColorHigh,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            detailDialogInfo = Pair(
+                                "Средний сахар (Mean)",
+                                "Среднее арифметическое значение всех измерений за 24 часа. Целевое значение для устойчивой компенсации: ≤7.8 ммоль/л."
+                            )
+                        }
+                    )
+
+                    BentoMetricSmall(
+                        title = "Вариабельность (%CV)",
+                        value = if (state.statistics.cvPercent > 0.0) String.format(Locale.US, "%.1f%%", state.statistics.cvPercent) else "--",
+                        unit = "",
+                        valueColor = if (state.statistics.cvPercent <= 36.0) PrimaryEmerald else ColorHigh,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            detailDialogInfo = Pair(
+                                "Вариабельность (%CV)",
+                                "Коэффициент вариации глюкозы (%CV = SD / Mean * 100%). Норма по международным консенсусам: ≤36.0%. Показывает стабильность сахара без резких скачков."
+                            )
+                        }
+                    )
                 }
-            )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    BentoMetricSmall(
+                        title = "Расчётный eA1c",
+                        value = if (state.statistics.gmiPercent > 0.0) String.format(Locale.US, "%.1f%%", state.statistics.gmiPercent) else "--",
+                        unit = "",
+                        valueColor = if (state.statistics.gmiPercent <= 7.0) PrimaryEmerald else ColorHigh,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            detailDialogInfo = Pair(
+                                "Расчётный гликированный гемоглобин (eA1c)",
+                                "Оценка гликированного гемоглобина по формуле ADAG: (Mean + 2.59) / 1.59. Международный ориентир: ≤7.0%."
+                            )
+                        }
+                    )
+
+                    BentoMetricSmall(
+                        title = if (targetMode == TargetMode.TING) "TING (Узкий)" else "TIR (В диапазоне)",
+                        value = String.format(Locale.US, "%.1f%%", if (targetMode == TargetMode.TING) state.statistics.tingPercent else state.statistics.tirPercent),
+                        unit = "",
+                        valueColor = PrimaryEmerald,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            detailDialogInfo = Pair(
+                                if (targetMode == TargetMode.TING) "TING (3.9–7.8 ммоль/л)" else "TIR (3.9–10.0 ммоль/л)",
+                                if (targetMode == TargetMode.TING) "Процент времени в узком идеальном диапазоне 3.9–7.8 ммоль/л. Цель: ≥50%." else "Процент времени в стандартном целевом диапазоне 3.9–10.0 ммоль/л. Цель: ≥70%."
+                            )
+                        }
+                    )
+                }
+            }
         }
 
-        // Night Stability Insight Card (00:00 - 06:00)
+        // 4. Additional Daily Parameters: Today's Points & Min/Max Glucose
         item {
-            NightStabilityCard(
-                state = state,
-                onCardClick = {
+            val minVal = if (state.recentReadings.isNotEmpty()) state.recentReadings.minOf { it.valueMmol } else 0.0
+            val maxVal = if (state.recentReadings.isNotEmpty()) state.recentReadings.maxOf { it.valueMmol } else 0.0
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                BentoMetricSmall(
+                    title = "Точек за сегодня",
+                    value = "${state.recentReadings.size}",
+                    unit = "изм.",
+                    valueColor = PrimaryEmerald,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        detailDialogInfo = Pair(
+                            "Точек за сегодня",
+                            "Всего получено измерений за текущие сутки: ${state.recentReadings.size} точек.\nПокрытие сенсора: ${String.format(Locale.US, "%.1f%%", state.statistics.activeTimePercent)}"
+                        )
+                    }
+                )
+
+                BentoMetricSmall(
+                    title = "Мин / Макс за сутки",
+                    value = if (minVal > 0.0) "${String.format(Locale.US, "%.1f", minVal)} – ${String.format(Locale.US, "%.1f", maxVal)}" else "--",
+                    unit = if (unit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL",
+                    valueColor = if (maxVal <= 10.0 && minVal >= 3.9) PrimaryEmerald else ColorHigh,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        detailDialogInfo = Pair(
+                            "Суточный диапазон",
+                            "Минимальный сахар за сутки: ${String.format(Locale.US, "%.1f", minVal)} ммоль/л\nМаксимальный сахар за сутки: ${String.format(Locale.US, "%.1f", maxVal)} ммоль/л"
+                        )
+                    }
+                )
+            }
+        }
+
+        // 5. Night Stability Indicator
+        item {
+            val nightStability = state.statistics.nightStability
+            val hasNightData = nightStability.nightReadingsCount >= 6
+
+            BentoCard(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
                     detailDialogInfo = Pair(
-                        "Ночной профиль",
-                        "Анализирует стабильность сахара в период с 00:00 до 06:00. Отсутствие ночных гипо- и гипергликемий является ключевым показателем правильности базального инсулина."
+                        "Ночной профиль сна (${userSettings.nightStartHour}:00–${userSettings.nightEndHour}:00)",
+                        if (!hasNightData) {
+                            "Недостаточно ночных данных за текущие сутки (менее 30 минут измерений в ночное окно)."
+                        } else {
+                            "TIR за ночь: ${String.format(Locale.US, "%.1f%%", nightStability.tirPercent)}\nВариабельность (SD): ${String.format(Locale.US, "%.2f", nightStability.sdMmol)} ммоль/л\nКоличество ночных точек: ${nightStability.nightReadingsCount}"
+                        }
                     )
                 }
-            )
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Bedtime,
+                            contentDescription = null,
+                            tint = if (hasNightData && nightStability.isStable) PrimaryEmerald else ColorHigh,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Ночной профиль (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)})",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = when {
+                                    !hasNightData -> "Недостаточно данных (<30 мин)"
+                                    nightStability.isStable -> "Стабильный ночной профиль"
+                                    else -> "Обнаружены ночные колебания"
+                                },
+                                style = MaterialTheme.typography.titleMedium,
+                                color = when {
+                                    !hasNightData -> onSurfaceVariant
+                                    nightStability.isStable -> PrimaryEmerald
+                                    else -> ColorHigh
+                                }
+                            )
+                        }
+                    }
+
+                    Icon(
+                        imageVector = if (hasNightData && nightStability.isStable) Icons.Default.CheckCircle else Icons.Default.Info,
+                        contentDescription = null,
+                        tint = if (hasNightData && nightStability.isStable) PrimaryEmerald else ColorHigh,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
         }
 
-        item { Spacer(modifier = Modifier.height(24.dp)) }
+        item { Spacer(modifier = Modifier.height(20.dp)) }
     }
 
-    // Interactive Clinical Info Dialog
-    detailDialogInfo?.let { (title, message) ->
+    // Detail Popups
+    if (detailDialogInfo != null) {
         AlertDialog(
             onDismissRequest = { detailDialogInfo = null },
-            title = { Text(text = title, color = TextPrimaryDark, fontWeight = FontWeight.Bold) },
-            text = { Text(text = message, color = TextSecondaryDark, style = MaterialTheme.typography.bodyMedium) },
+            title = {
+                Text(
+                    text = detailDialogInfo!!.first,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            text = {
+                Text(
+                    text = detailDialogInfo!!.second,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
             confirmButton = {
                 TextButton(onClick = { detailDialogInfo = null }) {
-                    Text(text = stringResource(R.string.action_close), color = PrimaryEmerald, fontWeight = FontWeight.Bold)
+                    Text(text = "Понятно", color = PrimaryEmerald, fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -188,24 +369,22 @@ fun FocusScreen(
 }
 
 @Composable
-private fun CurrentGlucoseHeroCard(
-    latest: GlucoseReading?,
+private fun HeroGlucoseCard(
+    latestReading: GlucoseReading?,
     unit: GlucoseUnit,
     targetMode: TargetMode,
-    onToggleTargetMode: () -> Unit,
-    onCardClick: () -> Unit
+    todayPointsCount: Int,
+    onModeChange: (TargetMode) -> Unit,
+    onClick: () -> Unit
 ) {
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
     BentoCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCardClick() },
-        cornerRadius = 28.dp,
-        backgroundColor = DarkSurfaceElevated
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -214,147 +393,146 @@ private fun CurrentGlucoseHeroCard(
                 Text(
                     text = stringResource(R.string.current_glucose),
                     style = MaterialTheme.typography.titleMedium,
-                    color = TextSecondaryDark
+                    color = onSurfaceVariant
                 )
 
-                // Horizontal Segmented Switch for TIR vs TING (Active filled in blue)
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF0F172A),
-                    border = BorderStroke(1.dp, DarkBorder)
+                // Mode Selector: TIR vs TING
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(3.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(9.dp),
-                            color = if (targetMode == TargetMode.TIR) Color(0xFF2563EB) else Color.Transparent,
-                            modifier = Modifier.clickable { if (targetMode != TargetMode.TIR) onToggleTargetMode() }
-                        ) {
-                            Text(
-                                text = "TIR 3.9–10.0",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = if (targetMode == TargetMode.TIR) FontWeight.Bold else FontWeight.Normal,
-                                color = if (targetMode == TargetMode.TIR) Color.White else TextMutedDark,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                            )
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(9.dp),
-                            color = if (targetMode == TargetMode.TING) Color(0xFF2563EB) else Color.Transparent,
-                            modifier = Modifier.clickable { if (targetMode != TargetMode.TING) onToggleTargetMode() }
-                        ) {
-                            Text(
-                                text = "TING 3.9–7.8",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = if (targetMode == TargetMode.TING) FontWeight.Bold else FontWeight.Normal,
-                                color = if (targetMode == TargetMode.TING) Color.White else TextMutedDark,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                            )
-                        }
-                    }
+                    TargetModeChip(
+                        title = "TIR 3.9–10.0",
+                        selected = targetMode == TargetMode.TIR,
+                        onClick = { onModeChange(TargetMode.TIR) }
+                    )
+                    TargetModeChip(
+                        title = "TING 3.9–7.8",
+                        selected = targetMode == TargetMode.TING,
+                        onClick = { onModeChange(TargetMode.TING) }
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (latest != null) {
-                val displayVal = if (unit == GlucoseUnit.MMOL_L) {
-                    String.format(Locale.US, "%.1f", latest.valueMmol)
-                } else {
-                    String.format(Locale.US, "%d", (latest.valueMmol * 18.0182).toInt())
-                }
-                val unitLabel = if (unit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL"
-
-                // Category color for hero number
-                val valColor = when {
-                    latest.valueMmol < 3.0 -> ColorVeryLow
-                    latest.valueMmol < 3.9 -> ColorLow
-                    latest.valueMmol <= 7.8 -> ColorTight
-                    latest.valueMmol <= 10.0 -> PrimaryEmerald
-                    latest.valueMmol <= 13.9 -> ColorHigh
+            // Large Hero Value with Trend Arrow
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                val valueColor = when {
+                    latestReading == null -> onSurfaceVariant
+                    latestReading.valueMmol < 3.0 -> ColorVeryLow
+                    latestReading.valueMmol < 3.9 -> ColorLow
+                    latestReading.valueMmol in 3.9..7.8 -> ColorTight
+                    latestReading.valueMmol in 7.9..10.0 -> ColorTight
+                    latestReading.valueMmol in 10.1..13.9 -> ColorHigh
                     else -> ColorVeryHigh
                 }
 
-                Row(
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = displayVal,
-                        fontSize = 54.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = valColor,
-                        lineHeight = 54.sp
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = unitLabel,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextMutedDark,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                val displayVal = if (latestReading != null) {
+                    if (unit == GlucoseUnit.MMOL_L) {
+                        String.format(Locale.US, "%.1f", latestReading.valueMmol)
+                    } else {
+                        String.format(Locale.US, "%d", (latestReading.valueMmol * 18.0182).toInt())
+                    }
+                } else "--"
 
-                    if (!latest.trendArrow.isNullOrEmpty()) {
-                        Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = displayVal,
+                    style = MaterialTheme.typography.displayLarge,
+                    color = valueColor,
+                    fontSize = 54.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Column {
+                    Text(
+                        text = if (unit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = onSurfaceVariant
+                    )
+                    if (latestReading?.trendArrow?.isNotEmpty() == true) {
                         Text(
-                            text = latest.trendArrow,
-                            fontSize = 38.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = valColor,
-                            modifier = Modifier.padding(bottom = 2.dp)
+                            text = latestReading.trendArrow,
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = valueColor,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                val relativeTime = DateUtils.getRelativeTimeSpanString(
-                    latest.timestamp,
-                    System.currentTimeMillis(),
-                    DateUtils.MINUTE_IN_MILLIS
-                )
-
-                Text(
-                    text = stringResource(R.string.last_reading, relativeTime),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextMutedDark
-                )
-            } else {
-                Text(
-                    text = stringResource(R.string.no_data),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextMutedDark,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(vertical = 16.dp)
-                )
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            val timeStr = if (latestReading != null) {
+                DateUtils.getRelativeTimeSpanString(
+                    latestReading.timestamp,
+                    System.currentTimeMillis(),
+                    DateUtils.MINUTE_IN_MILLIS,
+                    DateUtils.FORMAT_ABBREV_RELATIVE
+                ).toString()
+            } else "Нет данных трансляции"
+
+            val pointsSubtitle = if (todayPointsCount > 0) " • Получено сегодня: $todayPointsCount точек" else ""
+
+            Text(
+                text = "Последнее измерение: $timeStr$pointsSubtitle",
+                style = MaterialTheme.typography.bodySmall,
+                color = onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
 
 @Composable
-private fun TargetCompensatorCard(
-    state: FocusUiState,
-    onCardClick: () -> Unit
+private fun TargetModeChip(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit
 ) {
-    val goal = state.compensatorGoal
-    val isTir = goal.targetMode == TargetMode.TIR
-    val modeName = if (isTir) stringResource(R.string.mode_tir) else stringResource(R.string.mode_ting)
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = if (selected) Color(0xFF2563EB) else Color.Transparent,
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Text(
+            text = title,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+        )
+    }
+}
 
-    val currentScore = if (isTir) state.statistics.tirPercent else state.statistics.tingPercent
-    val progress = (currentScore / goal.targetGoalPercent.coerceAtLeast(1.0)).toFloat().coerceIn(0f, 1f)
+@Composable
+private fun TargetCompensatorCard(
+    message: String,
+    currentScore: Double,
+    targetGoal: Int,
+    targetMode: TargetMode,
+    remainingDays: Int,
+    onClick: () -> Unit
+) {
+    val progress = if (targetGoal > 0) (currentScore / targetGoal.toDouble()).toFloat().coerceIn(0f, 1f) else 0f
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
     BentoCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCardClick() },
-        cornerRadius = 24.dp
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -365,311 +543,83 @@ private fun TargetCompensatorCard(
                         imageVector = Icons.AutoMirrored.Filled.TrendingUp,
                         contentDescription = null,
                         tint = PrimaryEmerald,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = stringResource(R.string.compensator_title),
+                        text = "Компенсатор цели",
                         style = MaterialTheme.typography.titleMedium,
-                        color = TextPrimaryDark
+                        color = onSurface
                     )
                 }
 
                 Text(
-                    text = stringResource(R.string.target_label, goal.targetGoalPercent.toInt()),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = PrimaryEmerald
+                    text = "Цель: ≥$targetGoal%",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = PrimaryEmerald,
+                    fontWeight = FontWeight.Bold
                 )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
-
+            // Proportional Progress Bar
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(10.dp)
-                    .clip(RoundedCornerShape(6.dp)),
+                    .clip(RoundedCornerShape(5.dp)),
                 color = PrimaryEmerald,
-                trackColor = DarkBorder
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            val guidanceText = when (goal.status) {
-                CompensatorStatus.EXCEEDING -> stringResource(
-                    R.string.compensator_desc_exceeding,
-                    goal.neededRemainingPercent.coerceIn(0.0, 100.0),
-                    goal.remainingDays
-                )
-                CompensatorStatus.UNREALISTIC -> stringResource(
-                    R.string.compensator_desc_impossible
-                )
-                CompensatorStatus.REACHABLE -> stringResource(
-                    R.string.compensator_desc_reach,
-                    modeName,
-                    goal.targetGoalPercent.toInt(),
-                    goal.neededRemainingPercent.coerceIn(0.0, 100.0),
-                    goal.remainingDays
-                )
-            }
 
             Text(
-                text = guidanceText,
+                text = message,
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondaryDark,
-                lineHeight = 20.sp
+                color = onSurfaceVariant
             )
         }
     }
 }
 
 @Composable
-private fun BentoMetricsGrid(
-    state: FocusUiState,
-    onMetricClick: (String, String) -> Unit
+private fun BentoMetricSmall(
+    title: String,
+    value: String,
+    unit: String,
+    valueColor: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
-    val stats = state.statistics
-    val isMmol = state.userSettings.unit == GlucoseUnit.MMOL_L
-
-    // Color logic
-    val meanColor = when {
-        stats.meanMmol <= 0.0 -> TextPrimaryDark
-        stats.meanMmol <= 7.0 -> ColorTight
-        stats.meanMmol <= 8.5 -> ColorHigh
-        else -> ColorVeryHigh
-    }
-
-    val cvColor = when {
-        stats.cvPercent <= 0.0 -> TextPrimaryDark
-        stats.cvPercent <= 36.0 -> PrimaryEmerald
-        else -> ColorHigh
-    }
-
-    val gmiColor = when {
-        stats.gmiPercent <= 0.0 -> TextPrimaryDark
-        stats.gmiPercent <= 6.5 -> PrimaryEmerald
-        stats.gmiPercent <= 7.0 -> ColorHigh
-        else -> ColorVeryHigh
-    }
-
-    val isTirMode = state.userSettings.targetMode == TargetMode.TIR
-    val tirScore = if (isTirMode) stats.tirPercent else stats.tingPercent
-    val tirGoal = if (isTirMode) state.userSettings.targetRanges.tirGoalPercent else state.userSettings.targetRanges.tingGoalPercent
-    val tirColor = when {
-        stats.totalCount == 0 -> TextPrimaryDark
-        tirScore >= tirGoal -> PrimaryEmerald
-        tirScore >= 50.0 -> ColorHigh
-        else -> ColorVeryHigh
-    }
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        // Row 1: Mean & %CV
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            // Mean
-            BentoCard(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable {
-                        onMetricClick(
-                            "Средний сахар (Mean)",
-                            "Среднее значение уровня сахара за рассматриваемый период. Клиническая цель: ≤7.0 ммоль/л (≤126 мг/дл)."
-                        )
-                    }
-            ) {
-                Column {
-                    Text(
-                        text = stringResource(R.string.card_mean),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMutedDark
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = if (isMmol) String.format(Locale.US, "%.1f mmol/L", stats.meanMmol) else String.format(Locale.US, "%d mg/dL", (stats.meanMmol * 18.0182).toInt()),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = meanColor,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            // %CV
-            BentoCard(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable {
-                        onMetricClick(
-                            "Вариабельность (%CV)",
-                            "Коэффициент вариабельности глюкозы. Клинический консенсус рекомендует держать %CV ≤ 36.0% для снижения риска гипогликемий."
-                        )
-                    }
-            ) {
-                Column {
-                    Text(
-                        text = stringResource(R.string.card_cv),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMutedDark
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = String.format(Locale.US, "%.1f%%", stats.cvPercent),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = cvColor,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-
-        // Row 2: GMI & TIR
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            // GMI
-            BentoCard(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable {
-                        onMetricClick(
-                            "Расчётный HbA1c (GMI)",
-                            "Glucose Management Indicator — расчётный гликированный гемоглобин по формуле консенсуса (3.31 + 0.431 * Mean). Цель: ≤6.5-7.0%."
-                        )
-                    }
-            ) {
-                Column {
-                    Text(
-                        text = stringResource(R.string.card_gmi),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMutedDark
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = String.format(Locale.US, "%.1f%%", stats.gmiPercent),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = gmiColor,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            // TIR
-            BentoCard(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable {
-                        onMetricClick(
-                            "Время в диапазоне",
-                            "Процент времени нахождения сахара в целевом диапазоне (3.9–10.0 ммоль/л для TIR, 3.9–7.8 ммоль/л для TING). Цель: ≥70%."
-                        )
-                    }
-            ) {
-                Column {
-                    Text(
-                        text = if (isTirMode) stringResource(R.string.mode_tir) else stringResource(R.string.mode_ting),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMutedDark
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = String.format(Locale.US, "%.1f%%", tirScore),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = tirColor,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-
-        // Range Distribution Bar
-        BentoCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
-                    onMetricClick(
-                        "Распределение по диапазонам",
-                        "Красный: Очень низкий (<3.0) и Очень высокий (≥14.0)\nЖёлтый: Низкий (3.0-3.8) и Высокий (10.1-13.9)\nЗелёный: Целевой диапазон (3.9-10.0)"
-                    )
-                }
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = stringResource(R.string.tir_breakdown),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextMutedDark
-                )
-                RangeDistributionBar(
-                    tbrVeryLow = stats.tbrVeryLowPercent,
-                    tbrLow = stats.tbrLowPercent,
-                    tir = stats.tirPercent,
-                    tarHigh = stats.tarHighPercent,
-                    tarVeryHigh = stats.tarVeryHighPercent,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun NightStabilityCard(
-    state: FocusUiState,
-    onCardClick: () -> Unit
-) {
-    val night = state.statistics.nightStability
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
     BentoCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCardClick() }
+        modifier = modifier,
+        onClick = onClick
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Bedtime,
-                    contentDescription = null,
-                    tint = if (night.isStable) PrimaryEmerald else ColorHigh,
-                    modifier = Modifier.size(22.dp)
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodySmall,
+                color = onSurfaceVariant,
+                maxLines = 1
+            )
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = valueColor,
+                    fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    val nStart = state.userSettings.nightStartHour
-                    val nEnd = state.userSettings.nightEndHour
-                    val nightTitle = "Ночной профиль (${String.format(Locale.US, "%02d:00", nStart)}–${String.format(Locale.US, "%02d:00", nEnd)})"
-
+                if (unit.isNotEmpty()) {
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = nightTitle,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = TextPrimaryDark
-                    )
-                    Text(
-                        text = if (night.isStable) stringResource(R.string.night_stable) else stringResource(R.string.night_unstable),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (night.isStable) PrimaryEmerald else ColorHigh
+                        text = unit,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 2.dp)
                     )
                 }
             }
-
-            Icon(
-                imageVector = if (night.isStable) Icons.Default.CheckCircle else Icons.Default.Info,
-                contentDescription = null,
-                tint = if (night.isStable) PrimaryEmerald else ColorHigh,
-                modifier = Modifier.size(20.dp)
-            )
         }
     }
 }

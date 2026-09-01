@@ -217,7 +217,10 @@ class StreamingGlucoseImporter(
                 val gVal = rawVal.toDoubleOrNull()
                 if (ts != null && gVal != null && gVal > 0.0) {
                     val valueMmol = if (isMgDlHeader || gVal > 35.0) gVal / 18.0182 else gVal
-                    reading = HistoricalReadingEntity(timestamp = ts, valueMmol = valueMmol)
+                    if (valueMmol >= 2.1) {
+                        val roundedTs = (ts / 300000L) * 300000L // Standard 5-min bin
+                        reading = HistoricalReadingEntity(timestamp = roundedTs, valueMmol = valueMmol)
+                    }
                 }
             }
 
@@ -232,7 +235,10 @@ class StreamingGlucoseImporter(
                 val gVal = rawVal.toDoubleOrNull()
                 if (ts != null && gVal != null && gVal > 0.0) {
                     val valueMmol = if (isMgDlHeader || gVal > 35.0) gVal / 18.0182 else gVal
-                    reading = HistoricalReadingEntity(timestamp = ts, valueMmol = valueMmol)
+                    if (valueMmol >= 2.1) {
+                        val roundedTs = (ts / 300000L) * 300000L // Standard 5-min bin
+                        reading = HistoricalReadingEntity(timestamp = roundedTs, valueMmol = valueMmol)
+                    }
                 }
             }
 

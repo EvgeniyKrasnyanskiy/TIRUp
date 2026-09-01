@@ -482,20 +482,29 @@ object GlucoseMetricsCalculator {
         if (!griMet) issuesList.add("GRI")
 
         // 14. Night Profile Stability
-        val nightMet = nightStability.isStable
-        val nightValRu = if (nightMet) "Стабильный (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})" else "Обнаружены колебания (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})"
-        val nightValEn = if (nightMet) "Stable (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})" else "Fluctuations detected (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})"
+        val hasNightData = nightStability.nightReadingsCount >= 6
+        val nightMet = hasNightData && nightStability.isStable
+        val nightValRu = when {
+            !hasNightData -> "Недостаточно данных (<30 мин)"
+            nightStability.isStable -> "Стабильный (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})"
+            else -> "Обнаружены колебания (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})"
+        }
+        val nightValEn = when {
+            !hasNightData -> "Insufficient night data (<30m)"
+            nightStability.isStable -> "Stable (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})"
+            else -> "Fluctuations detected (TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)})"
+        }
 
         evalItems.add(
             ClinicalMetricStatus(
                 title = if (isRu) "Ночной профиль сна" else "Night Sleep Profile",
                 valueStr = if (isRu) nightValRu else nightValEn,
                 targetStr = if (isRu) "TIR ≥70% и SD ≤1.5" else "TIR ≥70% & SD ≤1.5",
-                isMet = nightMet,
-                isWarning = !nightMet
+                isMet = nightMet || !hasNightData,
+                isWarning = hasNightData && !nightStability.isStable
             )
         )
-        if (!nightMet) issuesList.add(if (isRu) "Ночной сон" else "Night sleep")
+        if (hasNightData && !nightStability.isStable) issuesList.add(if (isRu) "Ночной сон" else "Night sleep")
 
         val (status, isAllMet, rec) = when {
             issuesList.isEmpty() -> Triple(

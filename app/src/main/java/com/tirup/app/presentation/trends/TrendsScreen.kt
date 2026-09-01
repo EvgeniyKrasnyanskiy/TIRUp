@@ -1,6 +1,7 @@
 package com.tirup.app.presentation.trends
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -42,17 +44,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tirup.app.R
 import com.tirup.app.domain.model.GlucoseUnit
+import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.presentation.components.BentoCard
 import com.tirup.app.presentation.components.RangeDistributionBar
 import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
-import com.tirup.app.presentation.theme.DarkBorder
-import com.tirup.app.presentation.theme.DarkSurfaceElevated
 import com.tirup.app.presentation.theme.PrimaryEmerald
-import com.tirup.app.presentation.theme.TextMutedDark
-import com.tirup.app.presentation.theme.TextPrimaryDark
-import com.tirup.app.presentation.theme.TextSecondaryDark
 import java.util.Locale
 
 @Composable
@@ -63,6 +61,10 @@ fun TrendsScreen(
     val state by viewModel.uiState.collectAsState()
     val selectedPeriod by viewModel.selectedPeriod.collectAsState()
     var detailDialogInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var targetMode by remember { mutableStateOf(TargetMode.TIR) }
+
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
     LazyColumn(
         modifier = Modifier
@@ -76,21 +78,61 @@ fun TrendsScreen(
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onOpenSettings) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "Settings Menu",
-                        tint = TextPrimaryDark
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Settings Menu",
+                            tint = onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = stringResource(R.string.trends_title),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = onSurface
                     )
                 }
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = stringResource(R.string.trends_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = TextPrimaryDark
-                )
+
+                // Mode Selector: TIR vs TING
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (targetMode == TargetMode.TIR) Color(0xFF2563EB) else Color.Transparent,
+                        modifier = Modifier.clickable { targetMode = TargetMode.TIR }
+                    ) {
+                        Text(
+                            text = "TIR 3.9–10.0",
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (targetMode == TargetMode.TIR) Color.White else onSurfaceVariant,
+                            fontWeight = if (targetMode == TargetMode.TIR) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (targetMode == TargetMode.TING) Color(0xFF2563EB) else Color.Transparent,
+                        modifier = Modifier.clickable { targetMode = TargetMode.TING }
+                    ) {
+                        Text(
+                            text = "TING 3.9–7.8",
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (targetMode == TargetMode.TING) Color.White else onSurfaceVariant,
+                            fontWeight = if (targetMode == TargetMode.TING) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
             }
         }
 
@@ -119,7 +161,7 @@ fun TrendsScreen(
                     Text(
                         text = stringResource(R.string.agp_curve_title),
                         style = MaterialTheme.typography.titleMedium,
-                        color = TextPrimaryDark
+                        color = onSurface
                     )
 
                     // Legend
@@ -141,80 +183,154 @@ fun TrendsScreen(
             }
         }
 
-        // TIR Distribution Breakdown
+        // TIR / Range Distribution Breakdown
         item {
+            val stats = state.statistics
+            val tbrTotal = stats.tbrLowPercent + stats.tbrVeryLowPercent
+            val tarTotal = stats.tarHighPercent + stats.tarVeryHighPercent
+
             BentoCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
                         detailDialogInfo = Pair(
                             "Распределение времени в диапазонах",
-                            "Целевой диапазон (TIR 3.9-10.0 ммоль/л): норма ≥70%.\nНизкий (TBR <3.9 ммоль/л): норма <4%.\nОчень низкий (<3.0 ммоль/л): норма <1%.\nВысокий (TAR >10.0 ммоль/л): норма <25%."
+                            "Целевой диапазон (TIR 3.9-10.0 ммоль/л): норма ≥70%.\nУзкий (TING 3.9-7.8 ммоль/л): норма ≥50%.\nНизкий (TBR <3.9 ммоль/л): норма <4%.\nВысокий (TAR >10.0 ммоль/л): норма <25%."
                         )
                     }
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = stringResource(R.string.tir_breakdown),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = TextPrimaryDark
+                            text = "Распределение по диапазонам",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = onSurface
                         )
+
                         Text(
-                            text = String.format(Locale.US, "%.1f%% TIR", state.statistics.tirPercent),
+                            text = if (targetMode == TargetMode.TING) {
+                                String.format(Locale.US, "%.1f%% TING (цель ≥50%%)", stats.tingPercent)
+                            } else {
+                                String.format(Locale.US, "%.1f%% TIR (цель ≥70%%)", stats.tirPercent)
+                            },
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (state.statistics.tirPercent >= state.userSettings.targetRanges.tirGoalPercent) PrimaryEmerald else ColorHigh
+                            color = PrimaryEmerald,
+                            fontWeight = FontWeight.Bold
                         )
                     }
 
                     RangeDistributionBar(
-                        tbrVeryLow = state.statistics.tbrVeryLowPercent,
-                        tbrLow = state.statistics.tbrLowPercent,
-                        tir = state.statistics.tirPercent,
-                        tarHigh = state.statistics.tarHighPercent,
-                        tarVeryHigh = state.statistics.tarVeryHighPercent,
+                        tbrVeryLow = stats.tbrVeryLowPercent,
+                        tbrLow = stats.tbrLowPercent,
+                        tir = stats.tirPercent,
+                        tarHigh = stats.tarHighPercent,
+                        tarVeryHigh = stats.tarVeryHighPercent,
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    // Breakdown percentages
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(text = "TBR: ${String.format(Locale.US, "%.1f%%", state.statistics.tbrLowPercent + state.statistics.tbrVeryLowPercent)}", style = MaterialTheme.typography.bodySmall, color = TextMutedDark)
-                        Text(text = "TING: ${String.format(Locale.US, "%.1f%%", state.statistics.tingPercent)}", style = MaterialTheme.typography.bodySmall, color = ColorTight)
-                        Text(text = "TAR: ${String.format(Locale.US, "%.1f%%", state.statistics.tarHighPercent + state.statistics.tarVeryHighPercent)}", style = MaterialTheme.typography.bodySmall, color = TextMutedDark)
+                        Text(
+                            text = "TBR: ${String.format(Locale.US, "%.1f%%", tbrTotal)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (tbrTotal <= 4.0) onSurfaceVariant else ColorVeryHigh
+                        )
+                        Text(
+                            text = "TING: ${String.format(Locale.US, "%.1f%%", stats.tingPercent)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = PrimaryEmerald,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "TAR: ${String.format(Locale.US, "%.1f%%", tarTotal)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (tarTotal <= 25.0) onSurfaceVariant else ColorHigh
+                        )
                     }
                 }
             }
         }
 
-        // Summary Statistics Grid
+        // Summary 3-Column Metrics (Mean BG, %CV, eA1c)
         item {
-            TrendsStatsGrid(
-                state = state,
-                onStatClick = { title, desc ->
-                    detailDialogInfo = Pair(title, desc)
-                }
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TrendSummaryCard(
+                    title = "Средний сахар",
+                    value = String.format(Locale.US, "%.1f", state.statistics.meanMmol),
+                    unit = if (state.userSettings.unit == GlucoseUnit.MMOL_L) "mmol/L" else "mg/dL",
+                    valueColor = if (state.statistics.meanMmol in 3.9..7.8) PrimaryEmerald else ColorHigh,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        detailDialogInfo = Pair(
+                            "Средний сахар (Mean)",
+                            "Средний уровень сахара за выбранный период: ${String.format(Locale.US, "%.1f", state.statistics.meanMmol)} ммоль/л. Клиническая цель: ≤7.8 ммоль/л."
+                        )
+                    }
+                )
+
+                TrendSummaryCard(
+                    title = "Вариабельность (%CV)",
+                    value = String.format(Locale.US, "%.1f%%", state.statistics.cvPercent),
+                    unit = "",
+                    valueColor = if (state.statistics.cvPercent <= 36.0) PrimaryEmerald else ColorHigh,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        detailDialogInfo = Pair(
+                            "Вариабельность (%CV)",
+                            "Коэффициент вариабельности: ${String.format(Locale.US, "%.1f%%", state.statistics.cvPercent)}. Норма: ≤36.0%. Меньшее значение означает более стабильную гликемию."
+                        )
+                    }
+                )
+
+                TrendSummaryCard(
+                    title = "Расчётный eA1c",
+                    value = String.format(Locale.US, "%.1f%%", state.statistics.gmiPercent),
+                    unit = "",
+                    valueColor = if (state.statistics.gmiPercent <= 7.0) PrimaryEmerald else ColorHigh,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        detailDialogInfo = Pair(
+                            "Расчётный HbA1c (ADAG)",
+                            "Расчётный гликированный гемоглобин: ${String.format(Locale.US, "%.1f%%", state.statistics.gmiPercent)} (${state.statistics.hba1cMmolMol} mmol/mol). Цель: ≤7.0%."
+                        )
+                    }
+                )
+            }
         }
 
-        item { Spacer(modifier = Modifier.height(24.dp)) }
+        item { Spacer(modifier = Modifier.height(20.dp)) }
     }
 
-    // Detail Dialog
-    detailDialogInfo?.let { (title, message) ->
+    // Detail Popups
+    if (detailDialogInfo != null) {
         AlertDialog(
             onDismissRequest = { detailDialogInfo = null },
-            title = { Text(text = title, color = TextPrimaryDark, fontWeight = FontWeight.Bold) },
-            text = { Text(text = message, color = TextSecondaryDark, style = MaterialTheme.typography.bodyMedium) },
+            title = {
+                Text(
+                    text = detailDialogInfo!!.first,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            text = {
+                Text(
+                    text = detailDialogInfo!!.second,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
             confirmButton = {
                 TextButton(onClick = { detailDialogInfo = null }) {
-                    Text(text = stringResource(R.string.action_close), color = PrimaryEmerald, fontWeight = FontWeight.Bold)
+                    Text(text = "Понятно", color = PrimaryEmerald, fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -226,7 +342,7 @@ fun CompactPeriodSelector(
     selectedPeriod: TrendPeriod,
     onPeriodSelected: (TrendPeriod) -> Unit
 ) {
-    var expandedMore by remember { mutableStateOf(false) }
+    var expandedDropdown by remember { mutableStateOf(false) }
 
     val primaryPeriods = listOf(
         TrendPeriod.PERIOD_7D,
@@ -235,84 +351,85 @@ fun CompactPeriodSelector(
         TrendPeriod.PERIOD_90D
     )
 
-    val isOverflowSelected = selectedPeriod == TrendPeriod.PERIOD_YEAR || selectedPeriod == TrendPeriod.PERIOD_ALL
+    val isDropdownSelected = selectedPeriod !in primaryPeriods
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         primaryPeriods.forEach { period ->
-            val isSelected = period == selectedPeriod
-            val label = when (period) {
-                TrendPeriod.PERIOD_7D -> stringResource(R.string.period_7d)
-                TrendPeriod.PERIOD_14D -> stringResource(R.string.period_14d)
-                TrendPeriod.PERIOD_30D -> stringResource(R.string.period_30d)
-                TrendPeriod.PERIOD_90D -> stringResource(R.string.period_90d)
-                else -> ""
-            }
-
+            val isSelected = selectedPeriod == period
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = if (isSelected) PrimaryEmerald else DarkSurfaceElevated,
-                border = BorderStroke(1.dp, if (isSelected) PrimaryEmerald else DarkBorder),
+                color = if (isSelected) PrimaryEmerald else MaterialTheme.colorScheme.surfaceVariant,
+                border = BorderStroke(
+                    1.dp,
+                    if (isSelected) PrimaryEmerald else MaterialTheme.colorScheme.outline
+                ),
                 modifier = Modifier
                     .weight(1f)
                     .clickable { onPeriodSelected(period) }
             ) {
                 Box(
-                    modifier = Modifier.padding(vertical = 10.dp),
+                    modifier = Modifier.padding(vertical = 9.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (isSelected) Color.Black else TextSecondaryDark,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        text = stringResource(period.stringResId),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 11.5.sp
                     )
                 }
             }
         }
 
-        // Overflow "..." Dropdown button
-        Box {
+        // Dropdown Menu Button
+        Box(modifier = Modifier.weight(0.7f)) {
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = if (isOverflowSelected) PrimaryEmerald else DarkSurfaceElevated,
-                border = BorderStroke(1.dp, if (isOverflowSelected) PrimaryEmerald else DarkBorder),
+                color = if (isDropdownSelected) PrimaryEmerald else MaterialTheme.colorScheme.surfaceVariant,
+                border = BorderStroke(
+                    1.dp,
+                    if (isDropdownSelected) PrimaryEmerald else MaterialTheme.colorScheme.outline
+                ),
                 modifier = Modifier
-                    .width(44.dp)
-                    .clickable { expandedMore = true }
+                    .fillMaxWidth()
+                    .clickable { expandedDropdown = true }
             ) {
                 Box(
-                    modifier = Modifier.padding(vertical = 10.dp),
+                    modifier = Modifier.padding(vertical = 9.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreHoriz,
-                        contentDescription = "More periods",
-                        tint = if (isOverflowSelected) Color.Black else TextSecondaryDark,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = if (isDropdownSelected) stringResource(selectedPeriod.stringResId) else "•••",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isDropdownSelected) Color.Black else MaterialTheme.colorScheme.onSurface,
+                            fontWeight = if (isDropdownSelected) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 11.5.sp
+                        )
+                    }
                 }
             }
 
             DropdownMenu(
-                expanded = expandedMore,
-                onDismissRequest = { expandedMore = false }
+                expanded = expandedDropdown,
+                onDismissRequest = { expandedDropdown = false }
             ) {
                 DropdownMenuItem(
-                    text = { Text(stringResource(R.string.period_year)) },
+                    text = { Text(text = stringResource(R.string.period_year)) },
                     onClick = {
                         onPeriodSelected(TrendPeriod.PERIOD_YEAR)
-                        expandedMore = false
+                        expandedDropdown = false
                     }
                 )
                 DropdownMenuItem(
-                    text = { Text(stringResource(R.string.period_all)) },
+                    text = { Text(text = stringResource(R.string.period_all)) },
                     onClick = {
                         onPeriodSelected(TrendPeriod.PERIOD_ALL)
-                        expandedMore = false
+                        expandedDropdown = false
                     }
                 )
             }
@@ -321,94 +438,47 @@ fun CompactPeriodSelector(
 }
 
 @Composable
-private fun TrendsStatsGrid(
-    state: TrendsUiState,
-    onStatClick: (String, String) -> Unit
+private fun TrendSummaryCard(
+    title: String,
+    value: String,
+    unit: String,
+    valueColor: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
-    val stats = state.statistics
-    val isMmol = state.userSettings.unit == GlucoseUnit.MMOL_L
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
-    val meanColor = when {
-        stats.meanMmol <= 0.0 -> TextPrimaryDark
-        stats.meanMmol <= 7.0 -> ColorTight
-        stats.meanMmol <= 8.5 -> ColorHigh
-        else -> ColorVeryHigh
-    }
-
-    val cvColor = when {
-        stats.cvPercent <= 0.0 -> TextPrimaryDark
-        stats.cvPercent <= 36.0 -> PrimaryEmerald
-        else -> ColorHigh
-    }
-
-    val gmiColor = when {
-        stats.gmiPercent <= 0.0 -> TextPrimaryDark
-        stats.gmiPercent <= 6.5 -> PrimaryEmerald
-        stats.gmiPercent <= 7.0 -> ColorHigh
-        else -> ColorVeryHigh
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    BentoCard(
+        modifier = modifier,
+        onClick = onClick
     ) {
-        // Mean
-        BentoCard(
-            modifier = Modifier
-                .weight(1f)
-                .clickable {
-                    onStatClick("Средний сахар", "Среднее значение за выбранный период. Цель: ≤7.0 ммоль/л.")
-                }
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Column {
-                Text(text = stringResource(R.string.card_mean), style = MaterialTheme.typography.bodySmall, color = TextMutedDark)
-                Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodySmall,
+                color = onSurfaceVariant,
+                maxLines = 1
+            )
+            Row(verticalAlignment = Alignment.Bottom) {
                 Text(
-                    text = if (isMmol) String.format(Locale.US, "%.1f mmol/L", stats.meanMmol) else String.format(Locale.US, "%d mg/dL", (stats.meanMmol * 18.0182).toInt()),
+                    text = value,
                     style = MaterialTheme.typography.titleMedium,
-                    color = meanColor,
+                    color = valueColor,
                     fontWeight = FontWeight.Bold
                 )
-            }
-        }
-
-        // CV
-        BentoCard(
-            modifier = Modifier
-                .weight(1f)
-                .clickable {
-                    onStatClick("Вариабельность (%CV)", "Коэффициент вариабельности гликемии. Цель: ≤36.0%.")
+                if (unit.isNotEmpty()) {
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        text = unit,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 2.dp),
+                        fontSize = 9.sp
+                    )
                 }
-        ) {
-            Column {
-                Text(text = stringResource(R.string.card_cv), style = MaterialTheme.typography.bodySmall, color = TextMutedDark)
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = String.format(Locale.US, "%.1f%%", stats.cvPercent),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = cvColor,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
-        // GMI
-        BentoCard(
-            modifier = Modifier
-                .weight(1f)
-                .clickable {
-                    onStatClick("Расчётный HbA1c (GMI)", "Оценка гликированного гемоглобина. Цель: ≤6.5-7.0%.")
-                }
-        ) {
-            Column {
-                Text(text = stringResource(R.string.card_gmi), style = MaterialTheme.typography.bodySmall, color = TextMutedDark)
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = String.format(Locale.US, "%.1f%%", stats.gmiPercent),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = gmiColor,
-                    fontWeight = FontWeight.Bold
-                )
             }
         }
     }
@@ -417,12 +487,18 @@ private fun TrendsStatsGrid(
 @Composable
 private fun LegendItem(color: Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Surface(
-            shape = RoundedCornerShape(2.dp),
-            color = color,
-            modifier = Modifier.size(10.dp)
-        ) {}
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(text = label, style = MaterialTheme.typography.labelSmall, color = TextMutedDark)
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(color)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 10.5.sp
+        )
     }
 }

@@ -384,21 +384,46 @@ private fun HistoricalReportCard(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (state.isGeneratingHistorical) {
+                    if (state.isGeneratingHistorical || state.isImporting) {
                         CircularProgressIndicator(
                             color = Color(0xFF818CF8),
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
+                            modifier = Modifier.size(22.dp),
+                            strokeWidth = 2.5.dp
                         )
                     } else if (hist.hasData) {
-                        IconButton(onClick = { viewModel.clearHistoricalReport() }) {
+                        IconButton(
+                            onClick = { viewModel.clearHistoricalReport() },
+                            modifier = Modifier.size(36.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.DeleteOutline,
                                 contentDescription = "Clear",
-                                tint = ColorHigh
+                                tint = ColorHigh,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
+                }
+            }
+
+            if (state.isImporting) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    androidx.compose.material3.LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp)),
+                        color = PrimaryEmerald
+                    )
+                    Text(
+                        text = "Импорт и обработка данных...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = PrimaryEmerald,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
 
@@ -558,6 +583,12 @@ private fun ReportMetricsColumn(
             .padding(vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
+        ReportMetricRow(
+            label = "$atEmoji Активное время сенсора",
+            target = "Цель: ≥70.0%",
+            value = String.format(Locale.US, "%.1f%%", stats.activeTimePercent),
+            valueColor = atColor
+        )
         ReportMetricRow(
             label = "Mean BG (средний сахар)",
             target = "Цель: ≤7.8",
