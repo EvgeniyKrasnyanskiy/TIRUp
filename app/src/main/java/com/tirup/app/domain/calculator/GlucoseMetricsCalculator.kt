@@ -149,14 +149,10 @@ object GlucoseMetricsCalculator {
 
         val nightStability = calculateNightStability(nightReadings, targetRanges)
 
-        // 3. GVI calculation — on raw CUTOFF-filtered readings (matching Python/xDrip reference).
-        //    Python: gvi_exact = compute_gvi_xdrip_style(raw_mgdl_clean)
-        //    NOT on resampled 5-min data — resampling smooths the curve and lowers GVI artificially.
-        val rawFilteredMgdl = readings
-            .filter { it.valueMmol >= CUTOFF_MMOL }
-            .sortedBy { it.timestamp }
-            .map { it.valueMmol * MGDL_FACTOR }
-        val gvi = computeGviXdripStyle(rawFilteredMgdl)
+        // 3. GVI calculation — exact xDrip algorithm on 5-minute standard intervals in mg/dL.
+        //    xDrip step constant = 25 (dt = 5 min), timeComponent = usedRecords * 5
+        val clean5MinMgdl = clean5MinReadings.map { it.valueMmol * MGDL_FACTOR }
+        val gvi = computeGviXdripStyle(clean5MinMgdl)
 
         // 4. PGS calculation: GVI * floor(mean_mgdl) * (1 - floor(TIR)/100)
         val meanMgdlFloored = floor(mean * MGDL_FACTOR)

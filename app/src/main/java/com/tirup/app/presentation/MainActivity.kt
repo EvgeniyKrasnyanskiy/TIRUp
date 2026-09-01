@@ -91,12 +91,17 @@ class MainActivity : ComponentActivity() {
 
             ProvideLocalizedApp(languageCode = languageCode) {
                 TIRUpTheme(darkTheme = isDark) {
-                    AppNavigationRoot(
-                        focusViewModel = focusViewModel,
-                        trendsViewModel = trendsViewModel,
-                        reportsViewModel = reportsViewModel,
-                        settingsViewModel = settingsViewModel
-                    )
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        AppNavigationRoot(
+                            focusViewModel = focusViewModel,
+                            trendsViewModel = trendsViewModel,
+                            reportsViewModel = reportsViewModel,
+                            settingsViewModel = settingsViewModel
+                        )
+                    }
                 }
             }
         }
@@ -192,7 +197,7 @@ fun MainPagerScaffold(
     )
 
     Scaffold(
-        containerColor = Color.Transparent,
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             Surface(
                 modifier = Modifier

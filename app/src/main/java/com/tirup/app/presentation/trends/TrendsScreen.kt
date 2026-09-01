@@ -97,7 +97,7 @@ fun TrendsScreen(
                     )
                 }
 
-                // Mode Selector: TIR vs TING
+                // Mode Selector: TIR vs TING (Compact Pills)
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
@@ -111,11 +111,13 @@ fun TrendsScreen(
                         modifier = Modifier.clickable { targetMode = TargetMode.TIR }
                     ) {
                         Text(
-                            text = "TIR 3.9–10.0",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                            text = "TIR",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = if (targetMode == TargetMode.TIR) Color.White else onSurfaceVariant,
-                            fontWeight = if (targetMode == TargetMode.TIR) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (targetMode == TargetMode.TIR) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
 
@@ -125,11 +127,13 @@ fun TrendsScreen(
                         modifier = Modifier.clickable { targetMode = TargetMode.TING }
                     ) {
                         Text(
-                            text = "TING 3.9–7.8",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                            text = "TING",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = if (targetMode == TargetMode.TING) Color.White else onSurfaceVariant,
-                            fontWeight = if (targetMode == TargetMode.TING) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (targetMode == TargetMode.TING) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }

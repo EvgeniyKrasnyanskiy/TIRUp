@@ -510,7 +510,9 @@ private fun TargetModeChip(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             style = MaterialTheme.typography.labelSmall,
             color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            softWrap = false
         )
     }
 }
@@ -524,7 +526,9 @@ private fun TargetCompensatorCard(
     remainingDays: Int,
     onClick: () -> Unit
 ) {
-    val progress = if (targetGoal > 0) (currentScore / targetGoal.toDouble()).toFloat().coerceIn(0f, 1f) else 0f
+    val progress = (currentScore / 100.0).toFloat().coerceIn(0f, 1f)
+    val isGoalMet = currentScore >= targetGoal
+    val progressColor = if (isGoalMet) PrimaryEmerald else ColorHigh
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
@@ -542,7 +546,7 @@ private fun TargetCompensatorCard(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.TrendingUp,
                         contentDescription = null,
-                        tint = PrimaryEmerald,
+                        tint = progressColor,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
@@ -554,21 +558,21 @@ private fun TargetCompensatorCard(
                 }
 
                 Text(
-                    text = "Цель: ≥$targetGoal%",
+                    text = "${String.format(Locale.US, "%.0f%%", currentScore)} / Цель: ≥$targetGoal%",
                     style = MaterialTheme.typography.titleSmall,
-                    color = PrimaryEmerald,
+                    color = progressColor,
                     fontWeight = FontWeight.Bold
                 )
             }
 
-            // Proportional Progress Bar
+            // Proportional Progress Bar (0..100% of the bar)
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(10.dp)
                     .clip(RoundedCornerShape(5.dp)),
-                color = PrimaryEmerald,
+                color = progressColor,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
 

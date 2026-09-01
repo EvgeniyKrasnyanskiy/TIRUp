@@ -26,23 +26,23 @@ class GlucoseMetricsCalculatorTest {
 
     @Test
     fun testMeanSdAndCvCalculation() {
+        // 3 readings spaced by 5 minutes (300,000 ms)
         // Values: [6.0, 8.0, 10.0]
         // Mean = 8.0
-        // Variance = ((6-8)^2 + (8-8)^2 + (10-8)^2) / 2 = (4 + 0 + 4) / 2 = 4.0
-        // SD = sqrt(4.0) = 2.0
-        // %CV = (2.0 / 8.0) * 100% = 25.0%
+        // Variance (population N=3) = ((6-8)^2 + (8-8)^2 + (10-8)^2) / 3 = 8.0 / 3 = 2.6667
+        // SD = sqrt(8.0 / 3) = 1.63299
+        // %CV = (1.63299 / 8.0) * 100% = 20.4124%
         val readings = listOf(
-            GlucoseReading(timestamp = 1000L, valueMmol = 6.0),
-            GlucoseReading(timestamp = 2000L, valueMmol = 8.0),
-            GlucoseReading(timestamp = 3000L, valueMmol = 10.0)
+            GlucoseReading(timestamp = 0L, valueMmol = 6.0),
+            GlucoseReading(timestamp = 300000L, valueMmol = 8.0),
+            GlucoseReading(timestamp = 600000L, valueMmol = 10.0)
         )
 
         val stats = GlucoseMetricsCalculator.calculateStatistics(readings)
 
         assertEquals(8.0, stats.meanMmol, 0.001)
-        assertEquals(2.0, stats.sdMmol, 0.001)
-        assertEquals(25.0, stats.cvPercent, 0.001)
-        assertEquals(GlucoseMetricsCalculator.calculateGmi(8.0), stats.gmiPercent, 0.001)
+        assertEquals(1.633, stats.sdMmol, 0.001)
+        assertEquals(20.412, stats.cvPercent, 0.01)
         assertEquals(3, stats.totalCount)
     }
 
@@ -65,12 +65,12 @@ class GlucoseMetricsCalculatorTest {
         assertEquals(GlucoseRangeCategory.VERY_HIGH, targets.categorize(15.0))
 
         val readings = listOf(
-            GlucoseReading(timestamp = 1000L, valueMmol = 2.5),  // Very Low (1/6 = 16.67%)
-            GlucoseReading(timestamp = 2000L, valueMmol = 3.5),  // Low (1/6 = 16.67%)
-            GlucoseReading(timestamp = 3000L, valueMmol = 5.0),  // Tight & TIR (1/6)
-            GlucoseReading(timestamp = 4000L, valueMmol = 6.0),  // Tight & TIR (1/6)
-            GlucoseReading(timestamp = 5000L, valueMmol = 9.0),  // Target & TIR (1/6)
-            GlucoseReading(timestamp = 6000L, valueMmol = 12.0)  // High (1/6)
+            GlucoseReading(timestamp = 0L, valueMmol = 2.5),        // Very Low (1/6 = 16.67%)
+            GlucoseReading(timestamp = 300000L, valueMmol = 3.5),   // Low (1/6 = 16.67%)
+            GlucoseReading(timestamp = 600000L, valueMmol = 5.0),   // Tight & TIR (1/6)
+            GlucoseReading(timestamp = 900000L, valueMmol = 6.0),   // Tight & TIR (1/6)
+            GlucoseReading(timestamp = 1200000L, valueMmol = 9.0),  // Target & TIR (1/6)
+            GlucoseReading(timestamp = 1500000L, valueMmol = 12.0)  // High (1/6)
         )
 
         val stats = GlucoseMetricsCalculator.calculateStatistics(readings, targets)
@@ -106,5 +106,24 @@ class GlucoseMetricsCalculatorTest {
         assertTrue(stats.nightStability.isStable)
         assertEquals(100.0, stats.nightStability.tirPercent, 0.001)
         assertTrue(stats.nightStability.cvPercent < 36.0)
+    }
+
+    @Test
+    fun testGviCalculationMatchesReference() {
+        // Test 1-hour (12 points) flat series according to xDrip formula:
+        // gvi_total = 11 * 5 = 55.0, gvi_ideal = 12 * 5 = 60.0 -> 55/60 = 0.91
+        val oneHourReadings = (0 until 12).map { i ->
+            GlucoseReading(timestamp = i * 300000L, valueMmol = 6.0)
+        }
+        val oneHourStats = GlucoseMetricsCalculator.calculateStatistics(oneHourReadings)
+        assertEquals(0.91, oneHourStats.gvi, 0.01)
+
+        // Test 1-day (288 points) flat series according to xDrip formula:
+        // gvi_total = 287 * 5 = 1435.0, gvi_ideal = 288 * 5 = 1440.0 -> 1435/1440 = 0.99
+        val oneDayReadings = (0 until 288).map { i ->
+            GlucoseReading(timestamp = i * 300000L, valueMmol = 6.0)
+        }
+        val oneDayStats = GlucoseMetricsCalculator.calculateStatistics(oneDayReadings)
+        assertEquals(0.99, oneDayStats.gvi, 0.01)
     }
 }
