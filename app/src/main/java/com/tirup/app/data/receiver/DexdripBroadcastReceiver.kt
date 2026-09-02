@@ -65,6 +65,11 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         )
                     )
                     Log.i(TAG, "Successfully persisted reading into database.")
+                    com.tirup.app.data.backup.AutoBackupManager.maybeTriggerAutoBackup(
+                        context = context.applicationContext,
+                        database = app.database,
+                        settingsRepository = app.settingsRepository
+                    )
                 } else {
                     Log.e(TAG, "TirupApplication or repository instance is null.")
                 }

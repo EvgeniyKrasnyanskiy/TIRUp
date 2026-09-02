@@ -130,6 +130,8 @@ data class UserSettings(
     val nightEndHour: Int = 6,
     val themeMode: ThemeMode = ThemeMode.DARK,
     val patientProfile: PatientProfile = PatientProfile(),
+    val isAutoBackupEnabled: Boolean = true,
+    val lastBackupTimestamp: Long = 0L,
     val hasSeenOnboarding: Boolean = false
 )
 

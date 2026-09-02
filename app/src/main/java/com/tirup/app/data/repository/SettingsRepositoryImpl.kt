@@ -47,6 +47,8 @@ class SettingsRepositoryImpl(
             .putString(KEY_DIABETES_TYPE, settings.patientProfile.diabetesType)
             .putInt(KEY_DIAGNOSIS_YEAR, settings.patientProfile.diagnosisYear)
             .putString(KEY_THERAPY_TYPE, settings.patientProfile.therapyType)
+            .putBoolean(KEY_IS_AUTO_BACKUP_ENABLED, settings.isAutoBackupEnabled)
+            .putLong(KEY_LAST_BACKUP_TIMESTAMP, settings.lastBackupTimestamp)
             .putBoolean(KEY_HAS_SEEN_ONBOARDING, settings.hasSeenOnboarding)
             .apply()
 
@@ -84,6 +86,8 @@ class SettingsRepositoryImpl(
         val periodDays = prefs.getInt(KEY_PERIOD_DAYS, 14)
         val nightStart = prefs.getInt(KEY_NIGHT_START, 0)
         val nightEnd = prefs.getInt(KEY_NIGHT_END, 6)
+        val isAutoBackupEnabled = prefs.getBoolean(KEY_IS_AUTO_BACKUP_ENABLED, true)
+        val lastBackupTimestamp = prefs.getLong(KEY_LAST_BACKUP_TIMESTAMP, 0L)
         val hasSeenOnboarding = prefs.getBoolean(KEY_HAS_SEEN_ONBOARDING, false)
 
         val profile = PatientProfile(
@@ -114,6 +118,8 @@ class SettingsRepositoryImpl(
             nightEndHour = nightEnd,
             themeMode = themeMode,
             patientProfile = profile,
+            isAutoBackupEnabled = isAutoBackupEnabled,
+            lastBackupTimestamp = lastBackupTimestamp,
             hasSeenOnboarding = hasSeenOnboarding
         )
     }
@@ -140,6 +146,8 @@ class SettingsRepositoryImpl(
         private const val KEY_DIABETES_TYPE = "key_diabetes_type"
         private const val KEY_DIAGNOSIS_YEAR = "key_diagnosis_year"
         private const val KEY_THERAPY_TYPE = "key_therapy_type"
+        private const val KEY_IS_AUTO_BACKUP_ENABLED = "key_is_auto_backup_enabled"
+        private const val KEY_LAST_BACKUP_TIMESTAMP = "key_last_backup_timestamp"
         private const val KEY_HAS_SEEN_ONBOARDING = "key_has_seen_onboarding"
     }
 }

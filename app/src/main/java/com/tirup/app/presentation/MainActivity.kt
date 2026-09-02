@@ -62,6 +62,24 @@ import com.tirup.app.presentation.theme.PrimaryEmerald
 import com.tirup.app.presentation.theme.TIRUpTheme
 import com.tirup.app.presentation.trends.TrendsScreen
 import com.tirup.app.presentation.trends.TrendsViewModel
+import com.tirup.app.data.backup.AutoBackupManager
+import com.tirup.app.data.backup.BackupSummary
+import android.widget.Toast
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -79,7 +97,7 @@ class MainActivity : ComponentActivity() {
         val focusViewModel = FocusViewModel(glucoseRepo, settingsRepo)
         val trendsViewModel = TrendsViewModel(glucoseRepo, settingsRepo)
         val reportsViewModel = ReportsViewModel(this, glucoseRepo, settingsRepo, importer, database)
-        val settingsViewModel = SettingsViewModel(settingsRepo, glucoseRepo)
+        val settingsViewModel = SettingsViewModel(this, settingsRepo, glucoseRepo, database)
 
         setContent {
             val settingsState by settingsViewModel.uiState.collectAsState()
@@ -152,8 +170,112 @@ fun AppNavigationRoot(
 ) {
     val navController = rememberNavController()
     val settingsState by settingsViewModel.uiState.collectAsState()
+    var backupSummary by remember { mutableStateOf<BackupSummary?>(null) }
+    var hasCheckedBackup by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val app = context.applicationContext as TirupApplication
 
-    if (!settingsState.userSettings.hasSeenOnboarding) {
+    LaunchedEffect(Unit) {
+        if (!settingsState.userSettings.hasSeenOnboarding && !hasCheckedBackup) {
+            withContext(Dispatchers.IO) {
+                backupSummary = AutoBackupManager.getBackupSummary(context)
+            }
+            hasCheckedBackup = true
+        }
+    }
+
+    if (backupSummary != null) {
+        val summary = backupSummary!!
+        val isRu = settingsState.userSettings.language.equals("RU", ignoreCase = true)
+        val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+        val dateStr = if (summary.exportedAt > 0L) dateFormat.format(Date(summary.exportedAt)) else ""
+
+        AlertDialog(
+            onDismissRequest = { backupSummary = null },
+            title = {
+                Text(
+                    text = if (isRu) "Найдена резервная копия" else "Backup Found",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = if (isRu) "В папке TIRUp/Backups обнаружена сохранённая история мониторинга:"
+                               else "Found saved monitoring history in TIRUp/Backups:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (summary.patientName.isNotBlank()) {
+                        Text(
+                            text = "• ${if (isRu) "Пациент" else "Patient"}: ${summary.patientName}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Text(
+                        text = "• ${if (isRu) "Измерений сахара" else "Glucose readings"}: ${summary.readingsCount}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (dateStr.isNotBlank()) {
+                        Text(
+                            text = "• ${if (isRu) "Последнее сохранение" else "Last backup"}: $dateStr",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (isRu) "Восстановить данные и настройки профиля?" else "Restore data and profile settings?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            val res = AutoBackupManager.restoreBackup(context, app.database, app.settingsRepository)
+                            if (res.isSuccess) {
+                                Toast.makeText(
+                                    context,
+                                    if (isRu) "Данные успешно восстановлены (${res.getOrNull()} записей)" else "Data restored successfully (${res.getOrNull()} readings)",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                            backupSummary = null
+                            settingsViewModel.setHasSeenOnboarding(true)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald)
+                ) {
+                    Text(
+                        text = if (isRu) "Восстановить" else "Restore",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        backupSummary = null
+                    }
+                ) {
+                    Text(
+                        text = if (isRu) "Начать с нуля" else "Start fresh",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        )
+    } else if (!settingsState.userSettings.hasSeenOnboarding) {
         val isRu = settingsState.userSettings.language.equals("RU", ignoreCase = true)
         HelpAndDisclaimerDialog(
             isRu = isRu,

@@ -44,6 +44,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -64,6 +66,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tirup.app.R
+import com.tirup.app.data.backup.AutoBackupManager
 import com.tirup.app.domain.model.BmiCategory
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.PatientProfile
@@ -80,7 +83,9 @@ import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
 import com.tirup.app.presentation.theme.ColorVeryLow
 import com.tirup.app.presentation.theme.PrimaryEmerald
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -401,7 +406,73 @@ fun SettingsScreen(
             }
         }
 
-        // Section 4: Data Management (Clear Data)
+        // Section 4: Auto-Backup
+        item {
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isRu) "Ежедневный автобэкап" else "Daily Auto-Backup",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isRu) "Сохранение базы и профиля в TIRUp/Backups" else "Saves database and profile to TIRUp/Backups",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = settings.isAutoBackupEnabled,
+                            onCheckedChange = { viewModel.toggleAutoBackup(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = PrimaryEmerald
+                            )
+                        )
+                    }
+
+                    if (settings.isAutoBackupEnabled && settings.lastBackupTimestamp > 0L) {
+                        val fmt = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+                        val lastDateStr = fmt.format(Date(settings.lastBackupTimestamp))
+                        Text(
+                            text = if (isRu) "Последний бэкап: $lastDateStr" else "Last backup: $lastDateStr",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = PrimaryEmerald
+                        )
+                    }
+
+                    val hasStoragePerm = AutoBackupManager.hasStoragePermission()
+                    if (!hasStoragePerm && settings.isAutoBackupEnabled) {
+                        val ctx = LocalContext.current
+                        Text(
+                            text = if (isRu) "⚠️ Требуется доступ к файлам для сохранения в общую папку /sdcard/TIRUp/Backups/. Нажмите, чтобы разрешить."
+                                   else "⚠️ All files access required to save to /sdcard/TIRUp/Backups/. Tap to grant.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ColorHigh,
+                            modifier = Modifier.clickable {
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                                    try {
+                                        val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                            data = Uri.fromParts("package", ctx.packageName, null)
+                                        }
+                                        ctx.startActivity(intent)
+                                    } catch (_: Exception) {}
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Section 5: Data Management (Clear Data)
         item {
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

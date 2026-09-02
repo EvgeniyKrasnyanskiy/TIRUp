@@ -11,6 +11,7 @@ import com.tirup.app.data.repository.GlucoseRepositoryImpl
 import com.tirup.app.data.repository.SettingsRepositoryImpl
 import com.tirup.app.domain.repository.GlucoseRepository
 import com.tirup.app.domain.repository.SettingsRepository
+import kotlinx.coroutines.launch
 
 class TirupApplication : Application() {
 
@@ -38,6 +39,10 @@ class TirupApplication : Application() {
         streamingImporter = StreamingGlucoseImporter(this, database)
 
         registerDynamicReceivers()
+
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO).launch {
+            com.tirup.app.data.backup.AutoBackupManager.maybeTriggerAutoBackup(this@TirupApplication, database, settingsRepository)
+        }
     }
 
     private fun registerDynamicReceivers() {

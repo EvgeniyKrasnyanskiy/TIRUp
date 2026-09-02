@@ -2,6 +2,8 @@ package com.tirup.app.presentation.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tirup.app.data.backup.AutoBackupManager
+import com.tirup.app.data.local.AppDatabase
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.domain.model.TargetRanges
@@ -21,8 +23,10 @@ data class SettingsUiState(
 )
 
 class SettingsViewModel(
+    private val context: android.content.Context,
     private val settingsRepository: SettingsRepository,
-    private val glucoseRepository: GlucoseRepository
+    private val glucoseRepository: GlucoseRepository,
+    private val database: AppDatabase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -110,6 +114,18 @@ class SettingsViewModel(
             val updated = _uiState.value.userSettings.copy(patientProfile = profile)
             settingsRepository.updateSettings(updated)
             _uiState.update { it.copy(userSettings = updated) }
+            AutoBackupManager.maybeTriggerAutoBackup(context, database, settingsRepository, force = true)
+        }
+    }
+
+    fun toggleAutoBackup(enabled: Boolean) {
+        viewModelScope.launch {
+            val updated = _uiState.value.userSettings.copy(isAutoBackupEnabled = enabled)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+            if (enabled) {
+                AutoBackupManager.maybeTriggerAutoBackup(context, database, settingsRepository, force = true)
+            }
         }
     }
 
