@@ -124,7 +124,10 @@ class SettingsViewModel(
             settingsRepository.updateSettings(updated)
             _uiState.update { it.copy(userSettings = updated) }
             if (enabled) {
+                AutoBackupManager.scheduleNextDailyBackup(context)
                 AutoBackupManager.maybeTriggerAutoBackup(context, database, settingsRepository, force = true)
+            } else {
+                AutoBackupManager.cancelDailyBackup(context)
             }
         }
     }

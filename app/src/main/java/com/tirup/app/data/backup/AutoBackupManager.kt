@@ -34,36 +34,22 @@ data class BackupSummary(
 object AutoBackupManager {
 
     private const val TAG = "AutoBackupManager"
-    private const val BACKUP_DIR_NAME = "TIRUp/Backups"
+    private const val BACKUP_DIR_NAME = "Backups"
     private const val BACKUP_FILE_NAME = "tirup_backup.json"
     private const val BACKUP_BAK_NAME = "tirup_backup.json.bak"
     private const val BACKUP_TMP_NAME = "tirup_backup.json.tmp"
-
-    fun hasStoragePermission(): Boolean {
-        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            Environment.isExternalStorageManager()
-        } else {
-            true
-        }
-    }
+    private const val ALARM_REQUEST_CODE = 9021
 
     fun getBackupDirectory(context: android.content.Context? = null): File {
-        val root = Environment.getExternalStorageDirectory()
-        val primaryDir = File(root, BACKUP_DIR_NAME)
-
-        if (hasStoragePermission()) {
-            if (!primaryDir.exists()) primaryDir.mkdirs()
-            return primaryDir
-        }
-
-        // Fallback to app-specific external storage if system permission is not yet granted
         if (context != null) {
-            val fallbackDir = File(context.getExternalFilesDir(null), BACKUP_DIR_NAME)
-            if (!fallbackDir.exists()) fallbackDir.mkdirs()
-            return fallbackDir
+            val dir = File(context.getExternalFilesDir(null), BACKUP_DIR_NAME)
+            if (!dir.exists()) dir.mkdirs()
+            return dir
         }
-
-        return primaryDir
+        val root = Environment.getExternalStorageDirectory()
+        val dir = File(root, "Android/data/com.tirup.app/files/$BACKUP_DIR_NAME")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
     }
 
     fun getBackupFile(context: android.content.Context? = null): File {
@@ -76,6 +62,75 @@ object AutoBackupManager {
 
     private fun getTmpFile(context: android.content.Context? = null): File {
         return File(getBackupDirectory(context), BACKUP_TMP_NAME)
+    }
+
+    /**
+     * Schedules exact 23:59:59 daily auto-backup alarm using AlarmManager.
+     */
+    fun scheduleNextDailyBackup(context: android.content.Context) {
+        val alarmManager = context.getSystemService(android.content.Context.ALARM_SERVICE) as? android.app.AlarmManager ?: return
+        val intent = android.content.Intent(context, com.tirup.app.data.receiver.BackupAlarmReceiver::class.java)
+        val pendingIntent = android.app.PendingIntent.getBroadcast(
+            context,
+            ALARM_REQUEST_CODE,
+            intent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val calendar = java.util.Calendar.getInstance().apply {
+            timeInMillis = System.currentTimeMillis()
+            set(java.util.Calendar.HOUR_OF_DAY, 23)
+            set(java.util.Calendar.MINUTE, 59)
+            set(java.util.Calendar.SECOND, 59)
+            set(java.util.Calendar.MILLISECOND, 0)
+            if (timeInMillis <= System.currentTimeMillis()) {
+                add(java.util.Calendar.DAY_OF_YEAR, 1)
+            }
+        }
+
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    android.app.AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setExact(
+                    android.app.AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            }
+            Log.i(TAG, "Daily auto-backup scheduled strictly at 23:59:59 for: ${calendar.time}")
+        } catch (e: Exception) {
+            try {
+                alarmManager.setAndAllowWhileIdle(
+                    android.app.AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+                Log.i(TAG, "Daily auto-backup scheduled via setAndAllowWhileIdle for: ${calendar.time}")
+            } catch (e2: Exception) {
+                Log.e(TAG, "Failed to schedule backup alarm: ${e2.message}")
+            }
+        }
+    }
+
+    fun cancelDailyBackup(context: android.content.Context) {
+        val alarmManager = context.getSystemService(android.content.Context.ALARM_SERVICE) as? android.app.AlarmManager ?: return
+        val intent = android.content.Intent(context, com.tirup.app.data.receiver.BackupAlarmReceiver::class.java)
+        val pendingIntent = android.app.PendingIntent.getBroadcast(
+            context,
+            ALARM_REQUEST_CODE,
+            intent,
+            android.app.PendingIntent.FLAG_NO_CREATE or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        if (pendingIntent != null) {
+            alarmManager.cancel(pendingIntent)
+            pendingIntent.cancel()
+            Log.i(TAG, "Daily auto-backup alarm cancelled.")
+        }
     }
 
     /**
@@ -302,9 +357,19 @@ object AutoBackupManager {
 
     private val backupMutex = Mutex()
 
+    private fun isDifferentDay(t1: Long, t2: Long): Boolean {
+        if (t1 <= 0L || t2 <= 0L) return true
+        val c1 = java.util.Calendar.getInstance().apply { timeInMillis = t1 }
+        val c2 = java.util.Calendar.getInstance().apply { timeInMillis = t2 }
+        return c1.get(java.util.Calendar.YEAR) != c2.get(java.util.Calendar.YEAR) ||
+               c1.get(java.util.Calendar.DAY_OF_YEAR) != c2.get(java.util.Calendar.DAY_OF_YEAR)
+    }
+
     /**
-     * Checks if auto-backup is enabled and if 24 hours have elapsed since the last backup.
-     * If so, executes atomic backup.
+     * Checks if auto-backup is enabled and if backup should be executed:
+     * - If forced (e.g. 23:59:59 alarm or profile update)
+     * - Or if a previous day's backup was missed (e.g. phone was off at 23:59:59)
+     * - Or if it's the very first backup
      */
     suspend fun maybeTriggerAutoBackup(
         context: android.content.Context? = null,
@@ -322,10 +387,9 @@ object AutoBackupManager {
             if (count == 0L) return@withContext
 
             val now = System.currentTimeMillis()
-            val oneDayMs = 24 * 60 * 60 * 1000L
-            val elapsed = now - settings.lastBackupTimestamp
+            val isMissedDay = isDifferentDay(now, settings.lastBackupTimestamp) && settings.lastBackupTimestamp > 0L
 
-            if (force || elapsed >= oneDayMs || settings.lastBackupTimestamp == 0L) {
+            if (force || isMissedDay || settings.lastBackupTimestamp == 0L) {
                 val res = performBackup(context, database, settings)
                 if (res.isSuccess) {
                     settingsRepository.updateSettings(settings.copy(lastBackupTimestamp = now))

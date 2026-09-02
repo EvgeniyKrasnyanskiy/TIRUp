@@ -3,9 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!-- STRICTLY OFFLINE APPLICATION: NO INTERNET PERMISSION DECLARED -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" tools:ignore="ScopedStorage" />
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <queries>
         <package android:name="com.eveningoutpost.dexdrip" />
@@ -59,6 +57,15 @@
                 <action android:name="com.juggluco.action.NEW_GLUCOSE" />
                 <action android:name="com.dexcom.g6.ACTION_NEW_BG" />
                 <action android:name="com.dexcom.cgm.ACTION_NEW_BG" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Receiver for daily exact 23:59:59 auto-backup alarm -->
+        <receiver
+            android:name=".data.receiver.BackupAlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
 

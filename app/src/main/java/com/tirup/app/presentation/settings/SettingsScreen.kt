@@ -423,7 +423,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = if (isRu) "Сохранение базы и профиля в TIRUp/Backups" else "Saves database and profile to TIRUp/Backups",
+                                text = if (isRu) "Ежедневно в 23:59:59 в Android/data/.../Backups" else "Daily at 23:59:59 in Android/data/.../Backups",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -438,35 +438,22 @@ fun SettingsScreen(
                         )
                     }
 
-                    if (settings.isAutoBackupEnabled && settings.lastBackupTimestamp > 0L) {
-                        val fmt = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
-                        val lastDateStr = fmt.format(Date(settings.lastBackupTimestamp))
-                        Text(
-                            text = if (isRu) "Последний бэкап: $lastDateStr" else "Last backup: $lastDateStr",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = PrimaryEmerald
-                        )
-                    }
-
-                    val hasStoragePerm = AutoBackupManager.hasStoragePermission()
-                    if (!hasStoragePerm && settings.isAutoBackupEnabled) {
-                        val ctx = LocalContext.current
-                        Text(
-                            text = if (isRu) "⚠️ Требуется доступ к файлам для сохранения в общую папку /sdcard/TIRUp/Backups/. Нажмите, чтобы разрешить."
-                                   else "⚠️ All files access required to save to /sdcard/TIRUp/Backups/. Tap to grant.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ColorHigh,
-                            modifier = Modifier.clickable {
-                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                                    try {
-                                        val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                            data = Uri.fromParts("package", ctx.packageName, null)
-                                        }
-                                        ctx.startActivity(intent)
-                                    } catch (_: Exception) {}
-                                }
-                            }
-                        )
+                    if (settings.isAutoBackupEnabled) {
+                        if (settings.lastBackupTimestamp > 0L) {
+                            val fmt = SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.getDefault())
+                            val lastDateStr = fmt.format(Date(settings.lastBackupTimestamp))
+                            Text(
+                                text = if (isRu) "Последний бэкап: $lastDateStr" else "Last backup: $lastDateStr",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = PrimaryEmerald
+                            )
+                        } else {
+                            Text(
+                                text = if (isRu) "Запланирован на сегодня в 23:59:59" else "Scheduled for today at 23:59:59",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ActionBlue
+                            )
+                        }
                     }
                 }
             }
