@@ -52,6 +52,7 @@ import java.util.Locale
 fun BentoCard(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 24.dp,
+    padding: Dp = 18.dp,
     backgroundColor: Color = MaterialTheme.colorScheme.surface,
     borderColor: Color = MaterialTheme.colorScheme.outline,
     borderWidth: Dp = 1.dp,
@@ -77,7 +78,7 @@ fun BentoCard(
         color = backgroundColor,
         border = BorderStroke(borderWidth, borderColor)
     ) {
-        Box(modifier = Modifier.padding(18.dp)) {
+        Box(modifier = Modifier.padding(padding)) {
             content()
         }
     }

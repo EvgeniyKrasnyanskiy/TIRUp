@@ -348,7 +348,7 @@ fun SettingsScreen(
                             Text(text = if (isRu) "Тема" else "Theme", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             LanguageChip(
                                 label = if (isRu) "🌙 Тёмная" else "🌙 Dark",
                                 isSelected = settings.themeMode == com.tirup.app.domain.model.ThemeMode.DARK,
@@ -356,13 +356,8 @@ fun SettingsScreen(
                             )
                             LanguageChip(
                                 label = if (isRu) "☀️ Светлая" else "☀️ Light",
-                                isSelected = settings.themeMode == com.tirup.app.domain.model.ThemeMode.LIGHT,
+                                isSelected = settings.themeMode != com.tirup.app.domain.model.ThemeMode.DARK,
                                 onClick = { viewModel.setThemeMode(com.tirup.app.domain.model.ThemeMode.LIGHT) }
-                            )
-                            LanguageChip(
-                                label = if (isRu) "⚙️ Авто" else "⚙️ Auto",
-                                isSelected = settings.themeMode == com.tirup.app.domain.model.ThemeMode.SYSTEM,
-                                onClick = { viewModel.setThemeMode(com.tirup.app.domain.model.ThemeMode.SYSTEM) }
                             )
                         }
                     }
@@ -370,82 +365,72 @@ fun SettingsScreen(
             }
         }
 
-        // Section 3: Target Thresholds & Sleep Window
+        // Section 3: Clinical Targets & Sleep Window
         item {
-            var tirLow by remember(settings.targetRanges.tirLowMmol) { mutableStateOf(String.format(Locale.US, "%.1f", settings.targetRanges.tirLowMmol)) }
-            var tirHigh by remember(settings.targetRanges.tirHighMmol) { mutableStateOf(String.format(Locale.US, "%.1f", settings.targetRanges.tirHighMmol)) }
-            var tingHigh by remember(settings.targetRanges.tingHighMmol) { mutableStateOf(String.format(Locale.US, "%.1f", settings.targetRanges.tingHighMmol)) }
-            var tirGoal by remember(settings.targetRanges.tirGoalPercent) { mutableStateOf(settings.targetRanges.tirGoalPercent.toString()) }
-
-            fun triggerThresholdUpdate() {
-                val low = tirLow.toDoubleOrNull() ?: 3.9
-                val high = tirHigh.toDoubleOrNull() ?: 10.0
-                val tHigh = tingHigh.toDoubleOrNull() ?: 7.8
-                val goal = tirGoal.toIntOrNull() ?: 70
-                viewModel.autoUpdateThresholds(
-                    tirLow = low,
-                    tirHigh = high,
-                    tingHigh = tHigh,
-                    tirGoal = goal,
-                    tingGoal = 50,
-                    nightStart = settings.nightStartHour,
-                    nightEnd = settings.nightEndHour
-                )
-            }
-
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = stringResource(R.string.section_targets),
+                        text = if (isRu) "Клинические стандарты (ATTD / ADA)" else "Clinical Standards (ATTD / ADA)",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedTextField(
-                            value = tirLow,
-                            onValueChange = {
-                                tirLow = it
-                                triggerThresholdUpdate()
-                            },
-                            label = { Text(stringResource(R.string.target_tir_low)) },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = tirHigh,
-                            onValueChange = {
-                                tirHigh = it
-                                triggerThresholdUpdate()
-                            },
-                            label = { Text(stringResource(R.string.target_tir_high)) },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
+                    // Informational standard badge
+                    val isMmol = settings.unit == GlucoseUnit.MMOL_L
+                    val tirRangeStr = if (isMmol) "3.9 — 10.0 ммоль/л" else "70 — 180 mg/dL"
+                    val tingRangeStr = if (isMmol) "3.9 — 7.8 ммоль/л" else "70 — 140 mg/dL"
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "TIR (цель ≥70%):",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = tirRangeStr,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = PrimaryEmerald,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "TING (цель ≥50%):",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = tingRangeStr,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = ColorTight,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
                     }
 
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedTextField(
-                            value = tingHigh,
-                            onValueChange = {
-                                tingHigh = it
-                                triggerThresholdUpdate()
-                            },
-                            label = { Text(if (isRu) "Верх TING (узкий)" else "Upper TING (tight)") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = tirGoal,
-                            onValueChange = {
-                                tirGoal = it
-                                triggerThresholdUpdate()
-                            },
-                            label = { Text(stringResource(R.string.target_tir_percent)) },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                    }
+                    Text(
+                        text = if (isRu) "Ночной профиль (окно сна)" else "Night Profile (Sleep Window)",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
 
                     // Night Profile Hours (Sleep window)
                     Row(
@@ -457,12 +442,7 @@ fun SettingsScreen(
                             selectedHour = settings.nightStartHour,
                             modifier = Modifier.weight(1f),
                             onHourSelected = { newStart ->
-                                viewModel.autoUpdateThresholds(
-                                    tirLow = settings.targetRanges.tirLowMmol,
-                                    tirHigh = settings.targetRanges.tirHighMmol,
-                                    tingHigh = settings.targetRanges.tingHighMmol,
-                                    tirGoal = settings.targetRanges.tirGoalPercent,
-                                    tingGoal = settings.targetRanges.tingGoalPercent,
+                                viewModel.autoUpdateNightHours(
                                     nightStart = newStart,
                                     nightEnd = settings.nightEndHour
                                 )
@@ -474,12 +454,7 @@ fun SettingsScreen(
                             selectedHour = settings.nightEndHour,
                             modifier = Modifier.weight(1f),
                             onHourSelected = { newEnd ->
-                                viewModel.autoUpdateThresholds(
-                                    tirLow = settings.targetRanges.tirLowMmol,
-                                    tirHigh = settings.targetRanges.tirHighMmol,
-                                    tingHigh = settings.targetRanges.tingHighMmol,
-                                    tirGoal = settings.targetRanges.tirGoalPercent,
-                                    tingGoal = settings.targetRanges.tingGoalPercent,
+                                viewModel.autoUpdateNightHours(
                                     nightStart = settings.nightStartHour,
                                     nightEnd = newEnd
                                 )

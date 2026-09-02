@@ -67,6 +67,17 @@ class SettingsViewModel(
         }
     }
 
+    fun autoUpdateNightHours(nightStart: Int, nightEnd: Int) {
+        viewModelScope.launch {
+            val updated = _uiState.value.userSettings.copy(
+                nightStartHour = nightStart,
+                nightEndHour = nightEnd
+            )
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+        }
+    }
+
     fun autoUpdateThresholds(
         tirLow: Double,
         tirHigh: Double,

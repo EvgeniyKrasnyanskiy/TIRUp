@@ -1,21 +1,21 @@
 <resources>
     <string name="app_name">TIRUp</string>
-    <string name="nav_focus">Profile</string>
+    <string name="nav_focus">Current</string>
     <string name="nav_trends">Trends</string>
     <string name="nav_reports">Report</string>
     <string name="nav_settings">Settings</string>
 
     <!-- Focus Screen -->
-    <string name="focus_title">Daily Profile</string>
-    <string name="current_glucose">Current Glucose</string>
+    <string name="focus_title">Current Data</string>
+    <string name="current_glucose">Glucose</string>
     <string name="unit_mmol">mmol/L</string>
     <string name="unit_mgdl">mg/dL</string>
-    <string name="streak_days">%d Day Streak</string>
+    <string name="streak_days">%d d.</string>
     <string name="mode_tir">TIR (Standard)</string>
     <string name="mode_ting">TING (Tight)</string>
     <string name="target_label">Target: ≥%d%%</string>
     <string name="current_label">Current: %.1f%%</string>
-    <string name="compensator_title">Target Compensator</string>
+    <string name="compensator_title">Compensation</string>
     <string name="compensator_desc_reach">To reach your %1$s target of %2$d%%, maintain ≥%3$.0f%% in the remaining %4$d days.</string>
     <string name="compensator_desc_exceeding">Great pacing! You are ahead of target. Maintain ≥%1$.0f%% in the remaining %2$d days.</string>
     <string name="compensator_desc_impossible">Target is mathematically unreachable in this window, but every in-range day lowers your cumulative A1c.</string>

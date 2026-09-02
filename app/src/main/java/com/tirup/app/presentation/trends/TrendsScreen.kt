@@ -42,15 +42,19 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.AutoAwesome
 import com.tirup.app.R
+import com.tirup.app.domain.calculator.PatternRecognitionEngine
+import com.tirup.app.domain.calculator.PatternSeverity
 import com.tirup.app.domain.model.GlucoseUnit
-import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.presentation.components.BentoCard
 import com.tirup.app.presentation.components.RangeDistributionBar
 import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.ColorHigh
+import com.tirup.app.presentation.theme.ColorTargetSoft
 import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
+import com.tirup.app.presentation.theme.ColorVeryLow
 import com.tirup.app.presentation.theme.PrimaryEmerald
 import java.util.Locale
 
@@ -62,7 +66,6 @@ fun TrendsScreen(
     val state by viewModel.uiState.collectAsState()
     val selectedPeriod by viewModel.selectedPeriod.collectAsState()
     var detailDialogInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
-    var targetMode by remember { mutableStateOf(TargetMode.TIR) }
 
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
@@ -79,65 +82,21 @@ fun TrendsScreen(
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(
-                            imageVector = Icons.Default.Menu,
-                            contentDescription = "Settings Menu",
-                            tint = onSurface
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = stringResource(R.string.trends_title),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = onSurface
+                IconButton(onClick = onOpenSettings) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Settings Menu",
+                        tint = onSurface
                     )
                 }
-
-                // Mode Selector: TIR vs TING (Compact Pills)
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (targetMode == TargetMode.TIR) Color(0xFF2563EB) else Color.Transparent,
-                        modifier = Modifier.clickable { targetMode = TargetMode.TIR }
-                    ) {
-                        Text(
-                            text = "TIR",
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (targetMode == TargetMode.TIR) Color.White else onSurfaceVariant,
-                            fontWeight = if (targetMode == TargetMode.TIR) FontWeight.Bold else FontWeight.Medium,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (targetMode == TargetMode.TING) Color(0xFF2563EB) else Color.Transparent,
-                        modifier = Modifier.clickable { targetMode = TargetMode.TING }
-                    ) {
-                        Text(
-                            text = "TING",
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (targetMode == TargetMode.TING) Color.White else onSurfaceVariant,
-                            fontWeight = if (targetMode == TargetMode.TING) FontWeight.Bold else FontWeight.Medium,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                }
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = stringResource(R.string.trends_title),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = onSurface
+                )
             }
         }
 
@@ -192,6 +151,96 @@ fun TrendsScreen(
             }
         }
 
+        // Detected Clinical Patterns
+        item {
+            val detectedPatterns = remember(state.percentileBins, state.statistics) {
+                PatternRecognitionEngine.analyze(
+                    bins = state.percentileBins,
+                    stats = state.statistics,
+                    isMmol = isMmol
+                )
+            }
+
+            BentoCard(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 24.dp
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = PrimaryEmerald,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isRu) "Обнаруженные паттерны" else "Detected Glycemic Patterns",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = onSurface
+                            )
+                        }
+
+                        Text(
+                            text = "${detectedPatterns.size} ${if (isRu) "событ." else "events"}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = onSurfaceVariant
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        detectedPatterns.forEach { pattern ->
+                            val badgeColor = when (pattern.severity) {
+                                PatternSeverity.ALERT -> ColorVeryLow
+                                PatternSeverity.WARNING -> ColorHigh
+                                PatternSeverity.POSITIVE -> PrimaryEmerald
+                                PatternSeverity.INFO -> ActionBlue
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Text(
+                                        text = pattern.icon,
+                                        fontSize = 18.sp,
+                                        modifier = Modifier.padding(end = 10.dp, top = 2.dp)
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = if (isRu) pattern.titleRu else pattern.titleEn,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = badgeColor
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = if (isRu) pattern.descriptionRu else pattern.descriptionEn,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = onSurfaceVariant,
+                                            lineHeight = 16.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // TIR / Range Distribution Breakdown
         item {
             val stats = state.statistics
@@ -221,13 +270,8 @@ fun TrendsScreen(
                         )
 
                         Text(
-                            text = if (targetMode == TargetMode.TING) {
-                                if (isRu) String.format(Locale.US, "%.1f%% TING (цель ≥50%%)", stats.tingPercent)
-                                else String.format(Locale.US, "%.1f%% TING (goal ≥50%%)", stats.tingPercent)
-                            } else {
-                                if (isRu) String.format(Locale.US, "%.1f%% TIR (цель ≥70%%)", stats.tirPercent)
-                                else String.format(Locale.US, "%.1f%% TIR (goal ≥70%%)", stats.tirPercent)
-                            },
+                            text = if (isRu) "${String.format(Locale.US, "%.1f%%", stats.tirPercent)} TIR (цель ≥70%) • ${String.format(Locale.US, "%.1f%%", stats.tingPercent)} TING (≥50%)"
+                                   else "${String.format(Locale.US, "%.1f%%", stats.tirPercent)} TIR (goal ≥70%) • ${String.format(Locale.US, "%.1f%%", stats.tingPercent)} TING (≥50%)",
                             style = MaterialTheme.typography.titleSmall,
                             color = PrimaryEmerald,
                             fontWeight = FontWeight.Bold

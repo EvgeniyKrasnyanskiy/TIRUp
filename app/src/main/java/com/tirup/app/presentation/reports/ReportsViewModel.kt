@@ -86,6 +86,7 @@ class ReportsViewModel(
     val events: SharedFlow<ReportEvent> = _events.asSharedFlow()
 
     private val pdfGenerator = AgpPdfGenerator(context)
+    private val guidebookPdfGenerator = GuidebookPdfGenerator(context)
 
     init {
         observeLiveReport()
@@ -319,6 +320,30 @@ class ReportsViewModel(
                 _uiState.value = _uiState.value.copy(isGeneratingHistorical = false)
                 _events.emit(ReportEvent.Error(error.localizedMessage ?: "PDF Error"))
             }
+        }
+    }
+
+    fun generateAndShareGuidebookPdf() {
+        viewModelScope.launch {
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            guidebookPdfGenerator.generateGuidebookPdf(isRu)
+                .onSuccess { pdfFile ->
+                    dispatchShareIntent(pdfFile)
+                }.onFailure { error ->
+                    _events.emit(ReportEvent.Error(error.localizedMessage ?: "PDF Error"))
+                }
+        }
+    }
+
+    fun saveGuidebookPdfToDownloads() {
+        viewModelScope.launch {
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            guidebookPdfGenerator.generateGuidebookPdf(isRu)
+                .onSuccess { pdfFile ->
+                    saveToPublicDownloads(pdfFile, "TIRUp_Guidebook_${System.currentTimeMillis()}.pdf")
+                }.onFailure { error ->
+                    _events.emit(ReportEvent.Error(error.localizedMessage ?: "PDF Error"))
+                }
         }
     }
 

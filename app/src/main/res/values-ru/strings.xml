@@ -1,21 +1,21 @@
 <resources>
     <string name="app_name">TIRUp</string>
-    <string name="nav_focus">Профиль</string>
+    <string name="nav_focus">Текущие</string>
     <string name="nav_trends">Тренды</string>
     <string name="nav_reports">Отчёт</string>
     <string name="nav_settings">Настройки</string>
 
     <!-- Focus Screen -->
-    <string name="focus_title">Суточный профиль</string>
-    <string name="current_glucose">Текущий сахар</string>
+    <string name="focus_title">Текущие данные</string>
+    <string name="current_glucose">Глюкоза</string>
     <string name="unit_mmol">ммоль/л</string>
     <string name="unit_mgdl">мг/дл</string>
-    <string name="streak_days">%d дн. серия</string>
+    <string name="streak_days">%d д.</string>
     <string name="mode_tir">TIR (Стандартный)</string>
     <string name="mode_ting">TING (Узкий)</string>
     <string name="target_label">Цель: ≥%d%%</string>
     <string name="current_label">Текущий: %.1f%%</string>
-    <string name="compensator_title">Компенсатор цели</string>
+    <string name="compensator_title">Компенсация</string>
     <string name="compensator_desc_reach">Чтобы достичь цели %1$s в %2$d%%, удерживайте ≥%3$.0f%% в оставшиеся %4$d дн.</string>
     <string name="compensator_desc_exceeding">Отличный темп! Вы опережаете цель. Поддерживайте ≥%1$.0f%% в оставшиеся %2$d дн. для закрепления результата.</string>
     <string name="compensator_desc_impossible">В текущем периоде цель математически не закроется на 100%, но каждый день в диапазоне улучшает итоговый гликированный гемоглобин.</string>
