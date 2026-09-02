@@ -356,78 +356,85 @@ fun AgpSheetPreviewModal(
                     }
                 }
 
-                // Modal Bottom Action Buttons (Save PDF & Share)
+                // Modal Bottom Action Buttons (Save PDF, Share & Back)
                 Surface(
                     color = Color.White,
                     shadowElevation = 8.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(
-                            onClick = onSavePdf,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(44.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = ActionBlue,
-                                contentColor = Color.White
-                            ),
-                            enabled = !isGenerating
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            if (isGenerating) {
-                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            } else {
-                                Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Button(
+                                onClick = onSavePdf,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = ActionBlue,
+                                    contentColor = Color.White
+                                ),
+                                enabled = !isGenerating
+                            ) {
+                                if (isGenerating) {
+                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(text = if (isRu) "Сохранить" else "Save PDF", fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = onSharePdf,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, ActionBlue),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = ActionBlue
+                                ),
+                                enabled = !isGenerating
+                            ) {
+                                Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(text = if (isRu) "Сохранить" else "Save PDF", fontWeight = FontWeight.Bold)
+                                Text(text = if (isRu) "Поделиться" else "Share", fontWeight = FontWeight.Bold)
                             }
                         }
 
                         OutlinedButton(
-                            onClick = onSharePdf,
+                            onClick = onDismiss,
                             modifier = Modifier
-                                .weight(1f)
+                                .fillMaxWidth()
                                 .height(44.dp),
                             shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, ActionBlue),
+                            border = BorderStroke(1.dp, Color(0xFFD1D5DB)),
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = ActionBlue
-                            ),
-                            enabled = !isGenerating
+                                contentColor = Color(0xFF374151)
+                            )
                         ) {
-                            Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = Color(0xFF374151)
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = if (isRu) "Поделиться" else "Share", fontWeight = FontWeight.Bold)
+                            Text(
+                                text = if (isRu) "Назад" else "Back",
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF374151)
+                            )
                         }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isRu) "Назад" else "Back",
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
                     }
                 }
             }

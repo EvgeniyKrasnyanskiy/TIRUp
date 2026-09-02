@@ -278,8 +278,8 @@ fun TrendsScreen(
 
                         val tirColor = if (stats.tirPercent >= 70.0) PrimaryEmerald else ColorHigh
                         Text(
-                            text = if (isRu) "${String.format(Locale.US, "%.1f%%", stats.tirPercent)} TIR (цель ≥70%) • ${String.format(Locale.US, "%.1f%%", stats.tingPercent)} TING"
-                                   else "${String.format(Locale.US, "%.1f%%", stats.tirPercent)} TIR (goal ≥70%) • ${String.format(Locale.US, "%.1f%%", stats.tingPercent)} TING",
+                            text = if (isRu) "${String.format(Locale.US, "%.1f%%", stats.tirPercent)} TIR (цель ≥70%)"
+                                   else "${String.format(Locale.US, "%.1f%%", stats.tirPercent)} TIR (goal ≥70%)",
                             style = MaterialTheme.typography.titleSmall,
                             color = tirColor,
                             fontWeight = FontWeight.Bold
