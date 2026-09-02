@@ -742,7 +742,7 @@ private fun ReportMetricsColumn(
             valueColor = cvColor
         )
         ReportMetricRow(
-            label = if (isRu) "GRI (индекс риска)" else "GRI (glycemia risk)",
+            label = if (isRu) "GRI (риск гипо)" else "GRI (hypo risk)",
             target = if (isRu) "Цель: ≤40.0" else "Target: ≤40.0",
             value = String.format(Locale.US, "%.1f (%s)", stats.gri, stats.griLabel),
             valueColor = griColor

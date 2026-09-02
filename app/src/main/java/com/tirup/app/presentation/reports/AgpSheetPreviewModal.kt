@@ -256,7 +256,7 @@ fun AgpSheetPreviewModal(
                                     ReportStatLine(if (isRu) "Средний сахар (Mean):" else "Average Glucose (Mean):", meanStr)
                                     ReportStatLine(if (isRu) "Вариабельность (%CV):" else "Glucose Variability (%CV):", String.format(Locale.US, "%.1f%% (%s ≤36.0%%) • SD: %s", statistics.cvPercent, if (isRu) "Цель" else "Target", sdStr))
                                     ReportStatLine(if (isRu) "Расчётный eA1c (GMI):" else "Estimated A1c (eA1c):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol))
-                                    ReportStatLine(if (isRu) "Индекс риска GRI:" else "Glycemia Risk Index (GRI):", String.format(Locale.US, "%.1f (%s, %s ≤40.0)", statistics.gri, statistics.griLabel, if (isRu) "цель" else "target"))
+                                    ReportStatLine(if (isRu) "GRI (риск гипо):" else "GRI (Hypo Risk):", String.format(Locale.US, "%.1f (%s, %s ≤40.0)", statistics.gri, statistics.griLabel, if (isRu) "цель" else "target"))
                                     ReportStatLine(if (isRu) "Индексы GVI / PGS:" else "Variability Indexes (GVI/PGS):", String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs))
                                     val nStart = userSettings.nightStartHour
                                     val nEnd = userSettings.nightEndHour

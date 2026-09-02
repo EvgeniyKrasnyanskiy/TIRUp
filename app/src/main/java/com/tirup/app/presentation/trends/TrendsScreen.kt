@@ -319,7 +319,47 @@ fun TrendsScreen(
             }
         }
 
-        // 2. Compact 3x4 Metrics Grid (12 Core Clinical Parameters for Selected Period)
+        // 2. AGP 24h Modal Day Chart
+        item {
+            BentoCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        detailDialogInfo = Pair(
+                            if (isRu) "Амбулаторный профиль глюкозы (AGP)" else "Ambulatory Glucose Profile (AGP)",
+                            if (isRu) "Международный стандарт визуализации CGM: суточные профили за все дни накладываются на 24 часа. Сплошная линия — медиана 50%, тёмная полоса — 25-75% размах, светлое облако — 10-90% перцентили."
+                            else "International CGM visualization standard: daily profiles from all days overlaid across 24 hours. Solid line is 50% median, darker band is 25-75% IQR, light cloud is 10-90% percentiles."
+                        )
+                    },
+                cornerRadius = 24.dp
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = stringResource(R.string.agp_curve_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = onSurface
+                    )
+
+                    // Legend
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        LegendItem(color = PrimaryEmerald, label = stringResource(R.string.agp_median))
+                        LegendItem(color = PrimaryEmerald.copy(alpha = 0.5f), label = stringResource(R.string.agp_interquartile))
+                        LegendItem(color = PrimaryEmerald.copy(alpha = 0.2f), label = stringResource(R.string.agp_outer))
+                    }
+
+                    AgpChart(
+                        bins = state.percentileBins,
+                        targetRanges = state.userSettings.targetRanges,
+                        unit = state.userSettings.unit
+                    )
+                }
+            }
+        }
+
+        // 3. Compact 3x4 Metrics Grid (12 Core Clinical Parameters for Selected Period)
         item {
             val stats = state.statistics
             val unit = state.userSettings.unit
@@ -601,46 +641,6 @@ fun TrendsScreen(
                                 else "Min: $minStr\nMax: $maxStr"
                             )
                         }
-                    )
-                }
-            }
-        }
-
-        // 3. AGP 24h Modal Day Chart
-        item {
-            BentoCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        detailDialogInfo = Pair(
-                            if (isRu) "Амбулаторный профиль глюкозы (AGP)" else "Ambulatory Glucose Profile (AGP)",
-                            if (isRu) "Международный стандарт визуализации CGM: суточные профили за все дни накладываются на 24 часа. Сплошная линия — медиана 50%, тёмная полоса — 25-75% размах, светлое облако — 10-90% перцентили."
-                            else "International CGM visualization standard: daily profiles from all days overlaid across 24 hours. Solid line is 50% median, darker band is 25-75% IQR, light cloud is 10-90% percentiles."
-                        )
-                    },
-                cornerRadius = 24.dp
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = stringResource(R.string.agp_curve_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = onSurface
-                    )
-
-                    // Legend
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        LegendItem(color = PrimaryEmerald, label = stringResource(R.string.agp_median))
-                        LegendItem(color = PrimaryEmerald.copy(alpha = 0.5f), label = stringResource(R.string.agp_interquartile))
-                        LegendItem(color = PrimaryEmerald.copy(alpha = 0.2f), label = stringResource(R.string.agp_outer))
-                    }
-
-                    AgpChart(
-                        bins = state.percentileBins,
-                        targetRanges = state.userSettings.targetRanges,
-                        unit = state.userSettings.unit
                     )
                 }
             }

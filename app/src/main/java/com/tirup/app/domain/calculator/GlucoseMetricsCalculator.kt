@@ -576,7 +576,7 @@ object GlucoseMetricsCalculator {
         }
         evalItems.add(
             ClinicalMetricStatus(
-                title = if (isRu) "GRI (индекс риска)" else "GRI (glycemia risk)",
+                title = if (isRu) "GRI (риск гипо)" else "GRI (hypo risk)",
                 valueStr = griValueStr,
                 targetStr = if (isRu) "цель ≤40.0" else "target ≤40.0",
                 isMet = griMet,

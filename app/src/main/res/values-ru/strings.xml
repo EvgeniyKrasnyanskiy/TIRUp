@@ -31,7 +31,7 @@
     <string name="just_now">Только что</string>
 
     <!-- Trends & AGP -->
-    <string name="trends_title">Аналитика трендов</string>
+    <string name="trends_title">Аналитика</string>
     <string name="period_7d">7Д</string>
     <string name="period_14d">14Д (AGP)</string>
     <string name="period_30d">30Д</string>

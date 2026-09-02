@@ -173,7 +173,7 @@ fun AgpChart(
             hourLabels.forEachIndexed { idx, lbl ->
                 val xPos = (idx.toFloat() / 8f) * width
                 val textX = (xPos - 14f).coerceIn(2f, width - 28f)
-                val textY = if (idx % 2 == 0) height - 16f else height - 2f
+                val textY = height - 4f
                 drawContext.canvas.nativeCanvas.drawText(lbl, textX, textY, labelPaint)
             }
 

@@ -16,9 +16,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Brightness4
@@ -91,6 +93,7 @@ fun SettingsScreen(
     val currentYear = Calendar.getInstance().get(Calendar.YEAR)
     var showHelpDialog by remember { mutableStateOf(false) }
     var showAdvancedSettings by rememberSaveable { mutableStateOf(false) }
+    var showProfileDialog by rememberSaveable { mutableStateOf(false) }
 
     val isRu = settings.language.equals("RU", ignoreCase = true)
 
@@ -123,15 +126,11 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.headlineMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(12.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = if (isRu) "Настройки сохраняются автоматически" else "Settings are saved automatically",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        Text(
+                            text = if (isRu) "Настройки сохраняются автоматически" else "Settings are saved automatically",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
 
@@ -144,6 +143,15 @@ fun SettingsScreen(
                     )
                 }
             }
+        }
+
+        // Top Card: Patient Profile Summary (Opens Edit Dialog on Tap)
+        item {
+            PatientProfileSummaryCard(
+                profile = profile,
+                isRu = isRu,
+                onClick = { showProfileDialog = true }
+            )
         }
 
         // Section 1: Display Settings (Always Visible at the Top)
@@ -267,8 +275,8 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (isRu) "Профиль, время сна, стандарты, очистка"
-                                       else "Profile, sleep window, standards, clear",
+                                text = if (isRu) "Время сна, стандарты ATTD/ADA, очистка данных"
+                                       else "Sleep window, ATTD/ADA standards, clear data",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -285,139 +293,6 @@ fun SettingsScreen(
         }
 
         if (showAdvancedSettings) {
-            // Section 2.1: Patient Profile with Dropdowns and Dynamic Calculations
-            item {
-            BentoCard(modifier = Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Person, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (isRu) "Профиль пациента (для мед. отчётов)" else "Patient Profile (for medical reports)",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    // 1. Full Name (Text input)
-                    OutlinedTextField(
-                        value = profile.fullName,
-                        onValueChange = { newName ->
-                            viewModel.autoUpdatePatientProfile(profile.copy(fullName = newName))
-                        },
-                        label = { Text(if (isRu) "ФИО пациента" else "Full Name") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-
-                    // 2. Birth Year (with live calculated age)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        DropdownYearSelector(
-                            label = if (isRu) "Год рождения" else "Birth Year",
-                            selectedYear = profile.birthYear,
-                            yearRange = (currentYear - 100)..currentYear,
-                            modifier = Modifier.weight(1f),
-                            onYearSelected = { newYear ->
-                                viewModel.autoUpdatePatientProfile(profile.copy(birthYear = newYear))
-                            }
-                        )
-
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(56.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Text(if (isRu) "Возраст" else "Age", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("${profile.calculatedAge} ${if (isRu) "лет" else "y.o."}", style = MaterialTheme.typography.bodyMedium, color = PrimaryEmerald, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-
-                    // 3. Height & Weight
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = profile.heightCm,
-                            onValueChange = { newHeight ->
-                                viewModel.autoUpdatePatientProfile(profile.copy(heightCm = newHeight))
-                            },
-                            label = { Text(if (isRu) "Рост (см)" else "Height (cm)") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = profile.weightKg,
-                            onValueChange = { newWeight ->
-                                viewModel.autoUpdatePatientProfile(profile.copy(weightKg = newWeight))
-                            },
-                            label = { Text(if (isRu) "Вес (кг)" else "Weight (kg)") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                    }
-
-                    // 4. Diabetes Type & Diagnosis Year (with live duration)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        DropdownChoiceSelector(
-                            label = if (isRu) "Тип диабета" else "Diabetes Type",
-                            selectedOption = localizeDiabetesType(profile.diabetesType, isRu),
-                            options = if (isRu) listOf("СД1", "СД2", "LADA", "MODY", "ГСД") else listOf("T1D", "T2D", "LADA", "MODY", "GDM"),
-                            modifier = Modifier.weight(1f),
-                            onOptionSelected = { newType ->
-                                viewModel.autoUpdatePatientProfile(profile.copy(diabetesType = newType))
-                            }
-                        )
-
-                        DropdownYearSelector(
-                            label = if (isRu) "Диагноз с года" else "Diagnosed Year",
-                            selectedYear = profile.diagnosisYear,
-                            yearRange = (currentYear - 60)..currentYear,
-                            modifier = Modifier.weight(1f),
-                            onYearSelected = { newDiagYear ->
-                                viewModel.autoUpdatePatientProfile(profile.copy(diagnosisYear = newDiagYear))
-                            }
-                        )
-                    }
-
-                    // 5. Therapy Type Dropdown
-                    DropdownChoiceSelector(
-                        label = if (isRu) "Вид терапии" else "Therapy Type",
-                        selectedOption = localizeTherapyType(profile.therapyType, isRu),
-                        options = if (isRu) listOf(
-                            "Инсулиновая помпа",
-                            "Шприц-ручки (МДИ)",
-                            "Пероральные препараты (Таблетки)",
-                            "Диетотерапия"
-                        ) else listOf(
-                            "Insulin Pump",
-                            "Multiple Daily Injections (MDI)",
-                            "Oral Medication (Pills)",
-                            "Diet Therapy"
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                        onOptionSelected = { newTherapy ->
-                            viewModel.autoUpdatePatientProfile(profile.copy(therapyType = newTherapy))
-                        }
-                    )
-                }
-            }
-        }
-
         // Section 3: Clinical Targets & Sleep Window
         item {
             BentoCard(modifier = Modifier.fillMaxWidth()) {
@@ -643,6 +518,306 @@ fun SettingsScreen(
             }
         )
     }
+
+    if (showProfileDialog) {
+        PatientProfileEditDialog(
+            profile = profile,
+            isRu = isRu,
+            currentYear = currentYear,
+            onProfileChange = { updated ->
+                viewModel.autoUpdatePatientProfile(updated)
+            },
+            onDismiss = { showProfileDialog = false }
+        )
+    }
+}
+
+@Composable
+private fun PatientProfileSummaryCard(
+    profile: PatientProfile,
+    isRu: Boolean,
+    onClick: () -> Unit
+) {
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val hasName = profile.fullName.isNotBlank()
+    val displayName = if (hasName) profile.fullName else (if (isRu) "Профиль пациента" else "Patient Profile")
+
+    val ageStr = if (profile.birthYear > 1900) "${profile.calculatedAge} ${if (isRu) "лет" else "y.o."}" else ""
+    val diagStr = if (profile.diabetesType.isNotBlank()) localizeDiabetesType(profile.diabetesType, isRu) else ""
+    val durStr = if (profile.calculatedDuration > 0) "${if (isRu) "стаж" else "duration"} ${profile.calculatedDuration} ${if (isRu) "л." else "y."}" else ""
+
+    val subtitleParts = listOf(ageStr, diagStr, durStr).filter { it.isNotBlank() }
+    val subtitle = if (subtitleParts.isNotEmpty()) {
+        subtitleParts.joinToString(" • ")
+    } else {
+        if (isRu) "Нажмите для заполнения мед. профиля" else "Tap to edit clinical report profile"
+    }
+
+    BentoCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = PrimaryEmerald.copy(alpha = 0.16f),
+                    modifier = Modifier.size(46.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = PrimaryEmerald,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = displayName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (hasName) onSurfaceVariant else ActionBlue
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                        contentDescription = "Edit Profile",
+                        tint = onSurfaceVariant,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PatientProfileEditDialog(
+    profile: PatientProfile,
+    isRu: Boolean,
+    currentYear: Int,
+    onProfileChange: (PatientProfile) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val hM = profile.heightCm.toDoubleOrNull()?.let { it / 100.0 }
+    val wKg = profile.weightKg.toDoubleOrNull()
+    val bmi = if (hM != null && wKg != null && hM > 0.5) wKg / (hM * hM) else null
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    tint = PrimaryEmerald,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isRu) "Профиль пациента" else "Patient Profile",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        },
+        text = {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                item {
+                    // 1. Full Name (Text input)
+                    OutlinedTextField(
+                        value = profile.fullName,
+                        onValueChange = { newName ->
+                            onProfileChange(profile.copy(fullName = newName))
+                        },
+                        label = { Text(if (isRu) "ФИО пациента" else "Full Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+
+                item {
+                    // 2. Birth Year (with live calculated age)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        DropdownYearSelector(
+                            label = if (isRu) "Год рождения" else "Birth Year",
+                            selectedYear = profile.birthYear,
+                            yearRange = (currentYear - 100)..currentYear,
+                            modifier = Modifier.weight(1f),
+                            onYearSelected = { newYear ->
+                                onProfileChange(profile.copy(birthYear = newYear))
+                            }
+                        )
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(if (isRu) "Возраст" else "Age", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("${profile.calculatedAge} ${if (isRu) "лет" else "y.o."}", style = MaterialTheme.typography.bodyMedium, color = PrimaryEmerald, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    // 3. Height & Weight
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = profile.heightCm,
+                            onValueChange = { newHeight ->
+                                onProfileChange(profile.copy(heightCm = newHeight))
+                            },
+                            label = { Text(if (isRu) "Рост (см)" else "Height (cm)") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = profile.weightKg,
+                            onValueChange = { newWeight ->
+                                onProfileChange(profile.copy(weightKg = newWeight))
+                            },
+                            label = { Text(if (isRu) "Вес (кг)" else "Weight (kg)") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                    }
+                }
+
+                if (bmi != null) {
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(if (isRu) "ИМТ (индекс массы тела):" else "BMI:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    text = String.format(Locale.US, "%.1f кг/м²", bmi),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = PrimaryEmerald,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    // 4. Diabetes Type & Diagnosis Year
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        DropdownChoiceSelector(
+                            label = if (isRu) "Тип диабета" else "Diabetes Type",
+                            selectedOption = localizeDiabetesType(profile.diabetesType, isRu),
+                            options = if (isRu) listOf("СД1", "СД2", "LADA", "MODY", "ГСД") else listOf("T1D", "T2D", "LADA", "MODY", "GDM"),
+                            modifier = Modifier.weight(1f),
+                            onOptionSelected = { newType ->
+                                onProfileChange(profile.copy(diabetesType = newType))
+                            }
+                        )
+
+                        DropdownYearSelector(
+                            label = if (isRu) "Диагноз с года" else "Diagnosed Year",
+                            selectedYear = profile.diagnosisYear,
+                            yearRange = (currentYear - 60)..currentYear,
+                            modifier = Modifier.weight(1f),
+                            onYearSelected = { newDiagYear ->
+                                onProfileChange(profile.copy(diagnosisYear = newDiagYear))
+                            }
+                        )
+                    }
+                }
+
+                item {
+                    // 5. Therapy Type Dropdown
+                    DropdownChoiceSelector(
+                        label = if (isRu) "Вид терапии" else "Therapy Type",
+                        selectedOption = localizeTherapyType(profile.therapyType, isRu),
+                        options = if (isRu) listOf(
+                            "Инсулиновая помпа",
+                            "Шприц-ручки (МДИ)",
+                            "Пероральные препараты (Таблетки)",
+                            "Диетотерапия"
+                        ) else listOf(
+                            "Insulin Pump",
+                            "Multiple Daily Injections (MDI)",
+                            "Oral Medication (Pills)",
+                            "Diet Therapy"
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                        onOptionSelected = { newTherapy ->
+                            onProfileChange(profile.copy(therapyType = newTherapy))
+                        }
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = if (isRu) "Готово" else "Done",
+                    fontWeight = FontWeight.Bold,
+                    color = PrimaryEmerald
+                )
+            }
+        }
+    )
 }
 
 @Composable

@@ -202,7 +202,7 @@ class AgpPdfGenerator(private val context: Context) {
                     Pair("Средний сахар (Mean):", meanStr),
                     Pair("Вариабельность глюкозы (%CV):", String.format(Locale.US, "%.1f%% (Цель ≤36.0%%) • SD: %s", statistics.cvPercent, sdStr)),
                     Pair("Расчётный eA1c (ADAG):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)),
-                    Pair("Индекс риска GRI (Klonoff 2022):", String.format(Locale.US, "%.1f (%s, цель ≤40.0)", statistics.gri, statistics.griLabel)),
+                    Pair("GRI (риск гипо / Klonoff 2022):", String.format(Locale.US, "%.1f (%s, цель ≤40.0)", statistics.gri, statistics.griLabel)),
                     Pair("Индексы GVI / PGS:", String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs)),
                     Pair("Ночной профиль (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)}):", nightStr)
                 )
@@ -211,7 +211,7 @@ class AgpPdfGenerator(private val context: Context) {
                     Pair("Average Glucose (Mean):", meanStr),
                     Pair("Glucose Variability (%CV):", String.format(Locale.US, "%.1f%% (Target ≤36.0%%) • SD: %s", statistics.cvPercent, sdStr)),
                     Pair("Estimated A1c (eA1c):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)),
-                    Pair("Glycemia Risk Index (GRI):", String.format(Locale.US, "%.1f (%s, target ≤40.0)", statistics.gri, statistics.griLabel)),
+                    Pair("Glycemia Risk Index (GRI / Hypo Risk):", String.format(Locale.US, "%.1f (%s, target ≤40.0)", statistics.gri, statistics.griLabel)),
                     Pair("Variability Indexes (GVI/PGS):", String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs)),
                     Pair("Night Sleep Profile (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)}):", nightStr)
                 )
@@ -334,7 +334,7 @@ class AgpPdfGenerator(private val context: Context) {
             val hourLabels = listOf("00", "03", "06", "09", "12", "15", "18", "21", "24")
             hourLabels.forEachIndexed { idx, lbl ->
                 val x = graphLeft + (idx.toFloat() / 8f) * graphWidth
-                val y = if (idx % 2 == 0) graphBottom + 11f else graphBottom + 19f
+                val y = graphBottom + 12f
                 canvas.drawText(lbl, x - 5f, y, subTextPaint)
             }
 
