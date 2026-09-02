@@ -330,11 +330,12 @@ class AgpPdfGenerator(private val context: Context) {
                 canvas.drawPath(p50Path, p50Paint)
             }
 
-            // X Axis 3-hour time ticks
-            val hourLabels = listOf("00:00", "03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00", "24:00")
+            // X Axis 3-hour time ticks (staggered hours without minutes)
+            val hourLabels = listOf("00", "03", "06", "09", "12", "15", "18", "21", "24")
             hourLabels.forEachIndexed { idx, lbl ->
                 val x = graphLeft + (idx.toFloat() / 8f) * graphWidth
-                canvas.drawText(lbl, x - 10f, graphBottom + 13f, subTextPaint)
+                val y = if (idx % 2 == 0) graphBottom + 11f else graphBottom + 19f
+                canvas.drawText(lbl, x - 5f, y, subTextPaint)
             }
 
             // 4. Clinical Assessment in 2 Columns

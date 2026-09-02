@@ -56,7 +56,7 @@
     <string name="reports_title">Medical Report</string>
     <string name="reports_subtitle">Standardized AGP Sheet for Physician</string>
     <string name="report_live_title">Current Report (Live Broadcast)</string>
-    <string name="report_historical_title">Historical Report (from xDrip file)</string>
+    <string name="report_historical_title">xDrip+ File Report</string>
     <string name="report_period_title">Report Period</string>
     <string name="generate_pdf">Share / Send PDF</string>
     <string name="save_pdf_downloads">Save PDF to Downloads</string>

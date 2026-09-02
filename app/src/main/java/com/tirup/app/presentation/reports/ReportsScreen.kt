@@ -334,7 +334,7 @@ private fun LiveReportCard(
                 ) {
                     Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = if (isRu) "Сохранить PDF" else "Save PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(text = if (isRu) "Сохранить" else "Save PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
 
                 OutlinedButton(
@@ -508,47 +508,12 @@ private fun HistoricalReportCard(
                 // Parameters with Active Time at the very TOP
                 ReportMetricsColumn(stats = hist.statistics, unit = state.userSettings.unit, language = state.userSettings.language)
 
-                // Action Buttons Row (Save PDF, Share, and Load File)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = { viewModel.saveHistoricalPdfToDownloads() },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(40.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = ActionBlue,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = if (isRu) "Сохранить PDF" else "Save PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    OutlinedButton(
-                        onClick = { viewModel.generateAndShareHistoricalPdf() },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(40.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, ActionBlue),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = ActionBlue
-                        )
-                    ) {
-                        Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = if (isRu) "Поделиться" else "Share", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-
+                // Action Buttons: Import File above, Save & Share below
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
                         onClick = onPickFile,
                         modifier = Modifier
-                            .weight(1.1f)
+                            .fillMaxWidth()
                             .height(40.dp),
                         shape = RoundedCornerShape(10.dp),
                         border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.5f)),
@@ -557,8 +522,45 @@ private fun HistoricalReportCard(
                         )
                     ) {
                         Icon(imageVector = Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp), tint = ActionBlue)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = if (isRu) "Загрузить файл" else "Import File", fontSize = 12.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = if (isRu) "Загрузить другой файл (CSV / ZIP)" else "Import Another File (CSV / ZIP)", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.saveHistoricalPdfToDownloads() },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ActionBlue,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(text = if (isRu) "Сохранить" else "Save PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = { viewModel.generateAndShareHistoricalPdf() },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, ActionBlue),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = ActionBlue
+                            )
+                        ) {
+                            Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(text = if (isRu) "Поделиться" else "Share", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             } else {
@@ -830,7 +832,7 @@ private fun GuidebookCard(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = if (isRu) "📖 Справочник параметров и памятка" else "📖 Clinical Parameters Guidebook",
+                        text = if (isRu) "📖 Справочник параметров" else "📖 Parameters Guidebook",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
@@ -843,20 +845,6 @@ private fun GuidebookCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            }
-
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = ActionBlue.copy(alpha = 0.12f),
-                modifier = Modifier.clickable { onClick() }
-            ) {
-                Text(
-                    text = if (isRu) "Открыть" else "Open",
-                    color = ActionBlue,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                )
             }
         }
     }
@@ -903,7 +891,7 @@ private fun ParametersGuidebookModal(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isRu) "Справочник и памятка CGM" else "CGM Guide & Clinical Memo",
+                            text = if (isRu) "Справочник" else "Guide",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -1067,7 +1055,7 @@ private fun ParametersGuidebookModal(
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Text(
-                                    text = if (isRu) "⚠️ Важное примечание о точности данных и CGM:"
+                                    text = if (isRu) "⚠️ Важные примечания:"
                                            else "⚠️ Clinical Notice Regarding Continuous Glucose Monitoring (CGM):",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
@@ -1109,7 +1097,7 @@ private fun ParametersGuidebookModal(
                         Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (isRu) "Сохранить PDF" else "Save PDF",
+                            text = if (isRu) "Сохранить" else "Save PDF",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -1167,11 +1155,7 @@ private fun GuidebookItemCard(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyMedium,

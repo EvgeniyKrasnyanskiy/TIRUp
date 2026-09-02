@@ -36,7 +36,6 @@ object TargetCompensatorCalculator {
         language: String = "RU",
         referenceTimestamp: Long = System.currentTimeMillis()
     ): CompensatorGoal {
-        val isRu = language.equals("RU", ignoreCase = true)
         val targetName = targetMode.name
 
         // 1. Calendar Day Elapsed & Remaining Minutes
@@ -97,42 +96,45 @@ object TargetCompensatorCalculator {
                 status = CompensatorStatus.EXCEEDING
                 val inStr = formatHoursMins(inRangeMinutes, true)
                 val targetStr = formatHoursMins(targetGoalMinutes, true)
-                recRu = "Суточная цель выполнена! В норме уже $inStr (норма ≥$targetStr). Отличная компенсация!"
+                recRu = "Суточная цель выполнена досрочно! В норме уже $inStr (норма ≥$targetStr). Отличный результат!"
 
                 val inStrEn = formatHoursMins(inRangeMinutes, false)
                 val targetStrEn = formatHoursMins(targetGoalMinutes, false)
-                recEn = "Daily target achieved! Already $inStrEn in range (goal ≥$targetStrEn). Great control!"
+                recEn = "Daily target achieved! Already $inStrEn in range (goal ≥$targetStrEn). Great result!"
             }
 
             // Scenario 2: Unrealistic to reach targetPercent today (out-of-range time limit exceeded)
             neededMinutesToday > remainingMinutesToday -> {
                 status = CompensatorStatus.UNREALISTIC
                 val maxTirStr = String.format(Locale.US, "%.0f%%", maxPossibleTir)
-                recRu = "Лимит времени вне нормы исчерпан. Постарайтесь вернуться в диапазон сейчас, чтобы завершить сутки с максимальным $targetName (до $maxTirStr)."
-                recEn = "Time out of range exceeded limit. Return to range now to finish the day with highest $targetName (up to $maxTirStr)."
+                recRu = "Лимит времени вне нормы исчерпан (макс. $targetName за сегодня: $maxTirStr). Удерживайте диапазон до полуночи, чтобы завершить день с лучшим счётом."
+                recEn = "Out of range limit exceeded (max $targetName today: $maxTirStr). Keep in range until midnight to finish the day with highest score."
             }
 
             // Scenario 1A: Out of range right now -> urgent actionable recommendation
             !isCurrentlyInRange -> {
                 status = CompensatorStatus.REACHABLE
                 val needStrRu = formatHoursMins(neededMinutesToday, true)
+                val remainStrRu = formatHoursMins(remainingMinutesToday, true)
                 val targetPctInt = targetPercent.toInt()
-                recRu = "Сахар вне диапазона. Вернитесь в норму как можно скорее и удерживайте не менее $needStrRu до конца суток для цели ≥$targetPctInt%."
+                recRu = "Сахар вне диапазона. Вернитесь в норму: из оставшихся $remainStrRu суток удержите ещё не менее $needStrRu для цели ≥$targetPctInt%."
 
                 val needStrEn = formatHoursMins(neededMinutesToday, false)
-                recEn = "Glucose is out of range. Return to range ASAP and maintain for at least $needStrEn until end of day for ≥$targetPctInt% goal."
+                val remainStrEn = formatHoursMins(remainingMinutesToday, false)
+                recEn = "Glucose is out of range. Return to target: out of remaining $remainStrEn, keep at least $needStrEn for ≥$targetPctInt% goal."
             }
 
             // Scenario 1B: In range right now -> encouraging pace recommendation
             else -> {
                 status = if (currentScore >= targetPercent) CompensatorStatus.EXCEEDING else CompensatorStatus.REACHABLE
                 val needStrRu = formatHoursMins(neededMinutesToday, true)
-                val currentScoreStr = String.format(Locale.US, "%.0f%%", currentScore)
+                val remainStrRu = formatHoursMins(remainingMinutesToday, true)
                 val targetPctInt = targetPercent.toInt()
-                recRu = "Отличный темп ($targetName $currentScoreStr)! Удерживайте сахар в диапазоне ещё не менее $needStrRu, чтобы зафиксировать цель ≥$targetPctInt%."
+                recRu = "В норме. Из оставшихся $remainStrRu суток удерживайте диапазон ещё не менее $needStrRu для выполнения цели ≥$targetPctInt%."
 
                 val needStrEn = formatHoursMins(neededMinutesToday, false)
-                recEn = "Great pace ($targetName $currentScoreStr)! Keep glucose in range for at least $needStrEn to secure ≥$targetPctInt% daily goal."
+                val remainStrEn = formatHoursMins(remainingMinutesToday, false)
+                recEn = "In range. Out of remaining $remainStrEn today, keep at least $needStrEn to secure ≥$targetPctInt% goal."
             }
         }
 
@@ -154,6 +156,125 @@ object TargetCompensatorCalculator {
             neededMinutesToday = neededMinutesToday,
             maxPossibleTir = maxPossibleTir,
             isCurrentlyInRange = isCurrentlyInRange,
+            recommendationRu = recRu,
+            recommendationEn = recEn
+        )
+    }
+
+    /**
+     * Calculates multi-day strategic compensator for Trends screen.
+     * Evaluates successful days in period, hours balance (surplus/deficit), and recommended daily target for next period.
+     */
+    fun calculateStrategicCompensator(
+        targetMode: TargetMode,
+        targetGoalPercent: Double,
+        readings: List<GlucoseReading>,
+        periodDays: Int,
+        targetRanges: TargetRanges,
+        language: String = "RU"
+    ): CompensatorGoal {
+        val isRu = language.equals("RU", ignoreCase = true)
+        val targetName = targetMode.name
+
+        if (readings.isEmpty()) {
+            return CompensatorGoal(
+                targetMode = targetMode,
+                targetGoalPercent = targetGoalPercent,
+                recommendationRu = "Недостаточно данных за выбранный период для анализа тренда.",
+                recommendationEn = "Insufficient data for selected period to analyze trend."
+            )
+        }
+
+        val inRangeCheck: (GlucoseReading) -> Boolean = { reading ->
+            if (targetMode == TargetMode.TIR) {
+                targetRanges.isInTir(reading.valueMmol)
+            } else {
+                targetRanges.isInTing(reading.valueMmol)
+            }
+        }
+
+        // 1. Group readings by calendar day
+        val cal = Calendar.getInstance()
+        val readingsByDay = readings.groupBy { reading ->
+            cal.timeInMillis = reading.timestamp
+            "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.DAY_OF_YEAR)}"
+        }
+
+        var successfulDays = 0
+        var evaluatedDays = 0
+        readingsByDay.values.forEach { dayReadings ->
+            if (dayReadings.size >= 12) { // At least 1 hour of readings
+                evaluatedDays++
+                val dayInCount = dayReadings.count(inRangeCheck)
+                val dayTir = (dayInCount.toDouble() / dayReadings.size.toDouble()) * 100.0
+                if (dayTir >= targetGoalPercent) {
+                    successfulDays++
+                }
+            }
+        }
+
+        val totalDaysEvaluated = evaluatedDays.coerceAtLeast(1)
+        val totalReadingsCount = readings.size.coerceAtLeast(1)
+        val inCount = readings.count(inRangeCheck)
+        val overallTir = (inCount.toDouble() / totalReadingsCount.toDouble()) * 100.0
+
+        // 2. Time Balance in Hours (Surplus vs Deficit)
+        val totalPeriodHours = totalDaysEvaluated * 24.0
+        val targetHours = (targetGoalPercent / 100.0) * totalPeriodHours
+        val actualHours = (overallTir / 100.0) * totalPeriodHours
+        val balanceHours = actualHours - targetHours
+
+        // 3. Recommended daily target for next period to compensate or maintain
+        val neededDailyTirNextPeriod = if (overallTir >= targetGoalPercent) {
+            targetGoalPercent
+        } else {
+            (targetGoalPercent * 2.0 - overallTir).coerceIn(targetGoalPercent, 95.0)
+        }
+        val neededDailyMinutes = ((neededDailyTirNextPeriod / 100.0) * 1440.0).roundToInt()
+        val neededDailyHoursMins = formatHoursMins(neededDailyMinutes, isRu)
+
+        val status: CompensatorStatus
+        val recRu: String
+        val recEn: String
+
+        if (overallTir >= targetGoalPercent) {
+            status = CompensatorStatus.EXCEEDING
+            val surplusStr = String.format(Locale.US, "%.1f", balanceHours)
+            val surplusPctStr = String.format(Locale.US, "%.1f", overallTir - targetGoalPercent)
+            recRu = "Цель $targetName перевыполнена на +$surplusPctStr% (запас: +$surplusStr ч в норме). $successfulDays из $totalDaysEvaluated дн. закрыты успешно. Отличный темп!"
+            recEn = "$targetName target exceeded by +$surplusPctStr% (surplus: +$surplusStr h in range). $successfulDays of $totalDaysEvaluated days met target. Excellent!"
+        } else {
+            val deficitHoursStr = String.format(Locale.US, "%.1f", -balanceHours)
+            val neededPctStr = String.format(Locale.US, "%.0f%%", neededDailyTirNextPeriod)
+            if (neededDailyTirNextPeriod <= 90.0) {
+                status = CompensatorStatus.REACHABLE
+                recRu = "Дефицит диапазона: -$deficitHoursStr ч за период ($successfulDays из $totalDaysEvaluated дн. в норме). Чтобы выйти на цель, ориентируйтесь на $targetName ≥$neededPctStr ($neededDailyHoursMins в день)."
+                recEn = "Range deficit: -$deficitHoursStr h for period ($successfulDays of $totalDaysEvaluated days in target). Aim for daily $targetName ≥$neededPctStr ($neededDailyHoursMins/day)."
+            } else {
+                status = CompensatorStatus.UNREALISTIC
+                recRu = "Дефицит: -$deficitHoursStr ч ($successfulDays из $totalDaysEvaluated дн. в норме). Потребуется постепенная стабилизация гликемии с врачом."
+                recEn = "Deficit: -$deficitHoursStr h ($successfulDays of $totalDaysEvaluated days in target). Gradual stabilization with your clinician recommended."
+            }
+        }
+
+        return CompensatorGoal(
+            targetMode = targetMode,
+            targetGoalPercent = targetGoalPercent,
+            totalDays = if (periodDays > 0) periodDays else totalDaysEvaluated,
+            pastDays = totalDaysEvaluated,
+            remainingDays = 0,
+            pastAveragePercent = overallTir,
+            neededRemainingPercent = neededDailyTirNextPeriod,
+            status = status,
+            currentScore = overallTir,
+            inRangeMinutes = (actualHours * 60.0).roundToInt(),
+            outOfRangeMinutes = ((totalPeriodHours - actualHours) * 60.0).roundToInt(),
+            targetGoalMinutes = (targetHours * 60.0).roundToInt(),
+            allowedOutMinutes = ((totalPeriodHours - targetHours) * 60.0).roundToInt(),
+            successfulDaysCount = successfulDays,
+            totalDaysWithData = totalDaysEvaluated,
+            balanceHours = balanceHours,
+            neededDailyTirNextPeriod = neededDailyTirNextPeriod,
             recommendationRu = recRu,
             recommendationEn = recEn
         )

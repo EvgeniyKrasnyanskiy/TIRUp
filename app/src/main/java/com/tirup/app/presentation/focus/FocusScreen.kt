@@ -52,6 +52,7 @@ import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.presentation.components.BentoCard
+import com.tirup.app.presentation.components.BentoMetricCompact
 import com.tirup.app.presentation.components.StreakBadge
 import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorLow
@@ -205,12 +206,39 @@ fun FocusScreen(
                     detailDialogInfo = Pair(
                         if (isRu) "Ночной профиль сна" else "Night Sleep Profile",
                         if (!hasNightData) {
-                            if (isRu) "Недостаточно данных для анализа ночи." else "Insufficient data for night analysis."
+                            if (isRu) "Недостаточно данных для ночного анализа (<30 мин измерений во время сна)."
+                            else "Insufficient data for night analysis (<30 min readings)."
                         } else {
-                            val sdStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.2f", nightStability.sdMmol)} ${if (isRu) "ммоль/л" else "mmol/L"}"
-                                        else "${(nightStability.sdMmol * 18.0182).toInt()} ${if (isRu) "мг/дл" else "mg/dL"}"
-                            if (isRu) "TIR за ночь: ${String.format(Locale.US, "%.1f%%", nightStability.tirPercent)}\nВариабельность (SD): $sdStr\nТочек: ${nightStability.nightReadingsCount}"
-                            else "Night TIR: ${String.format(Locale.US, "%.1f%%", nightStability.tirPercent)}\nVariability (SD): $sdStr\nReadings: ${nightStability.nightReadingsCount}"
+                            val sdStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.2f", nightStability.sdMmol)} ммоль/л"
+                                        else "${(nightStability.sdMmol * 18.0182).toInt()} мг/дл"
+                            val meanStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", nightStability.meanMmol)} ммоль/л"
+                                          else "${(nightStability.meanMmol * 18.0182).toInt()} мг/дл"
+                            val minStr = if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", nightStability.minMmol)
+                                         else "${(nightStability.minMmol * 18.0182).toInt()}"
+                            val maxStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", nightStability.maxMmol)} ммоль/л"
+                                         else "${(nightStability.maxMmol * 18.0182).toInt()} мг/дл"
+
+                            if (isRu) {
+                                "Статус: ${if (nightStability.isStable) "Стабильный профиль (без колебаний)" else "Обнаружены ночные колебания"}\n\n" +
+                                "• Средний сахар за ночь: $meanStr\n" +
+                                "• Ночной размах: $minStr – $maxStr\n" +
+                                "• Ночной TIR (3.9–10.0): ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)} (цель ≥70%)\n" +
+                                "• Ночной TING (3.9–7.8): ${String.format(Locale.US, "%.0f%%", nightStability.tingPercent)} (цель ≥50%)\n" +
+                                "• Разброс (SD): $sdStr (норма ≤1.5)\n" +
+                                "• Вариабельность (%CV): ${String.format(Locale.US, "%.1f%%", nightStability.cvPercent)} (норма ≤36%)\n" +
+                                "• Ночные гипо (TBR): ${String.format(Locale.US, "%.1f%%", nightStability.tbrPercent)}\n" +
+                                "• Всего ночных точек: ${nightStability.nightReadingsCount}"
+                            } else {
+                                "Status: ${if (nightStability.isStable) "Stable profile" else "Fluctuations detected"}\n\n" +
+                                "• Night Mean: $meanStr\n" +
+                                "• Night Range: $minStr – $maxStr\n" +
+                                "• Night TIR (3.9–10.0): ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)}\n" +
+                                "• Night TING (3.9–7.8): ${String.format(Locale.US, "%.0f%%", nightStability.tingPercent)}\n" +
+                                "• Variability (SD): $sdStr\n" +
+                                "• Coefficient of Var (%CV): ${String.format(Locale.US, "%.1f%%", nightStability.cvPercent)}\n" +
+                                "• Night TBR: ${String.format(Locale.US, "%.1f%%", nightStability.tbrPercent)}\n" +
+                                "• Night Readings: ${nightStability.nightReadingsCount}"
+                            }
                         }
                     )
                 }
@@ -255,7 +283,7 @@ fun FocusScreen(
             }
         }
 
-        // 4. Compact 2x4 Metrics Grid
+        // 4. Compact 3x4 Metrics Grid (12 Core Clinical Parameters)
         item {
             val minVal = if (state.recentReadings.isNotEmpty()) state.recentReadings.minOf { it.valueMmol } else 0.0
             val maxVal = if (state.recentReadings.isNotEmpty()) state.recentReadings.maxOf { it.valueMmol } else 0.0
@@ -286,6 +314,25 @@ fun FocusScreen(
             val ea1cStr = if (state.statistics.gmiPercent > 0.0) String.format(Locale.US, "%.1f%%", state.statistics.gmiPercent) else "--"
             val isEa1cGood = state.statistics.gmiPercent in 0.01..7.0
 
+            val tirValStr = if (state.statistics.tirPercent > 0.0) "${state.statistics.tirPercent.toInt()}%" else "--"
+            val tirColor = when {
+                state.statistics.tirPercent <= 0.0 -> onSurfaceVariant
+                state.statistics.tirPercent >= 70.0 -> PrimaryEmerald
+                state.statistics.tirPercent >= 50.0 -> ColorHigh
+                else -> ColorVeryHigh
+            }
+
+            val tingValStr = if (state.statistics.tingPercent > 0.0) "${state.statistics.tingPercent.toInt()}%" else "--"
+            val isTingGood = state.statistics.tingPercent >= 50.0
+
+            val tbrVal = state.statistics.tbrLowPercent + state.statistics.tbrVeryLowPercent
+            val tbrValStr = if (tbrVal > 0.0) String.format(Locale.US, "%.1f%%", tbrVal) else "0%"
+            val isTbrGood = tbrVal <= 4.0
+
+            val tarVal = state.statistics.tarHighPercent + state.statistics.tarVeryHighPercent
+            val tarValStr = if (tarVal > 0.0) "${tarVal.toInt()}%" else "0%"
+            val isTarGood = tarVal <= 25.0
+
             val griValStr = if (state.statistics.gri > 0.0) "${state.statistics.gri.toInt()}" else "--"
             val griColor = when {
                 state.statistics.gri <= 0.0 -> onSurfaceVariant
@@ -309,7 +356,7 @@ fun FocusScreen(
             val glucoseUnitStr = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль" else "mmol") else (if (isRu) "мг/дл" else "mg/dl")
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Row 1: Mean, SD, %CV, eA1c
+                // Row 1: Mean, eA1c, SD, %CV
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -322,10 +369,33 @@ fun FocusScreen(
                         modifier = Modifier.weight(1f),
                         onClick = {
                             val targetVal = if (unit == GlucoseUnit.MMOL_L) "≤7.8 ммоль/л" else "≤140 мг/дл"
+                            val optVal = if (unit == GlucoseUnit.MMOL_L) "5.5–7.0 ммоль/л" else "100–126 мг/дл"
+                            val healthyVal = if (unit == GlucoseUnit.MMOL_L) "5.0–5.8 ммоль/л" else "90–105 мг/дл"
                             detailDialogInfo = Pair(
-                                if (isRu) "Средний сахар (Mean)" else "Average Glucose (Mean)",
-                                if (isRu) "Среднее арифметическое измерений за сутки. Клиническая цель: $targetVal."
-                                else "24h average glucose. Clinical target: $targetVal."
+                                if (isRu) "Средний сахар (Mean BG)" else "Average Glucose (Mean BG)",
+                                if (isRu) "Среднее арифметическое измерений за сутки.\n\n" +
+                                        "• Клиническая цель: $targetVal.\n" +
+                                        "• Оптимальный ориентир строгого контроля: $optVal (при условии TBR < 4%, без частых гипогликемий).\n" +
+                                        "• У здоровых людей без диабета: $healthyVal."
+                                else "24h average glucose.\n\n" +
+                                        "• Clinical target: $targetVal.\n" +
+                                        "• Optimal tight control: $optVal (provided TBR < 4%, without hypoglycemia).\n" +
+                                        "• Healthy non-diabetic baseline: $healthyVal."
+                            )
+                        }
+                    )
+
+                    BentoMetricCompact(
+                        title = "eA1c",
+                        value = ea1cStr,
+                        unit = if (isRu) "гликир." else "est.",
+                        valueColor = if (isEa1cGood) PrimaryEmerald else ColorHigh,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            detailDialogInfo = Pair(
+                                if (isRu) "Расчётный гликированный гемоглобин (eA1c)" else "Estimated Glycated Hemoglobin (eA1c)",
+                                if (isRu) "Расчётный A1c по формуле ADAG на основе среднего сахара. Клинический ориентир: ≤7.0%."
+                                else "Estimated glycated hemoglobin (ADAG formula). Target: ≤7.0%."
                             )
                         }
                     )
@@ -339,8 +409,8 @@ fun FocusScreen(
                         onClick = {
                             val targetSdStr = if (unit == GlucoseUnit.MMOL_L) "≤2.0 ммоль/л" else "≤36 мг/дл"
                             detailDialogInfo = Pair(
-                                if (isRu) "Разброс (SD)" else "Standard Deviation (SD)",
-                                if (isRu) "Стандартное отклонение сахара за сутки. Клиническая цель: $targetSdStr."
+                                if (isRu) "Разброс сахара (SD)" else "Standard Deviation (SD)",
+                                if (isRu) "Стандартное отклонение сахара за сутки. Отражает амплитуду дневных колебаний. Клиническая цель: $targetSdStr."
                                 else "Daily standard deviation. Clinical target: $targetSdStr."
                             )
                         }
@@ -355,29 +425,80 @@ fun FocusScreen(
                         onClick = {
                             detailDialogInfo = Pair(
                                 if (isRu) "Вариабельность (%CV)" else "Glucose Variability (%CV)",
-                                if (isRu) "Коэффициент вариации (%CV = SD / Mean * 100%). Норма ATTD: ≤36.0%."
+                                if (isRu) "Коэффициент вариации (%CV = SD / Mean * 100%). Международный консенсус ATTD: норма ≤36.0% (стабильный профиль без резких скачков)."
                                 else "Coefficient of variation. Consensus target: ≤36.0%."
-                            )
-                        }
-                    )
-
-                    BentoMetricCompact(
-                        title = "eA1c",
-                        value = ea1cStr,
-                        unit = if (isRu) "гликир." else "est.",
-                        valueColor = if (isEa1cGood) PrimaryEmerald else ColorHigh,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            detailDialogInfo = Pair(
-                                if (isRu) "Расчётный гликированный гемоглобин (eA1c)" else "Estimated Glycated Hemoglobin (eA1c)",
-                                if (isRu) "Расчётный A1c по формуле ADAG. Клинический ориентир: ≤7.0%."
-                                else "Estimated glycated hemoglobin (ADAG). Target: ≤7.0%."
                             )
                         }
                     )
                 }
 
-                // Row 2: GRI, GVI, PGS, Min/Max
+                // Row 2: TIR, TING, TBR, TAR
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    BentoMetricCompact(
+                        title = "TIR",
+                        value = tirValStr,
+                        unit = if (isRu) "норма" else "target",
+                        valueColor = tirColor,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            detailDialogInfo = Pair(
+                                if (isRu) "Время в целевом диапазоне (TIR)" else "Time in Range (TIR)",
+                                if (isRu) "Диапазон 3.9–10.0 ммоль/л (70–180 мг/дл).\n\nМеждународный консенсус ATTD: норма ≥70% времени (не менее 16 ч 48 мин в сутки). Каждый прирост TIR на 10% значительно снижает риск осложнений."
+                                else "Range 3.9–10.0 mmol/L (70–180 mg/dL). Clinical target: ≥70% (at least 16h 48m per day)."
+                            )
+                        }
+                    )
+
+                    BentoMetricCompact(
+                        title = "TING",
+                        value = tingValStr,
+                        unit = if (isRu) "узкий" else "tight",
+                        valueColor = if (isTingGood) PrimaryEmerald else ColorHigh,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            detailDialogInfo = Pair(
+                                if (isRu) "Узкий целевой диапазон (TING)" else "Time in Tight Range (TING)",
+                                if (isRu) "Диапазон 3.9–7.8 ммоль/л (70–140 мг/дл). Нормогликемия здорового человека без диабета.\n\nКлинический ориентир для продвинутого контроля: ≥50% времени (не менее 12 часов в сутки)."
+                                else "Tight range 3.9–7.8 mmol/L (70–140 mg/dL). Advanced target: ≥50% (at least 12h per day)."
+                            )
+                        }
+                    )
+
+                    BentoMetricCompact(
+                        title = "TBR",
+                        value = tbrValStr,
+                        unit = if (isRu) "гипо" else "hypo",
+                        valueColor = if (isTbrGood) PrimaryEmerald else ColorVeryHigh,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            detailDialogInfo = Pair(
+                                if (isRu) "Время в гипогликемии (TBR)" else "Time Below Range (TBR)",
+                                if (isRu) "Уровень глюкозы ниже 3.9 ммоль/л (<70 мг/дл).\n\nСтрогая норма безопасности: <4% (не более 58 минут в сутки), а для уровня ниже 3.0 ммоль/л — менее 1% (не более 14 минут)."
+                                else "Glucose < 3.9 mmol/L (<70 mg/dL). Safety target: <4% (<58 min/day)."
+                            )
+                        }
+                    )
+
+                    BentoMetricCompact(
+                        title = "TAR",
+                        value = tarValStr,
+                        unit = if (isRu) "гипер" else "hyper",
+                        valueColor = if (isTarGood) PrimaryEmerald else ColorHigh,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            detailDialogInfo = Pair(
+                                if (isRu) "Время в гипергликемии (TAR)" else "Time Above Range (TAR)",
+                                if (isRu) "Уровень глюкозы выше 10.0 ммоль/л (>180 мг/дл).\n\nКлинический ориентир консенсуса ATTD: <25% времени (не более 6 часов в сутки)."
+                                else "Glucose > 10.0 mmol/L (>180 mg/dL). Clinical target: <25% (<6h/day)."
+                            )
+                        }
+                    )
+                }
+
+                // Row 3: GRI, GVI, PGS, Min/Max
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -708,57 +829,6 @@ private fun TargetCompensatorCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = onSurfaceVariant
             )
-        }
-    }
-}
-
-@Composable
-private fun BentoMetricCompact(
-    title: String,
-    value: String,
-    unit: String = "",
-    valueColor: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
-
-    BentoCard(
-        modifier = modifier,
-        cornerRadius = 16.dp,
-        padding = 8.dp,
-        onClick = onClick
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelSmall,
-                color = onSurfaceVariant,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                fontSize = 11.sp
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                color = valueColor,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1
-            )
-            if (unit.isNotEmpty()) {
-                Text(
-                    text = unit,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = onSurfaceVariant,
-                    fontSize = 9.sp,
-                    maxLines = 1
-                )
-            }
         }
     }
 }

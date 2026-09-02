@@ -266,6 +266,8 @@ object GlucoseMetricsCalculator {
             activeTimePercent = activeTimePercent,
             totalCount = totalCount,
             daysCount = distinctDays.coerceAtLeast(1),
+            minMmol = rawMmoll.minOrNull() ?: 0.0,
+            maxMmol = rawMmoll.maxOrNull() ?: 0.0,
             nightStability = nightStability,
             clinicalSummary = clinicalSummary
         )
@@ -740,6 +742,7 @@ object GlucoseMetricsCalculator {
         var inRangeCount = 0
         var belowCount = 0
         var aboveCount = 0
+        var tingCount = 0
         nightReadings.forEach { r ->
             val cat = targetRanges.categorize(r.valueMmol)
             when (cat) {
@@ -748,11 +751,17 @@ object GlucoseMetricsCalculator {
                 GlucoseRangeCategory.HIGH, GlucoseRangeCategory.VERY_HIGH -> aboveCount++
                 else -> {}
             }
+            if (targetRanges.isInTing(r.valueMmol)) {
+                tingCount++
+            }
         }
 
         val tir = (inRangeCount.toDouble() / count) * 100.0
+        val ting = (tingCount.toDouble() / count) * 100.0
         val tbr = (belowCount.toDouble() / count) * 100.0
         val tar = (aboveCount.toDouble() / count) * 100.0
+        val minMmol = nightReadings.minOf { it.valueMmol }
+        val maxMmol = nightReadings.maxOf { it.valueMmol }
         val isStable = sd <= 1.5 && tir >= 70.0 && tbr <= 1.0
 
         return NightStability(
@@ -761,8 +770,11 @@ object GlucoseMetricsCalculator {
             sdMmol = sd,
             cvPercent = cv,
             tirPercent = tir,
+            tingPercent = ting,
             tbrPercent = tbr,
             tarPercent = tar,
+            minMmol = minMmol,
+            maxMmol = maxMmol,
             nightReadingsCount = count
         )
     }

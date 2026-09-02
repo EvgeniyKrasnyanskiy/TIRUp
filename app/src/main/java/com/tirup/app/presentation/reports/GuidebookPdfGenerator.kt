@@ -71,7 +71,7 @@ class GuidebookPdfGenerator(private val context: Context) {
 
             // Header Banner
             canvas.drawText(
-                if (isRu) "TIRUp • Справочник параметров гликемического профиля" else "TIRUp • Glycemic Profile Parameters Guide",
+                if (isRu) "TIRUp • Справочник параметров" else "TIRUp • Parameters Guide",
                 30f,
                 y,
                 titlePaint
@@ -188,7 +188,7 @@ class GuidebookPdfGenerator(private val context: Context) {
             canvas.drawRoundRect(warnRect, 8f, 8f, warningBorderPaint)
 
             canvas.drawText(
-                if (isRu) "⚠️ Важное примечание о точности данных и непрерывном мониторинге (CGM):"
+                if (isRu) "⚠️ Важные примечания:"
                 else "⚠️ Clinical Notice Regarding Continuous Glucose Monitoring (CGM) Accuracy:",
                 38f,
                 y + 14f,

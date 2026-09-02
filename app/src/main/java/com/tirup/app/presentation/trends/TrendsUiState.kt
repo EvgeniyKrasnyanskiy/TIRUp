@@ -1,6 +1,7 @@
 package com.tirup.app.presentation.trends
 
 import com.tirup.app.domain.model.AGPPercentileBin
+import com.tirup.app.domain.model.CompensatorGoal
 import com.tirup.app.domain.model.GlucoseStatistics
 import com.tirup.app.domain.model.HeatmapCell
 import com.tirup.app.domain.model.UserSettings
@@ -17,6 +18,7 @@ enum class TrendPeriod(val days: Int, val stringResId: Int) {
 data class TrendsUiState(
     val selectedPeriod: TrendPeriod = TrendPeriod.PERIOD_14D,
     val statistics: GlucoseStatistics = GlucoseStatistics(),
+    val compensatorGoal: CompensatorGoal = CompensatorGoal(),
     val percentileBins: List<AGPPercentileBin> = emptyList(),
     val heatmapData: List<List<HeatmapCell>> = emptyList(),
     val userSettings: UserSettings = UserSettings(),

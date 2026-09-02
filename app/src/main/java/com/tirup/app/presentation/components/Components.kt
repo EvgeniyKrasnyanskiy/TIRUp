@@ -224,3 +224,54 @@ fun RangeDistributionBar(
         }
     }
 }
+
+@Composable
+fun BentoMetricCompact(
+    title: String,
+    value: String,
+    unit: String = "",
+    valueColor: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
+    BentoCard(
+        modifier = modifier,
+        cornerRadius = 16.dp,
+        padding = 8.dp,
+        onClick = onClick
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelSmall,
+                color = onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                fontSize = 11.sp
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                color = valueColor,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+            if (unit.isNotEmpty()) {
+                Text(
+                    text = unit,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = onSurfaceVariant,
+                    fontSize = 9.sp,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}

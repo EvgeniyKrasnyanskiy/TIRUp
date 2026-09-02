@@ -41,6 +41,8 @@ data class GlucoseStatistics(
     val activeTimePercent: Double = 100.0,
     val totalCount: Int = 0,
     val daysCount: Int = 0,
+    val minMmol: Double = 0.0,
+    val maxMmol: Double = 0.0,
     val nightStability: NightStability = NightStability(),
     val clinicalSummary: ClinicalSummary = ClinicalSummary()
 )
@@ -50,8 +52,11 @@ data class NightStability(
     val sdMmol: Double = 0.0,
     val cvPercent: Double = 0.0,
     val tirPercent: Double = 0.0,
+    val tingPercent: Double = 0.0,
     val tbrPercent: Double = 0.0,
     val tarPercent: Double = 0.0,
+    val minMmol: Double = 0.0,
+    val maxMmol: Double = 0.0,
     val isStable: Boolean = true,
     val nightReadingsCount: Int = 0
 )
@@ -80,6 +85,10 @@ data class CompensatorGoal(
     val neededMinutesToday: Int = 0,
     val maxPossibleTir: Double = 100.0,
     val isCurrentlyInRange: Boolean = true,
+    val successfulDaysCount: Int = 0,
+    val totalDaysWithData: Int = 0,
+    val balanceHours: Double = 0.0,
+    val neededDailyTirNextPeriod: Double = 70.0,
     val recommendationRu: String = "",
     val recommendationEn: String = ""
 )

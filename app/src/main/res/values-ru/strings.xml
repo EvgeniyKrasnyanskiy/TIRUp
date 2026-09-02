@@ -6,7 +6,7 @@
     <string name="nav_settings">Настройки</string>
 
     <!-- Focus Screen -->
-    <string name="focus_title">Текущие данные</string>
+    <string name="focus_title">Текущие сутки</string>
     <string name="current_glucose">Глюкоза</string>
     <string name="unit_mmol">ммоль/л</string>
     <string name="unit_mgdl">мг/дл</string>
@@ -54,12 +54,12 @@
 
     <!-- Reports -->
     <string name="reports_title">Медицинский отчёт</string>
-    <string name="reports_subtitle">Стандартизированный бланк AGP для врача</string>
+    <string name="reports_subtitle">Стандартизированный бланк AGP</string>
     <string name="report_live_title">Текущий отчёт (Трансляция)</string>
-    <string name="report_historical_title">Исторический отчёт (из файла xDrip)</string>
+    <string name="report_historical_title">Отчёт из файла xDrip+</string>
     <string name="report_period_title">Период для отчёта</string>
     <string name="generate_pdf">Поделиться / Отправить PDF</string>
-    <string name="save_pdf_downloads">Сохранить PDF в Загрузки</string>
+    <string name="save_pdf_downloads">Сохранить в Загрузки</string>
     <string name="import_and_report">Загрузить CSV / ZIP из xDrip</string>
     <string name="clear_historical">Удалить исторический отчёт</string>
     <string name="pdf_saved_toast">Отчёт сохранён: %s</string>

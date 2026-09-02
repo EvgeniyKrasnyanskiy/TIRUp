@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tirup.app.domain.calculator.AGPPercentilesCalculator
 import com.tirup.app.domain.calculator.GlucoseMetricsCalculator
+import com.tirup.app.domain.calculator.TargetCompensatorCalculator
+import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.domain.repository.GlucoseRepository
 import com.tirup.app.domain.repository.SettingsRepository
@@ -74,9 +76,19 @@ class TrendsViewModel(
                         maxDays = if (period.days > 0) period.days.coerceAtMost(30) else 30
                     )
 
+                    val compensator = TargetCompensatorCalculator.calculateStrategicCompensator(
+                        targetMode = TargetMode.TIR,
+                        targetGoalPercent = latestSettings.targetRanges.tirGoalPercent.toDouble(),
+                        readings = readings,
+                        periodDays = period.days,
+                        targetRanges = latestSettings.targetRanges,
+                        language = latestSettings.language
+                    )
+
                     TrendsUiState(
                         selectedPeriod = period,
                         statistics = stats,
+                        compensatorGoal = compensator,
                         percentileBins = agpBins,
                         heatmapData = heatmap,
                         userSettings = latestSettings,

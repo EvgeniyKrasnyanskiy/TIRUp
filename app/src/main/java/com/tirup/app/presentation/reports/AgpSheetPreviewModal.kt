@@ -384,7 +384,7 @@ fun AgpSheetPreviewModal(
                             } else {
                                 Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(text = if (isRu) "Сохранить PDF" else "Save PDF", fontWeight = FontWeight.Bold)
+                                Text(text = if (isRu) "Сохранить" else "Save PDF", fontWeight = FontWeight.Bold)
                             }
                         }
 

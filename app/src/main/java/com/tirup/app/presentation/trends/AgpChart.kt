@@ -169,11 +169,12 @@ fun AgpChart(
                 color = textCol
             }
 
-            val hourLabels = listOf("00:00", "03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00", "24:00")
+            val hourLabels = listOf("00", "03", "06", "09", "12", "15", "18", "21", "24")
             hourLabels.forEachIndexed { idx, lbl ->
                 val xPos = (idx.toFloat() / 8f) * width
-                val textX = (xPos - 30f).coerceIn(0f, width - 60f)
-                drawContext.canvas.nativeCanvas.drawText(lbl, textX, height - 2f, labelPaint)
+                val textX = (xPos - 14f).coerceIn(2f, width - 28f)
+                val textY = if (idx % 2 == 0) height - 16f else height - 2f
+                drawContext.canvas.nativeCanvas.drawText(lbl, textX, textY, labelPaint)
             }
 
             // Y-axis target labels

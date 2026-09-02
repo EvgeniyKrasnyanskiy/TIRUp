@@ -24,9 +24,12 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -46,6 +49,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,6 +90,7 @@ fun SettingsScreen(
     val profile = settings.patientProfile
     val currentYear = Calendar.getInstance().get(Calendar.YEAR)
     var showHelpDialog by remember { mutableStateOf(false) }
+    var showAdvancedSettings by rememberSaveable { mutableStateOf(false) }
 
     val isRu = settings.language.equals("RU", ignoreCase = true)
 
@@ -141,8 +146,147 @@ fun SettingsScreen(
             }
         }
 
-        // Section 1: Patient Profile with Dropdowns and Dynamic Calculations
+        // Section 1: Display Settings (Always Visible at the Top)
         item {
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = stringResource(R.string.section_preferences),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    // Language Selector
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(imageVector = Icons.Default.Language, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = stringResource(R.string.pref_language), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            LanguageChip(
+                                label = "Русский",
+                                isSelected = settings.language.equals("RU", ignoreCase = true),
+                                onClick = { viewModel.setLanguage("RU") }
+                            )
+                            LanguageChip(
+                                label = "English",
+                                isSelected = settings.language.equals("EN", ignoreCase = true),
+                                onClick = { viewModel.setLanguage("EN") }
+                            )
+                        }
+                    }
+
+                    // Unit Selector
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(imageVector = Icons.Default.Tune, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = stringResource(R.string.pref_unit), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            LanguageChip(
+                                label = "mmol/L",
+                                isSelected = settings.unit == GlucoseUnit.MMOL_L,
+                                onClick = { viewModel.setUnit(GlucoseUnit.MMOL_L) }
+                            )
+                            LanguageChip(
+                                label = "mg/dL",
+                                isSelected = settings.unit == GlucoseUnit.MG_DL,
+                                onClick = { viewModel.setUnit(GlucoseUnit.MG_DL) }
+                            )
+                        }
+                    }
+
+                    // Theme Mode Selector
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(imageVector = Icons.Default.Brightness4, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = if (isRu) "Тема" else "Theme", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            LanguageChip(
+                                label = if (isRu) "🌙 Тёмная" else "🌙 Dark",
+                                isSelected = settings.themeMode == com.tirup.app.domain.model.ThemeMode.DARK,
+                                onClick = { viewModel.setThemeMode(com.tirup.app.domain.model.ThemeMode.DARK) }
+                            )
+                            LanguageChip(
+                                label = if (isRu) "☀️ Светлая" else "☀️ Light",
+                                isSelected = settings.themeMode != com.tirup.app.domain.model.ThemeMode.DARK,
+                                onClick = { viewModel.setThemeMode(com.tirup.app.domain.model.ThemeMode.LIGHT) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section 2: Expandable Additional Settings Header
+        item {
+            BentoCard(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { showAdvancedSettings = !showAdvancedSettings }
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = null,
+                            tint = ActionBlue,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = if (isRu) "Дополнительные настройки" else "Advanced Settings",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (isRu) "Профиль, время сна, стандарты, очистка"
+                                       else "Profile, sleep window, standards, clear",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Icon(
+                        imageVector = if (showAdvancedSettings) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        if (showAdvancedSettings) {
+            // Section 2.1: Patient Profile with Dropdowns and Dynamic Calculations
+            item {
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -270,97 +414,6 @@ fun SettingsScreen(
                             viewModel.autoUpdatePatientProfile(profile.copy(therapyType = newTherapy))
                         }
                     )
-                }
-            }
-        }
-
-        // Section 2: Preferences (Language & Unit)
-        item {
-            BentoCard(modifier = Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = stringResource(R.string.section_preferences),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    // Language Selector
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Default.Language, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = stringResource(R.string.pref_language), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            LanguageChip(
-                                label = "Русский",
-                                isSelected = settings.language.equals("RU", ignoreCase = true),
-                                onClick = { viewModel.setLanguage("RU") }
-                            )
-                            LanguageChip(
-                                label = "English",
-                                isSelected = settings.language.equals("EN", ignoreCase = true),
-                                onClick = { viewModel.setLanguage("EN") }
-                            )
-                        }
-                    }
-
-                    // Unit Selector
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Default.Tune, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = stringResource(R.string.pref_unit), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            LanguageChip(
-                                label = "mmol/L",
-                                isSelected = settings.unit == GlucoseUnit.MMOL_L,
-                                onClick = { viewModel.setUnit(GlucoseUnit.MMOL_L) }
-                            )
-                            LanguageChip(
-                                label = "mg/dL",
-                                isSelected = settings.unit == GlucoseUnit.MG_DL,
-                                onClick = { viewModel.setUnit(GlucoseUnit.MG_DL) }
-                            )
-                        }
-                    }
-
-                    // Theme Mode Selector
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Default.Brightness4, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = if (isRu) "Тема" else "Theme", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            LanguageChip(
-                                label = if (isRu) "🌙 Тёмная" else "🌙 Dark",
-                                isSelected = settings.themeMode == com.tirup.app.domain.model.ThemeMode.DARK,
-                                onClick = { viewModel.setThemeMode(com.tirup.app.domain.model.ThemeMode.DARK) }
-                            )
-                            LanguageChip(
-                                label = if (isRu) "☀️ Светлая" else "☀️ Light",
-                                isSelected = settings.themeMode != com.tirup.app.domain.model.ThemeMode.DARK,
-                                onClick = { viewModel.setThemeMode(com.tirup.app.domain.model.ThemeMode.LIGHT) }
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -505,6 +558,7 @@ fun SettingsScreen(
                 }
             }
         }
+    }
 
         // Section 5: Community Telegram Text Link
         item {
