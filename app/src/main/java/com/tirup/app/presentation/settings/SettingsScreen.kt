@@ -262,7 +262,128 @@ fun SettingsScreen(
             }
         }
 
-        // Section 2: Expandable Additional Settings Header
+        // Section 2: Smart Alerts (3 Tiers) - Master Card
+        item {
+            var isAlertsExpanded by rememberSaveable { mutableStateOf(false) }
+            val alerts = settings.alertSettings
+
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isAlertsExpanded = !isAlertsExpanded },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.NotificationsActive,
+                                contentDescription = null,
+                                tint = if (alerts.isAlertsMasterEnabled) PrimaryEmerald else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = if (isRu) "Умные оповещения (3 уровня)" else "Smart Alerts (3 Tiers)",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (!alerts.isAlertsMasterEnabled) {
+                                        if (isRu) "Все оповещения выключены" else "All alerts disabled"
+                                    } else {
+                                        if (isRu) "Предиктивные, основные и критические" else "Predictive, main and critical alarms"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (!alerts.isAlertsMasterEnabled) ColorVeryLow else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(
+                                checked = alerts.isAlertsMasterEnabled,
+                                onCheckedChange = { isEnabled ->
+                                    viewModel.updateAlertSettings(alerts.copy(isAlertsMasterEnabled = isEnabled))
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = PrimaryEmerald
+                                )
+                            )
+                            IconButton(onClick = { isAlertsExpanded = !isAlertsExpanded }) {
+                                Icon(
+                                    imageVector = if (isAlertsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    if (isAlertsExpanded && alerts.isAlertsMasterEnabled) {
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        // Tier 1: Predictive (Soft)
+                        AlertTierConfigRow(
+                            title = if (isRu) "1. Мягкие предиктивные (за 15 мин)" else "1. Soft Predictive (~15 min)",
+                            subtitle = if (isRu) "Упреждающий сигнал до выхода за диапазон" else "Warning before crossing target range",
+                            enabled = alerts.isPredictiveEnabled,
+                            onEnabledChange = { viewModel.updateAlertSettings(alerts.copy(isPredictiveEnabled = it)) },
+                            vibrate = alerts.isPredictiveVibrate,
+                            onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isPredictiveVibrate = it)) },
+                            flash = alerts.isPredictiveFlash,
+                            onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isPredictiveFlash = it)) },
+                            accentColor = ActionBlue,
+                            onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.PREDICTIVE) },
+                            isRu = isRu
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Tier 2: Main (5 points confirmed)
+                        AlertTierConfigRow(
+                            title = if (isRu) "2. Основные (5 точек вне нормы)" else "2. Main (5 points confirmed)",
+                            subtitle = if (isRu) "Тройной сигнал при подтверждённом выходе" else "Triple beep on confirmed out-of-range",
+                            enabled = alerts.isMainEnabled,
+                            onEnabledChange = { viewModel.updateAlertSettings(alerts.copy(isMainEnabled = it)) },
+                            vibrate = alerts.isMainVibrate,
+                            onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isMainVibrate = it)) },
+                            flash = alerts.isMainFlash,
+                            onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isMainFlash = it)) },
+                            accentColor = ColorHigh,
+                            onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.MAIN) },
+                            isRu = isRu
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Tier 3: Critical (Prolonged / Extreme)
+                        AlertTierConfigRow(
+                            title = if (isRu) "3. Критические и затяжные («кричащие»)" else "3. Critical & Prolonged (Alarms)",
+                            subtitle = if (isRu) "Сирена при гипо >20 мин, гипер >90 мин или <3.0 / >13.9" else "Siren on hypo >20m, hyper >90m or <3.0 / >13.9",
+                            enabled = alerts.isCriticalEnabled,
+                            onEnabledChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalEnabled = it)) },
+                            vibrate = alerts.isCriticalVibrate,
+                            onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalVibrate = it)) },
+                            flash = alerts.isCriticalFlash,
+                            onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalFlash = it)) },
+                            accentColor = ColorVeryLow,
+                            onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.CRITICAL) },
+                            isRu = isRu
+                        )
+                    }
+                }
+            }
+        }
+
+        // Section 3: Expandable Additional Settings Header
         item {
             BentoCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -410,111 +531,7 @@ fun SettingsScreen(
             }
         }
 
-        // Section 4: Smart Alerts (3 Tiers)
-        item {
-            var isAlertsExpanded by rememberSaveable { mutableStateOf(false) }
-            val alerts = settings.alertSettings
-
-            BentoCard(modifier = Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { isAlertsExpanded = !isAlertsExpanded },
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.NotificationsActive,
-                                contentDescription = null,
-                                tint = PrimaryEmerald,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Column {
-                                Text(
-                                    text = if (isRu) "Умные оповещения (3 уровня)" else "Smart Alerts (3 Tiers)",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = if (isRu) "Предиктивные, основные и критические" else "Predictive, main and critical alarms",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        IconButton(onClick = { isAlertsExpanded = !isAlertsExpanded }) {
-                            Icon(
-                                imageVector = if (isAlertsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    if (isAlertsExpanded) {
-                        Spacer(modifier = Modifier.height(2.dp))
-
-                        // Tier 1: Predictive (Soft)
-                        AlertTierConfigRow(
-                            title = if (isRu) "1. Мягкие предиктивные (за 15 мин)" else "1. Soft Predictive (~15 min)",
-                            subtitle = if (isRu) "Упреждающий сигнал до выхода за диапазон" else "Warning before crossing target range",
-                            enabled = alerts.isPredictiveEnabled,
-                            onEnabledChange = { viewModel.updateAlertSettings(alerts.copy(isPredictiveEnabled = it)) },
-                            vibrate = alerts.isPredictiveVibrate,
-                            onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isPredictiveVibrate = it)) },
-                            flash = alerts.isPredictiveFlash,
-                            onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isPredictiveFlash = it)) },
-                            accentColor = ActionBlue,
-                            onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.PREDICTIVE) },
-                            isRu = isRu
-                        )
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // Tier 2: Main (5 points confirmed)
-                        AlertTierConfigRow(
-                            title = if (isRu) "2. Основные (5 точек вне нормы)" else "2. Main (5 points confirmed)",
-                            subtitle = if (isRu) "Сигнал при подтверждённом факте гипо/гипер" else "Confirmed alert on out-of-range glucose",
-                            enabled = alerts.isMainEnabled,
-                            onEnabledChange = { viewModel.updateAlertSettings(alerts.copy(isMainEnabled = it)) },
-                            vibrate = alerts.isMainVibrate,
-                            onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isMainVibrate = it)) },
-                            flash = alerts.isMainFlash,
-                            onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isMainFlash = it)) },
-                            accentColor = ColorHigh,
-                            onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.MAIN) },
-                            isRu = isRu
-                        )
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // Tier 3: Critical (Prolonged / Extreme)
-                        AlertTierConfigRow(
-                            title = if (isRu) "3. Критические и затяжные («кричащие»)" else "3. Critical & Prolonged (Alarms)",
-                            subtitle = if (isRu) "Сирена при гипо >20 мин, гипер >90 мин или <3.0 / >13.9" else "Siren on hypo >20m, hyper >90m or <3.0 / >13.9",
-                            enabled = alerts.isCriticalEnabled,
-                            onEnabledChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalEnabled = it)) },
-                            vibrate = alerts.isCriticalVibrate,
-                            onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalVibrate = it)) },
-                            flash = alerts.isCriticalFlash,
-                            onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalFlash = it)) },
-                            accentColor = ColorVeryLow,
-                            onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.CRITICAL) },
-                            isRu = isRu
-                        )
-                    }
-                }
-            }
-        }
-
-        // Section 5: Auto-Backup
+        // Section 4: Auto-Backup
         item {
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

@@ -162,9 +162,11 @@ object GlucoseAlertManager {
         settings: UserSettings
     ) {
         if (recentReadings.isEmpty()) return
+        val alerts = settings.alertSettings
+        if (!alerts.isAlertsMasterEnabled) return
+
         initChannels(context)
 
-        val alerts = settings.alertSettings
         val targetRanges = settings.targetRanges
         val sorted = recentReadings.sortedBy { it.timestamp }
         val latest = sorted.last()
@@ -381,6 +383,8 @@ object GlucoseAlertManager {
         if (flash) {
             triggerFlashlight(context, tier)
         }
+
+        MedicalSoundPlayer.playSound(tier)
 
         try {
             nm.notify(notificationId, builder.build())

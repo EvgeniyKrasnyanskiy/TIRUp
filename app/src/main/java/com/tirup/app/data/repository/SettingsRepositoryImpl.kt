@@ -52,6 +52,7 @@ class SettingsRepositoryImpl(
             .putLong(KEY_LAST_BACKUP_TIMESTAMP, settings.lastBackupTimestamp)
             .putBoolean(KEY_HAS_SEEN_ONBOARDING, settings.hasSeenOnboarding)
             // Alert Settings
+            .putBoolean(KEY_ALERT_MASTER_ENABLED, settings.alertSettings.isAlertsMasterEnabled)
             .putBoolean(KEY_ALERT_PREDICTIVE_ENABLED, settings.alertSettings.isPredictiveEnabled)
             .putInt(KEY_ALERT_PREDICTIVE_MINUTES, settings.alertSettings.predictiveMinutesAhead)
             .putBoolean(KEY_ALERT_PREDICTIVE_VIBRATE, settings.alertSettings.isPredictiveVibrate)
@@ -139,6 +140,7 @@ class SettingsRepositoryImpl(
             lastBackupTimestamp = lastBackupTimestamp,
             hasSeenOnboarding = hasSeenOnboarding,
             alertSettings = AlertSettings(
+                isAlertsMasterEnabled = prefs.getBoolean(KEY_ALERT_MASTER_ENABLED, true),
                 isPredictiveEnabled = prefs.getBoolean(KEY_ALERT_PREDICTIVE_ENABLED, true),
                 predictiveMinutesAhead = prefs.getInt(KEY_ALERT_PREDICTIVE_MINUTES, 15),
                 isPredictiveVibrate = prefs.getBoolean(KEY_ALERT_PREDICTIVE_VIBRATE, true),
@@ -184,6 +186,7 @@ class SettingsRepositoryImpl(
         private const val KEY_LAST_BACKUP_TIMESTAMP = "key_last_backup_timestamp"
         private const val KEY_HAS_SEEN_ONBOARDING = "key_has_seen_onboarding"
 
+        private const val KEY_ALERT_MASTER_ENABLED = "key_alert_master_enabled"
         private const val KEY_ALERT_PREDICTIVE_ENABLED = "key_alert_predictive_enabled"
         private const val KEY_ALERT_PREDICTIVE_MINUTES = "key_alert_predictive_minutes"
         private const val KEY_ALERT_PREDICTIVE_VIBRATE = "key_alert_predictive_vibrate"
