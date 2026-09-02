@@ -40,6 +40,7 @@ class TirupApplication : Application() {
 
         registerDynamicReceivers()
 
+        com.tirup.app.data.alert.GlucoseAlertManager.initChannels(this)
         com.tirup.app.data.backup.AutoBackupManager.scheduleNextDailyBackup(this)
 
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO).launch {

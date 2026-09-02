@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tirup.app.data.backup.AutoBackupManager
 import com.tirup.app.data.local.AppDatabase
+import com.tirup.app.domain.model.AlertSettings
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.domain.model.TargetRanges
@@ -129,6 +130,14 @@ class SettingsViewModel(
             } else {
                 AutoBackupManager.cancelDailyBackup(context)
             }
+        }
+    }
+
+    fun updateAlertSettings(alerts: AlertSettings) {
+        viewModelScope.launch {
+            val updated = _uiState.value.userSettings.copy(alertSettings = alerts)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
         }
     }
 

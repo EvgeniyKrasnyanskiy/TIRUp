@@ -132,7 +132,8 @@ data class UserSettings(
     val patientProfile: PatientProfile = PatientProfile(),
     val isAutoBackupEnabled: Boolean = true,
     val lastBackupTimestamp: Long = 0L,
-    val hasSeenOnboarding: Boolean = false
+    val hasSeenOnboarding: Boolean = false,
+    val alertSettings: AlertSettings = AlertSettings()
 )
 
 fun localizeTherapyType(therapy: String, isRu: Boolean): String {

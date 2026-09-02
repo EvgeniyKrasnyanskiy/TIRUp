@@ -2,6 +2,7 @@ package com.tirup.app.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.tirup.app.domain.model.AlertSettings
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.domain.model.TargetMode
@@ -50,6 +51,22 @@ class SettingsRepositoryImpl(
             .putBoolean(KEY_IS_AUTO_BACKUP_ENABLED, settings.isAutoBackupEnabled)
             .putLong(KEY_LAST_BACKUP_TIMESTAMP, settings.lastBackupTimestamp)
             .putBoolean(KEY_HAS_SEEN_ONBOARDING, settings.hasSeenOnboarding)
+            // Alert Settings
+            .putBoolean(KEY_ALERT_PREDICTIVE_ENABLED, settings.alertSettings.isPredictiveEnabled)
+            .putInt(KEY_ALERT_PREDICTIVE_MINUTES, settings.alertSettings.predictiveMinutesAhead)
+            .putBoolean(KEY_ALERT_PREDICTIVE_VIBRATE, settings.alertSettings.isPredictiveVibrate)
+            .putBoolean(KEY_ALERT_PREDICTIVE_FLASH, settings.alertSettings.isPredictiveFlash)
+            .putBoolean(KEY_ALERT_MAIN_ENABLED, settings.alertSettings.isMainEnabled)
+            .putInt(KEY_ALERT_MAIN_POINTS, settings.alertSettings.mainConsecutivePoints)
+            .putBoolean(KEY_ALERT_MAIN_VIBRATE, settings.alertSettings.isMainVibrate)
+            .putBoolean(KEY_ALERT_MAIN_FLASH, settings.alertSettings.isMainFlash)
+            .putBoolean(KEY_ALERT_CRITICAL_ENABLED, settings.alertSettings.isCriticalEnabled)
+            .putInt(KEY_ALERT_CRITICAL_HYPO_MIN, settings.alertSettings.criticalHypoMinutes)
+            .putInt(KEY_ALERT_CRITICAL_HYPER_MIN, settings.alertSettings.criticalHyperMinutes)
+            .putBoolean(KEY_ALERT_CRITICAL_VIBRATE, settings.alertSettings.isCriticalVibrate)
+            .putBoolean(KEY_ALERT_CRITICAL_FLASH, settings.alertSettings.isCriticalFlash)
+            .putInt(KEY_ALERT_SNOOZE_HYPO, settings.alertSettings.snoozeHypoMinutes)
+            .putInt(KEY_ALERT_SNOOZE_HYPER, settings.alertSettings.snoozeHyperMinutes)
             .apply()
 
         _settingsFlow.value = settings
@@ -120,7 +137,24 @@ class SettingsRepositoryImpl(
             patientProfile = profile,
             isAutoBackupEnabled = isAutoBackupEnabled,
             lastBackupTimestamp = lastBackupTimestamp,
-            hasSeenOnboarding = hasSeenOnboarding
+            hasSeenOnboarding = hasSeenOnboarding,
+            alertSettings = AlertSettings(
+                isPredictiveEnabled = prefs.getBoolean(KEY_ALERT_PREDICTIVE_ENABLED, true),
+                predictiveMinutesAhead = prefs.getInt(KEY_ALERT_PREDICTIVE_MINUTES, 15),
+                isPredictiveVibrate = prefs.getBoolean(KEY_ALERT_PREDICTIVE_VIBRATE, true),
+                isPredictiveFlash = prefs.getBoolean(KEY_ALERT_PREDICTIVE_FLASH, false),
+                isMainEnabled = prefs.getBoolean(KEY_ALERT_MAIN_ENABLED, true),
+                mainConsecutivePoints = prefs.getInt(KEY_ALERT_MAIN_POINTS, 5),
+                isMainVibrate = prefs.getBoolean(KEY_ALERT_MAIN_VIBRATE, true),
+                isMainFlash = prefs.getBoolean(KEY_ALERT_MAIN_FLASH, false),
+                isCriticalEnabled = prefs.getBoolean(KEY_ALERT_CRITICAL_ENABLED, true),
+                criticalHypoMinutes = prefs.getInt(KEY_ALERT_CRITICAL_HYPO_MIN, 20),
+                criticalHyperMinutes = prefs.getInt(KEY_ALERT_CRITICAL_HYPER_MIN, 90),
+                isCriticalVibrate = prefs.getBoolean(KEY_ALERT_CRITICAL_VIBRATE, true),
+                isCriticalFlash = prefs.getBoolean(KEY_ALERT_CRITICAL_FLASH, true),
+                snoozeHypoMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPO, 15),
+                snoozeHyperMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPER, 45)
+            )
         )
     }
 
@@ -149,5 +183,21 @@ class SettingsRepositoryImpl(
         private const val KEY_IS_AUTO_BACKUP_ENABLED = "key_is_auto_backup_enabled"
         private const val KEY_LAST_BACKUP_TIMESTAMP = "key_last_backup_timestamp"
         private const val KEY_HAS_SEEN_ONBOARDING = "key_has_seen_onboarding"
+
+        private const val KEY_ALERT_PREDICTIVE_ENABLED = "key_alert_predictive_enabled"
+        private const val KEY_ALERT_PREDICTIVE_MINUTES = "key_alert_predictive_minutes"
+        private const val KEY_ALERT_PREDICTIVE_VIBRATE = "key_alert_predictive_vibrate"
+        private const val KEY_ALERT_PREDICTIVE_FLASH = "key_alert_predictive_flash"
+        private const val KEY_ALERT_MAIN_ENABLED = "key_alert_main_enabled"
+        private const val KEY_ALERT_MAIN_POINTS = "key_alert_main_points"
+        private const val KEY_ALERT_MAIN_VIBRATE = "key_alert_main_vibrate"
+        private const val KEY_ALERT_MAIN_FLASH = "key_alert_main_flash"
+        private const val KEY_ALERT_CRITICAL_ENABLED = "key_alert_critical_enabled"
+        private const val KEY_ALERT_CRITICAL_HYPO_MIN = "key_alert_critical_hypo_min"
+        private const val KEY_ALERT_CRITICAL_HYPER_MIN = "key_alert_critical_hyper_min"
+        private const val KEY_ALERT_CRITICAL_VIBRATE = "key_alert_critical_vibrate"
+        private const val KEY_ALERT_CRITICAL_FLASH = "key_alert_critical_flash"
+        private const val KEY_ALERT_SNOOZE_HYPO = "key_alert_snooze_hypo"
+        private const val KEY_ALERT_SNOOZE_HYPER = "key_alert_snooze_hyper"
     }
 }

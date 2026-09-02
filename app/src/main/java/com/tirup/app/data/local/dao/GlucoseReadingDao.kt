@@ -16,6 +16,9 @@ interface GlucoseReadingDao {
     @Query("SELECT * FROM glucose_readings ORDER BY timestamp DESC LIMIT :limit")
     fun getRecentReadings(limit: Int): Flow<List<GlucoseReadingEntity>>
 
+    @Query("SELECT * FROM glucose_readings ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getRecentReadingsSync(limit: Int): List<GlucoseReadingEntity>
+
     @Query("SELECT * FROM glucose_readings WHERE timestamp BETWEEN :startTime AND :endTime ORDER BY timestamp ASC")
     fun getReadingsBetween(startTime: Long, endTime: Long): Flow<List<GlucoseReadingEntity>>
 

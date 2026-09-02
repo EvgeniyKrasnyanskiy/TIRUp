@@ -10,6 +10,7 @@ import com.tirup.app.domain.model.GlucoseReading
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class DexdripBroadcastReceiver : BroadcastReceiver() {
@@ -65,6 +66,14 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         )
                     )
                     Log.i(TAG, "Successfully persisted reading into database.")
+                    val recentEntities = app.database.glucoseReadingDao().getRecentReadingsSync(25)
+                    val recentDomain = recentEntities.map { it.toDomain() }
+                    val userSettings = app.settingsRepository.getSettings().first()
+                    com.tirup.app.data.alert.GlucoseAlertManager.checkAndAlert(
+                        context = context.applicationContext,
+                        recentReadings = recentDomain,
+                        settings = userSettings
+                    )
                     com.tirup.app.data.backup.AutoBackupManager.maybeTriggerAutoBackup(
                         context = context.applicationContext,
                         database = app.database,

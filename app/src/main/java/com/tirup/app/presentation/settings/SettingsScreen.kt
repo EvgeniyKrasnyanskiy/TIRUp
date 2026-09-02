@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
@@ -36,6 +37,8 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -406,7 +409,106 @@ fun SettingsScreen(
             }
         }
 
-        // Section 4: Auto-Backup
+        // Section 4: Smart Alerts (3 Tiers)
+        item {
+            var isAlertsExpanded by rememberSaveable { mutableStateOf(false) }
+            val alerts = settings.alertSettings
+
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isAlertsExpanded = !isAlertsExpanded },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.NotificationsActive,
+                                contentDescription = null,
+                                tint = PrimaryEmerald,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = if (isRu) "Умные оповещения (3 уровня)" else "Smart Alerts (3 Tiers)",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (isRu) "Предиктивные, основные и критические" else "Predictive, main and critical alarms",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        IconButton(onClick = { isAlertsExpanded = !isAlertsExpanded }) {
+                            Icon(
+                                imageVector = if (isAlertsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    if (isAlertsExpanded) {
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        // Tier 1: Predictive
+                        AlertTierConfigRow(
+                            title = if (isRu) "1. Мягкие предиктивные (за 15 мин)" else "1. Soft Predictive (~15 min)",
+                            subtitle = if (isRu) "Упреждающий сигнал до выхода за диапазон" else "Warning before crossing target range",
+                            enabled = alerts.isPredictiveEnabled,
+                            onEnabledChange = { viewModel.updateAlertSettings(alerts.copy(isPredictiveEnabled = it)) },
+                            vibrate = alerts.isPredictiveVibrate,
+                            onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isPredictiveVibrate = it)) },
+                            flash = alerts.isPredictiveFlash,
+                            onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isPredictiveFlash = it)) },
+                            isRu = isRu
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Tier 2: Main (5 points confirmed)
+                        AlertTierConfigRow(
+                            title = if (isRu) "2. Основные (5 точек вне нормы)" else "2. Main (5 points confirmed)",
+                            subtitle = if (isRu) "Сигнал при подтверждённом факте гипо/гипер" else "Confirmed alert on out-of-range glucose",
+                            enabled = alerts.isMainEnabled,
+                            onEnabledChange = { viewModel.updateAlertSettings(alerts.copy(isMainEnabled = it)) },
+                            vibrate = alerts.isMainVibrate,
+                            onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isMainVibrate = it)) },
+                            flash = alerts.isMainFlash,
+                            onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isMainFlash = it)) },
+                            isRu = isRu
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Tier 3: Critical (Prolonged / Extreme)
+                        AlertTierConfigRow(
+                            title = if (isRu) "3. Критические и затяжные («кричащие»)" else "3. Critical & Prolonged (Alarms)",
+                            subtitle = if (isRu) "Сирена при гипо >20 мин, гипер >90 мин или <3.0 / >13.9" else "Siren on hypo >20m, hyper >90m or <3.0 / >13.9",
+                            enabled = alerts.isCriticalEnabled,
+                            onEnabledChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalEnabled = it)) },
+                            vibrate = alerts.isCriticalVibrate,
+                            onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalVibrate = it)) },
+                            flash = alerts.isCriticalFlash,
+                            onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalFlash = it)) },
+                            isRu = isRu,
+                            isCritical = true
+                        )
+                    }
+                }
+            }
+        }
+
+        // Section 5: Auto-Backup
         item {
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1118,6 +1220,102 @@ fun LanguageChip(
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
         )
+    }
+}
+
+@Composable
+private fun AlertTierConfigRow(
+    title: String,
+    subtitle: String,
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    vibrate: Boolean,
+    onVibrateChange: (Boolean) -> Unit,
+    flash: Boolean,
+    onFlashChange: (Boolean) -> Unit,
+    isRu: Boolean,
+    isCritical: Boolean = false
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isCritical) ColorVeryLow else MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = onEnabledChange,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = if (isCritical) ColorVeryLow else PrimaryEmerald
+                    )
+                )
+            }
+
+            if (enabled) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { onVibrateChange(!vibrate) }
+                    ) {
+                        Checkbox(
+                            checked = vibrate,
+                            onCheckedChange = onVibrateChange,
+                            colors = CheckboxDefaults.colors(checkedColor = PrimaryEmerald)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (isRu) "Вибрация" else "Vibration",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { onFlashChange(!flash) }
+                    ) {
+                        Checkbox(
+                            checked = flash,
+                            onCheckedChange = onFlashChange,
+                            colors = CheckboxDefaults.colors(checkedColor = PrimaryEmerald)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (isRu) "Вспышка" else "Flashlight",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
