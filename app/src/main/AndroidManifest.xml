@@ -72,6 +72,15 @@
             </intent-filter>
         </receiver>
 
+        <!-- Receiver for critical alarm notification actions (e.g. Dismiss) -->
+        <receiver
+            android:name=".data.receiver.AlertActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.tirup.app.ACTION_DISMISS_CRITICAL" />
+            </intent-filter>
+        </receiver>
+
         <!-- FileProvider for secure offline sharing of generated PDF medical reports -->
         <provider
             android:name="androidx.core.content.FileProvider"

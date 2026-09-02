@@ -289,14 +289,14 @@ fun SettingsScreen(
                             )
                             Column {
                                 Text(
-                                    text = if (isRu) "Умные оповещения (3 уровня)" else "Smart Alerts (3 Tiers)",
+                                    text = if (isRu) "Тревоги (3 уровня)" else "Alarms (3 Tiers)",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = if (!alerts.isAlertsMasterEnabled) {
-                                        if (isRu) "Все оповещения выключены" else "All alerts disabled"
+                                        if (isRu) "Все тревоги выключены" else "All alarms disabled"
                                     } else {
                                         if (isRu) "Предиктивные, основные и критические" else "Predictive, main and critical alarms"
                                     },
@@ -367,7 +367,7 @@ fun SettingsScreen(
                         // Tier 3: Critical (Prolonged / Extreme)
                         AlertTierConfigRow(
                             title = if (isRu) "3. Критические и затяжные («кричащие»)" else "3. Critical & Prolonged (Alarms)",
-                            subtitle = if (isRu) "Сирена при гипо >20 мин, гипер >90 мин или <3.0 / >13.9" else "Siren on hypo >20m, hyper >90m or <3.0 / >13.9",
+                            subtitle = if (isRu) "Сирена ~12 сек при гипо >20 мин, гипер >90 мин или <3.0 / >13.9" else "Siren ~12s on hypo >20m, hyper >90m or <3.0 / >13.9",
                             enabled = alerts.isCriticalEnabled,
                             onEnabledChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalEnabled = it)) },
                             vibrate = alerts.isCriticalVibrate,

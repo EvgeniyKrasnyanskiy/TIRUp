@@ -129,6 +129,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        com.tirup.app.data.alert.GlucoseAlertManager.dismissCriticalAlarm(this, fromUser = true)
+    }
+
     @Composable
     private fun ProvideLocalizedApp(
         languageCode: String,

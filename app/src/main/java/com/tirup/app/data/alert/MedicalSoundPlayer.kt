@@ -17,18 +17,32 @@ object MedicalSoundPlayer {
 
     private val audioScope = CoroutineScope(Dispatchers.IO)
 
+    @Volatile
+    private var isCriticalActive = false
+
+    private var currentAudioTrack: AudioTrack? = null
+
     fun playSound(tier: AlertTier) {
         audioScope.launch {
             try {
                 when (tier) {
                     AlertTier.PREDICTIVE -> playPredictiveChime()
                     AlertTier.MAIN -> playTripleMainBeep()
-                    AlertTier.CRITICAL -> playCriticalAlarmSiren()
+                    AlertTier.CRITICAL -> playCriticalAlarmSeries()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to play synthesized medical sound for tier=$tier: ${e.message}")
             }
         }
+    }
+
+    fun stopAll() {
+        isCriticalActive = false
+        try {
+            currentAudioTrack?.stop()
+            currentAudioTrack?.release()
+            currentAudioTrack = null
+        } catch (_: Exception) {}
     }
 
     /**
@@ -76,25 +90,34 @@ object MedicalSoundPlayer {
 
     /**
      * Tier 3: High-urgency alternating alarm siren (USAGE_ALARM).
+     * Plays a series lasting ~12 seconds (8 bursts with 300ms pause), cancellable anytime.
      */
-    private fun playCriticalAlarmSiren() {
-        val pulse1 = generateSineWave(freq = 1046.5, durationMs = 180, volume = 1.0f)
-        val pulse2 = generateSineWave(freq = 784.0, durationMs = 180, volume = 1.0f)
-        val pulse3 = generateSineWave(freq = 1046.5, durationMs = 180, volume = 1.0f)
-        val pulse4 = generateSineWave(freq = 784.0, durationMs = 180, volume = 1.0f)
-        val pulse5 = generateSineWave(freq = 1174.66, durationMs = 380, volume = 1.0f)
+    private fun playCriticalAlarmSeries() {
+        isCriticalActive = true
 
-        val totalLen = pulse1.size + pulse2.size + pulse3.size + pulse4.size + pulse5.size
-        val audioData = ShortArray(totalLen)
+        val pulse1 = generateSineWave(freq = 1046.5, durationMs = 150, volume = 1.0f)
+        val pulse2 = generateSineWave(freq = 784.0, durationMs = 150, volume = 1.0f)
+        val pulse3 = generateSineWave(freq = 1046.5, durationMs = 150, volume = 1.0f)
+        val pulse4 = generateSineWave(freq = 784.0, durationMs = 150, volume = 1.0f)
+        val pulse5 = generateSineWave(freq = 1174.66, durationMs = 320, volume = 1.0f)
+        val pause = ShortArray((SAMPLE_RATE * 0.35).toInt()) // 350ms pause
+
+        val burstLen = pulse1.size + pulse2.size + pulse3.size + pulse4.size + pulse5.size + pause.size
+        val burstData = ShortArray(burstLen)
         var offset = 0
+        System.arraycopy(pulse1, 0, burstData, offset, pulse1.size); offset += pulse1.size
+        System.arraycopy(pulse2, 0, burstData, offset, pulse2.size); offset += pulse2.size
+        System.arraycopy(pulse3, 0, burstData, offset, pulse3.size); offset += pulse3.size
+        System.arraycopy(pulse4, 0, burstData, offset, pulse4.size); offset += pulse4.size
+        System.arraycopy(pulse5, 0, burstData, offset, pulse5.size); offset += pulse5.size
+        System.arraycopy(pause, 0, burstData, offset, pause.size)
 
-        System.arraycopy(pulse1, 0, audioData, offset, pulse1.size); offset += pulse1.size
-        System.arraycopy(pulse2, 0, audioData, offset, pulse2.size); offset += pulse2.size
-        System.arraycopy(pulse3, 0, audioData, offset, pulse3.size); offset += pulse3.size
-        System.arraycopy(pulse4, 0, audioData, offset, pulse4.size); offset += pulse4.size
-        System.arraycopy(pulse5, 0, audioData, offset, pulse5.size)
-
-        playRawPcm(audioData, usage = AudioAttributes.USAGE_ALARM)
+        // Repeat 8 times (~12 seconds total), but stop immediately if cancelled
+        for (cycle in 0 until 8) {
+            if (!isCriticalActive) break
+            playRawPcm(burstData, usage = AudioAttributes.USAGE_ALARM)
+        }
+        isCriticalActive = false
     }
 
     private fun generateSineWave(freq: Double, durationMs: Int, volume: Float): ShortArray {
@@ -148,15 +171,23 @@ object MedicalSoundPlayer {
                 AudioTrack.MODE_STATIC,
                 android.media.AudioManager.AUDIO_SESSION_ID_GENERATE
             )
+            currentAudioTrack = track
             track.write(data, 0, data.size)
             track.play()
-            Thread.sleep((data.size.toDouble() / SAMPLE_RATE * 1000.0).toLong() + 50L)
+            val sleepTimeMs = (data.size.toDouble() / SAMPLE_RATE * 1000.0).toLong() + 30L
+            val step = 100L
+            var elapsed = 0L
+            while (elapsed < sleepTimeMs && (usage != AudioAttributes.USAGE_ALARM || isCriticalActive)) {
+                Thread.sleep(step)
+                elapsed += step
+            }
         } catch (e: Exception) {
             Log.e(TAG, "AudioTrack playback error: ${e.message}")
         } finally {
             try {
                 track?.stop()
                 track?.release()
+                if (currentAudioTrack == track) currentAudioTrack = null
             } catch (_: Exception) {}
         }
     }

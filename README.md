@@ -40,10 +40,24 @@
    - Поддержка данных пациента (ФИО, возраст, стаж диабета, вид инсулинотерапии) и автоматического клинического заключения.
    - Предпросмотр перед печатью, сохранение в файл и отправка через системный диалог Android.
 
-7. **Импорт ретроспективных данных**:
+7. **3-уровневая система тревог (Smart 3-Tier Alarms)**:
+   - **Уровень 1 (Предиктивный)**: математический регрессионный прогноз выхода за пределы диапазона за 15 минут с мягким перезвоном.
+   - **Уровень 2 (Основной)**: подтверждённый выход 5 точек за границы диапазона, выразительный тройной медицинский сигнал с паузой 1.5 сек.
+   - **Уровень 3 (Критический «кричащий»)**: серия громкой сирены ~12 сек на аудиопотоке будильника (`USAGE_ALARM`) со стробоскопом вспышки при экстремальных значениях (<3.0 / >13.9) или затяжном гипо/гипер.
+   - **Адаптивный клинический Снуз (Smart Adaptive Snooze)**:
+     - *При гипо*: 15 минут с защитой от комы (мгновенный повтор сирены, если сахар падает ниже 2.8 или продолжает обваливаться).
+     - *При гипер*: 30 минут начальной паузы для разворачивания инсулина; продление еще на 15 минут, если сахар начал снижаться; реэскалация сирены через 30–45 минут, если сахар не падает (подозрение на загиб канюли/нехватку болюса).
+   - Кнопка глушения прямо в шторке «✓ Принято», а также автоглушение при взятии в руки/разблокировке экрана.
+   - Программный синтезатор медицинских звуков (чистый синус `AudioTrack`, одинаковое качественное звучание на любом смартфоне).
+
+8. **Автоматический ежедневный бэкап без системных разрешений**:
+   - Ежедневное резервное копирование базы данных строго в **23:59:59** через точный будильник `AlarmManager.RTC_WAKEUP`.
+   - Сохранение в защищённую изолированную директорию приложения `Android/data/com.tirup.app/files/Backups` без запроса опасных системных разрешений хранилища.
+
+9. **Импорт ретроспективных данных**:
    - Загрузка архивов баз данных xDrip+ (`.zip`, `.sqlite`, `.csv`) для построения отчётов за 7, 14, 30, 90 дней или за всё время наблюдения.
 
-8. **Локализация и темы**:
+10. **Локализация и темы**:
    - Полная поддержка русского (`RU`) и английского (`EN`) языков интерфейса и отчётов.
    - Тёмная (Dark Bento), светлая (Light) и системная (Auto) темы оформления.
 
@@ -132,6 +146,8 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - **Dual Units**: Seamless switching between `mmol/L` and `mg/dL`.
 - **Clinical Metrics**: Real-time TIR, TING, TBR, TAR, %CV, eA1c, GRI (Glycemia Risk Index), GVI, and PGS according to international ATTD consensus.
 - **AGP PDF Reports**: One-click generation of official Ambulatory Glucose Profile sheets with patient profiles, therapy info, and 24-hour percentile curves.
+- **Smart 3-Tier Alarms**: Soft predictive forecasts (~15 min ahead), confirmed 5-point alerts (triple beep with 1.5s pause), and screaming critical sirens (~12s on `USAGE_ALARM` with flashlight strobe) featuring smart adaptive snooze for hypo/hyper.
+- **Permissionless Auto-Backup**: Daily automated database backup at 23:59:59 via exact RTC AlarmManager directly into app sandbox without asking dangerous storage permissions.
 - **Full Localization**: Russian and English language support.
 - **Modern UI**: Clean Material 3 Bento Card design with Dark/Light mode support.
 
