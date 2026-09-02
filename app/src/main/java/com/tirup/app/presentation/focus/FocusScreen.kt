@@ -80,18 +80,16 @@ fun FocusScreen(
     val unit = userSettings.unit
     val goal = state.compensatorGoal
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        item { Spacer(modifier = Modifier.height(4.dp)) }
-
-        // Top Header with Menu Button, Title & Streak
-        item {
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Fixed Top Header with Menu Button, Title & Streak
+        Surface(
+            color = MaterialTheme.colorScheme.background,
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -124,7 +122,15 @@ fun FocusScreen(
             }
         }
 
-        // 1. Hero Card: Current Glucose
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item { Spacer(modifier = Modifier.height(2.dp)) }
+
+            // 1. Hero Card: Current Glucose
         item {
             HeroGlucoseCard(
                 latestReading = state.latestReading,
@@ -599,6 +605,7 @@ fun FocusScreen(
         }
 
         item { Spacer(modifier = Modifier.height(20.dp)) }
+    }
     }
 
     // Detail Popups

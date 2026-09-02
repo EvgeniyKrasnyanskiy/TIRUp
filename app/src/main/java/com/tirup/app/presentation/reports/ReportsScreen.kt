@@ -110,18 +110,16 @@ fun ReportsScreen(
 
     val isRu = state.userSettings.language.equals("RU", ignoreCase = true)
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        item { Spacer(modifier = Modifier.height(4.dp)) }
-
-        // Header Title with Menu
-        item {
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Fixed Top Header with Menu
+        Surface(
+            color = MaterialTheme.colorScheme.background,
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onOpenSettings) {
@@ -147,7 +145,15 @@ fun ReportsScreen(
             }
         }
 
-        // Section 1: Live Broadcast Report Card
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item { Spacer(modifier = Modifier.height(2.dp)) }
+
+            // Section 1: Live Broadcast Report Card
         item {
             LiveReportCard(
                 state = state,
@@ -175,6 +181,7 @@ fun ReportsScreen(
         }
 
         item { Spacer(modifier = Modifier.height(24.dp)) }
+    }
     }
 
     // Live Report AGP Sheet Preview Modal

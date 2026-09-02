@@ -86,18 +86,16 @@ fun TrendsScreen(
         )
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        item { Spacer(modifier = Modifier.height(4.dp)) }
-
-        // Top Header
-        item {
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Fixed Top Header
+        Surface(
+            color = MaterialTheme.colorScheme.background,
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onOpenSettings) {
@@ -116,7 +114,15 @@ fun TrendsScreen(
             }
         }
 
-        // Compact Period Selector (4 Primary + More Dropdown)
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item { Spacer(modifier = Modifier.height(2.dp)) }
+
+            // Compact Period Selector (4 Primary + More Dropdown)
         item {
             CompactPeriodSelector(
                 selectedPeriod = selectedPeriod,
@@ -780,6 +786,7 @@ fun TrendsScreen(
             }
 
         item { Spacer(modifier = Modifier.height(20.dp)) }
+    }
     }
 
     // Detail Popups
