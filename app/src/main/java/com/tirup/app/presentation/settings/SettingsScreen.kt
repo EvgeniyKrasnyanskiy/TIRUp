@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
@@ -460,7 +461,7 @@ fun SettingsScreen(
                     if (isAlertsExpanded) {
                         Spacer(modifier = Modifier.height(2.dp))
 
-                        // Tier 1: Predictive
+                        // Tier 1: Predictive (Soft)
                         AlertTierConfigRow(
                             title = if (isRu) "1. Мягкие предиктивные (за 15 мин)" else "1. Soft Predictive (~15 min)",
                             subtitle = if (isRu) "Упреждающий сигнал до выхода за диапазон" else "Warning before crossing target range",
@@ -470,10 +471,12 @@ fun SettingsScreen(
                             onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isPredictiveVibrate = it)) },
                             flash = alerts.isPredictiveFlash,
                             onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isPredictiveFlash = it)) },
+                            accentColor = ActionBlue,
+                            onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.PREDICTIVE) },
                             isRu = isRu
                         )
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
 
                         // Tier 2: Main (5 points confirmed)
                         AlertTierConfigRow(
@@ -485,10 +488,12 @@ fun SettingsScreen(
                             onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isMainVibrate = it)) },
                             flash = alerts.isMainFlash,
                             onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isMainFlash = it)) },
+                            accentColor = ColorHigh,
+                            onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.MAIN) },
                             isRu = isRu
                         )
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
 
                         // Tier 3: Critical (Prolonged / Extreme)
                         AlertTierConfigRow(
@@ -500,8 +505,9 @@ fun SettingsScreen(
                             onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalVibrate = it)) },
                             flash = alerts.isCriticalFlash,
                             onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalFlash = it)) },
-                            isRu = isRu,
-                            isCritical = true
+                            accentColor = ColorVeryLow,
+                            onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.CRITICAL) },
+                            isRu = isRu
                         )
                     }
                 }
@@ -1233,13 +1239,15 @@ private fun AlertTierConfigRow(
     onVibrateChange: (Boolean) -> Unit,
     flash: Boolean,
     onFlashChange: (Boolean) -> Unit,
-    isRu: Boolean,
-    isCritical: Boolean = false
+    accentColor: Color,
+    onTestClick: () -> Unit,
+    isRu: Boolean
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+        color = accentColor.copy(alpha = 0.08f),
+        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f))
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -1255,7 +1263,7 @@ private fun AlertTierConfigRow(
                         text = title,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = if (isCritical) ColorVeryLow else MaterialTheme.colorScheme.onSurface
+                        color = accentColor
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
@@ -1269,7 +1277,7 @@ private fun AlertTierConfigRow(
                     onCheckedChange = onEnabledChange,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = Color.White,
-                        checkedTrackColor = if (isCritical) ColorVeryLow else PrimaryEmerald
+                        checkedTrackColor = accentColor
                     )
                 )
             }
@@ -1277,41 +1285,72 @@ private fun AlertTierConfigRow(
             if (enabled) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { onVibrateChange(!vibrate) }
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Checkbox(
-                            checked = vibrate,
-                            onCheckedChange = onVibrateChange,
-                            colors = CheckboxDefaults.colors(checkedColor = PrimaryEmerald)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (isRu) "Вибрация" else "Vibration",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { onVibrateChange(!vibrate) }
+                        ) {
+                            Checkbox(
+                                checked = vibrate,
+                                onCheckedChange = onVibrateChange,
+                                colors = CheckboxDefaults.colors(checkedColor = accentColor)
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text(
+                                text = if (isRu) "Вибро" else "Vibrate",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { onFlashChange(!flash) }
+                        ) {
+                            Checkbox(
+                                checked = flash,
+                                onCheckedChange = onFlashChange,
+                                colors = CheckboxDefaults.colors(checkedColor = accentColor)
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text(
+                                text = if (isRu) "Вспышка" else "Flash",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { onFlashChange(!flash) }
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = accentColor.copy(alpha = 0.16f),
+                        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.5f)),
+                        modifier = Modifier.clickable { onTestClick() }
                     ) {
-                        Checkbox(
-                            checked = flash,
-                            onCheckedChange = onFlashChange,
-                            colors = CheckboxDefaults.colors(checkedColor = PrimaryEmerald)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (isRu) "Вспышка" else "Flashlight",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = accentColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = if (isRu) "Тест" else "Test",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = accentColor
+                            )
+                        }
                     }
                 }
             }

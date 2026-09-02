@@ -141,6 +141,11 @@ class SettingsViewModel(
         }
     }
 
+    fun testAlert(tier: com.tirup.app.data.alert.AlertTier) {
+        val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+        com.tirup.app.data.alert.GlucoseAlertManager.sendTestAlert(context, tier, isRu)
+    }
+
     fun showClearConfirm(show: Boolean) {
         _uiState.update { it.copy(showClearDialog = show) }
     }

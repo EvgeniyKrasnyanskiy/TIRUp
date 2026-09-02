@@ -108,6 +108,52 @@ object GlucoseAlertManager {
     }
 
     /**
+     * Dispatches an immediate test alert with sound, vibration, and flashlight.
+     */
+    fun sendTestAlert(context: Context, tier: AlertTier, isRu: Boolean = true) {
+        initChannels(context)
+        val title: String
+        val text: String
+        val channelId: String
+        val notifId: Int
+
+        when (tier) {
+            AlertTier.PREDICTIVE -> {
+                channelId = CHANNEL_PREDICTIVE
+                notifId = NOTIFICATION_ID_PREDICTIVE
+                title = if (isRu) "🔮 ТЕСТ: 1. Мягкое предиктивное оповещение" else "🔮 TEST: 1. Soft Predictive Alert"
+                text = if (isRu) "Прогноз падения через ~14 минут. Проверка звука, мягкого вибро и вспышки."
+                       else "Forecast low in ~14 minutes. Checking soft sound, vibration and flash."
+            }
+            AlertTier.MAIN -> {
+                channelId = CHANNEL_MAIN
+                notifId = NOTIFICATION_ID_MAIN
+                title = if (isRu) "🔻 ТЕСТ: 2. Основное оповещение (5 точек)" else "🔻 TEST: 2. Main Alert (5 points)"
+                text = if (isRu) "Подтверждено 5 замеров вне нормы. Проверка двойной вибрации и звука."
+                       else "Confirmed 5 out-of-range readings. Checking double vibration and alert tone."
+            }
+            AlertTier.CRITICAL -> {
+                channelId = CHANNEL_CRITICAL
+                notifId = NOTIFICATION_ID_CRITICAL
+                title = if (isRu) "🚨 ТЕСТ: 3. Критическая тревога («кричащая»)" else "🚨 TEST: 3. Critical Alarm (Loud)"
+                text = if (isRu) "Затяжная гипогликемия. Проверка громкой сирены, SOS-вибрации и стробоскопа!"
+                       else "Prolonged hypo alarm. Checking loud siren, urgent vibration and strobe flash!"
+            }
+        }
+
+        sendNotification(
+            context = context,
+            channelId = channelId,
+            notificationId = notifId,
+            title = title,
+            text = text,
+            tier = tier,
+            vibrate = true,
+            flash = true
+        )
+    }
+
+    /**
      * Inspects recent readings against settings and triggers the appropriate alert tier.
      */
     fun checkAndAlert(
