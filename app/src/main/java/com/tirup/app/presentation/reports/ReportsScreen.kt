@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Download
@@ -832,7 +833,7 @@ private fun GuidebookCard(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = if (isRu) "📖 Справочник параметров" else "📖 Parameters Guidebook",
+                        text = if (isRu) "📖 Справочник" else "📖 Guidebook",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
@@ -891,7 +892,7 @@ private fun ParametersGuidebookModal(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isRu) "Справочник" else "Guide",
+                            text = if (isRu) "Справочник" else "Guidebook",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -1075,51 +1076,78 @@ private fun ParametersGuidebookModal(
                     item { Spacer(modifier = Modifier.height(16.dp)) }
                 }
 
-                // Bottom Action Bar
-                Row(
+                // Bottom Action Bar (Save PDF, Share & Back)
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surface)
                         .padding(horizontal = 16.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Button(
-                        onClick = onSavePdf,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = ActionBlue,
-                            contentColor = Color.White
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isRu) "Сохранить" else "Save PDF",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Button(
+                            onClick = onSavePdf,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ActionBlue,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isRu) "Сохранить" else "Save PDF",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = onSharePdf,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, ActionBlue),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = ActionBlue
+                            )
+                        ) {
+                            Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isRu) "Поделиться" else "Share",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
 
                     OutlinedButton(
-                        onClick = onSharePdf,
+                        onClick = onDismiss,
                         modifier = Modifier
-                            .weight(1f)
+                            .fillMaxWidth()
                             .height(44.dp),
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, ActionBlue),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = ActionBlue
-                        )
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                     ) {
-                        Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (isRu) "Поделиться" else "Share",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                            text = if (isRu) "Назад" else "Back",
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }

@@ -71,7 +71,7 @@ class GuidebookPdfGenerator(private val context: Context) {
 
             // Header Banner
             canvas.drawText(
-                if (isRu) "TIRUp • Справочник параметров" else "TIRUp • Parameters Guide",
+                if (isRu) "TIRUp • Справочник" else "TIRUp • Guidebook",
                 30f,
                 y,
                 titlePaint
