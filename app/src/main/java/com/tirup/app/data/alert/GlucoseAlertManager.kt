@@ -37,9 +37,9 @@ object GlucoseAlertManager {
 
     private const val TAG = "GlucoseAlertManager"
 
-    const val CHANNEL_PREDICTIVE = "tirup_alert_predictive"
-    const val CHANNEL_MAIN = "tirup_alert_main"
-    const val CHANNEL_CRITICAL = "tirup_alert_critical"
+    const val CHANNEL_PREDICTIVE = "tirup_alert_predictive_v2"
+    const val CHANNEL_MAIN = "tirup_alert_main_v2"
+    const val CHANNEL_CRITICAL = "tirup_alert_critical_v2"
 
     private const val NOTIFICATION_ID_PREDICTIVE = 1001
     private const val NOTIFICATION_ID_MAIN = 1002
@@ -60,45 +60,42 @@ object GlucoseAlertManager {
 
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
-        // Tier 1: Predictive (Soft)
+        // Delete old v1 channels that had system sound attached
+        listOf("tirup_alert_predictive", "tirup_alert_main", "tirup_alert_critical").forEach { id ->
+            try { nm.deleteNotificationChannel(id) } catch (_: Exception) {}
+        }
+
+        // Tier 1: Predictive (Soft) - sound handled purely by MedicalSoundPlayer
         val predictiveChannel = NotificationChannel(
             CHANNEL_PREDICTIVE,
             "1. Предиктивные предупреждения (за 15 мин)",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             description = "Мягкие упреждающие сигналы о скором выходе за целевой диапазон"
-            enableVibration(true)
-            vibrationPattern = longArrayOf(0, 150, 100, 150)
+            setSound(null, null)
+            enableVibration(false) // vibration handled explicitly by triggerVibration
         }
 
-        // Tier 2: Main (Confirmed 5 points)
+        // Tier 2: Main (Confirmed 5 points) - sound handled purely by MedicalSoundPlayer
         val mainChannel = NotificationChannel(
             CHANNEL_MAIN,
             "2. Основные оповещения (5 точек вне нормы)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = "Уверенные сигналы при подтверждённом выходе сахара за целевой диапазон"
-            enableVibration(true)
-            vibrationPattern = longArrayOf(0, 300, 200, 300)
+            setSound(null, null)
+            enableVibration(false)
         }
 
-        // Tier 3: Critical (Prolonged or extreme)
-        val criticalSound: Uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-        val audioAttributes = AudioAttributes.Builder()
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-            .setUsage(AudioAttributes.USAGE_ALARM)
-            .build()
-
+        // Tier 3: Critical (Prolonged or extreme) - sound handled purely by MedicalSoundPlayer on USAGE_ALARM
         val criticalChannel = NotificationChannel(
             CHANNEL_CRITICAL,
             "3. Критические и затяжные тревоги",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = "Громкие настойчивые тревоги при затяжной гипо/гипергликемии или экстремальных значениях"
-            enableVibration(true)
-            vibrationPattern = longArrayOf(0, 500, 200, 500, 200, 800)
-            setSound(criticalSound, audioAttributes)
+            setSound(null, null)
+            enableVibration(false)
             setBypassDnd(true)
         }
 
@@ -370,6 +367,8 @@ object GlucoseAlertManager {
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(priority)
             .setContentIntent(pendingIntent)
+            .setSilent(true)
+            .setSound(null)
             .setAutoCancel(true)
 
         if (tier == AlertTier.CRITICAL) {
@@ -407,7 +406,8 @@ object GlucoseAlertManager {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val pattern = when (tier) {
                     AlertTier.PREDICTIVE -> longArrayOf(0, 150, 100, 150)
-                    AlertTier.MAIN -> longArrayOf(0, 300, 200, 300)
+                    // Synchronized with the 3 beeps and 1.5s pauses of Tier 2
+                    AlertTier.MAIN -> longArrayOf(0, 320, 1500, 320, 1500, 320)
                     AlertTier.CRITICAL -> longArrayOf(0, 500, 200, 500, 200, 800)
                 }
                 vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
@@ -431,17 +431,22 @@ object GlucoseAlertManager {
                     chars.get(android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
                 } ?: return@launch
 
-                val pulses = when (tier) {
-                    AlertTier.PREDICTIVE -> 1
-                    AlertTier.MAIN -> 2
-                    AlertTier.CRITICAL -> 5
-                }
-
-                for (i in 0 until pulses) {
-                    cameraManager.setTorchMode(cameraId, true)
-                    delay(120)
-                    cameraManager.setTorchMode(cameraId, false)
-                    delay(120)
+                if (tier == AlertTier.MAIN) {
+                    // Synchronized with the 3 beeps and 1.5s pauses of Tier 2
+                    for (i in 0 until 3) {
+                        cameraManager.setTorchMode(cameraId, true)
+                        delay(160)
+                        cameraManager.setTorchMode(cameraId, false)
+                        if (i < 2) delay(1500)
+                    }
+                } else {
+                    val pulses = if (tier == AlertTier.CRITICAL) 5 else 1
+                    for (i in 0 until pulses) {
+                        cameraManager.setTorchMode(cameraId, true)
+                        delay(120)
+                        cameraManager.setTorchMode(cameraId, false)
+                        delay(120)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Flashlight pulse failed: ${e.message}")

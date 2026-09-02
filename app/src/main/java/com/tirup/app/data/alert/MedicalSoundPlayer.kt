@@ -45,23 +45,31 @@ object MedicalSoundPlayer {
     }
 
     /**
-     * Tier 2: Triple distinct medical beep (бип - бип - бип).
+     * Tier 2: Main alert played 3 times with 1.5 second pause between each.
      */
     private fun playTripleMainBeep() {
-        val beep1 = generateSineWave(freq = 784.0, durationMs = 150, volume = 0.85f)
-        val silence = ShortArray((SAMPLE_RATE * 0.10).toInt()) // 100ms silence
-        val beep2 = generateSineWave(freq = 784.0, durationMs = 150, volume = 0.85f)
-        val beep3 = generateSineWave(freq = 880.0, durationMs = 220, volume = 0.90f)
+        val note1 = generateSineWave(freq = 784.0, durationMs = 140, volume = 0.85f)
+        val note2 = generateSineWave(freq = 987.77, durationMs = 180, volume = 0.90f)
+        val singleBeep = ShortArray(note1.size + note2.size)
+        System.arraycopy(note1, 0, singleBeep, 0, note1.size)
+        System.arraycopy(note2, 0, singleBeep, note1.size, note2.size)
 
-        val totalLen = beep1.size + silence.size + beep2.size + silence.size + beep3.size
+        val pause = ShortArray((SAMPLE_RATE * 1.5).toInt()) // 1.5 seconds silence
+
+        val totalLen = (singleBeep.size * 3) + (pause.size * 2)
         val audioData = ShortArray(totalLen)
         var offset = 0
 
-        System.arraycopy(beep1, 0, audioData, offset, beep1.size); offset += beep1.size
-        System.arraycopy(silence, 0, audioData, offset, silence.size); offset += silence.size
-        System.arraycopy(beep2, 0, audioData, offset, beep2.size); offset += beep2.size
-        System.arraycopy(silence, 0, audioData, offset, silence.size); offset += silence.size
-        System.arraycopy(beep3, 0, audioData, offset, beep3.size)
+        // 1st play
+        System.arraycopy(singleBeep, 0, audioData, offset, singleBeep.size); offset += singleBeep.size
+        // 1.5s pause
+        System.arraycopy(pause, 0, audioData, offset, pause.size); offset += pause.size
+        // 2nd play
+        System.arraycopy(singleBeep, 0, audioData, offset, singleBeep.size); offset += singleBeep.size
+        // 1.5s pause
+        System.arraycopy(pause, 0, audioData, offset, pause.size); offset += pause.size
+        // 3rd play
+        System.arraycopy(singleBeep, 0, audioData, offset, singleBeep.size)
 
         playRawPcm(audioData, usage = AudioAttributes.USAGE_NOTIFICATION)
     }
