@@ -39,6 +39,7 @@ class SettingsRepositoryImpl(
             .putInt(KEY_NIGHT_END, settings.nightEndHour)
             .putString(KEY_THEME_MODE, settings.themeMode.name)
             .putString(KEY_PATIENT_NAME, settings.patientProfile.fullName)
+            .putString(KEY_PATIENT_GENDER, settings.patientProfile.gender)
             .putInt(KEY_PATIENT_BIRTH_YEAR, settings.patientProfile.birthYear)
             .putInt(KEY_PATIENT_BIRTH_MONTH, settings.patientProfile.birthMonth)
             .putString(KEY_PATIENT_HEIGHT, settings.patientProfile.heightCm)
@@ -87,6 +88,7 @@ class SettingsRepositoryImpl(
 
         val profile = PatientProfile(
             fullName = prefs.getString(KEY_PATIENT_NAME, "") ?: "",
+            gender = prefs.getString(KEY_PATIENT_GENDER, "M") ?: "M",
             birthYear = prefs.getInt(KEY_PATIENT_BIRTH_YEAR, 1990),
             birthMonth = prefs.getInt(KEY_PATIENT_BIRTH_MONTH, 1),
             heightCm = prefs.getString(KEY_PATIENT_HEIGHT, "") ?: "",
@@ -130,6 +132,7 @@ class SettingsRepositoryImpl(
         private const val KEY_NIGHT_END = "key_night_end"
         private const val KEY_THEME_MODE = "key_theme_mode"
         private const val KEY_PATIENT_NAME = "key_patient_name"
+        private const val KEY_PATIENT_GENDER = "key_patient_gender"
         private const val KEY_PATIENT_BIRTH_YEAR = "key_patient_birth_year"
         private const val KEY_PATIENT_BIRTH_MONTH = "key_patient_birth_month"
         private const val KEY_PATIENT_HEIGHT = "key_patient_height"

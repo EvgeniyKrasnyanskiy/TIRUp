@@ -276,11 +276,12 @@ fun TrendsScreen(
                             color = onSurface
                         )
 
+                        val tirColor = if (stats.tirPercent >= 70.0) PrimaryEmerald else ColorHigh
                         Text(
-                            text = if (isRu) "${String.format(Locale.US, "%.1f%%", stats.tirPercent)} TIR (цель ≥70%) • ${String.format(Locale.US, "%.1f%%", stats.tingPercent)} TING (≥50%)"
-                                   else "${String.format(Locale.US, "%.1f%%", stats.tirPercent)} TIR (goal ≥70%) • ${String.format(Locale.US, "%.1f%%", stats.tingPercent)} TING (≥50%)",
+                            text = if (isRu) "${String.format(Locale.US, "%.1f%%", stats.tirPercent)} TIR (цель ≥70%) • ${String.format(Locale.US, "%.1f%%", stats.tingPercent)} TING"
+                                   else "${String.format(Locale.US, "%.1f%%", stats.tirPercent)} TIR (goal ≥70%) • ${String.format(Locale.US, "%.1f%%", stats.tingPercent)} TING",
                             style = MaterialTheme.typography.titleSmall,
-                            color = PrimaryEmerald,
+                            color = tirColor,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -306,8 +307,8 @@ fun TrendsScreen(
                         Text(
                             text = "TING: ${String.format(Locale.US, "%.1f%%", stats.tingPercent)}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = PrimaryEmerald,
-                            fontWeight = FontWeight.SemiBold
+                            color = onSurfaceVariant,
+                            fontWeight = FontWeight.Medium
                         )
                         Text(
                             text = "TAR: ${String.format(Locale.US, "%.1f%%", tarTotal)}",
@@ -446,19 +447,19 @@ fun TrendsScreen(
                         valueColor = meanColor,
                         modifier = Modifier.weight(1f),
                         onClick = {
-                            val targetVal = if (unit == GlucoseUnit.MMOL_L) "≤7.8 ммоль/л" else "≤140 мг/дл"
-                            val optVal = if (unit == GlucoseUnit.MMOL_L) "5.5–7.0 ммоль/л" else "100–126 мг/дл"
-                            val healthyVal = if (unit == GlucoseUnit.MMOL_L) "5.0–5.8 ммоль/л" else "90–105 мг/дл"
+                            val targetVal = if (unit == GlucoseUnit.MMOL_L) "≤7.0–7.8 ммоль/л" else "≤126–140 мг/дл"
+                            val healthyMean = if (unit == GlucoseUnit.MMOL_L) "4.5–5.8 ммоль/л" else "80–105 мг/дл"
+                            val healthyFasting = if (unit == GlucoseUnit.MMOL_L) "3.3–5.5 ммоль/л" else "60–100 мг/дл"
                             detailDialogInfo = Pair(
-                                if (isRu) "Средний сахар за период" else "Mean Glucose for Period",
-                                if (isRu) "Среднее арифметическое измерений за выбранный период.\n\n" +
-                                        "• Клиническая цель: $targetVal.\n" +
-                                        "• Оптимальный ориентир строгого контроля: $optVal (при условии TBR < 4%, без частых гипогликемий).\n" +
-                                        "• У здоровых людей без диабета: $healthyVal."
-                                else "Average glucose over period.\n\n" +
-                                        "• Clinical target: $targetVal.\n" +
-                                        "• Optimal tight control: $optVal (provided TBR < 4%, without hypoglycemia).\n" +
-                                        "• Healthy non-diabetic baseline: $healthyVal."
+                                if (isRu) "Средний сахар (Mean Glucose)" else "Mean Glucose for Period",
+                                if (isRu) "Среднее арифметическое всех измерений за выбранный период.\n\n" +
+                                        "• Клиническая цель при диабете: $targetVal.\n" +
+                                        "• У здоровых людей без диабета: в среднем $healthyMean (натощак $healthyFasting).\n\n" +
+                                        "💡 Факт о нормогликемии: исследования CGM у здоровых людей показывают, что после обильной углеводной еды сахар может кратковременно подскакивать до 8.5–10.0 ммоль/л, но возвращается к норме за 20–30 минут."
+                                else "Average glucose over the selected period.\n\n" +
+                                        "• Clinical target in diabetes: $targetVal.\n" +
+                                        "• Healthy non-diabetic baseline: average $healthyMean (fasting $healthyFasting).\n\n" +
+                                        "💡 CGM fact: healthy individuals can briefly touch 8.5–10.0 mmol/L after high-carb meals, but return to baseline within 20–30 minutes."
                             )
                         }
                     )
@@ -472,8 +473,14 @@ fun TrendsScreen(
                         onClick = {
                             detailDialogInfo = Pair(
                                 if (isRu) "Расчётный гликированный гемоглобин (eA1c)" else "Estimated Glycated Hemoglobin (eA1c)",
-                                if (isRu) "Расчётный A1c по формуле ADAG за выбранный период: $ea1cStr (${stats.hba1cMmolMol} mmol/mol). Клинический ориентир: ≤7.0%."
-                                else "Estimated glycated hemoglobin (ADAG): $ea1cStr (${stats.hba1cMmolMol} mmol/mol). Target: ≤7.0%."
+                                if (isRu) "Расчётный HbA1c по формуле ADAG за выбранный период: $ea1cStr (${stats.hba1cMmolMol} mmol/mol).\n\n" +
+                                        "• У людей без диабета: 4.0–5.6% (20–38 ммоль/моль).\n" +
+                                        "• Зона предиабета: 5.7–6.4%.\n" +
+                                        "• Клиническая цель при диабете: ≤6.5–7.0% (≤48–53 ммоль/моль)."
+                                else "Estimated glycated hemoglobin (ADAG): $ea1cStr (${stats.hba1cMmolMol} mmol/mol).\n\n" +
+                                        "• Healthy non-diabetic baseline: 4.0–5.6% (20–38 mmol/mol).\n" +
+                                        "• Prediabetes range: 5.7–6.4%.\n" +
+                                        "• Clinical target in diabetes: ≤6.5–7.0% (≤48–53 mmol/mol)."
                             )
                         }
                     )
@@ -485,11 +492,16 @@ fun TrendsScreen(
                         valueColor = if (isSdGood) PrimaryEmerald else ColorHigh,
                         modifier = Modifier.weight(1f),
                         onClick = {
-                            val targetSdStr = if (unit == GlucoseUnit.MMOL_L) "≤2.0 ммоль/л" else "≤36 мг/дл"
+                            val targetSdStr = if (unit == GlucoseUnit.MMOL_L) "≤2.0–2.5 ммоль/л" else "≤36–45 мг/дл"
+                            val healthySdStr = if (unit == GlucoseUnit.MMOL_L) "≤1.0–1.2 ммоль/л" else "≤18–22 мг/дл"
                             detailDialogInfo = Pair(
                                 if (isRu) "Разброс сахара (SD)" else "Standard Deviation (SD)",
-                                if (isRu) "Стандартное отклонение за период. Отражает амплитуду колебаний вокруг среднего. Клиническая цель: $targetSdStr."
-                                else "Standard deviation over period. Clinical target: $targetSdStr."
+                                if (isRu) "Стандартное отклонение за период. Отражает амплитуду колебаний вокруг среднего значения.\n\n" +
+                                        "• Клиническая цель при диабете: $targetSdStr.\n" +
+                                        "• У здоровых людей без диабета: $healthySdStr (высокая плавность суточной кривой)."
+                                else "Standard deviation reflects the amplitude of glucose swings.\n\n" +
+                                        "• Clinical target in diabetes: $targetSdStr.\n" +
+                                        "• Healthy non-diabetic baseline: $healthySdStr."
                             )
                         }
                     )
@@ -502,9 +514,12 @@ fun TrendsScreen(
                         modifier = Modifier.weight(1f),
                         onClick = {
                             detailDialogInfo = Pair(
-                                if (isRu) "Вариабельность (%CV)" else "Glucose Variability (%CV)",
-                                if (isRu) "Коэффициент вариации (%CV = SD / Mean * 100%). Международный консенсус ATTD: норма ≤36.0%."
-                                else "Coefficient of variation. Consensus target: ≤36.0%."
+                                if (isRu) "Вариабельность глюкозы (%CV)" else "Glucose Variability (%CV)",
+                                if (isRu) "Коэффициент вариации (%CV = SD / Mean * 100%). Главный международный маркер стабильности диабета.\n\n" +
+                                        "• Консенсус ATTD/ADA: норма ≤36.0% (стабильный диабет). Выше 36% — лабильный диабет с частыми перепадами.\n" +
+                                        "• У здоровых людей без диабета: 12–20%."
+                                else "Coefficient of variation. Consensus target: ≤36.0%.\n\n" +
+                                        "• Healthy non-diabetic baseline: 12–20%."
                             )
                         }
                     )
@@ -524,8 +539,12 @@ fun TrendsScreen(
                         onClick = {
                             detailDialogInfo = Pair(
                                 if (isRu) "Время в целевом диапазоне (TIR)" else "Time in Range (TIR)",
-                                if (isRu) "Диапазон 3.9–10.0 ммоль/л (70–180 мг/дл).\n\nМеждународный консенсус ATTD: норма ≥70% времени."
-                                else "Range 3.9–10.0 mmol/L (70–180 mg/dL). Clinical target: ≥70%."
+                                if (isRu) "Диапазон 3.9–10.0 ммоль/л (70–180 мг/дл).\n\n" +
+                                        "• Международный клинический консенсус ADA/EASD/ATTD: норма ≥70% времени (не менее 16 ч 48 мин в сутки).\n" +
+                                        "• У здоровых людей без диабета: 99–100% времени суток."
+                                else "Target range 3.9–10.0 mmol/L (70–180 mg/dL).\n\n" +
+                                        "• Consensus clinical target: ≥70% (>16h 48m per day).\n" +
+                                        "• Healthy non-diabetic baseline: 99–100% of 24h."
                             )
                         }
                     )
@@ -539,8 +558,13 @@ fun TrendsScreen(
                         onClick = {
                             detailDialogInfo = Pair(
                                 if (isRu) "Узкий целевой диапазон (TING)" else "Time in Tight Range (TING)",
-                                if (isRu) "Диапазон 3.9–7.8 ммоль/л (70–140 мг/дл). Нормогликемия.\n\nКлинический ориентир для продвинутого контроля: ≥50% времени."
-                                else "Tight range 3.9–7.8 mmol/L (70–140 mg/dL). Advanced target: ≥50%."
+                                if (isRu) "Диапазон строгой нормогликемии 3.9–7.8 ммоль/л (70–140 мг/дл).\n\n" +
+                                        "• У здоровых людей без диабета: 95–99% времени суток.\n" +
+                                        "• Клинический ориентир при диабете: ≥50% (рекомендуется для систем замкнутой петли AID).\n\n" +
+                                        "💡 Примечание: даже у здоровых людей после плотного приёма простых углеводов сахар может кратковременно выходить до 8.5–9.5 ммоль/л, но быстро снижается."
+                                else "Tight range 3.9–7.8 mmol/L (70–140 mg/dL).\n\n" +
+                                        "• Healthy non-diabetic baseline: 95–99% of 24h.\n" +
+                                        "• Clinical target in diabetes: ≥50% (for AID users)."
                             )
                         }
                     )
@@ -635,10 +659,20 @@ fun TrendsScreen(
                         onClick = {
                             val minStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", minVal)} ммоль/л" else "${(minVal * 18.0182).toInt()} мг/дл"
                             val maxStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", maxVal)} ммоль/л" else "${(maxVal * 18.0182).toInt()} мг/дл"
+                            val healthySpan = if (unit == GlucoseUnit.MMOL_L) "4.0–7.8 ммоль/л" else "72–140 мг/дл"
+                            val healthyFasting = if (unit == GlucoseUnit.MMOL_L) "3.3–5.5 ммоль/л" else "60–100 мг/дл"
                             detailDialogInfo = Pair(
-                                if (isRu) "Диапазон сахара за период" else "Glucose Range for Period",
-                                if (isRu) "Минимум: $minStr\nМаксимум: $maxStr"
-                                else "Min: $minStr\nMax: $maxStr"
+                                if (isRu) "Экстремумы сахара (Min / Max)" else "Glucose Range for Period",
+                                if (isRu) "Фактический размах за период:\n" +
+                                        "• Минимум: $minStr\n" +
+                                        "• Максимум: $maxStr\n\n" +
+                                        "• У здоровых людей без диабета: 96% времени сахар находится в коридоре $healthySpan (натощак $healthyFasting, ночью во сне возможны кратковременные физиологические спады до 3.3–3.8 ммоль/л).\n" +
+                                        "• Клиническая цель при диабете: исключать падения <3.9 и сглаживать пики >10.0 ммоль/л."
+                                else "Observed range for period:\n" +
+                                        "• Min: $minStr\n" +
+                                        "• Max: $maxStr\n\n" +
+                                        "• Healthy non-diabetic baseline: 96% of day within $healthySpan (fasting $healthyFasting).\n" +
+                                        "• Clinical target in diabetes: avoid dips <3.9 and flatten spikes >10.0 mmol/L."
                             )
                         }
                     )

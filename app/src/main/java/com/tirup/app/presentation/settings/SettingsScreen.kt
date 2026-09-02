@@ -64,6 +64,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tirup.app.R
+import com.tirup.app.domain.model.BmiCategory
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.domain.model.TargetRanges
@@ -546,13 +547,21 @@ private fun PatientProfileSummaryCard(
     val ageStr = if (profile.birthYear > 1900) "${profile.calculatedAge} ${if (isRu) "лет" else "y.o."}" else ""
     val diagStr = if (profile.diabetesType.isNotBlank()) localizeDiabetesType(profile.diabetesType, isRu) else ""
     val durStr = if (profile.calculatedDuration > 0) "${if (isRu) "стаж" else "duration"} ${profile.calculatedDuration} ${if (isRu) "л." else "y."}" else ""
+    val bmi = profile.calculatedBmi
+    val bmiStr = if (bmi != null) {
+        val cat = BmiCategory.fromBmi(bmi, profile.calculatedAge, profile.gender)
+        String.format(Locale.US, "ИМТ %.1f (%s)", bmi, if (isRu) cat.labelRu else cat.labelEn)
+    } else ""
 
-    val subtitleParts = listOf(ageStr, diagStr, durStr).filter { it.isNotBlank() }
+    val subtitleParts = listOf(ageStr, diagStr, durStr, bmiStr).filter { it.isNotBlank() }
     val subtitle = if (subtitleParts.isNotEmpty()) {
         subtitleParts.joinToString(" • ")
     } else {
         if (isRu) "Нажмите для заполнения мед. профиля" else "Tap to edit clinical report profile"
     }
+
+    val isFemale = profile.gender.equals("F", ignoreCase = true)
+    val avatarBg = if (isFemale) Color(0xFFC026D3) else PrimaryEmerald
 
     BentoCard(
         modifier = Modifier.fillMaxWidth(),
@@ -569,16 +578,25 @@ private fun PatientProfileSummaryCard(
             ) {
                 Surface(
                     shape = CircleShape,
-                    color = PrimaryEmerald.copy(alpha = 0.16f),
+                    color = avatarBg,
                     modifier = Modifier.size(46.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            tint = PrimaryEmerald,
-                            modifier = Modifier.size(26.dp)
-                        )
+                        if (profile.initials.isNotBlank()) {
+                            Text(
+                                text = profile.initials,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
                     }
                 }
 
@@ -639,7 +657,7 @@ private fun PatientProfileEditDialog(
                 Icon(
                     imageVector = Icons.Default.Person,
                     contentDescription = null,
-                    tint = PrimaryEmerald,
+                    tint = if (profile.gender == "F") Color(0xFFC026D3) else PrimaryEmerald,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -666,6 +684,33 @@ private fun PatientProfileEditDialog(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
+                }
+
+                item {
+                    // Gender selector (M / F)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isRu) "Пол:" else "Gender:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            LanguageChip(
+                                label = if (isRu) "Мужской ♂" else "Male ♂",
+                                isSelected = profile.gender == "M",
+                                onClick = { onProfileChange(profile.copy(gender = "M")) }
+                            )
+                            LanguageChip(
+                                label = if (isRu) "Женский ♀" else "Female ♀",
+                                isSelected = profile.gender == "F",
+                                onClick = { onProfileChange(profile.copy(gender = "F")) }
+                            )
+                        }
+                    }
                 }
 
                 item {
@@ -731,25 +776,65 @@ private fun PatientProfileEditDialog(
                 }
 
                 if (bmi != null) {
+                    val age = profile.calculatedAge
+                    val isChild = age in 2..17
+                    val category = BmiCategory.fromBmi(bmi, age, profile.gender)
+                    val catColor = when (category) {
+                        BmiCategory.UNDERWEIGHT -> ActionBlue
+                        BmiCategory.NORMAL -> PrimaryEmerald
+                        BmiCategory.OVERWEIGHT -> ColorHigh
+                        BmiCategory.OBESE_1, BmiCategory.OBESE_2_3, BmiCategory.PEDIATRIC_OBESE -> ColorVeryHigh
+                    }
+                    val scaleNote = if (isChild) {
+                        val sexStr = if (profile.gender == "F") (if (isRu) "девочек" else "girls") else (if (isRu) "мальчиков" else "boys")
+                        if (isRu) "Педиатрическая шкала ВОЗ: перцентили для $sexStr $age лет"
+                        else "WHO Pediatric scale: percentiles for $sexStr age $age"
+                    } else {
+                        if (isRu) "Шкала ВОЗ для взрослых (норма 18.5–24.9 кг/м²)"
+                        else "WHO Adult scale (normal 18.5–24.9 kg/m²)"
+                    }
                     item {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 12.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text(if (isRu) "ИМТ (индекс массы тела):" else "BMI:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(if (isRu) "ИМТ (индекс массы тела):" else "BMI:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(
+                                        text = String.format(Locale.US, "%.1f кг/м²", bmi),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(if (isRu) "Оценка ВОЗ:" else "WHO Assessment:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(
+                                        text = if (isRu) category.labelRu else category.labelEn,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = catColor,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                                 Text(
-                                    text = String.format(Locale.US, "%.1f кг/м²", bmi),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = PrimaryEmerald,
-                                    fontWeight = FontWeight.Bold
+                                    text = scaleNote,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
