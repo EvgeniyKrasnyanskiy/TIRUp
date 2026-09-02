@@ -533,7 +533,7 @@ object GlucoseMetricsCalculator {
         val cvWarn = cvPercent in 36.1..40.0
         evalItems.add(
             ClinicalMetricStatus(
-                title = if (isRu) "Вариабельность (%CV)" else "Variability (%CV)",
+                title = if (isRu) "CV (вариабельность)" else "CV (variability)",
                 valueStr = String.format(Locale.US, "%.1f%%", cvPercent),
                 targetStr = if (isRu) "цель ≤36.0%" else "target ≤36.0%",
                 isMet = cvMet,
@@ -749,7 +749,6 @@ object GlucoseMetricsCalculator {
                 GlucoseRangeCategory.TARGET, GlucoseRangeCategory.TIGHT -> inRangeCount++
                 GlucoseRangeCategory.LOW, GlucoseRangeCategory.VERY_LOW -> belowCount++
                 GlucoseRangeCategory.HIGH, GlucoseRangeCategory.VERY_HIGH -> aboveCount++
-                else -> {}
             }
             if (targetRanges.isInTing(r.valueMmol)) {
                 tingCount++

@@ -737,7 +737,7 @@ private fun ReportMetricsColumn(
             valueColor = if (stats.pgs <= 35.0) PrimaryEmerald else ColorHigh
         )
         ReportMetricRow(
-            label = if (isRu) "Вариабельность (%CV)" else "Variability (%CV)",
+            label = if (isRu) "CV (вариабельность)" else "CV (variability)",
             target = if (isRu) "Цель: ≤36.0%" else "Target: ≤36.0%",
             value = String.format(Locale.US, "%.1f%%", stats.cvPercent),
             valueColor = cvColor

@@ -20,7 +20,7 @@
     <string name="compensator_desc_exceeding">Great pacing! You are ahead of target. Maintain ≥%1$.0f%% in the remaining %2$d days.</string>
     <string name="compensator_desc_impossible">Target is mathematically unreachable in this window, but every in-range day lowers your cumulative A1c.</string>
     <string name="card_mean">Average Glucose</string>
-    <string name="card_cv">Variability (%CV)</string>
+    <string name="card_cv">CV (variability)</string>
     <string name="card_gmi">Estimated A1c (GMI)</string>
     <string name="card_night">Night Profile (00:00–06:00)</string>
     <string name="night_stable">Stable Night Profile</string>

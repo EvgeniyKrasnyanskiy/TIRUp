@@ -20,7 +20,7 @@
     <string name="compensator_desc_exceeding">Отличный темп! Вы опережаете цель. Поддерживайте ≥%1$.0f%% в оставшиеся %2$d дн. для закрепления результата.</string>
     <string name="compensator_desc_impossible">В текущем периоде цель математически не закроется на 100%, но каждый день в диапазоне улучшает итоговый гликированный гемоглобин.</string>
     <string name="card_mean">Средний сахар</string>
-    <string name="card_cv">Вариабельность (%CV)</string>
+    <string name="card_cv">CV (вариабельность)</string>
     <string name="card_gmi">Расчётный A1c (GMI)</string>
     <string name="card_night">Ночной профиль (00:00–06:00)</string>
     <string name="night_stable">Стабильный ночной профиль</string>
