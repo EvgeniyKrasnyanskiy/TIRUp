@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -61,11 +62,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -104,6 +107,7 @@ fun SettingsScreen(
     var showHelpDialog by remember { mutableStateOf(false) }
     var showAdvancedSettings by rememberSaveable { mutableStateOf(false) }
     var showProfileDialog by rememberSaveable { mutableStateOf(false) }
+    var showCriticalHypoSafetyDialog by rememberSaveable { mutableStateOf(false) }
 
     val isRu = settings.language.equals("RU", ignoreCase = true)
 
@@ -363,12 +367,35 @@ fun SettingsScreen(
 
                         Spacer(modifier = Modifier.height(6.dp))
 
+                        val criticalSub = when {
+                            !alerts.isCriticalEnabled && alerts.criticalHypoPauseUntilTimestamp > System.currentTimeMillis() -> {
+                                val remMin = ((alerts.criticalHypoPauseUntilTimestamp - System.currentTimeMillis()) / 60000L).coerceAtLeast(1)
+                                if (isRu) "⏳ Пауза на $remMin мин (авто-возобновление)" else "⏳ Paused for $remMin min (auto-resumes)"
+                            }
+                            !alerts.isCriticalEnabled && alerts.isCriticalHypoPermanentDisabled -> {
+                                if (isRu) "⚠️ Отключено осознанно под вашу ответственность" else "⚠️ Permanently disabled at own risk"
+                            }
+                            else -> if (isRu) "Сирена ~12 сек при гипо >20 мин, гипер >90 мин или <3.0 / >13.9" else "Siren ~12s on hypo >20m, hyper >90m or <3.0 / >13.9"
+                        }
+
                         // Tier 3: Critical (Prolonged / Extreme)
                         AlertTierConfigRow(
                             title = if (isRu) "3. Критические и затяжные («кричащие»)" else "3. Critical & Prolonged (Alarms)",
-                            subtitle = if (isRu) "Сирена ~12 сек при гипо >20 мин, гипер >90 мин или <3.0 / >13.9" else "Siren ~12s on hypo >20m, hyper >90m or <3.0 / >13.9",
+                            subtitle = criticalSub,
                             enabled = alerts.isCriticalEnabled,
-                            onEnabledChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalEnabled = it)) },
+                            onEnabledChange = { isEnabled ->
+                                if (!isEnabled) {
+                                    showCriticalHypoSafetyDialog = true
+                                } else {
+                                    viewModel.updateAlertSettings(
+                                        alerts.copy(
+                                            isCriticalEnabled = true,
+                                            criticalHypoPauseUntilTimestamp = 0L,
+                                            isCriticalHypoPermanentDisabled = false
+                                        )
+                                    )
+                                }
+                            },
                             vibrate = alerts.isCriticalVibrate,
                             onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalVibrate = it)) },
                             flash = alerts.isCriticalFlash,
@@ -703,6 +730,137 @@ fun SettingsScreen(
             isRu = isRu,
             onPrintManual = { viewModel.printOrShareUserManual() },
             onDismiss = { showHelpDialog = false }
+        )
+    }
+
+    if (showCriticalHypoSafetyDialog) {
+        var isAcknowledged by remember { mutableStateOf(false) }
+        val alerts = settings.alertSettings
+        AlertDialog(
+            onDismissRequest = { showCriticalHypoSafetyDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = ColorVeryLow,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isRu) "Защита от тяжёлой гипогликемии" else "Severe Hypo Safety Guard",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = if (isRu) "Критическая сирена предупреждает о падении сахара ниже 3.0 ммоль/л и спасает от потери сознания и комы во сне.\n\nВ соответствии с клиническими стандартами безопасности рекомендуется ставить оповещение на временную паузу."
+                               else "The critical siren alerts you when glucose drops below 3.0 mmol/L, preventing nocturnal unconsciousness and coma.\n\nPer clinical safety guidelines, a temporary pause is strongly recommended over permanent disabling.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 20.sp
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { isAcknowledged = !isAcknowledged }
+                                .padding(10.dp)
+                        ) {
+                            Checkbox(
+                                checked = isAcknowledged,
+                                onCheckedChange = { isAcknowledged = it },
+                                colors = CheckboxDefaults.colors(checkedColor = ColorVeryLow)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isRu) "Я осознаю смертельный риск гипогликемической комы и беру ответственность на себя"
+                                       else "I acknowledge the life-threatening risk of severe hypoglycemia and assume full responsibility",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            viewModel.updateAlertSettings(
+                                alerts.copy(
+                                    isCriticalEnabled = false,
+                                    criticalHypoPauseUntilTimestamp = System.currentTimeMillis() + 2 * 3600 * 1000L,
+                                    isCriticalHypoPermanentDisabled = false
+                                )
+                            )
+                            showCriticalHypoSafetyDialog = false
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
+                    ) {
+                        Text(
+                            text = if (isRu) "⏸️ Приостановить на 2 часа" else "⏸️ Pause for 2 Hours",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+
+                    if (isAcknowledged) {
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.updateAlertSettings(
+                                    alerts.copy(
+                                        isCriticalEnabled = false,
+                                        isCriticalHypoPermanentDisabled = true,
+                                        criticalHypoPauseUntilTimestamp = 0L
+                                    )
+                                )
+                                showCriticalHypoSafetyDialog = false
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(42.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, ColorVeryLow),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ColorVeryLow)
+                        ) {
+                            Text(
+                                text = if (isRu) "Отключить навсегда" else "Disable Permanently",
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    TextButton(
+                        onClick = { showCriticalHypoSafetyDialog = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = if (isRu) "Отмена (Оставить включённым)" else "Cancel (Keep Enabled)",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
         )
     }
 

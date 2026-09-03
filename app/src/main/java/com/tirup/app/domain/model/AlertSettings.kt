@@ -22,6 +22,8 @@ data class AlertSettings(
     val criticalHyperMinutes: Int = 90,
     val isCriticalVibrate: Boolean = true,
     val isCriticalFlash: Boolean = true,
+    val criticalHypoPauseUntilTimestamp: Long = 0L,
+    val isCriticalHypoPermanentDisabled: Boolean = false,
 
     // Tier 4: Signal Loss (Потеря связи с сенсором >20 мин)
     val isSignalLossEnabled: Boolean = true,

@@ -66,6 +66,8 @@ class SettingsRepositoryImpl(
             .putInt(KEY_ALERT_CRITICAL_HYPER_MIN, settings.alertSettings.criticalHyperMinutes)
             .putBoolean(KEY_ALERT_CRITICAL_VIBRATE, settings.alertSettings.isCriticalVibrate)
             .putBoolean(KEY_ALERT_CRITICAL_FLASH, settings.alertSettings.isCriticalFlash)
+            .putLong(KEY_ALERT_CRITICAL_HYPO_PAUSE, settings.alertSettings.criticalHypoPauseUntilTimestamp)
+            .putBoolean(KEY_ALERT_CRITICAL_HYPO_PERM_DISABLED, settings.alertSettings.isCriticalHypoPermanentDisabled)
             .putInt(KEY_ALERT_SNOOZE_HYPO, settings.alertSettings.snoozeHypoMinutes)
             .putInt(KEY_ALERT_SNOOZE_HYPER, settings.alertSettings.snoozeHyperMinutes)
             .putBoolean(KEY_ALERT_SIGNAL_LOSS_ENABLED, settings.alertSettings.isSignalLossEnabled)
@@ -155,6 +157,8 @@ class SettingsRepositoryImpl(
                 criticalHyperMinutes = prefs.getInt(KEY_ALERT_CRITICAL_HYPER_MIN, 90),
                 isCriticalVibrate = prefs.getBoolean(KEY_ALERT_CRITICAL_VIBRATE, true),
                 isCriticalFlash = prefs.getBoolean(KEY_ALERT_CRITICAL_FLASH, true),
+                criticalHypoPauseUntilTimestamp = prefs.getLong(KEY_ALERT_CRITICAL_HYPO_PAUSE, 0L),
+                isCriticalHypoPermanentDisabled = prefs.getBoolean(KEY_ALERT_CRITICAL_HYPO_PERM_DISABLED, false),
                 snoozeHypoMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPO, 15),
                 snoozeHyperMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPER, 45),
                 isSignalLossEnabled = prefs.getBoolean(KEY_ALERT_SIGNAL_LOSS_ENABLED, true)
@@ -202,6 +206,8 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_CRITICAL_HYPER_MIN = "key_alert_critical_hyper_min"
         private const val KEY_ALERT_CRITICAL_VIBRATE = "key_alert_critical_vibrate"
         private const val KEY_ALERT_CRITICAL_FLASH = "key_alert_critical_flash"
+        private const val KEY_ALERT_CRITICAL_HYPO_PAUSE = "key_alert_critical_hypo_pause"
+        private const val KEY_ALERT_CRITICAL_HYPO_PERM_DISABLED = "key_alert_critical_hypo_perm_disabled"
         private const val KEY_ALERT_SNOOZE_HYPO = "key_alert_snooze_hypo"
         private const val KEY_ALERT_SNOOZE_HYPER = "key_alert_snooze_hyper"
         private const val KEY_ALERT_SIGNAL_LOSS_ENABLED = "key_alert_signal_loss_enabled"

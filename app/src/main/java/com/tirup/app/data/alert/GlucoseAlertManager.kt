@@ -361,10 +361,22 @@ object GlucoseAlertManager {
         val tirLow = targetRanges.tirLowMmol
         val tirHigh = if (settings.targetMode.name == "TING") targetRanges.tingHighMmol else targetRanges.tirHighMmol
 
+        // Auto-dismiss stale out-of-range notifications when back in normal range
+        val isInNormalRange = latest.valueMmol in tirLow..tirHigh
+        if (isInNormalRange) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            nm?.cancel(NOTIFICATION_ID_PREDICTIVE)
+            nm?.cancel(NOTIFICATION_ID_MAIN)
+        }
+
         // ----------------------------------------------------
         // TIER 3: CRITICAL / PROLONGED
         // ----------------------------------------------------
-        if (alerts.isCriticalEnabled) {
+        // Hypo protection is always on unless temporarily paused (<2h) or permanently disabled with explicit consent
+        val isHypoProtectionActive = alerts.isCriticalEnabled ||
+                (!alerts.isCriticalHypoPermanentDisabled && now >= alerts.criticalHypoPauseUntilTimestamp)
+
+        if (isHypoProtectionActive) {
             // Extreme Low (< 3.0) or Prolonged Low (< 3.9 for >= criticalHypoMinutes)
             val isExtremeLow = latest.valueMmol < targetRanges.veryLowThresholdMmol
             val isProlongedLow = checkProlongedOutOfRange(sorted, isLow = true, threshold = tirLow, minutes = alerts.criticalHypoMinutes)
@@ -395,18 +407,23 @@ object GlucoseAlertManager {
                     } else {
                         if (isRu) "🚨 ЗАТЯЖНАЯ ГИПОГЛИКЕМИЯ (${alerts.criticalHypoMinutes}+ мин)!" else "🚨 PROLONGED HYPO (${alerts.criticalHypoMinutes}+ min)!"
                     }
+                    val iobText = if (latest.iob != null && latest.iob > 0.0) {
+                        String.format(Locale.US, if (isRu) " (IoB: %.1f Ед)" else " (IoB: %.1f U)", latest.iob)
+                    } else ""
                     val text = String.format(
                         Locale.US,
-                        if (isRu) "Текущий сахар: %.1f ммоль/л %s. Срочно примите быстрые углеводы!"
-                        else "Current glucose: %.1f mmol/L %s. Take fast-acting carbs now!",
+                        if (isRu) "Текущий сахар: %.1f ммоль/л%s. Срочно примите быстрые углеводы!"
+                        else "Current glucose: %.1f mmol/L%s. Take fast-acting carbs now!",
                         latest.valueMmol,
-                        latest.trendArrow ?: ""
+                        iobText
                     )
                     sendNotification(context, CHANNEL_CRITICAL, NOTIFICATION_ID_CRITICAL, title, text, AlertTier.CRITICAL, alerts.isCriticalVibrate, alerts.isCriticalFlash)
                     return
                 }
             }
+        }
 
+        if (alerts.isCriticalEnabled) {
             // Extreme High (> 13.9) or Prolonged High (> tirHigh for >= criticalHyperMinutes)
             val isExtremeHigh = latest.valueMmol > targetRanges.veryHighThresholdMmol
             val isProlongedHigh = checkProlongedOutOfRange(sorted, isLow = false, threshold = tirHigh, minutes = alerts.criticalHyperMinutes)
@@ -416,13 +433,14 @@ object GlucoseAlertManager {
                 val isUnderInitialSnooze = userAcknowledgedHyperTimestamp > 0 && timeSinceAck < 30 * 60000L
                 val isBetween30And45 = userAcknowledgedHyperTimestamp > 0 && timeSinceAck in (30 * 60000L)..(45 * 60000L)
 
-                // Check trend: is glucose falling significantly (bolus working)?
+                // Check trend & active bolus: is glucose falling or is there active bolus IoB >= 0.5?
+                val hasActiveBolus = latest.iob != null && latest.iob >= 0.5
                 val isFalling = sorted.size >= 3 && (latest.valueMmol - sorted[sorted.size - 3].valueMmol) <= -0.5
 
                 val shouldTriggerHyper = when {
                     isUnderInitialSnooze -> false // give insulin 30 min minimum
-                    isBetween30And45 && isFalling -> false // insulin is working nicely, extend snooze!
-                    userAcknowledgedHyperTimestamp > 0 && (timeSinceAck >= 45 * 60000L || !isFalling) -> true // after 30-45m not falling! Re-escalate!
+                    (isBetween30And45 || (hasActiveBolus && timeSinceAck < 60 * 60000L)) && (isFalling || hasActiveBolus) -> false // active bolus working, extend snooze
+                    userAcknowledgedHyperTimestamp > 0 && timeSinceAck >= (if (hasActiveBolus) 60 * 60000L else 45 * 60000L) -> true // insulin expired or not falling!
                     else -> now - lastHyperAlertTimestamp >= 15 * 60000L // no reaction yet: repeat every 15 min
                 }
 
@@ -435,12 +453,15 @@ object GlucoseAlertManager {
                     } else {
                         if (isRu) "⚠️ ЗАТЯЖНАЯ ГИПЕРГЛИКЕМИЯ (${alerts.criticalHyperMinutes}+ мин)!" else "⚠️ PROLONGED HIGH (${alerts.criticalHyperMinutes}+ min)!"
                     }
+                    val iobText = if (latest.iob != null && latest.iob > 0.0) {
+                        String.format(Locale.US, if (isRu) " (IoB: %.1f Ед)" else " (IoB: %.1f U)", latest.iob)
+                    } else ""
                     val text = String.format(
                         Locale.US,
-                        if (isRu) "Текущий сахар: %.1f ммоль/л %s. Проверьте помпу/подколку и кетоны."
-                        else "Current glucose: %.1f mmol/L %s. Check insulin delivery and ketones.",
+                        if (isRu) "Текущий сахар: %.1f ммоль/л%s. Проверьте помпу/подколку и кетоны."
+                        else "Current glucose: %.1f mmol/L%s. Check insulin delivery and ketones.",
                         latest.valueMmol,
-                        latest.trendArrow ?: ""
+                        iobText
                     )
                     sendNotification(context, CHANNEL_CRITICAL, NOTIFICATION_ID_CRITICAL, title, text, AlertTier.CRITICAL, alerts.isCriticalVibrate, alerts.isCriticalFlash)
                     return
@@ -461,10 +482,9 @@ object GlucoseAlertManager {
                 val title = if (isRu) "🔻 Низкий сахар (подтверждено 5 точек)" else "🔻 Low Glucose (5 points confirmed)"
                 val text = String.format(
                     Locale.US,
-                    if (isRu) "Глюкоза: %.1f ммоль/л %s ниже порога %.1f."
-                    else "Glucose: %.1f mmol/L %s below threshold %.1f.",
+                    if (isRu) "Глюкоза: %.1f ммоль/л ниже порога %.1f."
+                    else "Glucose: %.1f mmol/L below threshold %.1f.",
                     latest.valueMmol,
-                    latest.trendArrow ?: "",
                     tirLow
                 )
                 sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash)
@@ -474,10 +494,9 @@ object GlucoseAlertManager {
                 val title = if (isRu) "🔺 Высокий сахар (подтверждено 5 точек)" else "🔺 High Glucose (5 points confirmed)"
                 val text = String.format(
                     Locale.US,
-                    if (isRu) "Глюкоза: %.1f ммоль/л %s выше нормы %.1f."
-                    else "Glucose: %.1f mmol/L %s above threshold %.1f.",
+                    if (isRu) "Глюкоза: %.1f ммоль/л выше нормы %.1f."
+                    else "Glucose: %.1f mmol/L above threshold %.1f.",
                     latest.valueMmol,
-                    latest.trendArrow ?: "",
                     tirHigh
                 )
                 sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash)
@@ -496,17 +515,34 @@ object GlucoseAlertManager {
                 useTingForHigh = settings.targetMode.name == "TING"
             )
 
-            if (prediction.event == PredictedEvent.PREDICTED_LOW && now - lastPredictiveAlertTimestamp >= 20 * 60000L) {
+            val isPredictedLow = prediction.event == PredictedEvent.PREDICTED_LOW
+            val hasHighIobRisk = (latest.iob != null && latest.iob >= 1.0 && latest.valueMmol <= 6.5 &&
+                    prediction.rateOfChangeMmolPerMin < -0.01)
+
+            if ((isPredictedLow || hasHighIobRisk) && now - lastPredictiveAlertTimestamp >= 20 * 60000L) {
                 lastPredictiveAlertTimestamp = now
                 val eventTime = now + (prediction.minutesUntilCrossing ?: 15) * 60000L
                 val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(eventTime))
                 val title = if (isRu) "📉 Скоро гипогликемия (в $timeStr)" else "📉 Predicted Low (at $timeStr)"
+
+                // Derive trend arrow strictly from rate of change to prevent conflicting arrows
+                val arrow = when {
+                    prediction.rateOfChangeMmolPerMin <= -0.15 -> "↓↓"
+                    prediction.rateOfChangeMmolPerMin <= -0.06 -> "↓"
+                    else -> "↘"
+                }
+
+                val iobNotice = if (latest.iob != null && latest.iob > 0.0) {
+                    String.format(Locale.US, if (isRu) " (IoB: %.1f Ед)" else " (IoB: %.1f U)", latest.iob)
+                } else ""
+
                 val text = String.format(
                     Locale.US,
-                    if (isRu) "Сахар %.1f ммоль/л %s падает со скоростью %.2f ммоль/л/мин."
-                    else "Glucose %.1f mmol/L %s dropping at %.2f mmol/L/min.",
+                    if (isRu) "Сахар %.1f ммоль/л %s%s падает со скоростью %.2f ммоль/л/мин."
+                    else "Glucose %.1f mmol/L %s%s dropping at %.2f mmol/L/min.",
                     latest.valueMmol,
-                    latest.trendArrow ?: "",
+                    arrow,
+                    iobNotice,
                     kotlin.math.abs(prediction.rateOfChangeMmolPerMin)
                 )
                 sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash)
@@ -515,12 +551,19 @@ object GlucoseAlertManager {
                 val eventTime = now + (prediction.minutesUntilCrossing ?: 15) * 60000L
                 val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(eventTime))
                 val title = if (isRu) "📈 Скоро гипергликемия (в $timeStr)" else "📈 Predicted High (at $timeStr)"
+
+                val arrow = when {
+                    prediction.rateOfChangeMmolPerMin >= 0.15 -> "↑↑"
+                    prediction.rateOfChangeMmolPerMin >= 0.06 -> "↑"
+                    else -> "↗"
+                }
+
                 val text = String.format(
                     Locale.US,
                     if (isRu) "Сахар %.1f ммоль/л %s растёт со скоростью %.2f ммоль/л/мин."
                     else "Glucose %.1f mmol/L %s rising at %.2f mmol/L/min.",
                     latest.valueMmol,
-                    latest.trendArrow ?: "",
+                    arrow,
                     prediction.rateOfChangeMmolPerMin
                 )
                 sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash)
@@ -589,6 +632,11 @@ object GlucoseAlertManager {
             .setSilent(true)
             .setSound(null)
             .setAutoCancel(true)
+
+        if (tier != AlertTier.CRITICAL) {
+            // Automatically clear unread predictive/main/signal loss alerts after 60 minutes
+            builder.setTimeoutAfter(60 * 60 * 1000L)
+        }
 
         if (tier == AlertTier.CRITICAL) {
             builder.setCategory(NotificationCompat.CATEGORY_ALARM)

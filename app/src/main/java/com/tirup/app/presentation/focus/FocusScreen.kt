@@ -54,6 +54,8 @@ import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.presentation.components.BentoCard
 import com.tirup.app.presentation.components.BentoMetricCompact
 import com.tirup.app.presentation.components.StreakBadge
+import androidx.compose.foundation.BorderStroke
+import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorLow
 import com.tirup.app.presentation.theme.ColorTarget
@@ -707,19 +709,52 @@ private fun HeroGlucoseCard(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Start,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(R.string.current_glucose),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = onSurfaceVariant
-                )
-            }
+            val hasIob = (latestReading?.iob != null && latestReading.iob > 0.0)
+            val hasCob = (latestReading?.cob != null && latestReading.cob > 0.0)
 
-            Spacer(modifier = Modifier.height(10.dp))
+            if (hasIob || hasCob) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (hasIob) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = ActionBlue.copy(alpha = 0.12f),
+                            border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.35f))
+                        ) {
+                            Text(
+                                text = String.format(Locale.US, if (isRu) "💉 %.2f Ед IoB" else "💉 %.2f U IoB", latestReading!!.iob),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = ActionBlue
+                            )
+                        }
+                    }
+
+                    if (hasCob) {
+                        if (hasIob) Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = PrimaryEmerald.copy(alpha = 0.12f),
+                            border = BorderStroke(0.8.dp, PrimaryEmerald.copy(alpha = 0.35f))
+                        ) {
+                            Text(
+                                text = String.format(Locale.US, if (isRu) "🍞 %.0f г CoB" else "🍞 %.0f g CoB", latestReading!!.cob),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = PrimaryEmerald
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            } else {
+                Spacer(modifier = Modifier.height(4.dp))
+            }
 
             // Large Hero Value with Trend Arrow
             Row(

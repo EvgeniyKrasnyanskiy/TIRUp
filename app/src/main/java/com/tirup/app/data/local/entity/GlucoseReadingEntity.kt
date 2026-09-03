@@ -24,13 +24,21 @@ data class GlucoseReadingEntity(
     val valueMmol: Double,
 
     @ColumnInfo(name = "trend_arrow")
-    val trendArrow: String? = null
+    val trendArrow: String? = null,
+
+    @ColumnInfo(name = "iob", defaultValue = "NULL")
+    val iob: Double? = null,
+
+    @ColumnInfo(name = "cob", defaultValue = "NULL")
+    val cob: Double? = null
 ) {
     fun toDomain(): GlucoseReading = GlucoseReading(
         id = id,
         timestamp = timestamp,
         valueMmol = valueMmol,
-        trendArrow = trendArrow
+        trendArrow = trendArrow,
+        iob = iob,
+        cob = cob
     )
 
     companion object {
@@ -38,7 +46,9 @@ data class GlucoseReadingEntity(
             id = domain.id,
             timestamp = domain.timestamp,
             valueMmol = domain.valueMmol,
-            trendArrow = domain.trendArrow
+            trendArrow = domain.trendArrow,
+            iob = domain.iob,
+            cob = domain.cob
         )
     }
 }

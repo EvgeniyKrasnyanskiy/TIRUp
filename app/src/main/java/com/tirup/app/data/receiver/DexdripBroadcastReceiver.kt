@@ -50,7 +50,11 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         val slopeName = extractSlopeName(extras)
         val trendArrow = slopeToArrow(slopeName)
 
-        Log.i(TAG, "Saving glucose: $valueMmol mmol/L (raw: $glucoseVal) at $timestamp (trend: $trendArrow)")
+        // 4. Extract IoB (Insulin on Board) & CoB (Carbs on Board)
+        val iob = extractIob(extras)
+        val cob = extractCob(extras)
+
+        Log.i(TAG, "Saving glucose: $valueMmol mmol/L at $timestamp (trend: $trendArrow, iob: $iob, cob: $cob)")
 
         val pendingResult = goAsync()
         scope.launch {
@@ -62,7 +66,9 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         GlucoseReading(
                             timestamp = timestamp,
                             valueMmol = valueMmol,
-                            trendArrow = trendArrow
+                            trendArrow = trendArrow,
+                            iob = iob,
+                            cob = cob
                         )
                     )
                     Log.i(TAG, "Successfully persisted reading into database.")
@@ -162,6 +168,42 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             if (extras.containsKey(key)) {
                 val str = extras.getString(key)
                 if (!str.isNullOrBlank()) return str
+            }
+        }
+        return null
+    }
+
+    private fun extractIob(extras: Bundle): Double? {
+        val candidateKeys = listOf(
+            "com.eveningoutpost.dexdrip.Extras.Iob",
+            "iob",
+            "IOB",
+            "current_iob",
+            "active_insulin",
+            "de.michelinside.glucodatahandler.iob"
+        )
+        for (key in candidateKeys) {
+            if (extras.containsKey(key)) {
+                val num = getDoubleFromBundle(extras, key)
+                if (num != null && num >= 0.0) return num
+            }
+        }
+        return null
+    }
+
+    private fun extractCob(extras: Bundle): Double? {
+        val candidateKeys = listOf(
+            "com.eveningoutpost.dexdrip.Extras.Cob",
+            "cob",
+            "COB",
+            "current_cob",
+            "carbs_on_board",
+            "de.michelinside.glucodatahandler.cob"
+        )
+        for (key in candidateKeys) {
+            if (extras.containsKey(key)) {
+                val num = getDoubleFromBundle(extras, key)
+                if (num != null && num >= 0.0) return num
             }
         }
         return null

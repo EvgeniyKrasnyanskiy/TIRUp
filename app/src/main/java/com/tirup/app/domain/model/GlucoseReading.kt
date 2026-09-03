@@ -14,7 +14,9 @@ data class GlucoseReading(
     val id: Long = 0,
     val timestamp: Long,
     val valueMmol: Double,
-    val trendArrow: String? = null
+    val trendArrow: String? = null,
+    val iob: Double? = null,
+    val cob: Double? = null
 ) {
     fun getValue(unit: GlucoseUnit): Double {
         return when (unit) {
