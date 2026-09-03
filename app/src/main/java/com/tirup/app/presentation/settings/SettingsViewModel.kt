@@ -158,4 +158,32 @@ class SettingsViewModel(
             _uiState.update { it.copy(showClearDialog = false, infoMessage = msg) }
         }
     }
+
+    private val manualPdfGenerator = UserManualPdfGenerator(context)
+
+    fun printOrShareUserManual() {
+        viewModelScope.launch {
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            manualPdfGenerator.generateUserManualPdf(isRu).onSuccess { pdfFile ->
+                val uri = androidx.core.content.FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    pdfFile
+                )
+                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    putExtra(android.content.Intent.EXTRA_SUBJECT, if (isRu) "TIRUp • Руководство пользователя" else "TIRUp User Manual")
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                val chooser = android.content.Intent.createChooser(intent, if (isRu) "Инструкция к TIRUp (PDF)" else "TIRUp User Manual").apply {
+                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(chooser)
+            }.onFailure { error ->
+                _uiState.update { it.copy(infoMessage = "Error: ${error.localizedMessage}") }
+            }
+        }
+    }
 }

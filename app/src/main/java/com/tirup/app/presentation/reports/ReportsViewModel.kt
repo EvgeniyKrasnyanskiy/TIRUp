@@ -340,7 +340,7 @@ class ReportsViewModel(
             val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
             guidebookPdfGenerator.generateGuidebookPdf(isRu)
                 .onSuccess { pdfFile ->
-                    saveToPublicDownloads(pdfFile, "TIRUp_Guidebook_${System.currentTimeMillis()}.pdf")
+                    saveToPublicDownloads(pdfFile, "TIRUp_CGM_Parameters_Guide_${System.currentTimeMillis()}.pdf")
                 }.onFailure { error ->
                     _events.emit(ReportEvent.Error(error.localizedMessage ?: "PDF Error"))
                 }

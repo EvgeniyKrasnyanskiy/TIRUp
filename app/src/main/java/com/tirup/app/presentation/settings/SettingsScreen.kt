@@ -661,7 +661,7 @@ fun SettingsScreen(
                         try {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/diakia"))
                             context.startActivity(intent)
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) {}
                     }
                 )
             }
@@ -701,6 +701,7 @@ fun SettingsScreen(
     if (showHelpDialog) {
         HelpAndDisclaimerDialog(
             isRu = isRu,
+            onPrintManual = { viewModel.printOrShareUserManual() },
             onDismiss = { showHelpDialog = false }
         )
     }

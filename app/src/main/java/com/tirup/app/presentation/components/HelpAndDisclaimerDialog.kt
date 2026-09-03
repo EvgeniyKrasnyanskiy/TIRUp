@@ -15,8 +15,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.SettingsInputAntenna
 import androidx.compose.material.icons.filled.Summarize
 import androidx.compose.material3.AlertDialog
@@ -24,6 +27,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,6 +47,7 @@ import com.tirup.app.presentation.theme.PrimaryEmerald
 @Composable
 fun HelpAndDisclaimerDialog(
     isRu: Boolean,
+    onPrintManual: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val onSurface = MaterialTheme.colorScheme.onSurface
@@ -141,23 +146,86 @@ fun HelpAndDisclaimerDialog(
                         "• TIRUp will calculate clinical indices (TIR, TING, GRI, eA1c) and generate a printable PDF report."
                     }
                 )
+
+                // 4. Smart 4-Tier Alarms Card
+                HelpSectionCard(
+                    icon = Icons.Default.NotificationsActive,
+                    iconTint = ColorHigh,
+                    title = if (isRu) "Умные тревоги (4 уровня) и Снуз" else "Smart 4-Tier Alarms & Snooze",
+                    content = if (isRu) {
+                        "• Уровень 1: прогноз выхода за диапазон с точным временем («в 16:42»).\n" +
+                        "• Уровень 2: тройной сигнал подтверждённого выхода 5 точек за границы.\n" +
+                        "• Уровень 3: критическая сирена 12 сек. Мгновенно глушится любой кнопкой громкости или питания.\n" +
+                        "• Уровень 4: потеря сигнала >20 мин с прогрессивным бэкоффом (20 ➔ 40 ➔ 80 мин).\n" +
+                        "• Умный Снуз: 15 мин при гипо (защита <2.8 ммоль/л); 30–45 мин при гипер на действие инсулина."
+                    } else {
+                        "• Tier 1: predictive forecast with exact timestamp ('at 16:42').\n" +
+                        "• Tier 2: confirmed boundary exit (triple beep with 1.5s pause).\n" +
+                        "• Tier 3: critical 12s siren. Instant mute with volume or power buttons.\n" +
+                        "• Tier 4: sensor signal loss >20 min with geometric backoff.\n" +
+                        "• Smart Snooze: 15 min for hypo (<2.8 coma guard); 30-45 min for hyper."
+                    }
+                )
+
+                // 5. Automated Daily Backup Card
+                HelpSectionCard(
+                    icon = Icons.Default.Backup,
+                    iconTint = PrimaryEmerald,
+                    title = if (isRu) "Ежедневный автобэкап в 23:59:59" else "Daily Auto-Backup at 23:59:59",
+                    content = if (isRu) {
+                        "• Точный будильник сохраняет настройки и базу данных в защищённую изолированную папку приложения.\n" +
+                        "• Не требует опасных разрешений на доступ ко всем файлам смартфона.\n" +
+                        "• При переустановке приложение автоматически обнаружит копию и восстановит историю."
+                    } else {
+                        "• Exact RTC AlarmManager backs up settings and database into app sandbox.\n" +
+                        "• Operates without dangerous storage permissions.\n" +
+                        "• Automatically detects and restores your history upon reinstallation."
+                    }
+                )
             }
         },
         confirmButton = {
-            Button(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = if (isRu) "Понятно и согласен" else "I Understand & Agree",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = Color.White
-                )
+                OutlinedButton(
+                    onClick = onPrintManual,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PictureAsPdf,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = ActionBlue
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isRu) "📄 Распечатать руководство по TIRUp (PDF)" else "📄 Print User Manual (PDF)",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = ActionBlue
+                    )
+                }
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
+                ) {
+                    Text(
+                        text = if (isRu) "Понятно и согласен" else "I Understand & Agree",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = Color.White
+                    )
+                }
             }
         }
     )

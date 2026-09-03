@@ -68,6 +68,10 @@
    - Полная поддержка русского (`RU`) и английского (`EN`) языков интерфейса и отчётов.
    - Тёмная (Dark Bento), светлая (Light) и системная (Auto) темы оформления.
 
+12. **Справочник параметров CGM и печать Руководства пользователя**:
+    - **Справочник параметров CGM (PDF на лист А4)**: подробный разбор 12 клинических параметров (Mean BG, eA1c, Min/Max, TIR, TING, TBR, TAR, %CV, SD, GVI, GRI, PGS, окно сна, «утренняя заря») с нормами ATTD/ADA и дисклеймером.
+    - **Руководство пользователя TIRUp (PDF)**: печатная памятка прямо из настроек по связке с xDrip+, 4 уровням тревог, снузу, аппаратным кнопкам глушения и автобэкапу.
+
 ---
 
 ## 📱 Интеграция с xDrip+
@@ -155,6 +159,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - **AGP PDF Reports**: One-click generation of official Ambulatory Glucose Profile sheets with patient profiles, therapy info, and 24-hour percentile curves.
 - **Smart 4-Tier Alarms**: Predictive alerts with astronomical timestamps, confirmed alerts (triple beep with 1.5s pause), screaming critical sirens (~12s on `USAGE_ALARM` with instant physical button muting), and signal loss alarm (>20 min with geometric backoff).
 - **Clinical Pattern Detection & AGP Card Toggle**: Automated detection of dawn phenomenon, night drops, postprandial spikes, and dual-mode AGP card with 24h percentile curves & 12 core clinical parameters.
+- **CGM Clinical Guidebook & Printable User Manual**: One-page full A4 printable reference sheets for ATTD/ADA parameters and step-by-step app manual.
 - **Permissionless Auto-Backup**: Daily automated database backup at 23:59:59 via exact RTC AlarmManager directly into app sandbox without asking dangerous storage permissions.
 - **Full Localization & Compact UI**: Russian and English language support, ultra-thin auto-hiding navigation bar (44dp).
 - **Modern UI**: Clean Material 3 Bento Card design with Dark/Light mode support.

@@ -1,4 +1,4 @@
-﻿package com.tirup.app.presentation.reports
+package com.tirup.app.presentation.reports
 
 import android.content.Context
 import android.graphics.Color
@@ -28,21 +28,30 @@ class GuidebookPdfGenerator(private val context: Context) {
             }
             val subtitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(100, 116, 139)
-                textSize = 8.5f
+                textSize = 8.2f
+            }
+            val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(16, 185, 129) // PrimaryEmerald
+                strokeWidth = 1.5f
             }
             val sectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(16, 185, 129) // PrimaryEmerald
-                textSize = 11f
+                textSize = 10.5f
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             }
             val itemTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(30, 41, 59)
-                textSize = 9.5f
+                textSize = 9.2f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            val itemTargetPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(5, 150, 105) // Emerald 600
+                textSize = 8.5f
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             }
             val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.rgb(51, 65, 85)
-                textSize = 8f
+                color = Color.rgb(71, 85, 105)
+                textSize = 7.7f
             }
             val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(248, 250, 252)
@@ -51,7 +60,7 @@ class GuidebookPdfGenerator(private val context: Context) {
             val cardBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(226, 232, 240)
                 style = Paint.Style.STROKE
-                strokeWidth = 1f
+                strokeWidth = 0.8f
             }
             val warningBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(254, 243, 199) // Amber 100
@@ -60,46 +69,54 @@ class GuidebookPdfGenerator(private val context: Context) {
             val warningBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(245, 158, 11) // Amber 500
                 style = Paint.Style.STROKE
-                strokeWidth = 1f
+                strokeWidth = 0.9f
             }
             val warningTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(146, 64, 14) // Amber 800
-                textSize = 7.5f
+                textSize = 7.3f
             }
 
-            var y = 35f
+            var y = 44f
 
-            // Header Banner
+            // 1. Header Banner
             canvas.drawText(
-                if (isRu) "TIRUp • Справочник" else "TIRUp • Guidebook",
+                if (isRu) "TIRUp • Справочник параметров CGM" else "TIRUp • CGM Parameters Guide",
                 30f,
                 y,
                 titlePaint
             )
             y += 14f
             canvas.drawText(
-                if (isRu) "Клиническое руководство по интерпретации данных непрерывного мониторинга (CGM)" else "Clinical interpretation guide for continuous glucose monitoring data (CGM)",
+                if (isRu) "Международные клинические ориентиры непрерывного мониторинга глюкозы (консенсус ATTD / ADA)"
+                else "International clinical benchmarks for continuous glucose monitoring (ATTD / ADA consensus)",
                 30f,
                 y,
                 subtitlePaint
             )
-            y += 18f
+            y += 8f
+            canvas.drawLine(30f, y, 565f, y, linePaint)
+            y += 14f
 
-            fun drawSection(title: String, items: List<Pair<String, String>>) {
+            fun drawSection(title: String, items: List<Triple<String, String, String>>, cardHeight: Float = 39f) {
                 canvas.drawText(title, 30f, y, sectionPaint)
-                y += 12f
+                y += 13f
 
-                for ((itemTitle, itemDesc) in items) {
-                    val rect = RectF(30f, y, 565f, y + 34f)
+                for ((itemTitle, itemTarget, itemDesc) in items) {
+                    val rect = RectF(30f, y, 565f, y + cardHeight)
                     canvas.drawRoundRect(rect, 6f, 6f, cardBgPaint)
                     canvas.drawRoundRect(rect, 6f, 6f, cardBorderPaint)
 
-                    canvas.drawText(itemTitle, 38f, y + 12f, itemTitlePaint)
+                    // Title and Target Badge
+                    canvas.drawText(itemTitle, 38f, y + 12.5f, itemTitlePaint)
+                    if (itemTarget.isNotEmpty()) {
+                        val targetWidth = itemTargetPaint.measureText(itemTarget)
+                        canvas.drawText(itemTarget, 557f - targetWidth, y + 12.5f, itemTargetPaint)
+                    }
 
-                    // Word wrap description up to 2 lines
+                    // Word wrap description across 2 lines
                     val words = itemDesc.split(" ")
                     var line = ""
-                    var lineY = y + 23f
+                    var lineY = y + 24.5f
                     for (w in words) {
                         val testLine = if (line.isEmpty()) w else "$line $w"
                         if (bodyPaint.measureText(testLine) < 515f) {
@@ -107,116 +124,158 @@ class GuidebookPdfGenerator(private val context: Context) {
                         } else {
                             canvas.drawText(line, 38f, lineY, bodyPaint)
                             line = w
-                            lineY += 9f
-                            if (lineY > y + 32f) break
+                            lineY += 10f
+                            if (lineY > y + cardHeight - 2f) break
                         }
                     }
-                    if (line.isNotEmpty() && lineY <= y + 32f) {
+                    if (line.isNotEmpty() && lineY <= y + cardHeight - 2f) {
                         canvas.drawText(line, 38f, lineY, bodyPaint)
                     }
 
-                    y += 38f
+                    y += cardHeight + 4.5f
                 }
-                y += 4f
+                y += 6f
             }
 
-            // Section 1
+            // Section 1: Core Control Metrics (3 items)
             drawSection(
-                if (isRu) "1. Основные показатели контроля" else "1. Core Glycemic Control Metrics",
+                if (isRu) "1. Показатели общего гликемического контроля" else "1. Core Glycemic Control Metrics",
                 listOf(
-                    Pair(
-                        if (isRu) "Mean BG (Средняя гликемия)" else "Mean BG (Average Glucose)",
-                        if (isRu) "Средний уровень глюкозы за анализируемый период (цель: ≤7.8 ммоль/л / ≤140 мг/дл). Показывает общий генеральный тренд гликемии."
-                        else "Average glucose over the period (target: ≤7.8 mmol/L / ≤140 mg/dL). Reflects overall glycemic trajectory."
+                    Triple(
+                        if (isRu) "Mean Glucose (Средний сахар)" else "Mean Glucose (Average)",
+                        if (isRu) "Цель: ≤7.8 ммоль/л (≤140 мг/дл)" else "Target: ≤7.8 mmol/L (≤140 mg/dL)",
+                        if (isRu) "Среднее арифметическое всех измерений. Фундаментальный показатель общего уровня компенсации. У здоровых людей без диабета составляет 4.5–5.8 ммоль/л (80–105 мг/дл)."
+                        else "Arithmetic mean of all readings. Reflects overall baseline. Healthy non-diabetic average is 4.5–5.8 mmol/L (80–105 mg/dL)."
                     ),
-                    Pair(
-                        if (isRu) "eA1c (Расчётный гликированный гемоглобин)" else "eA1c (Estimated A1c)",
-                        if (isRu) "Математическая экстраполяция лабораторного HbA1c по формуле ADAG (цель: ≤7.0%). Отражает средний уровень сахара за последние недели."
-                        else "Mathematical extrapolation of laboratory HbA1c (target: ≤7.0%). Correlates with multi-week average glucose."
+                    Triple(
+                        if (isRu) "eA1c / GMI (Расчётный гликированный гемоглобин)" else "eA1c / GMI (Estimated HbA1c)",
+                        if (isRu) "Цель: ≤7.0% (≤53 ммоль/моль)" else "Target: ≤7.0% (≤53 mmol/mol)",
+                        if (isRu) "Математическая экстраполяция лабораторного HbA1c по формуле ADAG. Отражает долгосрочный сахар без искажений от анемии. У людей без диабета: 4.0–5.6%."
+                        else "Mathematical projection of laboratory HbA1c based on ADAG formula. Non-diabetic reference range: 4.0–5.6%."
+                    ),
+                    Triple(
+                        if (isRu) "Min / Max (Экстремумы сахара за период)" else "Min / Max (Observed Glycemic Range)",
+                        if (isRu) "Коридор: 3.9–10.0 ммоль/л" else "Target Corridor: 3.9–10.0 mmol/L",
+                        if (isRu) "Фактический размах колебаний. У здоровых людей 96% времени суток сахар находится строго в коридоре 4.0–7.8 ммоль/л (натощак 3.3–5.5 ммоль/л)."
+                        else "Full observed span of values. Healthy individuals spend 96% of the day within 4.0–7.8 mmol/L (fasting 3.3–5.5 mmol/L)."
                     )
-                )
+                ),
+                cardHeight = 39f
             )
 
-            // Section 2
+            // Section 2: Time in Range (4 items)
             drawSection(
-                if (isRu) "2. Время в целевых диапазонах (Time in Range)" else "2. Time in Range Metrics",
+                if (isRu) "2. Время в целевых диапазонах (Time in Range — консенсус ATTD/ADA)" else "2. Time in Range Metrics (ATTD Consensus)",
                 listOf(
-                    Pair(
-                        if (isRu) "TIR (3.9–10.0 ммоль/л, норма ≥70%)" else "TIR (70–180 mg/dL, target ≥70%)",
-                        if (isRu) "Главный маркер компенсации. Увеличение TIR на каждые 10% существенно снижает риск ретинопатии, нефропатии и нейропатии."
-                        else "Primary clinical target. Every 10% increase in TIR substantially lowers vascular complication risks."
+                    Triple(
+                        if (isRu) "TIR (Целевой диапазон 3.9–10.0 ммоль/л)" else "TIR (Target Range 3.9–10.0 mmol/L)",
+                        if (isRu) "Норма: ≥70% (>16 ч 48 мин)" else "Target: ≥70% (>16h 48m/day)",
+                        if (isRu) "Главный маркер компенсации. Каждые дополнительные 10% TIR снижают риск ретинопатии и нефропатии на 40%! У здоровых людей без диабета составляет 96–99%."
+                        else "Gold standard metric. Every 10% increase in TIR reduces microvascular complications risk by 40%. Non-diabetic baseline: 96–99%."
                     ),
-                    Pair(
-                        if (isRu) "TING (3.9–7.8 ммоль/л, норма ≥50%)" else "TING (70–140 mg/dL, target ≥50%)",
-                        if (isRu) "Время в идеальной норме здорового человека (Tight in Normal Glycemia). Помогает оценить тонкую ювелирную настройку терапии."
-                        else "Time in tight physiological range. Helps assess advanced fine-tuning of insulin regimens and diets."
+                    Triple(
+                        if (isRu) "TING (Узкий диапазон нормы 3.9–7.8 ммоль/л)" else "TING (Tight Range 3.9–7.8 mmol/L)",
+                        if (isRu) "Ориентир: ≥50% (>12 ч)" else "Advanced Goal: ≥50% (>12h/day)",
+                        if (isRu) "Time in Tight Range — физиологический коридор здорового человека. Оценивает ювелирную точность компенсации и отсутствие скачков после приёма пищи."
+                        else "Physiological tight corridor. Evaluates precision of postprandial glycemic excursions blunting and AID algorithm performance."
                     ),
-                    Pair(
-                        if (isRu) "TBR (<3.9 ммоль/л: норма <4%, <3.0 ммоль/л: <1%)" else "TBR (<70 mg/dL: <4%, <54 mg/dL: <1%)",
-                        if (isRu) "Критический параметр безопасности. Гипогликемия вызывает аритмии и когнитивные расстройства. Время <3.0 должно быть сведено к нулю."
-                        else "Safety-critical index. Hypoglycemia directly triggers cardiac arrhythmias and neurological deficits."
+                    Triple(
+                        if (isRu) "TBR (Время в гипогликемии <3.9 ммоль/л)" else "TBR (Hypoglycemia <3.9 mmol/L)",
+                        if (isRu) "Безопасность: <4% (<1 ч), <3.0: <1%" else "Safety: <4% (<1h), <3.0: <15m",
+                        if (isRu) "Критический лимит безопасности. Гипогликемия провоцирует аритмии и нейрогликопению. Уровень 2 (<3.0 ммоль/л) должен быть сведён к абсолютному минимуму."
+                        else "Critical safety boundary. Hypoglycemia triggers arrhythmias and cognitive impairment. Level 2 (<3.0 mmol/L) must be <1%."
                     ),
-                    Pair(
-                        if (isRu) "TAR (>10.0 ммоль/л: норма <25%, >13.9 ммоль/л: <5%)" else "TAR (>180 mg/dL: <25%, >250 mg/dL: <5%)",
-                        if (isRu) "Время в гипергликемии. Высокий сахар повреждает эндотелий сосудов, ведёт к дегидратации и накоплению токсичных метаболитов."
-                        else "Time in hyperglycemia. Sustained high glucose drives oxidative stress, endothelial damage, and microvascular decline."
+                    Triple(
+                        if (isRu) "TAR (Время в гипергликемии >10.0 ммоль/л)" else "TAR (Hyperglycemia >10.0 mmol/L)",
+                        if (isRu) "Цель: <25% (<6 ч), >13.9: <5%" else "Target: <25% (<6h), >13.9: <5%",
+                        if (isRu) "Высокий сахар повреждает эндотелий сосудов и форсирует образование конечных продуктов гликирования. Уровень 2 (>13.9 ммоль/л) должен быть <5% (<1 ч 12 мин)."
+                        else "Prolonged elevation damages microvasculature and drives advanced glycation end-products. Level 2 (>13.9 mmol/L) must stay <5%."
                     )
-                )
+                ),
+                cardHeight = 39f
             )
 
-            // Section 3
+            // Section 3: Variability & Composite Indices (3 items)
             drawSection(
-                if (isRu) "3. Вариабельность и качество кривой" else "3. Variability & Curve Smoothness",
+                if (isRu) "3. Вариабельность и качество кривой" else "3. Glycemic Variability & Quality Indices",
                 listOf(
-                    Pair(
-                        if (isRu) "Вариабельность (%CV ≤36%, SD ≤2.0 ммоль/л)" else "Variability (%CV ≤36%, SD ≤36 mg/dL)",
-                        if (isRu) "Коэффициент вариации и стандартное отклонение. Высокий %CV (>36%) создаёт опасный окислительный стресс эндотелия сосудов."
-                        else "Coefficient of variation and standard deviation. High CV (>36%) drives profound vascular endothelial stress."
+                    Triple(
+                        if (isRu) "%CV (Коэффициент вариации) и SD (Разброс)" else "%CV (Variability) & SD (Dispersion)",
+                        if (isRu) "Норма: %CV ≤36.0%, SD ≤2.0 ммоль/л" else "Target: %CV ≤36.0%, SD ≤36 mg/dL",
+                        if (isRu) "%CV = SD / Mean × 100%. При %CV > 36% диабет считается лабильным (резко возрастает риск скрытых гипогликемий). У людей без диабета %CV составляет 14–22%."
+                        else "%CV = SD / Mean * 100%. Values >36% denote high glycemic variability and heightened vulnerability to unexpected hypoglycemia."
                     ),
-                    Pair(
-                        if (isRu) "GVI (Лабильность, идеал ≤1.20) и GRI (Индекс риска ≤20)" else "GVI (Lability ≤1.20) & GRI (Risk Index ≤20)",
-                        if (isRu) "GVI оценивает извилистость графика (скачки). GRI (0–100) — композитный индекс риска осложнений (Зона А: ≤20 баллов)."
-                        else "GVI evaluates glucose zigzag lability. GRI (0–100) reflects composite clinical risk (Zone A low risk: ≤20)."
+                    Triple(
+                        if (isRu) "GVI (Индекс лабильности) и GRI (Индекс риска)" else "GVI (Glycemic Variability) & GRI (Risk)",
+                        if (isRu) "GVI: ≤1.20, GRI: Зона A (≤20)" else "GVI: ≤1.20, GRI: Zone A (≤20)",
+                        if (isRu) "GVI оценивает длину реальной кривой («американские горки»). GRI (0–100) — композитная шкала риска ATTD с повышенным штрафом за гипогликемию."
+                        else "GVI measures actual glucose curve zigzag length. GRI (0–100) scores overall glycemic safety with higher penalties for hypoglycemia."
+                    ),
+                    Triple(
+                        if (isRu) "PGS (Персональный балл стабильности)" else "PGS (Personal Glycemic Score)",
+                        if (isRu) "Норма: ≤35.0 баллов" else "Target: ≤35.0 points",
+                        if (isRu) "Комплексный штрафной балл на основе дистанции от целевого диапазона, лабильности и частоты пиков. Чем ниже балл, тем ближе профиль к идеалу."
+                        else "Comprehensive penalty scoring system accounting for target deviations, volatility, and extremes. Lower score denotes superior control."
                     )
-                )
+                ),
+                cardHeight = 39f
             )
 
-            // Footer Disclaimer Banner
-            y = 750f
-            val warnRect = RectF(30f, y, 565f, 815f)
-            canvas.drawRoundRect(warnRect, 8f, 8f, warningBgPaint)
-            canvas.drawRoundRect(warnRect, 8f, 8f, warningBorderPaint)
+            // Section 4: Night Profile & Clinical Patterns (2 items)
+            drawSection(
+                if (isRu) "4. Ночной профиль и клинические паттерны" else "4. Nocturnal Profile & Glycemic Patterns",
+                listOf(
+                    Triple(
+                        if (isRu) "Ночной профиль (Окно сна 00:00–06:00)" else "Nocturnal Glycemia (Sleep Window)",
+                        if (isRu) "Цель: SD ≤1.5 ммоль/л, TBR = 0%" else "Target: SD ≤27 mg/dL, TBR = 0%",
+                        if (isRu) "Ночь — самый физиологически стабильный период суток без влияния еды. Отражает адекватность дозы базального инсулина и защищает от ночных гипогликемий."
+                        else "The most basal metabolic phase of 24h. Evaluates background basal insulin coverage and rules out dangerous nocturnal hypoglycemia."
+                    ),
+                    Triple(
+                        if (isRu) "Паттерны: «Утренняя заря» и постпрандиальные пики" else "Patterns: Dawn Phenomenon & Meal Spikes",
+                        if (isRu) "Ранняя детекция" else "Early Detection",
+                        if (isRu) "Феномен утренней зари — подъём сахара в 4–8 утра из-за выброса кортизола и гормона роста. Постпрандиальный пик — подъём через 60–90 мин после еды (>2.5 ммоль/л)."
+                        else "Dawn phenomenon denotes early morning glucose rise driven by cortisol. Postprandial spikes reflect carbohydrate-insulin mismatch."
+                    )
+                ),
+                cardHeight = 39f
+            )
+
+            // Footer Disclaimer Banner (Pinned gracefully at the bottom)
+            val warnRect = RectF(30f, 742f, 565f, 810f)
+            canvas.drawRoundRect(warnRect, 7f, 7f, warningBgPaint)
+            canvas.drawRoundRect(warnRect, 7f, 7f, warningBorderPaint)
 
             canvas.drawText(
-                if (isRu) "⚠️ Важные примечания:"
-                else "⚠️ Clinical Notice Regarding Continuous Glucose Monitoring (CGM) Accuracy:",
+                if (isRu) "⚠️ Важные клинические примечания к системам CGM:"
+                else "⚠️ Important Clinical Notes Regarding Continuous Glucose Monitoring (CGM):",
                 38f,
-                y + 14f,
+                755f,
                 itemTitlePaint.apply { color = Color.rgb(180, 83, 9) }
             )
             val discText1 = if (isRu) {
-                "• Физиологическое запаздывание: датчики CGM измеряют сахар в межтканевой жидкости, отставание от крови составляет 5–15 минут."
+                "• Физиологическое запаздывание: сенсоры CGM измеряют глюкозу в межтканевой жидкости; запаздывание от крови составляет 5–15 минут."
             } else {
-                "• Physiological Lag: CGM sensors measure interstitial fluid; physiological lag relative to capillary blood is 5–15 minutes."
+                "• Physiological Lag: CGM sensors measure interstitial fluid; physiological lag relative to blood glucose is typically 5–15 minutes."
             }
             val discText2 = if (isRu) {
-                "• Погрешность MARD: стандартная средняя погрешность систем CGM составляет 8–10%. Не является диагнозом."
+                "• Погрешность MARD: стандартная клиническая погрешность систем CGM составляет 8–10%. Возможны ночные компрессионные ложные спады."
             } else {
-                "• MARD Accuracy: standard mean absolute relative difference of CGM systems is 8–10%. Not a standalone diagnosis."
+                "• MARD Accuracy: standard mean absolute relative difference is 8–10%. Sleep compression lows may occasionally occur."
             }
             val discText3 = if (isRu) {
-                "• Принятие решений: при выраженном расхождении самочувствия с показаниями выполните замер по капле крови и проконсультируйтесь с врачом."
+                "• Принятие решений: при выраженном расхождении самочувствия с показаниями CGM выполните контрольный замер по капле крови."
             } else {
-                "• Medical Decisions: verify unexpected symptoms with capillary blood testing before clinical dosing decisions."
+                "• Medical Decisions: verify unexpected sensor readings with a capillary blood glucose fingerstick before corrective action."
             }
-            canvas.drawText(discText1, 38f, y + 27f, warningTextPaint)
-            canvas.drawText(discText2, 38f, y + 38f, warningTextPaint)
-            canvas.drawText(discText3, 38f, y + 49f, warningTextPaint)
+            canvas.drawText(discText1, 38f, 769f, warningTextPaint)
+            canvas.drawText(discText2, 38f, 781f, warningTextPaint)
+            canvas.drawText(discText3, 38f, 793f, warningTextPaint)
 
             document.finishPage(page)
 
             val outputDir = File(context.cacheDir, "reports").apply { mkdirs() }
-            val outputFile = File(outputDir, "TIRUp_Guidebook.pdf")
+            val outputFile = File(outputDir, "TIRUp_CGM_Parameters_Guide.pdf")
             FileOutputStream(outputFile).use { out ->
                 document.writeTo(out)
             }

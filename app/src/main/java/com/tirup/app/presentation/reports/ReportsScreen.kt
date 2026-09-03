@@ -897,15 +897,15 @@ private fun GuidebookCard(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = if (isRu) "📖 Справочник" else "📖 Guidebook",
+                        text = if (isRu) "📖 Справочник параметров CGM" else "📖 CGM Parameters Guide",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = if (isRu) "Смысл метрик, влияние на здоровье и дисклеймер CGM"
-                               else "Metrics meaning, health impact, and CGM disclaimer",
+                        text = if (isRu) "Клинические нормы ATTD/ADA, смысл метрик и дисклеймер"
+                               else "ATTD/ADA clinical targets, metrics meaning & disclaimer",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -956,37 +956,13 @@ private fun ParametersGuidebookModal(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isRu) "Справочник" else "Guidebook",
+                            text = if (isRu) "Справочник параметров CGM" else "CGM Clinical Parameters Guide",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                    }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        IconButton(onClick = onSavePdf) {
-                            Icon(
-                                imageVector = Icons.Default.Download,
-                                contentDescription = "Save PDF",
-                                tint = ActionBlue
-                            )
-                        }
-                        IconButton(onClick = onSharePdf) {
-                            Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = "Share",
-                                tint = ActionBlue
-                            )
-                        }
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
                     }
                 }
 
