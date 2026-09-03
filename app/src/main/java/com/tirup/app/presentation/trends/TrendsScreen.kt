@@ -343,7 +343,7 @@ fun TrendsScreen(
                     ) {
                         Text(
                             text = if (agpCardMode == 0) stringResource(R.string.agp_curve_title)
-                                   else (if (isRu) "Клинические параметры" else "Clinical Parameters"),
+                                   else (if (isRu) "Параметры" else "Parameters"),
                             style = MaterialTheme.typography.titleMedium,
                             color = onSurface,
                             modifier = Modifier.weight(1f)

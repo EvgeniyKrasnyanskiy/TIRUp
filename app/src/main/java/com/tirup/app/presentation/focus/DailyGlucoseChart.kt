@@ -145,8 +145,8 @@ fun DailyGlucoseChart(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (selectedMode == 0) (if (isRu) "Суточный график" else "24h Glucose Profile")
-                               else (if (isRu) "Параметры суток" else "Daily Metrics"),
+                        text = if (selectedMode == 0) (if (isRu) "График" else "Profile")
+                               else (if (isRu) "Параметры" else "Metrics"),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = onSurface
