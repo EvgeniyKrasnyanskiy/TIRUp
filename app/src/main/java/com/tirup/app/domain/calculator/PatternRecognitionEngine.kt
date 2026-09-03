@@ -136,21 +136,6 @@ object PatternRecognitionEngine {
             )
         }
 
-        // 5. Если декомпенсаций нет — фиксируем позитивный паттерн
-        if (patterns.isEmpty()) {
-            patterns.add(
-                DetectedPattern(
-                    id = "stable_profile",
-                    titleRu = "Стабильный профиль без паттернов декомпенсации",
-                    titleEn = "Stable Profile — No Adverse Patterns",
-                    descriptionRu = "Повторяющихся ночных гипогликемий, всплесков «зари» и выраженной вариабельности не выявлено. Профиль предсказуем и сбалансирован.",
-                    descriptionEn = "No recurring nocturnal hypoglycemia, dawn spikes, or high-variability clusters detected. Glucose trajectory is stable and predictable.",
-                    severity = PatternSeverity.POSITIVE,
-                    icon = "✔"
-                )
-            )
-        }
-
         return patterns
     }
 }

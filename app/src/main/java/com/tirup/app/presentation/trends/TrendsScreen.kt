@@ -73,7 +73,8 @@ fun TrendsScreen(
     val state by viewModel.uiState.collectAsState()
     val selectedPeriod by viewModel.selectedPeriod.collectAsState()
     var detailDialogInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
-    var dismissedPatternIds by rememberSaveable { mutableStateOf(setOf<String>()) }
+    val dismissedPatternIds by viewModel.dismissedPatternIds.collectAsState()
+    val dismissedInsightIds by viewModel.dismissedInsightIds.collectAsState()
     var agpCardMode by rememberSaveable { mutableStateOf(0) } // 0 = Chart, 1 = Metrics
 
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -94,11 +95,11 @@ fun TrendsScreen(
         detectedPatterns.filter { it.id !in dismissedPatternIds }
     }
 
-    val tirInsights = remember(state.percentileBins, state.statistics) {
+    val tirInsights = remember(state.percentileBins, state.statistics, dismissedInsightIds) {
         TirAdvisorEngine.generateInsights(
             bins = state.percentileBins,
             stats = state.statistics
-        )
+        ).filter { it.id !in dismissedInsightIds }
     }
 
     LaunchedEffect(detectedPatterns) {
@@ -238,7 +239,7 @@ fun TrendsScreen(
                                             )
                                         }
                                         IconButton(
-                                            onClick = { dismissedPatternIds = dismissedPatternIds + pattern.id },
+                                            onClick = { viewModel.dismissPattern(pattern.id) },
                                             modifier = Modifier.size(28.dp)
                                         ) {
                                             Icon(
@@ -498,6 +499,18 @@ fun TrendsScreen(
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = onSurfaceVariant,
                                                 lineHeight = 17.sp
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        IconButton(
+                                            onClick = { viewModel.dismissInsight(insight.id) },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Dismiss",
+                                                tint = onSurfaceVariant.copy(alpha = 0.5f),
+                                                modifier = Modifier.size(16.dp)
                                             )
                                         }
                                     }

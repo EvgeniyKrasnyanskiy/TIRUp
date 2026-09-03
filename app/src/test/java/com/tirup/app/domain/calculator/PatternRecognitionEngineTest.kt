@@ -1,4 +1,4 @@
-﻿package com.tirup.app.domain.calculator
+package com.tirup.app.domain.calculator
 
 import com.tirup.app.domain.model.AGPPercentileBin
 import com.tirup.app.domain.model.GlucoseStatistics
@@ -103,6 +103,6 @@ class PatternRecognitionEngineTest {
             bins = bins,
             stats = GlucoseStatistics(totalCount = 200, cvPercent = 25.0)
         )
-        assertTrue(patterns.any { it.severity == PatternSeverity.POSITIVE })
+        assertTrue(patterns.isEmpty())
     }
 }

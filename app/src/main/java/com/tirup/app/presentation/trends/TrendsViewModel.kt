@@ -1,5 +1,7 @@
 package com.tirup.app.presentation.trends
 
+import android.content.Context
+import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tirup.app.domain.calculator.AGPPercentilesCalculator
@@ -20,8 +22,24 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 class TrendsViewModel(
     private val glucoseRepository: GlucoseRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    context: Context? = null
 ) : ViewModel() {
+
+    companion object {
+        const val DISMISSAL_COOLDOWN_MS = 14L * 24 * 60 * 60 * 1000L // 14 days
+        private const val PREFS_NAME = "tirup_trends_dismissed"
+        private const val PREFIX_PATTERN = "dismissed_pattern_"
+        private const val PREFIX_INSIGHT = "dismissed_insight_"
+    }
+
+    private val prefs: SharedPreferences? = context?.applicationContext?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    private val _dismissedPatternIds = MutableStateFlow<Set<String>>(emptySet())
+    val dismissedPatternIds: StateFlow<Set<String>> = _dismissedPatternIds.asStateFlow()
+
+    private val _dismissedInsightIds = MutableStateFlow<Set<String>>(emptySet())
+    val dismissedInsightIds: StateFlow<Set<String>> = _dismissedInsightIds.asStateFlow()
 
     private val _selectedPeriod = MutableStateFlow(TrendPeriod.PERIOD_14D)
     val selectedPeriod: StateFlow<TrendPeriod> = _selectedPeriod.asStateFlow()
@@ -30,7 +48,41 @@ class TrendsViewModel(
     val uiState: StateFlow<TrendsUiState> = _uiState.asStateFlow()
 
     init {
+        loadDismissedItems()
         observeData()
+    }
+
+    private fun loadDismissedItems() {
+        val sp = prefs ?: return
+        val now = System.currentTimeMillis()
+        val allEntries = sp.all
+        val activePatterns = mutableSetOf<String>()
+        val activeInsights = mutableSetOf<String>()
+
+        allEntries.forEach { (key, value) ->
+            val timestamp = (value as? Long) ?: return@forEach
+            if (now - timestamp < DISMISSAL_COOLDOWN_MS) {
+                if (key.startsWith(PREFIX_PATTERN)) {
+                    activePatterns.add(key.removePrefix(PREFIX_PATTERN))
+                } else if (key.startsWith(PREFIX_INSIGHT)) {
+                    activeInsights.add(key.removePrefix(PREFIX_INSIGHT))
+                }
+            }
+        }
+        _dismissedPatternIds.value = activePatterns
+        _dismissedInsightIds.value = activeInsights
+    }
+
+    fun dismissPattern(id: String) {
+        val now = System.currentTimeMillis()
+        prefs?.edit()?.putLong("$PREFIX_PATTERN$id", now)?.apply()
+        _dismissedPatternIds.value = _dismissedPatternIds.value + id
+    }
+
+    fun dismissInsight(id: String) {
+        val now = System.currentTimeMillis()
+        prefs?.edit()?.putLong("$PREFIX_INSIGHT$id", now)?.apply()
+        _dismissedInsightIds.value = _dismissedInsightIds.value + id
     }
 
     private fun observeData() {
