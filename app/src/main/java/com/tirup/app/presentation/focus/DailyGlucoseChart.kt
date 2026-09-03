@@ -128,7 +128,7 @@ fun DailyGlucoseChart(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Header: Title, Zoom Scale Badge, and Mode Toggle (Chart vs Metrics)
+            // Header: Mode Toggle (Chart vs Metrics) on the left, Zoom Scale / Settings on the right
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -136,21 +136,42 @@ fun DailyGlucoseChart(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ShowChart,
-                        contentDescription = null,
-                        tint = PrimaryEmerald,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (selectedMode == 0) (if (isRu) "График" else "Profile")
-                               else (if (isRu) "Параметры" else "Metrics"),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = onSurface
-                    )
+                // Mode Selector Toggle
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (selectedMode == 0) ActionBlue else Color.Transparent,
+                        modifier = Modifier.clickable { onModeChange(0) }
+                    ) {
+                        Text(
+                            text = if (isRu) "📊 График" else "📊 Chart",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (selectedMode == 0) Color.White else onSurfaceVariant,
+                            fontWeight = if (selectedMode == 0) FontWeight.Bold else FontWeight.Normal,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (selectedMode == 1) ActionBlue else Color.Transparent,
+                        modifier = Modifier.clickable { onModeChange(1) }
+                    ) {
+                        Text(
+                            text = if (isRu) "🔢 Параметры" else "🔢 Metrics",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (selectedMode == 1) Color.White else onSurfaceVariant,
+                            fontWeight = if (selectedMode == 1) FontWeight.Bold else FontWeight.Normal,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
                 }
 
                 Row(
@@ -177,43 +198,6 @@ fun DailyGlucoseChart(
                                 color = onSurfaceVariant,
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-
-                    // Mode Selector Toggle
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.background)
-                            .padding(2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (selectedMode == 0) ActionBlue else Color.Transparent,
-                            modifier = Modifier.clickable { onModeChange(0) }
-                        ) {
-                            Text(
-                                text = if (isRu) "📊 График" else "📊 Chart",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (selectedMode == 0) Color.White else onSurfaceVariant,
-                                fontWeight = if (selectedMode == 0) FontWeight.Bold else FontWeight.Normal,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                            )
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (selectedMode == 1) ActionBlue else Color.Transparent,
-                            modifier = Modifier.clickable { onModeChange(1) }
-                        ) {
-                            Text(
-                                text = if (isRu) "🔢 Параметры" else "🔢 Metrics",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (selectedMode == 1) Color.White else onSurfaceVariant,
-                                fontWeight = if (selectedMode == 1) FontWeight.Bold else FontWeight.Normal,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                             )
                         }
                     }

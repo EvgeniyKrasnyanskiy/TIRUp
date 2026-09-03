@@ -338,17 +338,9 @@ fun TrendsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.Start,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = if (agpCardMode == 0) stringResource(R.string.agp_curve_title)
-                                   else (if (isRu) "Параметры" else "Parameters"),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = onSurface,
-                            modifier = Modifier.weight(1f)
-                        )
-
                         // Mode Selector Toggle
                         Row(
                             modifier = Modifier
