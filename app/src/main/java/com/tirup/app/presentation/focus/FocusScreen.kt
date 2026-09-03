@@ -826,16 +826,46 @@ private fun HeroGlucoseCard(
                     ColorHigh
                 )
                 else -> {
-                    val inRangeReadings = sorted.takeLastWhile { it.valueMmol in 3.9..10.0 }
-                    if (inRangeReadings.isNotEmpty()) {
-                        val spanMs = latestReading.timestamp - inRangeReadings.first().timestamp
+                    // Scope continuous in-range status to the current day (00:00)
+                    val nowMs = latestReading.timestamp
+                    val calendar = java.util.Calendar.getInstance().apply {
+                        timeInMillis = nowMs
+                        set(java.util.Calendar.HOUR_OF_DAY, 0)
+                        set(java.util.Calendar.MINUTE, 0)
+                        set(java.util.Calendar.SECOND, 0)
+                        set(java.util.Calendar.MILLISECOND, 0)
+                    }
+                    val startOfDay = calendar.timeInMillis
+
+                    val todayReadings = sorted.filter { it.timestamp >= startOfDay }
+                    val todayInRange = todayReadings.takeLastWhile { it.valueMmol in 3.9..10.0 }
+
+                    if (todayInRange.isNotEmpty()) {
+                        val isSinceMidnight = todayInRange.size == todayReadings.size && todayReadings.isNotEmpty()
+                        val spanMs = nowMs - todayInRange.first().timestamp
                         val spanHours = spanMs / 3_600_000.0
-                        if (spanHours >= 1.0) {
+
+                        if (isSinceMidnight && spanHours >= 0.5) {
                             Pair(
-                                if (isRu) String.format(Locale.US, "✨ В норме последние %.1f ч", spanHours)
-                                else String.format(Locale.US, "✨ In target for last %.1f h", spanHours),
+                                if (isRu) String.format(Locale.US, "✨ В норме с начала суток (%.1f ч)", spanHours)
+                                else String.format(Locale.US, "✨ In target since midnight (%.1f h)", spanHours),
                                 PrimaryEmerald
                             )
+                        } else if (spanHours >= 0.5) {
+                            val spanMin = (spanMs / 60_000L).toInt()
+                            if (spanHours >= 1.0) {
+                                Pair(
+                                    if (isRu) String.format(Locale.US, "✨ В норме последние %.1f ч", spanHours)
+                                    else String.format(Locale.US, "✨ In target for last %.1f h", spanHours),
+                                    PrimaryEmerald
+                                )
+                            } else {
+                                Pair(
+                                    if (isRu) "✨ В норме последние $spanMin мин"
+                                    else "✨ In target for last $spanMin min",
+                                    PrimaryEmerald
+                                )
+                            }
                         } else {
                             Pair(if (isRu) "В целевом диапазоне" else "In target range", PrimaryEmerald)
                         }

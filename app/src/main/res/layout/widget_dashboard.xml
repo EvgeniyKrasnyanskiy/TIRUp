@@ -65,7 +65,7 @@
                 android:textSize="10sp" />
         </LinearLayout>
 
-        <View
+        <FrameLayout
             android:layout_width="0dp"
             android:layout_height="1dp"
             android:layout_weight="1" />
@@ -163,7 +163,8 @@
             android:layout_marginTop="3dp"
             android:max="100"
             android:progress="82"
-            android:progressDrawable="@drawable/widget_progress_bar" />
+            android:progressTint="#10B981"
+            android:progressBackgroundTint="#2E3A4B" />
     </LinearLayout>
 
 </LinearLayout>

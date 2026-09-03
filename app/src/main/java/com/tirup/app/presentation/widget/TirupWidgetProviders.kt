@@ -13,8 +13,13 @@ import kotlinx.coroutines.launch
 class TirupStripWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
+        val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
-            TirupWidgetUpdater.updateAllWidgets(context)
+            try {
+                TirupWidgetUpdater.updateAllWidgets(context)
+            } finally {
+                pendingResult.finish()
+            }
         }
     }
 }
@@ -25,8 +30,13 @@ class TirupStripWidgetProvider : AppWidgetProvider() {
 class TirupDashboardWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
+        val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
-            TirupWidgetUpdater.updateAllWidgets(context)
+            try {
+                TirupWidgetUpdater.updateAllWidgets(context)
+            } finally {
+                pendingResult.finish()
+            }
         }
     }
 }
@@ -37,8 +47,13 @@ class TirupDashboardWidgetProvider : AppWidgetProvider() {
 class TirupCompactWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
+        val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
-            TirupWidgetUpdater.updateAllWidgets(context)
+            try {
+                TirupWidgetUpdater.updateAllWidgets(context)
+            } finally {
+                pendingResult.finish()
+            }
         }
     }
 }
