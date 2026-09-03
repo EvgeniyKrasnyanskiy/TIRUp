@@ -172,10 +172,14 @@ fun FocusScreen(
                 currentScore = currentScore,
                 targetGoal = targetGoal,
                 targetMode = targetMode,
+                observedPointsCount = goal.observedPointsCount,
+                activeMonitoringMinutes = goal.activeMonitoringMinutes,
                 unit = unit,
                 isRu = isRu,
                 onModeChange = { mode -> viewModel.setTargetMode(mode) },
                 onClick = {
+                    val observedPtsStr = "${goal.observedPointsCount}"
+                    val activeMonStr = TargetCompensatorCalculator.formatHoursMins(goal.activeMonitoringMinutes, isRu)
                     val inRangeStr = TargetCompensatorCalculator.formatHoursMins(goal.inRangeMinutes, isRu)
                     val targetMinsStr = TargetCompensatorCalculator.formatHoursMins(goal.targetGoalMinutes, isRu)
                     val outOfRangeStr = TargetCompensatorCalculator.formatHoursMins(goal.outOfRangeMinutes, isRu)
@@ -184,12 +188,14 @@ fun FocusScreen(
 
                     val dialogBody = if (isRu) {
                         "Текущий ${targetMode.name}: ${String.format(Locale.US, "%.1f%%", currentScore)} (Цель: ≥$targetGoal%)\n\n" +
+                        "• Замеров за сутки: $observedPtsStr точек ($activeMonStr данных)\n" +
                         "• В диапазоне за сегодня: $inRangeStr (норма ≥$targetMinsStr)\n" +
                         "• Вне диапазона за сегодня: $outOfRangeStr (допустимый лимит: $allowedOutStr)\n" +
                         "• До конца суток осталось: $remainingDayStr\n\n" +
                         "Рекомендация: $compMessage"
                     } else {
                         "Current ${targetMode.name}: ${String.format(Locale.US, "%.1f%%", currentScore)} (Target: ≥$targetGoal%)\n\n" +
+                        "• Readings today: $observedPtsStr pts ($activeMonStr data)\n" +
                         "• In range today: $inRangeStr (target ≥$targetMinsStr)\n" +
                         "• Out of range today: $outOfRangeStr (allowed limit: $allowedOutStr)\n" +
                         "• Remaining today: $remainingDayStr\n\n" +
@@ -784,8 +790,10 @@ private fun HeroGlucoseCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
+                val isStale = diffMinutes > 5
                 val valueColor = when {
                     latestReading == null -> onSurfaceVariant
+                    isStale -> onSurfaceVariant.copy(alpha = 0.55f)
                     latestReading.valueMmol < 3.0 -> ColorVeryLow
                     latestReading.valueMmol < 3.9 -> ColorLow
                     latestReading.valueMmol in 3.9..7.0 -> ColorTight
@@ -897,6 +905,8 @@ private fun TargetCompensatorCard(
     currentScore: Double,
     targetGoal: Int,
     targetMode: TargetMode,
+    observedPointsCount: Int,
+    activeMonitoringMinutes: Int,
     unit: GlucoseUnit,
     isRu: Boolean,
     onModeChange: (TargetMode) -> Unit,
@@ -963,6 +973,24 @@ private fun TargetCompensatorCard(
                         title = tingTitle,
                         selected = targetMode == TargetMode.TING,
                         onClick = { onModeChange(TargetMode.TING) }
+                    )
+                }
+            }
+
+            if (observedPointsCount > 0) {
+                val durationStr = TargetCompensatorCalculator.formatHoursMins(activeMonitoringMinutes, isRu)
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(0.6.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                ) {
+                    Text(
+                        text = if (isRu) "📊 $observedPointsCount точек за сегодня ($durationStr мониторинга)"
+                               else "📊 $observedPointsCount readings today ($durationStr active)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = onSurfaceVariant,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
             }

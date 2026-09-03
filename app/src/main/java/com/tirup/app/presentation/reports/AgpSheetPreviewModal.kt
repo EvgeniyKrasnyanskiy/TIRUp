@@ -372,20 +372,20 @@ fun AgpSheetPreviewModal(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Button(
+                            OutlinedButton(
                                 onClick = onSavePdf,
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(44.dp),
                                 shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = ActionBlue,
-                                    contentColor = Color.White
+                                border = BorderStroke(1.dp, ActionBlue),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = ActionBlue
                                 ),
                                 enabled = !isGenerating
                             ) {
                                 if (isGenerating) {
-                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    CircularProgressIndicator(color = ActionBlue, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                                 } else {
                                     Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
@@ -411,28 +411,28 @@ fun AgpSheetPreviewModal(
                             }
                         }
 
-                        OutlinedButton(
+                        Button(
                             onClick = onDismiss,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(44.dp),
                             shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, Color(0xFFD1D5DB)),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = Color(0xFF374151)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ActionBlue,
+                                contentColor = Color.White
                             )
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp),
-                                tint = Color(0xFF374151)
+                                tint = Color.White
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = if (isRu) "Назад" else "Back",
                                 fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF374151)
+                                color = Color.White
                             )
                         }
                     }

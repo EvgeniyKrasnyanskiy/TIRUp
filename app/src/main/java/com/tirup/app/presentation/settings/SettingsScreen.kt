@@ -362,8 +362,27 @@ fun SettingsScreen(
                         }
                     }
 
-                    if (isAlertsExpanded && alerts.isAlertsMasterEnabled) {
+                    if (isAlertsExpanded) {
                         Spacer(modifier = Modifier.height(14.dp))
+
+                        if (!alerts.isAlertsMasterEnabled) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = ColorVeryLow.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, ColorVeryLow.copy(alpha = 0.35f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = if (isRu) "⚠️ Оповещения выключены. Вы можете настроить параметры или бессрочно отключить критическую тревогу гипо ниже."
+                                           else "⚠️ Master alerts are disabled. You can configure parameters or permanently disable critical hypo below.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ColorVeryLow,
+                                    modifier = Modifier.padding(10.dp),
+                                    lineHeight = 16.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                        }
 
                         // Tier 1: Predictive (Soft)
                         AlertTierConfigRow(

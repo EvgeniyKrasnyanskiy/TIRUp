@@ -120,4 +120,40 @@ class TargetCompensatorCalculatorTest {
         org.junit.Assert.assertTrue(goal.recommendationRu.contains("Сахар вне диапазона"))
         org.junit.Assert.assertTrue(goal.recommendationRu.contains("Вернитесь в норму"))
     }
+
+    @org.junit.Test
+    fun testDailyCompensatorFewPointsDoesNotTriggerExceeding() {
+        val ranges = com.tirup.app.domain.model.TargetRanges()
+        val calendar = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 18)
+            set(java.util.Calendar.MINUTE, 0)
+        }
+        val eveningTime = calendar.timeInMillis
+
+        // 26 points over 26 minutes (1-min intervals, 100% in range)
+        val readings = (0 until 26).map { i ->
+            com.tirup.app.domain.model.GlucoseReading(
+                timestamp = eveningTime - (25 - i) * 60_000L,
+                valueMmol = 5.5
+            )
+        }
+        val latest = readings.last()
+
+        val goal = TargetCompensatorCalculator.calculateDailyCompensator(
+            targetMode = TargetMode.TIR,
+            targetPercent = 70.0,
+            latestReading = latest,
+            recentReadings = readings,
+            targetRanges = ranges,
+            language = "RU",
+            referenceTimestamp = eveningTime
+        )
+
+        // Must NOT declare goal completed (EXCEEDING) with only 26 points
+        org.junit.Assert.assertNotEquals(com.tirup.app.domain.model.CompensatorStatus.EXCEEDING, goal.status)
+        org.junit.Assert.assertEquals(com.tirup.app.domain.model.CompensatorStatus.INSUFFICIENT_DATA, goal.status)
+        org.junit.Assert.assertEquals(26, goal.observedPointsCount)
+        org.junit.Assert.assertTrue(goal.recommendationRu.contains("Сбор данных за сегодня"))
+        org.junit.Assert.assertTrue(goal.recommendationRu.contains("требуется ≥6 ч"))
+    }
 }

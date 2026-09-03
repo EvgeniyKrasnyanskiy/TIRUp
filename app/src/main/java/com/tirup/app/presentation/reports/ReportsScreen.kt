@@ -372,15 +372,15 @@ private fun LiveReportCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(
+                OutlinedButton(
                     onClick = { viewModel.saveLivePdfToDownloads() },
                     modifier = Modifier
                         .weight(1f)
                         .height(40.dp),
                     shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = ActionBlue,
-                        contentColor = Color.White
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     ),
                     enabled = state.liveReadings.isNotEmpty() && !state.isGeneratingLive
                 ) {
@@ -595,15 +595,15 @@ private fun HistoricalReportCard(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(
+                        OutlinedButton(
                             onClick = { viewModel.saveHistoricalPdfToDownloads() },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(40.dp),
                             shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = ActionBlue,
-                                contentColor = Color.White
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onSurface
                             )
                         ) {
                             Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -1128,15 +1128,15 @@ private fun ParametersGuidebookModal(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Button(
+                        OutlinedButton(
                             onClick = onSavePdf,
                             modifier = Modifier
                                 .weight(1f)
                                 .height(44.dp),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = ActionBlue,
-                                contentColor = Color.White
+                            border = BorderStroke(1.dp, ActionBlue),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = ActionBlue
                             )
                         ) {
                             Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -1169,25 +1169,28 @@ private fun ParametersGuidebookModal(
                         }
                     }
 
-                    OutlinedButton(
+                    Button(
                         onClick = onDismiss,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(44.dp),
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ActionBlue,
+                            contentColor = Color.White
+                        )
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.onSurface
+                            tint = Color.White
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = if (isRu) "Назад" else "Back",
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = Color.White
                         )
                     }
                 }

@@ -62,6 +62,7 @@ data class NightStability(
 )
 
 enum class CompensatorStatus {
+    INSUFFICIENT_DATA,
     REACHABLE,
     EXCEEDING,
     UNREALISTIC
@@ -85,6 +86,8 @@ data class CompensatorGoal(
     val neededMinutesToday: Int = 0,
     val maxPossibleTir: Double = 100.0,
     val isCurrentlyInRange: Boolean = true,
+    val observedPointsCount: Int = 0,
+    val activeMonitoringMinutes: Int = 0,
     val successfulDaysCount: Int = 0,
     val totalDaysWithData: Int = 0,
     val balanceHours: Double = 0.0,

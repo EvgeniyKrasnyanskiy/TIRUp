@@ -54,6 +54,25 @@ object TargetCompensatorCalculator {
         // 2. Select readings for today (or fallback to recent 24h only if no readings today yet)
         val todayReadings = recentReadings.filter { it.timestamp >= startOfDay }
         val effectiveReadings = if (todayReadings.isNotEmpty()) todayReadings else recentReadings
+        val sortedToday = effectiveReadings.sortedBy { it.timestamp }
+
+        // Accurately compute active monitoring minutes (supporting 1m, 5m, or irregular intervals)
+        var activeCoveredMs = 0L
+        for (i in 1 until sortedToday.size) {
+            val dt = sortedToday[i].timestamp - sortedToday[i - 1].timestamp
+            if (dt in 10_000L..(15 * 60_000L)) {
+                activeCoveredMs += dt
+            } else if (dt > 15 * 60_000L) {
+                // Gap between sensor transmissions: count a single reading interval (up to 5m)
+                activeCoveredMs += 5 * 60_000L
+            }
+        }
+        if (sortedToday.isNotEmpty() && activeCoveredMs == 0L) {
+            activeCoveredMs = (sortedToday.size * 5 * 60_000L).coerceAtMost(elapsedTodayMillis)
+        }
+        val activeMonitoringMinutes = (activeCoveredMs / 60000L).toInt()
+            .coerceIn(sortedToday.size.coerceAtMost(elapsedMinutesToday), elapsedMinutesToday)
+        val observedPointsCount = sortedToday.size
 
         // 3. Determine in-range proportion
         val inRangeCheck: (GlucoseReading) -> Boolean = { reading ->
@@ -64,14 +83,14 @@ object TargetCompensatorCalculator {
             }
         }
 
-        val inCount = effectiveReadings.count(inRangeCheck)
-        val totalCount = effectiveReadings.size.coerceAtLeast(1)
+        val inCount = sortedToday.count(inRangeCheck)
+        val totalCount = sortedToday.size.coerceAtLeast(1)
         val currentTirFraction = inCount.toDouble() / totalCount.toDouble()
         val currentScore = currentTirFraction * 100.0
 
-        // In-range & Out-of-range minutes today
-        val inRangeMinutes = (currentTirFraction * elapsedMinutesToday).roundToInt().coerceIn(0, elapsedMinutesToday)
-        val outOfRangeMinutes = elapsedMinutesToday - inRangeMinutes
+        // In-range & Out-of-range minutes today based on actual active monitoring
+        val inRangeMinutes = (currentTirFraction * activeMonitoringMinutes).roundToInt().coerceIn(0, activeMonitoringMinutes)
+        val outOfRangeMinutes = activeMonitoringMinutes - inRangeMinutes
 
         // Target thresholds for the full 24 hours (1440 minutes)
         val targetGoalMinutes = ((targetPercent / 100.0) * 1440.0).roundToInt()
@@ -86,11 +105,43 @@ object TargetCompensatorCalculator {
         // Current status of latest reading
         val isCurrentlyInRange = latestReading?.let(inRangeCheck) ?: true
 
+        // Clinical validity: at least 6 hours (360 min) of active data to declare target completion
+        val isDataSufficient = activeMonitoringMinutes >= 360 || observedPointsCount >= 72
+
         val status: CompensatorStatus
         val recRu: String
         val recEn: String
 
         when {
+            // Scenario 1: Out of range right now -> urgent clinical priority
+            !isCurrentlyInRange -> {
+                status = if (!isDataSufficient) CompensatorStatus.INSUFFICIENT_DATA else CompensatorStatus.REACHABLE
+                val needStrRu = formatHoursMins(neededMinutesToday, true)
+                val remainStrRu = formatHoursMins(remainingMinutesToday, true)
+                val targetPctInt = targetPercent.toInt()
+                val suffHintRu = if (!isDataSufficient) " (сбор данных: $observedPointsCount точек, требуется ≥6 ч)" else ""
+                val suffHintEn = if (!isDataSufficient) " (collecting data: $observedPointsCount pts, ≥6h required)" else ""
+
+                recRu = "Сахар вне диапазона$suffHintRu. Вернитесь в норму: из оставшихся $remainStrRu суток удержите ещё не менее $needStrRu для цели ≥$targetPctInt%."
+
+                val needStrEn = formatHoursMins(neededMinutesToday, false)
+                val remainStrEn = formatHoursMins(remainingMinutesToday, false)
+                recEn = "Glucose is out of range$suffHintEn. Return to target: out of remaining $remainStrEn, keep at least $needStrEn for ≥$targetPctInt% goal."
+            }
+
+            // Scenario 0: Insufficient data (< 6 hours of monitoring today) while currently in range
+            !isDataSufficient -> {
+                status = CompensatorStatus.INSUFFICIENT_DATA
+                val coveredStrRu = formatHoursMins(activeMonitoringMinutes, true)
+                val coveredStrEn = formatHoursMins(activeMonitoringMinutes, false)
+                val needStrRu = formatHoursMins(neededMinutesToday, true)
+                val needStrEn = formatHoursMins(neededMinutesToday, false)
+                val targetPctInt = targetPercent.toInt()
+
+                recRu = "Сбор данных за сегодня ($observedPointsCount точек, $coveredStrRu). Для расчёта цели требуется ≥6 ч. Для цели ≥$targetPctInt% удержите в норме ещё $needStrRu."
+                recEn = "Collecting daily data ($observedPointsCount pts, $coveredStrEn). Target analysis requires ≥6h. Keep in range $needStrEn to reach ≥$targetPctInt%."
+            }
+
             // Scenario 3: Target already guaranteed / exceeded (> targetGoalMinutes)
             inRangeMinutes >= targetGoalMinutes || neededMinutesToday == 0 -> {
                 status = CompensatorStatus.EXCEEDING
@@ -109,19 +160,6 @@ object TargetCompensatorCalculator {
                 val maxTirStr = String.format(Locale.US, "%.0f%%", maxPossibleTir)
                 recRu = "Лимит времени вне нормы исчерпан (макс. $targetName за сегодня: $maxTirStr). Удерживайте диапазон до полуночи, чтобы завершить день с лучшим счётом."
                 recEn = "Out of range limit exceeded (max $targetName today: $maxTirStr). Keep in range until midnight to finish the day with highest score."
-            }
-
-            // Scenario 1A: Out of range right now -> urgent actionable recommendation
-            !isCurrentlyInRange -> {
-                status = CompensatorStatus.REACHABLE
-                val needStrRu = formatHoursMins(neededMinutesToday, true)
-                val remainStrRu = formatHoursMins(remainingMinutesToday, true)
-                val targetPctInt = targetPercent.toInt()
-                recRu = "Сахар вне диапазона. Вернитесь в норму: из оставшихся $remainStrRu суток удержите ещё не менее $needStrRu для цели ≥$targetPctInt%."
-
-                val needStrEn = formatHoursMins(neededMinutesToday, false)
-                val remainStrEn = formatHoursMins(remainingMinutesToday, false)
-                recEn = "Glucose is out of range. Return to target: out of remaining $remainStrEn, keep at least $needStrEn for ≥$targetPctInt% goal."
             }
 
             // Scenario 1B: In range right now -> encouraging pace recommendation
@@ -156,6 +194,8 @@ object TargetCompensatorCalculator {
             neededMinutesToday = neededMinutesToday,
             maxPossibleTir = maxPossibleTir,
             isCurrentlyInRange = isCurrentlyInRange,
+            observedPointsCount = observedPointsCount,
+            activeMonitoringMinutes = activeMonitoringMinutes,
             recommendationRu = recRu,
             recommendationEn = recEn
         )
