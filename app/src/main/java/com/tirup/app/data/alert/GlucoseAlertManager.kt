@@ -26,8 +26,10 @@ import com.tirup.app.presentation.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -319,7 +321,12 @@ object GlucoseAlertManager {
     ) {
         if (recentReadings.isEmpty()) return
         val alerts = settings.alertSettings
-        if (!alerts.isAlertsMasterEnabled) return
+        val now = System.currentTimeMillis()
+        val isHypoProtectionActive = alerts.isCriticalEnabled ||
+                (!alerts.isCriticalHypoPermanentDisabled && now >= alerts.criticalHypoPauseUntilTimestamp)
+
+        // If master is disabled and hypo protection is also inactive/paused, return early
+        if (!alerts.isAlertsMasterEnabled && !isHypoProtectionActive) return
 
         // Auto-dismiss if phone is actively used
         if (isCriticalAlarmActive && isPhoneInActiveUse(context)) {
@@ -331,7 +338,6 @@ object GlucoseAlertManager {
         val targetRanges = settings.targetRanges
         val sorted = recentReadings.sortedBy { it.timestamp }
         val latest = sorted.last()
-        val now = System.currentTimeMillis()
         val isRu = settings.language.equals("RU", ignoreCase = true)
 
         // ----------------------------------------------------
@@ -373,9 +379,6 @@ object GlucoseAlertManager {
         // TIER 3: CRITICAL / PROLONGED
         // ----------------------------------------------------
         // Hypo protection is always on unless temporarily paused (<2h) or permanently disabled with explicit consent
-        val isHypoProtectionActive = alerts.isCriticalEnabled ||
-                (!alerts.isCriticalHypoPermanentDisabled && now >= alerts.criticalHypoPauseUntilTimestamp)
-
         if (isHypoProtectionActive) {
             // Extreme Low (< 3.0) or Prolonged Low (< 3.9 for >= criticalHypoMinutes)
             val isExtremeLow = latest.valueMmol < targetRanges.veryLowThresholdMmol
@@ -422,6 +425,9 @@ object GlucoseAlertManager {
                 }
             }
         }
+
+        // If master alerts switch is disabled, skip remaining tiers (Hyper, Main, Predictive, Signal loss)
+        if (!alerts.isAlertsMasterEnabled) return
 
         if (alerts.isCriticalEnabled) {
             // Extreme High (> 13.9) or Prolonged High (> tirHigh for >= criticalHyperMinutes)
@@ -718,11 +724,13 @@ object GlucoseAlertManager {
 
         flashJob?.cancel()
         flashJob = CoroutineScope(Dispatchers.IO).launch {
+            var activeCameraId: String? = null
             try {
                 val cameraId = cameraManager.cameraIdList.firstOrNull { id ->
                     val chars = cameraManager.getCameraCharacteristics(id)
                     chars.get(android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
                 } ?: return@launch
+                activeCameraId = cameraId
 
                 when (tier) {
                     AlertTier.PREDICTIVE -> {
@@ -755,6 +763,18 @@ object GlucoseAlertManager {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Flashlight pulse failed: ${e.message}")
+            } finally {
+                // Guarantee torch is turned off even if coroutine was cancelled or interrupted
+                withContext(NonCancellable) {
+                    try {
+                        activeCameraId?.let { id ->
+                            cameraManager.setTorchMode(id, false)
+                        }
+                    } catch (ignored: Exception) {
+                        Log.w(TAG, "Failed to force reset torch in finally: ${ignored.message}")
+                    }
+                    Unit
+                }
             }
         }
     }

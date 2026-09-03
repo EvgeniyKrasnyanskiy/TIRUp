@@ -98,6 +98,8 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
     private fun extractGlucoseValue(extras: Bundle): Double? {
         val candidateKeys = listOf(
+            "bg.valueMgdl",
+            "bg.value",
             "com.eveningoutpost.dexdrip.Extras.BgEstimate",
             "com.eveningoutpost.dexdrip.Extras.Bg",
             "com.eveningoutpost.dexdrip.Extras.Value",
@@ -133,6 +135,8 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
     private fun extractTimestamp(extras: Bundle): Long? {
         val candidateKeys = listOf(
+            "bg.timeStamp",
+            "treatment.timeStamp",
             "com.eveningoutpost.dexdrip.Extras.RawTimestamp",
             "com.eveningoutpost.dexdrip.Extras.Time",
             "rawtimestamp",
@@ -156,12 +160,14 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
     private fun extractSlopeName(extras: Bundle): String? {
         val candidateKeys = listOf(
+            "bg.deltaName",
             "com.eveningoutpost.dexdrip.Extras.BgSlopeName",
             "slope_name",
-            "slopeName",
+            "slopename",
             "slope",
             "trend",
-            "direction"
+            "direction",
+            "trend_name"
         )
 
         for (key in candidateKeys) {
@@ -175,6 +181,9 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
     private fun extractIob(extras: Bundle): Double? {
         val candidateKeys = listOf(
+            "predict.IOB",
+            "predict.iob",
+            "treatment.insulin",
             "com.eveningoutpost.dexdrip.Extras.Iob",
             "iob",
             "IOB",
@@ -193,6 +202,9 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
     private fun extractCob(extras: Bundle): Double? {
         val candidateKeys = listOf(
+            "predict.COB",
+            "predict.cob",
+            "predict.BWP",
             "com.eveningoutpost.dexdrip.Extras.Cob",
             "cob",
             "COB",
@@ -202,6 +214,11 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         )
         for (key in candidateKeys) {
             if (extras.containsKey(key)) {
+                val obj = extras.get(key)
+                if (obj is String && obj.contains("Carbs:", ignoreCase = true)) {
+                    val extracted = Regex("""\d+([.,]\d+)?""").find(obj)?.value?.replace(',', '.')?.toDoubleOrNull()
+                    if (extracted != null && extracted >= 0.0) return extracted
+                }
                 val num = getDoubleFromBundle(extras, key)
                 if (num != null && num >= 0.0) return num
             }

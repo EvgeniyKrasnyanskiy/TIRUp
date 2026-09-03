@@ -60,6 +60,7 @@
                 <action android:name="com.juggluco.action.NEW_GLUCOSE" />
                 <action android:name="com.dexcom.g6.ACTION_NEW_BG" />
                 <action android:name="com.dexcom.cgm.ACTION_NEW_BG" />
+                <action android:name="com.eveningoutpost.dexdrip.watch.wearintegration.BROADCAST_SERVICE_SENDER" />
             </intent-filter>
         </receiver>
 

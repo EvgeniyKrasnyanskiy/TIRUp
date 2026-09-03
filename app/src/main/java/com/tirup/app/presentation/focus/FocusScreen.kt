@@ -364,10 +364,31 @@ fun FocusScreen(
 
             val glucoseUnitStr = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль" else "mmol") else (if (isRu) "мг/дл" else "mg/dl")
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Row 1: Mean, eA1c, SD, %CV
-                Row(
+            BentoCard(
+                modifier = Modifier.fillMaxWidth(),
+                padding = 12.dp
+            ) {
+                Column(
                     modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isRu) "📊 Клинические параметры суток (12)" else "📊 Daily Clinical Metrics (12)",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    // Row 1: Mean, eA1c, SD, %CV
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     BentoMetricCompact(
@@ -606,6 +627,7 @@ fun FocusScreen(
                 }
             }
         }
+    }
 
         item { Spacer(modifier = Modifier.height(20.dp)) }
     }

@@ -249,7 +249,10 @@ class ReportsViewModel(
 
             result.onSuccess { pdfFile ->
                 _uiState.value = _uiState.value.copy(isGeneratingLive = false)
-                dispatchShareIntent(pdfFile)
+                val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+                val subject = if (isRu) "TIRUp • Амбулаторный гликемический профиль (AGP)" else "TIRUp • Ambulatory Glucose Profile (AGP) Report"
+                val chooser = if (isRu) "Поделиться отчётом AGP" else "Share AGP Report"
+                dispatchShareIntent(pdfFile, subject, chooser)
             }.onFailure { error ->
                 _uiState.value = _uiState.value.copy(isGeneratingLive = false)
                 _events.emit(ReportEvent.Error(error.localizedMessage ?: "PDF Error"))
@@ -293,7 +296,10 @@ class ReportsViewModel(
 
             result.onSuccess { pdfFile ->
                 _uiState.value = _uiState.value.copy(isGeneratingHistorical = false)
-                dispatchShareIntent(pdfFile)
+                val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+                val subject = if (isRu) "TIRUp • Амбулаторный гликемический профиль (AGP)" else "TIRUp • Ambulatory Glucose Profile (AGP) Report"
+                val chooser = if (isRu) "Поделиться отчётом AGP" else "Share AGP Report"
+                dispatchShareIntent(pdfFile, subject, chooser)
             }.onFailure { error ->
                 _uiState.value = _uiState.value.copy(isGeneratingHistorical = false)
                 _events.emit(ReportEvent.Error(error.localizedMessage ?: "PDF Error"))
@@ -328,7 +334,9 @@ class ReportsViewModel(
             val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
             guidebookPdfGenerator.generateGuidebookPdf(isRu)
                 .onSuccess { pdfFile ->
-                    dispatchShareIntent(pdfFile)
+                    val subject = if (isRu) "TIRUp • Справочник параметров CGM" else "TIRUp • CGM Parameters Guidebook"
+                    val chooser = if (isRu) "Поделиться справочником CGM" else "Share CGM Guidebook"
+                    dispatchShareIntent(pdfFile, subject, chooser)
                 }.onFailure { error ->
                     _events.emit(ReportEvent.Error(error.localizedMessage ?: "PDF Error"))
                 }
@@ -347,7 +355,7 @@ class ReportsViewModel(
         }
     }
 
-    private suspend fun dispatchShareIntent(pdfFile: File) {
+    private suspend fun dispatchShareIntent(pdfFile: File, subject: String, chooserTitle: String) {
         val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
@@ -356,11 +364,12 @@ class ReportsViewModel(
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "application/pdf"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "TIRUp Ambulatory Glucose Profile (AGP) Report")
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+            putExtra(Intent.EXTRA_TEXT, subject)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        val chooser = Intent.createChooser(intent, "Share AGP Report").apply {
+        val chooser = Intent.createChooser(intent, chooserTitle).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         _events.emit(ReportEvent.SharePdf(chooser))

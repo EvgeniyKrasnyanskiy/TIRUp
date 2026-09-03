@@ -80,6 +80,29 @@ object PatternRecognitionEngine {
             )
         }
 
+        // 3. Эпизодические ночные всплески (выброс гормона роста / СТГ, 23:00–03:00)
+        // В первой половине ночи p90 поднимается >= 9.5 ммоль/л, при этом медиана (p50) остаётся в норме,
+        // что отражает цикличный характер (2–3 ночи в неделю), характерный для детей и лиц до 25 лет.
+        val midnightBins = bins.filter { (it.minuteOfDay >= 1380 || it.minuteOfDay in 0..180) && it.readingsCount > 0 }
+        val eveningBins = bins.filter { it.minuteOfDay in 1260..1380 && it.readingsCount > 0 }
+        val eveningMedian = if (eveningBins.isNotEmpty()) eveningBins.map { it.p50 }.average() else 6.0
+        val maxP90Midnight = midnightBins.maxOfOrNull { it.p90 } ?: 0.0
+        val medianMidnight = if (midnightBins.isNotEmpty()) midnightBins.map { it.p50 }.average() else 6.0
+
+        if (maxP90Midnight >= 9.5 && medianMidnight <= 7.8 && eveningMedian <= 8.5) {
+            patterns.add(
+                DetectedPattern(
+                    id = "growth_hormone_surge",
+                    titleRu = "Ночные всплески соматотропина / СТГ (23:00–03:00)",
+                    titleEn = "Nocturnal Growth Hormone Surges (23:00–03:00)",
+                    descriptionRu = "Эпизодический ночной подъём сахара 2–3 раза в неделю в фазе глубокого сна при нормальном сахаре перед сном. Типичен для детей, подростков и лиц до 25 лет из-за импульсной секреции гормона роста.",
+                    descriptionEn = "Episodic nocturnal glucose elevation 2–3 times a week during deep sleep. Characteristic for children, teens, and young adults under 25 due to pulsatile growth hormone secretion.",
+                    severity = PatternSeverity.INFO,
+                    icon = "🧬"
+                )
+            )
+        }
+
         // 3. Постобеденный / вечерний подъём (13:00–21:00: minuteOfDay in 780..1260)
         val postMealBins = bins.filter { it.minuteOfDay in 780..1260 && it.readingsCount > 0 }
         val highPostMealCount = postMealBins.count { it.p75 > 10.5 }

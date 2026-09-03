@@ -47,6 +47,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -54,6 +59,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +68,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.delay
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -108,10 +115,19 @@ fun SettingsScreen(
     var showAdvancedSettings by rememberSaveable { mutableStateOf(false) }
     var showProfileDialog by rememberSaveable { mutableStateOf(false) }
     var showCriticalHypoSafetyDialog by rememberSaveable { mutableStateOf(false) }
+    var masterOffHintVisible by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(masterOffHintVisible) {
+        if (masterOffHintVisible) {
+            delay(3000L)
+            masterOffHintVisible = false
+        }
+    }
 
     val isRu = settings.language.equals("RU", ignoreCase = true)
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
         // Fixed Top Header
         Surface(
             color = MaterialTheme.colorScheme.background,
@@ -314,7 +330,23 @@ fun SettingsScreen(
                             Switch(
                                 checked = alerts.isAlertsMasterEnabled,
                                 onCheckedChange = { isEnabled ->
-                                    viewModel.updateAlertSettings(alerts.copy(isAlertsMasterEnabled = isEnabled))
+                                    if (!isEnabled) {
+                                        masterOffHintVisible = true
+                                        viewModel.updateAlertSettings(
+                                            alerts.copy(
+                                                isAlertsMasterEnabled = false,
+                                                criticalHypoPauseUntilTimestamp = System.currentTimeMillis() + 2 * 3600 * 1000L
+                                            )
+                                        )
+                                    } else {
+                                        masterOffHintVisible = false
+                                        viewModel.updateAlertSettings(
+                                            alerts.copy(
+                                                isAlertsMasterEnabled = true,
+                                                criticalHypoPauseUntilTimestamp = 0L
+                                            )
+                                        )
+                                    }
                                 },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = Color.White,
@@ -897,6 +929,45 @@ fun SettingsScreen(
             onDismiss = { showProfileDialog = false }
         )
     }
+
+    // Centered 3-second floating HUD banner on turning Master alerts off
+    AnimatedVisibility(
+        visible = masterOffHintVisible,
+        enter = fadeIn() + scaleIn(initialScale = 0.88f),
+        exit = fadeOut() + scaleOut(targetScale = 0.88f),
+        modifier = Modifier
+            .align(Alignment.Center)
+            .padding(horizontal = 24.dp)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = Color(0xF00F172A),
+            shadowElevation = 16.dp,
+            border = BorderStroke(1.2.dp, ColorVeryLow.copy(alpha = 0.85f))
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = ColorVeryLow,
+                    modifier = Modifier.size(30.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = if (isRu) "Оповещения отключены.\nКритическая сирена (<3.0) на паузе 2 часа для вашей безопасности."
+                           else "Alerts turned off.\nCritical siren (<3.0) paused for 2h for your safety.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 19.sp
+                )
+            }
+        }
+    }
+}
 }
 
 @Composable

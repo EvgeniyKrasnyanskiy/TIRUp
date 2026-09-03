@@ -97,9 +97,15 @@ class UserManualPdfGenerator(private val context: Context) {
             canvas.drawLine(30f, y, 565f, y, linePaint)
             y += 14f
 
+            var isFirstSection = true
             fun drawSection(title: String, items: List<Triple<String, String, String>>, cardHeight: Float = 44f) {
+                if (!isFirstSection) {
+                    y += 11f // Generous gap above section header, separating from previous block
+                }
+                isFirstSection = false
+
                 canvas.drawText(title, 30f, y, sectionPaint)
-                y += 13f
+                y += 7.5f // Tight gap below section header, keeping it attached to its cards
 
                 for ((itemTitle, itemBadge, itemDesc) in items) {
                     val rect = RectF(30f, y, 565f, y + cardHeight)
@@ -132,9 +138,8 @@ class UserManualPdfGenerator(private val context: Context) {
                         canvas.drawText(line, 38f, lineY, bodyPaint)
                     }
 
-                    y += cardHeight + 4.5f
+                    y += cardHeight + 4f
                 }
-                y += 6f
             }
 
             // Section 1: xDrip+ Setup (2 items)
