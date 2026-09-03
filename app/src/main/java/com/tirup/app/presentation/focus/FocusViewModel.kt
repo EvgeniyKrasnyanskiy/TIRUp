@@ -34,8 +34,18 @@ class FocusViewModel(
                 glucoseRepository.getStreakDays(),
                 settingsRepository.getSettings()
             ) { latest, recent, streak, settings ->
+                val calendar = java.util.Calendar.getInstance().apply {
+                    set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    set(java.util.Calendar.MINUTE, 0)
+                    set(java.util.Calendar.SECOND, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                }
+                val startOfDay = calendar.timeInMillis
+                val todayReadings = recent.filter { it.timestamp >= startOfDay }
+                val effectiveReadings = if (todayReadings.isNotEmpty()) todayReadings else recent
+
                 val stats = GlucoseMetricsCalculator.calculateStatistics(
-                    readings = recent,
+                    readings = effectiveReadings,
                     targetRanges = settings.targetRanges,
                     nightStartHour = settings.nightStartHour,
                     nightEndHour = settings.nightEndHour,

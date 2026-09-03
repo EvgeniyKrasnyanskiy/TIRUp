@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">TIRUp</string>
     <string name="nav_focus">Текущие</string>
-    <string name="nav_trends">Тренды</string>
+    <string name="nav_trends">Аналитика и тренды</string>
     <string name="nav_reports">Отчёт</string>
     <string name="nav_settings">Настройки</string>
 
@@ -31,7 +31,7 @@
     <string name="just_now">Только что</string>
 
     <!-- Trends & AGP -->
-    <string name="trends_title">Аналитика</string>
+    <string name="trends_title">Аналитика и тренды</string>
     <string name="period_7d">7Д</string>
     <string name="period_14d">14Д (AGP)</string>
     <string name="period_30d">30Д</string>

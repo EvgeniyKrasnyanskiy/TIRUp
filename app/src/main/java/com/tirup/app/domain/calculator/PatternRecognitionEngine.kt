@@ -1,4 +1,4 @@
-﻿package com.tirup.app.domain.calculator
+package com.tirup.app.domain.calculator
 
 import com.tirup.app.domain.model.AGPPercentileBin
 import com.tirup.app.domain.model.GlucoseStatistics
@@ -11,6 +11,7 @@ enum class PatternSeverity {
 }
 
 data class DetectedPattern(
+    val id: String = "",
     val titleRu: String,
     val titleEn: String,
     val descriptionRu: String,
@@ -29,6 +30,7 @@ object PatternRecognitionEngine {
         if (bins.isEmpty() || stats.totalCount < 50) {
             return listOf(
                 DetectedPattern(
+                    id = "collecting_data",
                     titleRu = "Сбор данных",
                     titleEn = "Collecting Data",
                     descriptionRu = "Недостаточно измерений для выявления устойчивых суточных паттернов. Продолжайте носить датчик.",
@@ -47,6 +49,7 @@ object PatternRecognitionEngine {
         if (hasNightHypo) {
             patterns.add(
                 DetectedPattern(
+                    id = "night_drops",
                     titleRu = "Ночные провалы (00:00–06:00)",
                     titleEn = "Night Drops (00:00–06:00)",
                     descriptionRu = "Обнаружена повторяющаяся склонность к гипогликемии в ночное время. Рекомендуется оценить дозу вечернего базального инсулина или лёгкий перекус перед сном.",
@@ -66,6 +69,7 @@ object PatternRecognitionEngine {
         if (dawnMedian >= 9.5 && earlyNightMedian in 4.0..7.5) {
             patterns.add(
                 DetectedPattern(
+                    id = "dawn_phenomenon",
                     titleRu = "Феномен «Утренней зари» (06:00–09:00)",
                     titleEn = "Dawn Phenomenon (06:00–09:00)",
                     descriptionRu = "Регулярный подъём сахара в утренние часы без ночной гипогликемии. Обусловлен естественным выбросом контринсулярных гормонов на рассвете.",
@@ -82,6 +86,7 @@ object PatternRecognitionEngine {
         if (highPostMealCount >= 4) {
             patterns.add(
                 DetectedPattern(
+                    id = "postprandial_spikes",
                     titleRu = "Постпрандиальные всплески (13:00–21:00)",
                     titleEn = "Postprandial Spikes (13:00–21:00)",
                     descriptionRu = "Повторяющийся выход выше целевых 10.0 ммоль/л после основных приёмов пищи. Может помочь увеличение паузы перед едой или пересмотр углеводного коэффициента.",
@@ -97,6 +102,7 @@ object PatternRecognitionEngine {
         if (maxSpreadBin != null && (maxSpreadBin.p90 - maxSpreadBin.p10) >= 6.0 && stats.cvPercent > 36.0) {
             patterns.add(
                 DetectedPattern(
+                    id = "high_fluctuation",
                     titleRu = "Высокая амплитуда колебаний",
                     titleEn = "High Glucose Fluctuation",
                     descriptionRu = "В районе ${maxSpreadBin.formattedTime} наблюдается широкий разброс сахаров между днями. График показывает повышенную чувствительность к углеводам и физической активности.",
@@ -111,6 +117,7 @@ object PatternRecognitionEngine {
         if (patterns.isEmpty()) {
             patterns.add(
                 DetectedPattern(
+                    id = "stable_profile",
                     titleRu = "Стабильный профиль без паттернов декомпенсации",
                     titleEn = "Stable Profile — No Adverse Patterns",
                     descriptionRu = "Повторяющихся ночных гипогликемий, всплесков «зари» и выраженной вариабельности не выявлено. Профиль предсказуем и сбалансирован.",

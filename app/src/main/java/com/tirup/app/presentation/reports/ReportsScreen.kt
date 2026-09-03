@@ -25,13 +25,16 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -83,6 +86,7 @@ fun ReportsScreen(
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showGuidebookModal by remember { mutableStateOf(false) }
+    var showXdripExportHelp by remember { mutableStateOf(false) }
 
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -168,7 +172,8 @@ fun ReportsScreen(
                 state = state,
                 onPickFile = { filePicker.launch(arrayOf("*/*")) },
                 viewModel = viewModel,
-                onCardClick = { viewModel.showHistoricalDetails(true) }
+                onCardClick = { viewModel.showHistoricalDetails(true) },
+                onHelpClick = { showXdripExportHelp = true }
             )
         }
 
@@ -237,6 +242,45 @@ fun ReportsScreen(
             onSavePdf = { viewModel.saveGuidebookPdfToDownloads() },
             onSharePdf = { viewModel.generateAndShareGuidebookPdf() },
             onDismiss = { showGuidebookModal = false }
+        )
+    }
+
+    if (showXdripExportHelp) {
+        AlertDialog(
+            onDismissRequest = { showXdripExportHelp = false },
+            title = {
+                Text(
+                    text = if (isRu) "Как экспортировать файл из xDrip+" else "How to export file from xDrip+",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            text = {
+                Text(
+                    text = if (isRu) {
+                        "1️⃣ Откройте приложение xDrip+ на телефоне.\n\n" +
+                        "2️⃣ Нажмите на значок с тремя вертикальными точками в правом верхнем углу экрана.\n\n" +
+                        "3️⃣ Выберите пункт «Функции импорта/экспорта».\n\n" +
+                        "4️⃣ Нажмите «Экспорт CSV (формат SiDiary)».\n\n" +
+                        "5️⃣ Выберите дату начала нужного периода. После этого xDrip+ автоматически создаст файл и сохранит его на телефоне.\n\n" +
+                        "📂 Файл находится в папке:\nВнутреннее хранилище → xdrip → файл с названием exportCSV...zip"
+                    } else {
+                        "1️⃣ Open xDrip+ app on your phone.\n\n" +
+                        "2️⃣ Tap the three-dot menu icon in the top right corner.\n\n" +
+                        "3️⃣ Select 'Import / Export features'.\n\n" +
+                        "4️⃣ Tap 'Export CSV (SiDiary format)'.\n\n" +
+                        "5️⃣ Choose the start date. xDrip+ will automatically generate the export archive.\n\n" +
+                        "📂 File location:\nInternal storage → xdrip → file named exportCSV...zip"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showXdripExportHelp = false }) {
+                    Text(text = if (isRu) "Понятно" else "Got it", color = ActionBlue, fontWeight = FontWeight.Bold)
+                }
+            }
         )
     }
 }
@@ -371,7 +415,8 @@ private fun HistoricalReportCard(
     state: ReportsUiState,
     onPickFile: () -> Unit,
     viewModel: ReportsViewModel,
-    onCardClick: () -> Unit
+    onCardClick: () -> Unit,
+    onHelpClick: () -> Unit
 ) {
     val hist = state.historicalReport
     val isRu = state.userSettings.language.equals("RU", ignoreCase = true)
@@ -453,6 +498,18 @@ private fun HistoricalReportCard(
                                 imageVector = Icons.Default.DeleteOutline,
                                 contentDescription = "Clear",
                                 tint = ColorHigh,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    } else {
+                        IconButton(
+                            onClick = onHelpClick,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.HelpOutline,
+                                contentDescription = "Help",
+                                tint = ActionBlue,
                                 modifier = Modifier.size(24.dp)
                             )
                         }

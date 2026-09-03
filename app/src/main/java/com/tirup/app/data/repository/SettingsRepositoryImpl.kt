@@ -68,6 +68,7 @@ class SettingsRepositoryImpl(
             .putBoolean(KEY_ALERT_CRITICAL_FLASH, settings.alertSettings.isCriticalFlash)
             .putInt(KEY_ALERT_SNOOZE_HYPO, settings.alertSettings.snoozeHypoMinutes)
             .putInt(KEY_ALERT_SNOOZE_HYPER, settings.alertSettings.snoozeHyperMinutes)
+            .putBoolean(KEY_ALERT_SIGNAL_LOSS_ENABLED, settings.alertSettings.isSignalLossEnabled)
             .apply()
 
         _settingsFlow.value = settings
@@ -155,7 +156,8 @@ class SettingsRepositoryImpl(
                 isCriticalVibrate = prefs.getBoolean(KEY_ALERT_CRITICAL_VIBRATE, true),
                 isCriticalFlash = prefs.getBoolean(KEY_ALERT_CRITICAL_FLASH, true),
                 snoozeHypoMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPO, 15),
-                snoozeHyperMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPER, 45)
+                snoozeHyperMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPER, 45),
+                isSignalLossEnabled = prefs.getBoolean(KEY_ALERT_SIGNAL_LOSS_ENABLED, true)
             )
         )
     }
@@ -202,5 +204,6 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_CRITICAL_FLASH = "key_alert_critical_flash"
         private const val KEY_ALERT_SNOOZE_HYPO = "key_alert_snooze_hypo"
         private const val KEY_ALERT_SNOOZE_HYPER = "key_alert_snooze_hyper"
+        private const val KEY_ALERT_SIGNAL_LOSS_ENABLED = "key_alert_signal_loss_enabled"
     }
 }

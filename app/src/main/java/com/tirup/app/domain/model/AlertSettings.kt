@@ -23,6 +23,11 @@ data class AlertSettings(
     val isCriticalVibrate: Boolean = true,
     val isCriticalFlash: Boolean = true,
 
+    // Tier 4: Signal Loss (Потеря связи с сенсором >20 мин)
+    val isSignalLossEnabled: Boolean = true,
+    val signalLossMinutes: Int = 20,
+    val isSignalLossVibrate: Boolean = true,
+
     // Snooze / Anti-spam intervals in minutes
     val snoozeHypoMinutes: Int = 15,
     val snoozeHyperMinutes: Int = 45

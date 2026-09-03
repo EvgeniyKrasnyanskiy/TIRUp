@@ -51,9 +51,9 @@ object TargetCompensatorCalculator {
         val elapsedMinutesToday = (elapsedTodayMillis / 60000L).toInt().coerceIn(1, 1440)
         val remainingMinutesToday = (1440 - elapsedMinutesToday).coerceIn(0, 1440)
 
-        // 2. Select readings for today (or fallback to recent 24h if early morning)
+        // 2. Select readings for today (or fallback to recent 24h only if no readings today yet)
         val todayReadings = recentReadings.filter { it.timestamp >= startOfDay }
-        val effectiveReadings = if (todayReadings.size >= 6) todayReadings else recentReadings
+        val effectiveReadings = if (todayReadings.isNotEmpty()) todayReadings else recentReadings
 
         // 3. Determine in-range proportion
         val inRangeCheck: (GlucoseReading) -> Boolean = { reading ->

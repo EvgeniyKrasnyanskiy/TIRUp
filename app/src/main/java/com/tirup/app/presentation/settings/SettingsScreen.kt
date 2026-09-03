@@ -289,7 +289,7 @@ fun SettingsScreen(
                             )
                             Column {
                                 Text(
-                                    text = if (isRu) "Тревоги (3 уровня)" else "Alarms (3 Tiers)",
+                                    text = if (isRu) "Тревоги (4 уровня)" else "Alarms (4 Tiers)",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
@@ -298,7 +298,7 @@ fun SettingsScreen(
                                     text = if (!alerts.isAlertsMasterEnabled) {
                                         if (isRu) "Все тревоги выключены" else "All alarms disabled"
                                     } else {
-                                        if (isRu) "Предиктивные, основные и критические" else "Predictive, main and critical alarms"
+                                        if (isRu) "Предиктивные, основные, критические, связь" else "Predictive, main, critical, signal loss"
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = if (!alerts.isAlertsMasterEnabled) ColorVeryLow else MaterialTheme.colorScheme.onSurfaceVariant
@@ -317,23 +317,22 @@ fun SettingsScreen(
                                     checkedTrackColor = PrimaryEmerald
                                 )
                             )
-                            IconButton(onClick = { isAlertsExpanded = !isAlertsExpanded }) {
-                                Icon(
-                                    imageVector = if (isAlertsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = if (isAlertsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
 
                     if (isAlertsExpanded && alerts.isAlertsMasterEnabled) {
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
                         // Tier 1: Predictive (Soft)
                         AlertTierConfigRow(
-                            title = if (isRu) "1. Мягкие предиктивные (за 15 мин)" else "1. Soft Predictive (~15 min)",
-                            subtitle = if (isRu) "Упреждающий сигнал до выхода за диапазон" else "Warning before crossing target range",
+                            title = if (isRu) "1. Предиктивные (умные за 15 мин)" else "1. Predictive (Smart ~15 min)",
+                            subtitle = if (isRu) "Мягкий сигнал прогноза до выхода за диапазон" else "Soft early warning before crossing limits",
                             enabled = alerts.isPredictiveEnabled,
                             onEnabledChange = { viewModel.updateAlertSettings(alerts.copy(isPredictiveEnabled = it)) },
                             vibrate = alerts.isPredictiveVibrate,
@@ -376,6 +375,23 @@ fun SettingsScreen(
                             onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalFlash = it)) },
                             accentColor = ColorVeryLow,
                             onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.CRITICAL) },
+                            isRu = isRu
+                        )
+                        
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Tier 4: Signal Loss (>20 min)
+                        AlertTierConfigRow(
+                            title = if (isRu) "4. Потеря сигнала сенсора (>20 мин)" else "4. Signal Loss (>20 min)",
+                            subtitle = if (isRu) "Нисходящий сигнал с нарастающим интервалом (20 ➔ 40 ➔ 80 мин)" else "Descending tone with geometric backoff (20 ➔ 40 ➔ 80 min)",
+                            enabled = alerts.isSignalLossEnabled,
+                            onEnabledChange = { viewModel.updateAlertSettings(alerts.copy(isSignalLossEnabled = it)) },
+                            vibrate = alerts.isSignalLossVibrate,
+                            onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isSignalLossVibrate = it)) },
+                            flash = false,
+                            onFlashChange = {},
+                            accentColor = Color(0xFF8B5CF6),
+                            onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.SIGNAL_LOSS) },
                             isRu = isRu
                         )
                     }

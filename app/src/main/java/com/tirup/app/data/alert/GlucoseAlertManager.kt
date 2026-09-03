@@ -16,7 +16,9 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.tirup.app.R
 import com.tirup.app.data.receiver.AlertActionReceiver
+import com.tirup.app.domain.calculator.DetectedPattern
 import com.tirup.app.domain.calculator.GlucoseTrendPredictor
+import com.tirup.app.domain.calculator.PatternSeverity
 import com.tirup.app.domain.calculator.PredictedEvent
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.UserSettings
@@ -26,12 +28,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 enum class AlertTier {
-    PREDICTIVE, // Tier 1: Soft / Упреждающий за 15 мин
-    MAIN,       // Tier 2: Confirmed 5 points / Основной (тройной сигнал)
-    CRITICAL    // Tier 3: Prolonged / Критический «кричащий» (сирена 12 сек)
+    PREDICTIVE,  // Tier 1: Soft / Упреждающий за 15 мин
+    MAIN,        // Tier 2: Confirmed 5 points / Основной (тройной сигнал)
+    CRITICAL,    // Tier 3: Prolonged / Критический «кричащий» (сирена 12 сек)
+    SIGNAL_LOSS  // Tier 4: Signal Loss / Потеря связи (>20 мин)
 }
 
 object GlucoseAlertManager {
@@ -41,10 +46,13 @@ object GlucoseAlertManager {
     const val CHANNEL_PREDICTIVE = "tirup_alert_predictive_v2"
     const val CHANNEL_MAIN = "tirup_alert_main_v2"
     const val CHANNEL_CRITICAL = "tirup_alert_critical_v2"
+    const val CHANNEL_SIGNAL_LOSS = "tirup_alert_signal_loss_v2"
+    const val CHANNEL_PATTERNS = "tirup_patterns_v1"
 
     private const val NOTIFICATION_ID_PREDICTIVE = 1001
     private const val NOTIFICATION_ID_MAIN = 1002
     private const val NOTIFICATION_ID_CRITICAL = 1003
+    private const val NOTIFICATION_ID_SIGNAL_LOSS = 1004
 
     // Timestamps for Smart Snooze / Anti-spam
     @Volatile
@@ -55,6 +63,12 @@ object GlucoseAlertManager {
 
     @Volatile
     private var lastPredictiveAlertTimestamp: Long = 0L
+
+    @Volatile
+    private var lastSignalLossAlertTimestamp: Long = 0L
+
+    @Volatile
+    private var currentSignalLossIntervalMs: Long = 20 * 60 * 1000L
 
     // Adaptive Snooze tracking
     @Volatile
@@ -113,9 +127,21 @@ object GlucoseAlertManager {
             setBypassDnd(true)
         }
 
+        // Tier 4: Signal Loss (No readings >20 min)
+        val signalLossChannel = NotificationChannel(
+            CHANNEL_SIGNAL_LOSS,
+            "4. Потеря сигнала сенсора (>20 мин)",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Оповещения при отсутствии свежих данных от трансмиттера/сенсора"
+            setSound(null, null)
+            enableVibration(false)
+        }
+
         nm.createNotificationChannel(predictiveChannel)
         nm.createNotificationChannel(mainChannel)
         nm.createNotificationChannel(criticalChannel)
+        nm.createNotificationChannel(signalLossChannel)
     }
 
     /**
@@ -155,6 +181,22 @@ object GlucoseAlertManager {
     /**
      * Checks if user is currently interacting with the phone (screen ON and device UNLOCKED).
      */
+    /**
+     * Instantly silences any actively playing sound, vibration, and torch (e.g. on hardware volume/power key press)
+     * WITHOUT modifying user acknowledged timestamps or snooze intervals.
+     */
+    fun silenceCurrentSoundOnly() {
+        Log.i(TAG, "silenceCurrentSoundOnly")
+        MedicalSoundPlayer.stopAll()
+        try {
+            flashJob?.cancel()
+            flashJob = null
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * Checks if user is currently interacting with the phone (screen ON and device UNLOCKED).
+     */
     fun isPhoneInActiveUse(context: Context): Boolean {
         return try {
             val km = context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
@@ -177,22 +219,26 @@ object GlucoseAlertManager {
             AlertTier.PREDICTIVE -> CHANNEL_PREDICTIVE
             AlertTier.MAIN -> CHANNEL_MAIN
             AlertTier.CRITICAL -> CHANNEL_CRITICAL
+            AlertTier.SIGNAL_LOSS -> CHANNEL_SIGNAL_LOSS
         }
         val notificationId = when (tier) {
             AlertTier.PREDICTIVE -> NOTIFICATION_ID_PREDICTIVE
             AlertTier.MAIN -> NOTIFICATION_ID_MAIN
             AlertTier.CRITICAL -> NOTIFICATION_ID_CRITICAL
+            AlertTier.SIGNAL_LOSS -> NOTIFICATION_ID_SIGNAL_LOSS
         }
 
         val title = when (tier) {
             AlertTier.PREDICTIVE -> if (isRu) "🔔 Тест: Предиктивная тревога" else "🔔 Test: Predictive Alert"
             AlertTier.MAIN -> if (isRu) "⚠️ Тест: Основная тревога (3 бипа)" else "⚠️ Test: Main Alert (3 beeps)"
             AlertTier.CRITICAL -> if (isRu) "🚨 Тест: Критическая сирена" else "🚨 Test: Critical Alarm"
+            AlertTier.SIGNAL_LOSS -> if (isRu) "📡 Тест: Потеря сигнала" else "📡 Test: Signal Loss"
         }
         val text = when (tier) {
             AlertTier.PREDICTIVE -> if (isRu) "Мягкий сигнал прогноза падения/роста." else "Soft warning before crossing range."
             AlertTier.MAIN -> if (isRu) "Тройной сигнал с интервалом 1.5 сек при 5 точках вне нормы." else "Triple beep (1.5s pause) on confirmed out-of-range."
             AlertTier.CRITICAL -> if (isRu) "Серия громкой сирены ~12 сек. Нажмите «Принято» для глушения." else "Loud siren series ~12s. Tap 'Dismiss' to silence."
+            AlertTier.SIGNAL_LOSS -> if (isRu) "Двухтональный сигнал при отсутствии данных более 20 минут." else "Two-tone alert on missing data for >20 minutes."
         }
 
         sendNotification(
@@ -203,13 +249,68 @@ object GlucoseAlertManager {
             text = text,
             tier = tier,
             vibrate = true,
-            flash = true
+            flash = tier == AlertTier.CRITICAL
         )
     }
 
     /**
+     * Posts a notification to the Android shade when a significant clinical pattern is discovered.
+     * Guaranteed rate-limited to at most 1 notification per day per pattern ID.
+     */
+    fun notifyPatternIfNew(context: Context, pattern: DetectedPattern, isRu: Boolean) {
+        if (pattern.severity != PatternSeverity.ALERT && pattern.severity != PatternSeverity.WARNING) return
+
+        val prefs = context.getSharedPreferences("tirup_patterns_notif", Context.MODE_PRIVATE)
+        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        val key = "last_notif_${pattern.id}"
+        val lastDate = prefs.getString(key, null)
+        if (lastDate == todayStr) {
+            return // Already notified today
+        }
+
+        prefs.edit().putString(key, todayStr).apply()
+
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_PATTERNS,
+                "Клинические паттерны",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Уведомления об обнаруженных трендах и скрытых закономерностях гликемии"
+            }
+            nm.createNotificationChannel(channel)
+        }
+
+        val appIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            pattern.id.hashCode(),
+            appIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val title = if (isRu) "🔍 Паттерн: ${pattern.titleRu}" else "🔍 Pattern: ${pattern.titleEn}"
+        val text = if (isRu) pattern.descriptionRu else pattern.descriptionEn
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_PATTERNS)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        nm.notify(5000 + kotlin.math.abs(pattern.id.hashCode() % 100), notification)
+    }
+
+    /**
      * Inspects recent readings against settings and triggers the appropriate alert tier.
-     * Uses Smart Adaptive Snooze for Hypo and Hyper.
+     * Uses Smart Adaptive Snooze for Hypo and Hyper, and Exponential Backoff for Signal Loss.
      */
     fun checkAndAlert(
         context: Context,
@@ -231,13 +332,34 @@ object GlucoseAlertManager {
         val sorted = recentReadings.sortedBy { it.timestamp }
         val latest = sorted.last()
         val now = System.currentTimeMillis()
+        val isRu = settings.language.equals("RU", ignoreCase = true)
 
-        // Don't alert on stale readings (> 20 min)
-        if (now - latest.timestamp > 20 * 60 * 1000L) return
+        // ----------------------------------------------------
+        // TIER 4: SIGNAL LOSS CHECK (Exponential Backoff: 20m -> 40m -> 80m -> 160m)
+        // ----------------------------------------------------
+        val elapsedSinceLatest = now - latest.timestamp
+        if (elapsedSinceLatest > alerts.signalLossMinutes * 60 * 1000L) {
+            if (alerts.isSignalLossEnabled) {
+                if (now - lastSignalLossAlertTimestamp >= currentSignalLossIntervalMs) {
+                    lastSignalLossAlertTimestamp = now
+                    currentSignalLossIntervalMs = (currentSignalLossIntervalMs * 2).coerceAtMost(160 * 60 * 1000L)
+                    val elapsedMin = (elapsedSinceLatest / 60000L).toInt()
+                    val title = if (isRu) "📡 Потеря связи с сенсором ($elapsedMin мин)" else "📡 Sensor Signal Lost ($elapsedMin min)"
+                    val text = if (isRu) "Нет данных от xDrip+ более $elapsedMin мин. Проверьте Bluetooth и трансмиттер."
+                    else "No CGM readings for $elapsedMin min. Check Bluetooth and transmitter."
+                    sendNotification(context, CHANNEL_SIGNAL_LOSS, NOTIFICATION_ID_SIGNAL_LOSS, title, text, AlertTier.SIGNAL_LOSS, alerts.isSignalLossVibrate, flash = false)
+                }
+            }
+            return
+        } else {
+            // Signal is active! Reset backoff interval and dismiss signal loss notification
+            currentSignalLossIntervalMs = alerts.signalLossMinutes * 60 * 1000L
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            nm?.cancel(NOTIFICATION_ID_SIGNAL_LOSS)
+        }
 
         val tirLow = targetRanges.tirLowMmol
         val tirHigh = if (settings.targetMode.name == "TING") targetRanges.tingHighMmol else targetRanges.tirHighMmol
-        val isRu = settings.language.equals("RU", ignoreCase = true)
 
         // ----------------------------------------------------
         // TIER 3: CRITICAL / PROLONGED
@@ -376,7 +498,9 @@ object GlucoseAlertManager {
 
             if (prediction.event == PredictedEvent.PREDICTED_LOW && now - lastPredictiveAlertTimestamp >= 20 * 60000L) {
                 lastPredictiveAlertTimestamp = now
-                val title = if (isRu) "📉 Скоро гипогликемия (~${prediction.minutesUntilCrossing} мин)" else "📉 Predicted Low (~${prediction.minutesUntilCrossing} min)"
+                val eventTime = now + (prediction.minutesUntilCrossing ?: 15) * 60000L
+                val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(eventTime))
+                val title = if (isRu) "📉 Скоро гипогликемия (в $timeStr)" else "📉 Predicted Low (at $timeStr)"
                 val text = String.format(
                     Locale.US,
                     if (isRu) "Сахар %.1f ммоль/л %s падает со скоростью %.2f ммоль/л/мин."
@@ -388,7 +512,9 @@ object GlucoseAlertManager {
                 sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash)
             } else if (prediction.event == PredictedEvent.PREDICTED_HIGH && now - lastPredictiveAlertTimestamp >= 30 * 60000L) {
                 lastPredictiveAlertTimestamp = now
-                val title = if (isRu) "📈 Скоро гипергликемия (~${prediction.minutesUntilCrossing} мин)" else "📈 Predicted High (~${prediction.minutesUntilCrossing} min)"
+                val eventTime = now + (prediction.minutesUntilCrossing ?: 15) * 60000L
+                val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(eventTime))
+                val title = if (isRu) "📈 Скоро гипергликемия (в $timeStr)" else "📈 Predicted High (at $timeStr)"
                 val text = String.format(
                     Locale.US,
                     if (isRu) "Сахар %.1f ммоль/л %s растёт со скоростью %.2f ммоль/л/мин."
@@ -449,6 +575,7 @@ object GlucoseAlertManager {
         val priority = when (tier) {
             AlertTier.CRITICAL -> NotificationCompat.PRIORITY_MAX
             AlertTier.MAIN -> NotificationCompat.PRIORITY_HIGH
+            AlertTier.SIGNAL_LOSS -> NotificationCompat.PRIORITY_HIGH
             AlertTier.PREDICTIVE -> NotificationCompat.PRIORITY_DEFAULT
         }
 
@@ -516,6 +643,7 @@ object GlucoseAlertManager {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val pattern = when (tier) {
                     AlertTier.PREDICTIVE -> longArrayOf(0, 150, 100, 150)
+                    AlertTier.SIGNAL_LOSS -> longArrayOf(0, 250, 150, 250)
                     // Tier 2: 3 pulses synchronized with 1.5s pauses
                     AlertTier.MAIN -> longArrayOf(0, 320, 1500, 320, 1500, 320)
                     // Tier 3: High urgency repeat pattern for ~12 seconds
@@ -573,6 +701,9 @@ object GlucoseAlertManager {
                             delay(340)
                         }
                     }
+                    AlertTier.SIGNAL_LOSS -> {
+                        // Signal loss does not pulse flashlight
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Flashlight pulse failed: ${e.message}")
@@ -586,6 +717,6 @@ object GlucoseAlertManager {
             val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager ?: return
             val cameraId = cameraManager.cameraIdList.firstOrNull() ?: return
             cameraManager.setTorchMode(cameraId, false)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {}
     }
 }

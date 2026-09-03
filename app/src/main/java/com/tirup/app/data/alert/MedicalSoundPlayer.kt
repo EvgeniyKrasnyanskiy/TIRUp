@@ -29,11 +29,25 @@ object MedicalSoundPlayer {
                     AlertTier.PREDICTIVE -> playPredictiveChime()
                     AlertTier.MAIN -> playTripleMainBeep()
                     AlertTier.CRITICAL -> playCriticalAlarmSeries()
+                    AlertTier.SIGNAL_LOSS -> playSignalLossTone()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to play synthesized medical sound for tier=$tier: ${e.message}")
             }
         }
+    }
+
+    /**
+     * Tier 4: Signal loss descending notification tone (659 Hz -> 440 Hz).
+     */
+    private fun playSignalLossTone() {
+        val note1 = generateSineWave(freq = 659.25, durationMs = 180, volume = 0.70f)
+        val note2 = generateSineWave(freq = 440.00, durationMs = 240, volume = 0.75f)
+        val audioData = ShortArray(note1.size + note2.size)
+        System.arraycopy(note1, 0, audioData, 0, note1.size)
+        System.arraycopy(note2, 0, audioData, note1.size, note2.size)
+
+        playRawPcm(audioData, usage = AudioAttributes.USAGE_NOTIFICATION)
     }
 
     fun stopAll() {

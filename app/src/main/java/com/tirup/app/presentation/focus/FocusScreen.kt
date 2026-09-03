@@ -130,10 +130,11 @@ fun FocusScreen(
         ) {
             item { Spacer(modifier = Modifier.height(2.dp)) }
 
-            // 1. Hero Card: Current Glucose
+        // 1. Hero Card: Current Glucose
         item {
             HeroGlucoseCard(
                 latestReading = state.latestReading,
+                recentReadings = state.recentReadings,
                 unit = unit,
                 isRu = isRu,
                 onClick = {
@@ -638,11 +639,65 @@ fun FocusScreen(
 @Composable
 private fun HeroGlucoseCard(
     latestReading: GlucoseReading?,
+    recentReadings: List<GlucoseReading>,
     unit: GlucoseUnit,
     isRu: Boolean,
     onClick: () -> Unit
 ) {
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val now = System.currentTimeMillis()
+    val diffMinutes = if (latestReading != null) ((now - latestReading.timestamp) / 60000L).toInt().coerceAtLeast(0) else 0
+
+    // Operational clinical status notification
+    val statusInfo: Pair<String, Color>? = remember(latestReading, recentReadings, isRu) {
+        if (latestReading == null) null
+        else {
+            val v = latestReading.valueMmol
+            val sorted = recentReadings.sortedBy { it.timestamp }
+            val rate = if (sorted.size >= 2) {
+                val prev = sorted[sorted.size - 2]
+                val dtMin = ((latestReading.timestamp - prev.timestamp) / 60000.0).coerceAtLeast(1.0)
+                (latestReading.valueMmol - prev.valueMmol) / dtMin
+            } else 0.0
+
+            when {
+                v < 3.0 -> Pair(if (isRu) "🚨 Тяжёлая гипогликемия! Быстрые углеводы!" else "🚨 Severe low! Fast carbs now!", ColorVeryLow)
+                v < 3.9 -> Pair(if (isRu) "🔻 Ниже целевого диапазона" else "🔻 Below target range", ColorLow)
+                v > 13.9 -> Pair(if (isRu) "⚠️ Экстремальный сахар! Проверьте кетоны" else "⚠️ Very high! Check ketones", ColorVeryHigh)
+                v > 10.0 -> Pair(if (isRu) "🔺 Выше целевого диапазона" else "🔺 Above target range", ColorHigh)
+                rate <= -0.12 -> Pair(
+                    if (isRu) String.format(Locale.US, "⚡ Быстро падает (%.2f ммоль/л/мин)", rate)
+                    else String.format(Locale.US, "⚡ Dropping fast (%.2f mmol/L/min)", rate),
+                    ColorLow
+                )
+                rate >= 0.12 -> Pair(
+                    if (isRu) String.format(Locale.US, "⚡ Быстро растёт (+%.2f ммоль/л/мин)", rate)
+                    else String.format(Locale.US, "⚡ Rising fast (+%.2f mmol/L/min)", rate),
+                    ColorHigh
+                )
+                else -> {
+                    val inRangeCount = sorted.takeLastWhile { it.valueMmol in 3.9..10.0 }.size
+                    if (inRangeCount >= 12) {
+                        val hours = inRangeCount * 5 / 60.0
+                        Pair(
+                            if (isRu) String.format(Locale.US, "✨ В норме последние %.1f ч", hours)
+                            else String.format(Locale.US, "✨ In target for last %.1f h", hours),
+                            PrimaryEmerald
+                        )
+                    } else {
+                        Pair(if (isRu) "В целевом диапазоне" else "In target range", PrimaryEmerald)
+                    }
+                }
+            }
+        }
+    }
+
+    val timeLabel = when {
+        latestReading == null -> if (isRu) "Нет данных" else "No data"
+        diffMinutes <= 1 -> ""
+        diffMinutes < 60 -> if (isRu) "$diffMinutes мин назад" else "${diffMinutes}m ago"
+        else -> if (isRu) "${diffMinutes / 60} ч назад" else "${diffMinutes / 60}h ago"
+    }
 
     BentoCard(
         modifier = Modifier.fillMaxWidth(),
@@ -664,7 +719,7 @@ private fun HeroGlucoseCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Large Hero Value with Trend Arrow
             Row(
@@ -718,24 +773,40 @@ private fun HeroGlucoseCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            val timeStr = if (latestReading != null) {
-                DateUtils.getRelativeTimeSpanString(
-                    latestReading.timestamp,
-                    System.currentTimeMillis(),
-                    DateUtils.MINUTE_IN_MILLIS,
-                    DateUtils.FORMAT_ABBREV_RELATIVE
-                ).toString()
-            } else if (isRu) "Нет данных трансляции" else "No broadcast data"
-
-            Text(
-                text = if (isRu) "Последнее измерение: $timeStr" else "Latest reading: $timeStr",
-                style = MaterialTheme.typography.bodySmall,
-                color = onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
+            if (statusInfo != null || timeLabel.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background((statusInfo?.second ?: PrimaryEmerald).copy(alpha = 0.12f))
+                        .padding(horizontal = 12.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    if (statusInfo != null) {
+                        Text(
+                            text = statusInfo.first,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = statusInfo.second,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    if (statusInfo != null && timeLabel.isNotEmpty()) {
+                        Text(
+                            text = " • ",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = onSurfaceVariant
+                        )
+                    }
+                    if (timeLabel.isNotEmpty()) {
+                        Text(
+                            text = timeLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = onSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
     }
 }
