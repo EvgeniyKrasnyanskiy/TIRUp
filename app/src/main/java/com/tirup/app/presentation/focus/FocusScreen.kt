@@ -595,7 +595,34 @@ fun FocusScreen(
         // 3. Night Stability Indicator
         item {
             val nightStability = state.statistics.nightStability
-            val hasNightData = nightStability.nightReadingsCount >= 6
+            val hasNightData = nightStability.nightDurationMinutes >= 45 || (nightStability.nightReadingsCount >= 10 && nightStability.nightDurationMinutes >= 30)
+
+            val sdFormatted = if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", nightStability.sdMmol)
+            else "${(nightStability.sdMmol * 18.0182).toInt()}"
+            val sdTarget = if (unit == GlucoseUnit.MMOL_L) 1.5 else (1.5 * 18.0182)
+
+            val nightStatusText = when {
+                !hasNightData -> if (isRu) "Недостаточно данных (<1 ч сна)" else "Insufficient data (<1h sleep)"
+                nightStability.isGrowthHormoneSpike -> if (isRu) "Всплеск сна (СТГ): max ${String.format(Locale.US, "%.1f", nightStability.maxMmol)}"
+                                                       else "Deep-sleep surge (GH): max ${String.format(Locale.US, "%.1f", nightStability.maxMmol)}"
+                nightStability.tbrPercent > 1.0 -> if (isRu) "Риск ночных гипо: TBR ${String.format(Locale.US, "%.1f%%", nightStability.tbrPercent)}"
+                                                   else "Night hypo risk: TBR ${String.format(Locale.US, "%.1f%%", nightStability.tbrPercent)}"
+                nightStability.tarPercent > 25.0 -> if (isRu) "Ночные подъёмы: TAR ${String.format(Locale.US, "%.0f%%", nightStability.tarPercent)}, SD $sdFormatted"
+                                                    else "Night highs: TAR ${String.format(Locale.US, "%.0f%%", nightStability.tarPercent)}, SD $sdFormatted"
+                nightStability.sdMmol > sdTarget -> if (isRu) "Высокая вариабельность: SD $sdFormatted"
+                                                    else "High variability: SD $sdFormatted"
+                nightStability.isStable -> if (isRu) "Стабильный профиль: TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)}, SD $sdFormatted"
+                                           else "Stable profile: TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)}, SD $sdFormatted"
+                else -> if (isRu) "Обнаружены колебания сахара" else "Glucose fluctuations detected"
+            }
+
+            val statusColor = when {
+                !hasNightData -> onSurfaceVariant
+                nightStability.isStable -> PrimaryEmerald
+                nightStability.isGrowthHormoneSpike -> ActionBlue
+                nightStability.tbrPercent > 1.0 -> ColorVeryLow
+                else -> ColorHigh
+            }
 
             BentoCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -603,8 +630,8 @@ fun FocusScreen(
                     detailDialogInfo = Pair(
                         if (isRu) "Ночной профиль сна" else "Night Sleep Profile",
                         if (!hasNightData) {
-                            if (isRu) "Недостаточно данных для ночного анализа (<30 мин измерений во время сна)."
-                            else "Insufficient data for night analysis (<30 min readings)."
+                            if (isRu) "Недостаточно данных для ночного анализа (<1 ч измерений во время сна)."
+                            else "Insufficient data for night analysis (<1h readings during sleep)."
                         } else {
                             val sdStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.2f", nightStability.sdMmol)} ммоль/л"
                                         else "${(nightStability.sdMmol * 18.0182).toInt()} мг/дл"
@@ -615,8 +642,13 @@ fun FocusScreen(
                             val maxStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", nightStability.maxMmol)} ммоль/л"
                                          else "${(nightStability.maxMmol * 18.0182).toInt()} мг/дл"
 
+                            val hormoneNote = if (nightStability.isGrowthHormoneSpike) {
+                                if (isRu) "\n\n🧬 Примечание: в первой половине ночи зафиксирован изолированный подъём сахара до $maxStr без предшествующей гипогликемии. У детей, подростков и людей до 25 лет это частый физиологический признак импульсного выброса соматотропного гормона (СТГ) в фазе глубокого сна."
+                                else "\n\n🧬 Note: isolated early-night glucose surge to $maxStr without preceding hypoglycemia. Characteristic physiological sign of deep-sleep growth hormone secretion in youth under 25."
+                            } else ""
+
                             if (isRu) {
-                                "Статус: ${if (nightStability.isStable) "Стабильный профиль (без колебаний)" else "Обнаружены ночные колебания"}\n\n" +
+                                "Статус: $nightStatusText\n\n" +
                                 "• Средний сахар за ночь: $meanStr\n" +
                                 "• Ночной размах: $minStr – $maxStr\n" +
                                 "• Ночной TIR (3.9–10.0): ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)} (цель ≥70%)\n" +
@@ -624,9 +656,10 @@ fun FocusScreen(
                                 "• Разброс (SD): $sdStr (норма ≤1.5)\n" +
                                 "• Вариабельность (%CV): ${String.format(Locale.US, "%.1f%%", nightStability.cvPercent)} (норма ≤36%)\n" +
                                 "• Ночные гипо (TBR): ${String.format(Locale.US, "%.1f%%", nightStability.tbrPercent)}\n" +
-                                "• Всего ночных точек: ${nightStability.nightReadingsCount}"
+                                "• Длительность сна: ${nightStability.nightDurationMinutes} мин (${nightStability.nightReadingsCount} точек)" +
+                                hormoneNote
                             } else {
-                                "Status: ${if (nightStability.isStable) "Stable profile" else "Fluctuations detected"}\n\n" +
+                                "Status: $nightStatusText\n\n" +
                                 "• Night Mean: $meanStr\n" +
                                 "• Night Range: $minStr – $maxStr\n" +
                                 "• Night TIR (3.9–10.0): ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)}\n" +
@@ -634,7 +667,8 @@ fun FocusScreen(
                                 "• Variability (SD): $sdStr\n" +
                                 "• Coefficient of Var (%CV): ${String.format(Locale.US, "%.1f%%", nightStability.cvPercent)}\n" +
                                 "• Night TBR: ${String.format(Locale.US, "%.1f%%", nightStability.tbrPercent)}\n" +
-                                "• Night Readings: ${nightStability.nightReadingsCount}"
+                                "• Sleep Duration: ${nightStability.nightDurationMinutes} min (${nightStability.nightReadingsCount} readings)" +
+                                hormoneNote
                             }
                         }
                     )
@@ -645,7 +679,10 @@ fun FocusScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Bedtime,
                             contentDescription = null,
@@ -660,12 +697,9 @@ fun FocusScreen(
                                 color = onSurfaceVariant
                             )
                             Text(
-                                text = when {
-                                    !hasNightData -> if (isRu) "Недостаточно данных (<30 мин)" else "Insufficient data (<30 min)"
-                                    nightStability.isStable -> if (isRu) "Стабильный ночной профиль" else "Stable night profile"
-                                    else -> if (isRu) "Обнаружены ночные колебания" else "Night fluctuations detected"
-                                },
+                                text = nightStatusText,
                                 style = MaterialTheme.typography.titleMedium,
+                                color = statusColor
                             )
                         }
                     }
@@ -673,7 +707,7 @@ fun FocusScreen(
                     Icon(
                         imageVector = if (hasNightData && nightStability.isStable) Icons.Default.CheckCircle else Icons.Default.Info,
                         contentDescription = null,
-                        tint = if (hasNightData && nightStability.isStable) PrimaryEmerald else ColorHigh,
+                        tint = statusColor,
                         modifier = Modifier.size(22.dp)
                     )
                 }

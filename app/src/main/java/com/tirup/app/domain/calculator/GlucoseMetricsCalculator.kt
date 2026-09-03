@@ -586,7 +586,7 @@ object GlucoseMetricsCalculator {
         if (!griMet) issuesList.add("GRI")
 
         // 14. Night Profile Stability
-        val hasNightData = nightStability.nightReadingsCount >= 6
+        val hasNightData = nightStability.nightDurationMinutes >= 45 || (nightStability.nightReadingsCount >= 10 && nightStability.nightDurationMinutes >= 30)
         val nightMet = hasNightData && nightStability.isStable
         val nightTir = nightStability.tirPercent
         val nightSd = nightStability.sdMmol
@@ -602,7 +602,11 @@ object GlucoseMetricsCalculator {
 
         val (nightValRu, nightTargetRu) = when {
             !hasNightData -> Pair(
-                "Недостаточно данных (<30 мин)",
+                "Недостаточно данных (<1 ч сна)",
+                "цель TIR ≥70%, $nightSdTargetFormatted"
+            )
+            nightStability.isGrowthHormoneSpike -> Pair(
+                String.format(Locale.US, "Всплеск сна (СТГ): max %.1f, SD %s", nightStability.maxMmol, nightSdFormatted),
                 "цель TIR ≥70%, $nightSdTargetFormatted"
             )
             nightStability.isStable -> Pair(
@@ -629,7 +633,11 @@ object GlucoseMetricsCalculator {
 
         val (nightValEn, nightTargetEn) = when {
             !hasNightData -> Pair(
-                "Insufficient night data (<30m)",
+                "Insufficient night data (<1h sleep)",
+                "target TIR ≥70%, $nightSdTargetFormatted"
+            )
+            nightStability.isGrowthHormoneSpike -> Pair(
+                String.format(Locale.US, "Deep-sleep surge (GH): max %.1f, SD %s", nightStability.maxMmol, nightSdFormatted),
                 "target TIR ≥70%, $nightSdTargetFormatted"
             )
             nightStability.isStable -> Pair(
@@ -641,11 +649,11 @@ object GlucoseMetricsCalculator {
                 "target TBR <1%, TIR ≥70%"
             )
             nightTar > 25.0 -> Pair(
-                String.format(Locale.US, "Nocturnal spikes: TAR %.0f%%, TIR %.0f%%, SD %s", nightTar, nightTir, nightSdFormatted),
+                String.format(Locale.US, "Night glucose climbs: TAR %.0f%%, TIR %.0f%%, SD %s", nightTar, nightTir, nightSdFormatted),
                 "target TAR <25%, TIR ≥70%"
             )
             nightSd > (if (isMmol) 1.5 else (1.5 * MGDL_FACTOR)) -> Pair(
-                String.format(Locale.US, "Elevated variability: SD %s, TIR %.0f%%", nightSdFormatted, nightTir),
+                String.format(Locale.US, "High variability: SD %s, TIR %.0f%%", nightSdFormatted, nightTir),
                 "target $nightSdTargetFormatted, TIR ≥70%"
             )
             else -> Pair(
@@ -761,7 +769,23 @@ object GlucoseMetricsCalculator {
         val tar = (aboveCount.toDouble() / count) * 100.0
         val minMmol = nightReadings.minOf { it.valueMmol }
         val maxMmol = nightReadings.maxOf { it.valueMmol }
-        val isStable = sd <= 1.5 && tir >= 70.0 && tbr <= 1.0
+
+        val timeSpanMs = if (count >= 2) {
+            nightReadings.maxOf { it.timestamp } - nightReadings.minOf { it.timestamp }
+        } else 0L
+        val nightDurationMinutes = (timeSpanMs / 60000L).toInt()
+
+        // Detect isolated deep-sleep surge in early night (00:00 - 03:30, minuteOfDay in 0..210)
+        val earlyNightReadings = nightReadings.filter {
+            val cal = java.util.Calendar.getInstance().apply { timeInMillis = it.timestamp }
+            val minuteOfDay = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+            minuteOfDay in 0..210
+        }
+        val maxEarlyMmol = if (earlyNightReadings.isNotEmpty()) earlyNightReadings.maxOf { it.valueMmol } else 0.0
+        val minEarlyMmol = if (earlyNightReadings.isNotEmpty()) earlyNightReadings.minOf { it.valueMmol } else 0.0
+        val isGrowthHormoneSpike = maxEarlyMmol >= 9.5 && minEarlyMmol <= 7.0 && tbr <= 0.0
+
+        val isStable = sd <= 1.5 && tir >= 70.0 && tbr <= 1.0 && !isGrowthHormoneSpike
 
         return NightStability(
             isStable = isStable,
@@ -774,7 +798,9 @@ object GlucoseMetricsCalculator {
             tarPercent = tar,
             minMmol = minMmol,
             maxMmol = maxMmol,
-            nightReadingsCount = count
+            nightReadingsCount = count,
+            nightDurationMinutes = nightDurationMinutes,
+            isGrowthHormoneSpike = isGrowthHormoneSpike
         )
     }
 }

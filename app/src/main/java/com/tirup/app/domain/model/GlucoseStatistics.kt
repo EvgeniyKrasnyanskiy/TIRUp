@@ -58,7 +58,9 @@ data class NightStability(
     val minMmol: Double = 0.0,
     val maxMmol: Double = 0.0,
     val isStable: Boolean = true,
-    val nightReadingsCount: Int = 0
+    val nightReadingsCount: Int = 0,
+    val nightDurationMinutes: Int = 0,
+    val isGrowthHormoneSpike: Boolean = false
 )
 
 enum class CompensatorStatus {

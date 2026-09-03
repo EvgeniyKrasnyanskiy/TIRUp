@@ -104,6 +104,26 @@ object TirAdvisorEngine {
             )
         }
 
+        // 3b. Nocturnal Growth Hormone Surges (23:00 - 03:00)
+        val midnightBins = bins.filter { (it.minuteOfDay >= 1380 || it.minuteOfDay in 0..180) && it.readingsCount > 0 }
+        val maxP90Midnight = midnightBins.maxOfOrNull { it.p90 } ?: 0.0
+        val medianMidnight = if (midnightBins.isNotEmpty()) midnightBins.map { it.p50 }.average() else 6.0
+        if (maxP90Midnight >= 9.5 && medianMidnight <= 7.8) {
+            insights.add(
+                TirInsight(
+                    id = "growth_hormone_surge",
+                    titleRu = "Ночные всплески гормона роста (СТГ)",
+                    titleEn = "Nocturnal Growth Hormone (GH)",
+                    adviceRu = "Периодические подъёмы сахара в первой половине ночи (23:00–03:00) 2–3 раза в неделю у детей и лиц до 25 лет — признак выброса соматотропина в глубоком сне. Обсудите с врачом микроболюс ДПС или временный базал.",
+                    adviceEn = "Periodic glucose rises in early night (23:00–03:00) 2–3 times a week in youth are often driven by deep-sleep growth hormone pulses. Discuss micro-corrections or temporary basal with your doctor.",
+                    badgeRu = "Гормон роста",
+                    badgeEn = "GH Surge",
+                    icon = "🧬",
+                    priority = 3
+                )
+            )
+        }
+
         // 4. High Variability Flattening (%CV > 36%)
         if (stats.cvPercent > 36.0) {
             insights.add(
