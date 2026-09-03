@@ -384,12 +384,31 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.height(10.dp))
                         }
 
+                        val isMaster = alerts.isAlertsMasterEnabled
+                        val nowMs = System.currentTimeMillis()
+                        val isCriticalPaused = alerts.criticalHypoPauseUntilTimestamp > nowMs
+                        val remSec = if (isCriticalPaused) ((alerts.criticalHypoPauseUntilTimestamp - nowMs) / 1000L).coerceAtLeast(0) else 0L
+                        val remHours = remSec / 3600
+                        val remMin = ((remSec % 3600) / 60).coerceAtLeast(1)
+                        val resumeTime = if (isCriticalPaused) SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(alerts.criticalHypoPauseUntilTimestamp)) else ""
+
+                        val criticalBadge = if (isCriticalPaused) {
+                            if (remHours > 0) "⏳ ${remHours}ч ${remMin}м" else "⏳ ${remMin}м"
+                        } else null
+
                         // Tier 1: Predictive (Soft)
                         AlertTierConfigRow(
                             title = if (isRu) "1. Предиктивные (умные за 15 мин)" else "1. Predictive (Smart ~15 min)",
-                            subtitle = if (isRu) "Мягкий сигнал прогноза до выхода за диапазон" else "Soft early warning before crossing limits",
-                            enabled = alerts.isPredictiveEnabled,
-                            onEnabledChange = { viewModel.updateAlertSettings(alerts.copy(isPredictiveEnabled = it)) },
+                            subtitle = if (!isMaster) (if (isRu) "Выключено (общий тумблер выключен)" else "Disabled (master switch off)")
+                                       else if (isRu) "Мягкий сигнал прогноза до выхода за диапазон" else "Soft early warning before crossing limits",
+                            enabled = isMaster && alerts.isPredictiveEnabled,
+                            onEnabledChange = { isChecked ->
+                                if (isChecked) {
+                                    viewModel.updateAlertSettings(alerts.copy(isAlertsMasterEnabled = true, isPredictiveEnabled = true))
+                                } else {
+                                    viewModel.updateAlertSettings(alerts.copy(isPredictiveEnabled = false))
+                                }
+                            },
                             vibrate = alerts.isPredictiveVibrate,
                             onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isPredictiveVibrate = it)) },
                             flash = alerts.isPredictiveFlash,
@@ -404,9 +423,16 @@ fun SettingsScreen(
                         // Tier 2: Main (5 points confirmed)
                         AlertTierConfigRow(
                             title = if (isRu) "2. Основные (5 точек вне нормы)" else "2. Main (5 points confirmed)",
-                            subtitle = if (isRu) "Тройной сигнал при подтверждённом выходе" else "Triple beep on confirmed out-of-range",
-                            enabled = alerts.isMainEnabled,
-                            onEnabledChange = { viewModel.updateAlertSettings(alerts.copy(isMainEnabled = it)) },
+                            subtitle = if (!isMaster) (if (isRu) "Выключено (общий тумблер выключен)" else "Disabled (master switch off)")
+                                       else if (isRu) "Тройной сигнал при подтверждённом выходе" else "Triple beep on confirmed out-of-range",
+                            enabled = isMaster && alerts.isMainEnabled,
+                            onEnabledChange = { isChecked ->
+                                if (isChecked) {
+                                    viewModel.updateAlertSettings(alerts.copy(isAlertsMasterEnabled = true, isMainEnabled = true))
+                                } else {
+                                    viewModel.updateAlertSettings(alerts.copy(isMainEnabled = false))
+                                }
+                            },
                             vibrate = alerts.isMainVibrate,
                             onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isMainVibrate = it)) },
                             flash = alerts.isMainFlash,
@@ -419,12 +445,23 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(6.dp))
 
                         val criticalSub = when {
-                            !alerts.isCriticalEnabled && alerts.criticalHypoPauseUntilTimestamp > System.currentTimeMillis() -> {
-                                val remMin = ((alerts.criticalHypoPauseUntilTimestamp - System.currentTimeMillis()) / 60000L).coerceAtLeast(1)
-                                if (isRu) "⏳ Пауза на $remMin мин (авто-возобновление)" else "⏳ Paused for $remMin min (auto-resumes)"
+                            isCriticalPaused -> {
+                                if (remHours > 0) {
+                                    if (isRu) "⏳ Пауза: ещё ${remHours} ч ${remMin} мин (авто-возобновление в $resumeTime)"
+                                    else "⏳ Paused: ${remHours}h ${remMin}m left (auto-resumes at $resumeTime)"
+                                } else {
+                                    if (isRu) "⏳ Пауза: ещё ${remMin} мин (авто-возобновление в $resumeTime)"
+                                    else "⏳ Paused: ${remMin}m left (auto-resumes at $resumeTime)"
+                                }
                             }
-                            !alerts.isCriticalEnabled && alerts.isCriticalHypoPermanentDisabled -> {
+                            alerts.isCriticalHypoPermanentDisabled -> {
                                 if (isRu) "⚠️ Отключено осознанно под вашу ответственность" else "⚠️ Permanently disabled at own risk"
+                            }
+                            !isMaster -> {
+                                if (isRu) "Выключено (общий тумблер выключен)" else "Disabled (master switch off)"
+                            }
+                            !alerts.isCriticalEnabled -> {
+                                if (isRu) "Выключено пользователем" else "Disabled by user"
                             }
                             else -> if (isRu) "Сирена ~12 сек при гипо >20 мин, гипер >90 мин или <3.0 / >13.9" else "Siren ~12s on hypo >20m, hyper >90m or <3.0 / >13.9"
                         }
@@ -433,13 +470,14 @@ fun SettingsScreen(
                         AlertTierConfigRow(
                             title = if (isRu) "3. Критические и затяжные («кричащие»)" else "3. Critical & Prolonged (Alarms)",
                             subtitle = criticalSub,
-                            enabled = alerts.isCriticalEnabled,
+                            enabled = isMaster && alerts.isCriticalEnabled && !isCriticalPaused && !alerts.isCriticalHypoPermanentDisabled,
                             onEnabledChange = { isEnabled ->
                                 if (!isEnabled) {
                                     showCriticalHypoSafetyDialog = true
                                 } else {
                                     viewModel.updateAlertSettings(
                                         alerts.copy(
+                                            isAlertsMasterEnabled = true,
                                             isCriticalEnabled = true,
                                             criticalHypoPauseUntilTimestamp = 0L,
                                             isCriticalHypoPermanentDisabled = false
@@ -453,7 +491,8 @@ fun SettingsScreen(
                             onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalFlash = it)) },
                             accentColor = ColorVeryLow,
                             onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.CRITICAL) },
-                            isRu = isRu
+                            isRu = isRu,
+                            timerBadge = criticalBadge
                         )
                         
                         Spacer(modifier = Modifier.height(6.dp))
@@ -461,9 +500,16 @@ fun SettingsScreen(
                         // Tier 4: Signal Loss (>20 min)
                         AlertTierConfigRow(
                             title = if (isRu) "4. Потеря сигнала сенсора (>20 мин)" else "4. Signal Loss (>20 min)",
-                            subtitle = if (isRu) "Нисходящий сигнал с нарастающим интервалом (20 ➔ 40 ➔ 80 мин)" else "Descending tone with geometric backoff (20 ➔ 40 ➔ 80 min)",
-                            enabled = alerts.isSignalLossEnabled,
-                            onEnabledChange = { viewModel.updateAlertSettings(alerts.copy(isSignalLossEnabled = it)) },
+                            subtitle = if (!isMaster) (if (isRu) "Выключено (общий тумблер выключен)" else "Disabled (master switch off)")
+                                       else if (isRu) "Нисходящий сигнал с нарастающим интервалом (20 ➔ 40 ➔ 80 мин)" else "Descending tone with geometric backoff (20 ➔ 40 ➔ 80 min)",
+                            enabled = isMaster && alerts.isSignalLossEnabled,
+                            onEnabledChange = { isChecked ->
+                                if (isChecked) {
+                                    viewModel.updateAlertSettings(alerts.copy(isAlertsMasterEnabled = true, isSignalLossEnabled = true))
+                                } else {
+                                    viewModel.updateAlertSettings(alerts.copy(isSignalLossEnabled = false))
+                                }
+                            },
                             vibrate = alerts.isSignalLossVibrate,
                             onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isSignalLossVibrate = it)) },
                             flash = false,
@@ -1523,7 +1569,8 @@ private fun AlertTierConfigRow(
     onFlashChange: (Boolean) -> Unit,
     accentColor: Color,
     onTestClick: () -> Unit,
-    isRu: Boolean
+    isRu: Boolean,
+    timerBadge: String? = null
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1554,14 +1601,32 @@ private fun AlertTierConfigRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Switch(
-                    checked = enabled,
-                    onCheckedChange = onEnabledChange,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = accentColor
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (timerBadge != null) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = accentColor.copy(alpha = 0.16f),
+                            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.45f))
+                        ) {
+                            Text(
+                                text = timerBadge,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = accentColor,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Switch(
+                        checked = enabled,
+                        onCheckedChange = onEnabledChange,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = accentColor
+                        )
                     )
-                )
+                }
             }
 
             if (enabled) {

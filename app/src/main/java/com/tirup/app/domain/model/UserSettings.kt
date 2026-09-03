@@ -120,6 +120,12 @@ data class PatientProfile(
         }
 }
 
+val DEFAULT_METRICS_ORDER: List<String> = listOf(
+    "mean", "ea1c", "sd", "cv",
+    "tir", "ting", "tbr", "tar",
+    "gri", "gvi", "pgs", "minmax"
+)
+
 data class UserSettings(
     val language: String = "RU", // "RU" or "EN"
     val unit: GlucoseUnit = GlucoseUnit.MMOL_L,
@@ -133,6 +139,8 @@ data class UserSettings(
     val isAutoBackupEnabled: Boolean = true,
     val lastBackupTimestamp: Long = 0L,
     val hasSeenOnboarding: Boolean = false,
+    val lastStreakCelebratedDays: Int = 0,
+    val metricsOrder: List<String> = DEFAULT_METRICS_ORDER,
     val alertSettings: AlertSettings = AlertSettings()
 )
 

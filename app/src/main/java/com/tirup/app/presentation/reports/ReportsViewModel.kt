@@ -409,4 +409,11 @@ class ReportsViewModel(
             _events.emit(ReportEvent.Error("Save failed: ${e.message}"))
         }
     }
+
+    fun updateMetricsOrder(newOrder: List<String>) {
+        val currentSettings = _uiState.value.userSettings
+        viewModelScope.launch {
+            settingsRepository.updateSettings(currentSettings.copy(metricsOrder = newOrder))
+        }
+    }
 }

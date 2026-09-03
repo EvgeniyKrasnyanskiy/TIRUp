@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -64,6 +65,7 @@ import com.tirup.app.R
 import com.tirup.app.domain.model.GlucoseStatistics
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.presentation.components.BentoCard
+import com.tirup.app.presentation.components.MetricsOrderDialog
 import com.tirup.app.presentation.components.RangeDistributionBar
 import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.ColorHigh
@@ -87,6 +89,7 @@ fun ReportsScreen(
     val context = LocalContext.current
     var showGuidebookModal by remember { mutableStateOf(false) }
     var showXdripExportHelp by remember { mutableStateOf(false) }
+    var showMetricsOrderDialog by remember { mutableStateOf(false) }
 
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -158,35 +161,47 @@ fun ReportsScreen(
             item { Spacer(modifier = Modifier.height(2.dp)) }
 
             // Section 1: Live Broadcast Report Card
-        item {
-            LiveReportCard(
-                state = state,
-                viewModel = viewModel,
-                onCardClick = { viewModel.showLiveDetails(true) }
-            )
-        }
+            item {
+                LiveReportCard(
+                    state = state,
+                    viewModel = viewModel,
+                    onCardClick = { viewModel.showLiveDetails(true) },
+                    onReorderClick = { showMetricsOrderDialog = true }
+                )
+            }
 
-        // Section 2: Historical File Report Card (xDrip CSV / ZIP)
-        item {
-            HistoricalReportCard(
-                state = state,
-                onPickFile = { filePicker.launch(arrayOf("*/*")) },
-                viewModel = viewModel,
-                onCardClick = { viewModel.showHistoricalDetails(true) },
-                onHelpClick = { showXdripExportHelp = true }
-            )
-        }
+            // Section 2: Historical File Report Card (xDrip CSV / ZIP)
+            item {
+                HistoricalReportCard(
+                    state = state,
+                    onPickFile = { filePicker.launch(arrayOf("*/*")) },
+                    viewModel = viewModel,
+                    onCardClick = { viewModel.showHistoricalDetails(true) },
+                    onHelpClick = { showXdripExportHelp = true },
+                    onReorderClick = { showMetricsOrderDialog = true }
+                )
+            }
 
-        // Section 3: Clinical Parameters Guidebook & CGM Disclaimer
-        item {
-            GuidebookCard(
-                isRu = isRu,
-                onClick = { showGuidebookModal = true }
-            )
-        }
+            // Section 3: Clinical Parameters Guidebook & CGM Disclaimer
+            item {
+                GuidebookCard(
+                    isRu = isRu,
+                    onClick = { showGuidebookModal = true }
+                )
+            }
 
-        item { Spacer(modifier = Modifier.height(24.dp)) }
+            item { Spacer(modifier = Modifier.height(24.dp)) }
+        }
     }
+
+    // Metrics Order Dialog
+    if (showMetricsOrderDialog) {
+        MetricsOrderDialog(
+            currentOrder = state.userSettings.metricsOrder,
+            isRu = isRu,
+            onSave = { newOrder -> viewModel.updateMetricsOrder(newOrder) },
+            onDismiss = { showMetricsOrderDialog = false }
+        )
     }
 
     // Live Report AGP Sheet Preview Modal
@@ -258,15 +273,15 @@ fun ReportsScreen(
             text = {
                 Text(
                     text = if (isRu) {
-                        "1️⃣ Откройте приложение xDrip+ на телефоне.\n\n" +
-                        "2️⃣ Нажмите на значок с тремя вертикальными точками в правом верхнем углу экрана.\n\n" +
-                        "3️⃣ Выберите пункт «Функции импорта/экспорта».\n\n" +
-                        "4️⃣ Нажмите «Экспорт CSV (формат SiDiary)».\n\n" +
-                        "5️⃣ Выберите дату начала нужного периода. После этого xDrip+ автоматически создаст файл и сохранит его на телефоне.\n\n" +
-                        "📂 Файл находится в папке:\nВнутреннее хранилище → xdrip → файл с названием exportCSV...zip"
+                        "1️⃣ Откройте приложение xDrip+ на смартфоне.\n\n" +
+                        "2️⃣ Нажмите на три точки ⋮ (Меню) в верхнем правом углу экрана.\n\n" +
+                        "3️⃣ Выберите пункт «Import / Export features» (Функции импорта / экспорта).\n\n" +
+                        "4️⃣ Нажмите «Export CSV (SiDiary format)» (Экспорт CSV в формате SiDiary).\n\n" +
+                        "5️⃣ Выберите дату начала экспорта данных. Приложение автоматически сформирует архив.\n\n" +
+                        "📂 Где найти готовый файл:\nВнутренняя память смартфона → папка xdrip → файл с именем exportCSV...zip"
                     } else {
-                        "1️⃣ Open xDrip+ app on your phone.\n\n" +
-                        "2️⃣ Tap the three-dot menu icon in the top right corner.\n\n" +
+                        "1️⃣ Open the xDrip+ application on your phone.\n\n" +
+                        "2️⃣ Tap the three dots ⋮ (Menu) in the upper right corner.\n\n" +
                         "3️⃣ Select 'Import / Export features'.\n\n" +
                         "4️⃣ Tap 'Export CSV (SiDiary format)'.\n\n" +
                         "5️⃣ Choose the start date. xDrip+ will automatically generate the export archive.\n\n" +
@@ -289,7 +304,8 @@ fun ReportsScreen(
 private fun LiveReportCard(
     state: ReportsUiState,
     viewModel: ReportsViewModel,
-    onCardClick: () -> Unit
+    onCardClick: () -> Unit,
+    onReorderClick: () -> Unit
 ) {
     val stats = state.liveStatistics
     val isRu = state.userSettings.language.equals("RU", ignoreCase = true)
@@ -365,7 +381,13 @@ private fun LiveReportCard(
             )
 
             // Parameters with Active Time at the very TOP
-            ReportMetricsColumn(stats = stats, unit = state.userSettings.unit, language = state.userSettings.language)
+            ReportMetricsColumn(
+                stats = stats,
+                unit = state.userSettings.unit,
+                language = state.userSettings.language,
+                metricsOrder = state.userSettings.metricsOrder,
+                onReorderClick = onReorderClick
+            )
 
             // Bottom Buttons Row (Save PDF & Share)
             Row(
@@ -416,7 +438,8 @@ private fun HistoricalReportCard(
     onPickFile: () -> Unit,
     viewModel: ReportsViewModel,
     onCardClick: () -> Unit,
-    onHelpClick: () -> Unit
+    onHelpClick: () -> Unit,
+    onReorderClick: () -> Unit
 ) {
     val hist = state.historicalReport
     val isRu = state.userSettings.language.equals("RU", ignoreCase = true)
@@ -571,7 +594,13 @@ private fun HistoricalReportCard(
                 )
 
                 // Parameters with Active Time at the very TOP
-                ReportMetricsColumn(stats = hist.statistics, unit = state.userSettings.unit, language = state.userSettings.language)
+                ReportMetricsColumn(
+                    stats = hist.statistics,
+                    unit = state.userSettings.unit,
+                    language = state.userSettings.language,
+                    metricsOrder = state.userSettings.metricsOrder,
+                    onReorderClick = onReorderClick
+                )
 
                 // Action Buttons: Import File above, Save & Share below
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -675,12 +704,15 @@ private fun HistoricalReportCard(
 private fun ReportMetricsColumn(
     stats: GlucoseStatistics,
     unit: GlucoseUnit,
-    language: String = "RU"
+    language: String = "RU",
+    metricsOrder: List<String> = com.tirup.app.domain.model.DEFAULT_METRICS_ORDER,
+    onReorderClick: (() -> Unit)? = null
 ) {
     val isRu = language.equals("RU", ignoreCase = true)
     val isMmol = unit == GlucoseUnit.MMOL_L
-    val meanVal = if (isMmol) String.format(Locale.US, "%.1f mmol/L", stats.meanMmol) else String.format(Locale.US, "%d mg/dL", (stats.meanMmol * 18.0182).toInt())
     val onSurface = MaterialTheme.colorScheme.onSurface
+
+    val meanVal = if (isMmol) String.format(Locale.US, "%.1f mmol/L", stats.meanMmol) else String.format(Locale.US, "%d mg/dL", (stats.meanMmol * 18.0182).toInt())
     val meanColor = when {
         stats.meanMmol <= 0.0 -> onSurface
         stats.meanMmol <= 7.0 -> ColorTight
@@ -718,100 +750,167 @@ private fun ReportMetricsColumn(
     }
     val atEmoji = if (stats.activeTimePercent >= 90.0) "🟢" else if (stats.activeTimePercent >= 70.0) "🟡" else "🔴"
 
+    val sdValStr = if (stats.sdMmol > 0.0) {
+        if (isMmol) String.format(Locale.US, "%.2f mmol/L", stats.sdMmol)
+        else String.format(Locale.US, "%d mg/dL", (stats.sdMmol * 18.0182).toInt())
+    } else "--"
+
+    val minVal = stats.minMmol
+    val maxVal = stats.maxMmol
+    val minMaxValStr = if (minVal > 0.0) {
+        if (isMmol) "${String.format(Locale.US, "%.1f", minVal)}–${String.format(Locale.US, "%.1f", maxVal)}"
+        else "${(minVal * 18.0182).toInt()}–${(maxVal * 18.0182).toInt()}"
+    } else "--"
+
+    val tbrTotal = stats.tbrLowPercent + stats.tbrVeryLowPercent
+    val tarTotal = stats.tarHighPercent + stats.tarVeryHighPercent
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (isRu) "Клинические параметры" else "Clinical Parameters",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (onReorderClick != null) {
+                IconButton(
+                    onClick = onReorderClick,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = "Reorder",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+
+        // 1. Active sensor time ALWAYS first
         ReportMetricRow(
             label = if (isRu) "$atEmoji Активное время сенсора" else "$atEmoji Active CGM Time",
             target = if (isRu) "Цель: ≥70.0%" else "Target: ≥70.0%",
             value = String.format(Locale.US, "%.1f%%", stats.activeTimePercent),
             valueColor = atColor
         )
-        ReportMetricRow(
-            label = if (isRu) "Mean BG (средний сахар)" else "Mean BG (average glucose)",
-            target = if (isMmol) (if (isRu) "Цель: ≤7.8" else "Target: ≤7.8") else (if (isRu) "Цель: ≤140" else "Target: ≤140"),
-            value = meanVal,
-            valueColor = meanColor
-        )
-        ReportMetricRow(
-            label = if (isRu) "eA1c (расчётный ГГ)" else "eA1c (estimated A1c)",
-            target = if (isRu) "Цель: ≤7.0%" else "Target: ≤7.0%",
-            value = String.format(Locale.US, "%.1f%%", stats.gmiPercent),
-            valueColor = gmiColor
-        )
-        val tirLabel = if (isMmol) {
-            if (isRu) "TIR (3.9–10.0 ммоль/л)" else "TIR (3.9–10.0 mmol/L)"
-        } else {
-            if (isRu) "TIR (70–180 мг/дл)" else "TIR (70–180 mg/dL)"
+
+        // 2. User-ordered parameters
+        val safeOrder = if (metricsOrder.isNotEmpty()) metricsOrder else com.tirup.app.domain.model.DEFAULT_METRICS_ORDER
+        for (id in safeOrder) {
+            when (id.lowercase()) {
+                "mean" -> ReportMetricRow(
+                    label = if (isRu) "Mean BG (средний сахар)" else "Mean BG (average glucose)",
+                    target = if (isMmol) (if (isRu) "Цель: ≤7.8" else "Target: ≤7.8") else (if (isRu) "Цель: ≤140" else "Target: ≤140"),
+                    value = meanVal,
+                    valueColor = meanColor
+                )
+                "ea1c" -> ReportMetricRow(
+                    label = if (isRu) "eA1c (расчётный ГГ)" else "eA1c (estimated A1c)",
+                    target = if (isRu) "Цель: ≤7.0%" else "Target: ≤7.0%",
+                    value = String.format(Locale.US, "%.1f%%", stats.gmiPercent),
+                    valueColor = gmiColor
+                )
+                "sd" -> ReportMetricRow(
+                    label = if (isRu) "SD (стандартное отклонение)" else "SD (standard deviation)",
+                    target = if (isMmol) (if (isRu) "Цель: ≤2.0" else "Target: ≤2.0") else (if (isRu) "Цель: ≤36" else "Target: ≤36"),
+                    value = sdValStr,
+                    valueColor = if (stats.sdMmol in 0.01..2.0) PrimaryEmerald else ColorHigh
+                )
+                "cv" -> ReportMetricRow(
+                    label = if (isRu) "CV (вариабельность)" else "CV (variability)",
+                    target = if (isRu) "Цель: ≤36.0%" else "Target: ≤36.0%",
+                    value = String.format(Locale.US, "%.1f%%", stats.cvPercent),
+                    valueColor = cvColor
+                )
+                "tir" -> {
+                    val tirLabel = if (isMmol) {
+                        if (isRu) "TIR (3.9–10.0 ммоль/л)" else "TIR (3.9–10.0 mmol/L)"
+                    } else {
+                        if (isRu) "TIR (70–180 мг/дл)" else "TIR (70–180 mg/dL)"
+                    }
+                    ReportMetricRow(
+                        label = tirLabel,
+                        target = if (isRu) "Цель: ≥70%" else "Target: ≥70%",
+                        value = String.format(Locale.US, "%.0f%%", stats.tirPercent),
+                        valueColor = tirColor
+                    )
+                }
+                "ting" -> {
+                    val tingLabel = if (isMmol) {
+                        if (isRu) "TING (3.9–7.8 ммоль/л)" else "TING (3.9–7.8 mmol/L)"
+                    } else {
+                        if (isRu) "TING (70–140 мг/дл)" else "TING (70–140 mg/dL)"
+                    }
+                    ReportMetricRow(
+                        label = tingLabel,
+                        target = if (isRu) "Цель: ≥50%" else "Target: ≥50%",
+                        value = String.format(Locale.US, "%.0f%%", stats.tingPercent),
+                        valueColor = if (stats.tingPercent >= 50.0) PrimaryEmerald else ColorHigh
+                    )
+                }
+                "tbr" -> {
+                    val tbrLabel = if (isMmol) {
+                        if (isRu) "TBR < 3.9 ммоль/л" else "TBR < 3.9 mmol/L"
+                    } else {
+                        if (isRu) "TBR < 70 мг/дл" else "TBR < 70 mg/dL"
+                    }
+                    ReportMetricRow(
+                        label = tbrLabel,
+                        target = if (isRu) "Цель: <4%" else "Target: <4%",
+                        value = String.format(Locale.US, "%.1f%%", tbrTotal),
+                        valueColor = if (tbrTotal <= 4.0) PrimaryEmerald else ColorVeryHigh
+                    )
+                }
+                "tar" -> {
+                    val tarLabel = if (isMmol) {
+                        if (isRu) "TAR > 10.0 ммоль/л" else "TAR > 10.0 mmol/L"
+                    } else {
+                        if (isRu) "TAR > 180 мг/дл" else "TAR > 180 mg/dL"
+                    }
+                    ReportMetricRow(
+                        label = tarLabel,
+                        target = if (isRu) "Цель: <25%" else "Target: <25%",
+                        value = String.format(Locale.US, "%.0f%%", tarTotal),
+                        valueColor = if (tarTotal <= 25.0) PrimaryEmerald else ColorHigh
+                    )
+                }
+                "gri" -> ReportMetricRow(
+                    label = if (isRu) "GRI (риск гипо)" else "GRI (hypo risk)",
+                    target = if (isRu) "Цель: ≤40.0" else "Target: ≤40.0",
+                    value = String.format(Locale.US, "%.1f (%s)", stats.gri, stats.griLabel),
+                    valueColor = griColor
+                )
+                "gvi" -> ReportMetricRow(
+                    label = if (isRu) "GVI (лабильность)" else "GVI (glycemic variability)",
+                    target = if (isRu) "Цель: ≤1.20" else "Target: ≤1.20",
+                    value = String.format(Locale.US, "%.2f", stats.gvi),
+                    valueColor = if (stats.gvi <= 1.20) PrimaryEmerald else ColorHigh
+                )
+                "pgs" -> ReportMetricRow(
+                    label = if (isRu) "PGS (гликемический статус)" else "PGS (patient status)",
+                    target = if (isRu) "Цель: ≤35.0" else "Target: ≤35.0",
+                    value = String.format(Locale.US, "%.1f", stats.pgs),
+                    valueColor = if (stats.pgs <= 35.0) PrimaryEmerald else ColorHigh
+                )
+                "minmax" -> ReportMetricRow(
+                    label = if (isRu) "Min / Max (суточный размах)" else "Min / Max (daily span)",
+                    target = if (isMmol) (if (isRu) "Цель: 3.9–10.0" else "Target: 3.9–10.0") else (if (isRu) "Цель: 70–180" else "Target: 70–180"),
+                    value = minMaxValStr,
+                    valueColor = if (maxVal <= 10.0 && minVal >= 3.9 && minVal > 0.0) PrimaryEmerald else ColorHigh
+                )
+            }
         }
-        ReportMetricRow(
-            label = tirLabel,
-            target = if (isRu) "Цель: ≥70%" else "Target: ≥70%",
-            value = String.format(Locale.US, "%.0f%%", stats.tirPercent),
-            valueColor = tirColor
-        )
-        val tingLabel = if (isMmol) {
-            if (isRu) "TING (3.9–7.8 ммоль/л)" else "TING (3.9–7.8 mmol/L)"
-        } else {
-            if (isRu) "TING (70–140 мг/дл)" else "TING (70–140 mg/dL)"
-        }
-        ReportMetricRow(
-            label = tingLabel,
-            target = if (isRu) "Цель: ≥50%" else "Target: ≥50%",
-            value = String.format(Locale.US, "%.0f%%", stats.tingPercent),
-            valueColor = if (stats.tingPercent >= 50.0) PrimaryEmerald else ColorHigh
-        )
-        val tbrTotal = stats.tbrLowPercent + stats.tbrVeryLowPercent
-        val tbrLabel = if (isMmol) {
-            if (isRu) "TBR < 3.9 ммоль/л" else "TBR < 3.9 mmol/L"
-        } else {
-            if (isRu) "TBR < 70 мг/дл" else "TBR < 70 mg/dL"
-        }
-        ReportMetricRow(
-            label = tbrLabel,
-            target = if (isRu) "Цель: <4%" else "Target: <4%",
-            value = String.format(Locale.US, "%.1f%%", tbrTotal),
-            valueColor = if (tbrTotal <= 4.0) PrimaryEmerald else ColorVeryHigh
-        )
-        val tarTotal = stats.tarHighPercent + stats.tarVeryHighPercent
-        val tarLabel = if (isMmol) {
-            if (isRu) "TAR > 10.0 ммоль/л" else "TAR > 10.0 mmol/L"
-        } else {
-            if (isRu) "TAR > 180 мг/дл" else "TAR > 180 mg/dL"
-        }
-        ReportMetricRow(
-            label = tarLabel,
-            target = if (isRu) "Цель: <25%" else "Target: <25%",
-            value = String.format(Locale.US, "%.0f%%", tarTotal),
-            valueColor = if (tarTotal <= 25.0) PrimaryEmerald else ColorHigh
-        )
-        ReportMetricRow(
-            label = if (isRu) "GVI (лабильность)" else "GVI (glycemic variability)",
-            target = if (isRu) "Цель: ≤1.20" else "Target: ≤1.20",
-            value = String.format(Locale.US, "%.2f", stats.gvi),
-            valueColor = if (stats.gvi <= 1.20) PrimaryEmerald else ColorHigh
-        )
-        ReportMetricRow(
-            label = if (isRu) "PGS (гликемический статус)" else "PGS (patient status)",
-            target = if (isRu) "Цель: ≤35.0" else "Target: ≤35.0",
-            value = String.format(Locale.US, "%.1f", stats.pgs),
-            valueColor = if (stats.pgs <= 35.0) PrimaryEmerald else ColorHigh
-        )
-        ReportMetricRow(
-            label = if (isRu) "CV (вариабельность)" else "CV (variability)",
-            target = if (isRu) "Цель: ≤36.0%" else "Target: ≤36.0%",
-            value = String.format(Locale.US, "%.1f%%", stats.cvPercent),
-            valueColor = cvColor
-        )
-        ReportMetricRow(
-            label = if (isRu) "GRI (риск гипо)" else "GRI (hypo risk)",
-            target = if (isRu) "Цель: ≤40.0" else "Target: ≤40.0",
-            value = String.format(Locale.US, "%.1f (%s)", stats.gri, stats.griLabel),
-            valueColor = griColor
-        )
     }
 }
 

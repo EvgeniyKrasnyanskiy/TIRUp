@@ -30,7 +30,7 @@ class FocusViewModel(
         viewModelScope.launch {
             combine(
                 glucoseRepository.getLatestReading(),
-                glucoseRepository.getRecentReadings(288), // last 24h of 5-min readings
+                glucoseRepository.getRecentReadings(1440), // up to 24h of 1-min readings
                 glucoseRepository.getStreakDays(),
                 settingsRepository.getSettings()
             ) { latest, recent, streak, settings ->
@@ -106,6 +106,20 @@ class FocusViewModel(
         val currentSettings = _uiState.value.userSettings
         viewModelScope.launch {
             settingsRepository.updateSettings(currentSettings.copy(targetMode = mode))
+        }
+    }
+
+    fun markStreakCelebrated(days: Int) {
+        val currentSettings = _uiState.value.userSettings
+        viewModelScope.launch {
+            settingsRepository.updateSettings(currentSettings.copy(lastStreakCelebratedDays = days))
+        }
+    }
+
+    fun updateMetricsOrder(newOrder: List<String>) {
+        val currentSettings = _uiState.value.userSettings
+        viewModelScope.launch {
+            settingsRepository.updateSettings(currentSettings.copy(metricsOrder = newOrder))
         }
     }
 }
