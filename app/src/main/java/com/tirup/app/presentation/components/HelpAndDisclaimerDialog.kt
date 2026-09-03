@@ -204,7 +204,7 @@ fun HelpAndDisclaimerDialog(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isRu) "📄 Распечатать руководство по TIRUp (PDF)" else "📄 Print User Manual (PDF)",
+                        text = if (isRu) "📄 Распечатать руководство" else "📄 Print User Manual",
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
                         color = ActionBlue
