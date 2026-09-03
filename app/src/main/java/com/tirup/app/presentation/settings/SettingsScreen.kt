@@ -523,6 +523,57 @@ fun SettingsScreen(
                             onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.SIGNAL_LOSS) },
                             isRu = isRu
                         )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Daily Compensator: Last Chance Alert
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isRu) "⏳ Последний шанс для TIR" else "⏳ Last Chance for Daily TIR",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (!isMaster) (if (isRu) "Выключено (общий тумблер выключен)" else "Disabled (master switch off)")
+                                        else if (isRu) "Предупреждать вечером, если сахар вне нормы и запас времени до срыва цели ≤1 часа (1 раз в сутки)"
+                                        else "Alert in evening when out of range and margin before target failure is ≤1 hour (once a day)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        lineHeight = 16.sp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Switch(
+                                    checked = isMaster && alerts.isLastChanceAlertEnabled,
+                                    onCheckedChange = { isChecked ->
+                                        if (isChecked) {
+                                            viewModel.updateAlertSettings(alerts.copy(isAlertsMasterEnabled = true, isLastChanceAlertEnabled = true))
+                                        } else {
+                                            viewModel.updateAlertSettings(alerts.copy(isLastChanceAlertEnabled = false))
+                                        }
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = PrimaryEmerald
+                                    )
+                                )
+                            }
+                        }
                     }
                 }
             }

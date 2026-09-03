@@ -74,6 +74,8 @@ class SettingsRepositoryImpl(
             .putInt(KEY_ALERT_SNOOZE_HYPO, settings.alertSettings.snoozeHypoMinutes)
             .putInt(KEY_ALERT_SNOOZE_HYPER, settings.alertSettings.snoozeHyperMinutes)
             .putBoolean(KEY_ALERT_SIGNAL_LOSS_ENABLED, settings.alertSettings.isSignalLossEnabled)
+            .putBoolean(KEY_ALERT_LAST_CHANCE_ENABLED, settings.alertSettings.isLastChanceAlertEnabled)
+            .putInt(KEY_ALERT_LAST_CHANCE_BUFFER, settings.alertSettings.lastChanceBufferMinutes)
             .apply()
 
         _settingsFlow.value = settings
@@ -169,7 +171,9 @@ class SettingsRepositoryImpl(
                 isCriticalHypoPermanentDisabled = prefs.getBoolean(KEY_ALERT_CRITICAL_HYPO_PERM_DISABLED, false),
                 snoozeHypoMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPO, 15),
                 snoozeHyperMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPER, 45),
-                isSignalLossEnabled = prefs.getBoolean(KEY_ALERT_SIGNAL_LOSS_ENABLED, true)
+                isSignalLossEnabled = prefs.getBoolean(KEY_ALERT_SIGNAL_LOSS_ENABLED, true),
+                isLastChanceAlertEnabled = prefs.getBoolean(KEY_ALERT_LAST_CHANCE_ENABLED, true),
+                lastChanceBufferMinutes = prefs.getInt(KEY_ALERT_LAST_CHANCE_BUFFER, 60)
             )
         )
     }
@@ -222,5 +226,7 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_SNOOZE_HYPO = "key_alert_snooze_hypo"
         private const val KEY_ALERT_SNOOZE_HYPER = "key_alert_snooze_hyper"
         private const val KEY_ALERT_SIGNAL_LOSS_ENABLED = "key_alert_signal_loss_enabled"
+        private const val KEY_ALERT_LAST_CHANCE_ENABLED = "key_alert_last_chance_enabled"
+        private const val KEY_ALERT_LAST_CHANCE_BUFFER = "key_alert_last_chance_buffer"
     }
 }

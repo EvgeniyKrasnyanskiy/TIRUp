@@ -538,3 +538,26 @@
   - Добавить индивидуальную кнопку закрытия `[✕]` для каждого совета в блоке «💡 Фокусы для роста TIR».
   - Автоматически скрывать весь блок, если все советы закрыты.
 
+---
+
+## 27. Мотивирующее пуш-уведомление «Последний шанс» для суточного TIR (Daily Compensator Alert) [Completed]
+
+### 27.1. Доменный слой и настройки:
+- [x] В `AlertSettings.kt` добавить параметры `isLastChanceAlertEnabled: Boolean = true` и `lastChanceBufferMinutes: Int = 60`.
+- [x] В `SettingsRepositoryImpl.kt` реализовать сохранение и чтение флага `KEY_ALERT_LAST_CHANCE_ENABLED`.
+
+### 27.2. Движок оповещений, фоновый приёмник и настройки:
+- [x] В `GlucoseAlertManager.kt`:
+  - Инициализировать канал `CHANNEL_COMPENSATOR` («Суточный компенсатор TIR») с высокой важностью.
+  - Реализовать метод `checkLastChanceAlert(context, todayReadings, latestReading, settings)`:
+    - Проверка времени (вечер, после 16:00, когда оставшееся время дня $\le 8$ ч).
+    - Расчёт необходимого времени в норме и запаса на ошибку (`slackMinutes = remainingMinutesToday - neededMinutesToday`).
+    - Условие триггера: `neededMinutesToday in 1..remainingMinutesToday`, `slackMinutes <= 60`, сахар вне целевого диапазона.
+    - Анти-спам: сохранение даты последней отправки (`YYYY-MM-DD`) в SharedPreferences (не более 1 раза в сутки).
+    - Формирование информативного пуша с точными цифрами сахара, остатка времени и допустимого запаса.
+- [x] В `DexdripBroadcastReceiver.kt`:
+  - Загрузка суточных точек (`getReadingsBetweenSync`) от начала текущих суток и вызов `checkLastChanceAlert`.
+- [x] В `SettingsScreen.kt`:
+  - Добавить переключатель «Уведомление „Последний шанс“ (суточный TIR)» в карточку «Уведомления и сигналы».
+
+

@@ -32,5 +32,9 @@ data class AlertSettings(
 
     // Snooze / Anti-spam intervals in minutes
     val snoozeHypoMinutes: Int = 15,
-    val snoozeHyperMinutes: Int = 45
+    val snoozeHyperMinutes: Int = 45,
+
+    // Daily Compensator: Last Chance Alert (Последний шанс спасти суточный TIR)
+    val isLastChanceAlertEnabled: Boolean = true,
+    val lastChanceBufferMinutes: Int = 60
 )

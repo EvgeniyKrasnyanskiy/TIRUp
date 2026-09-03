@@ -80,6 +80,27 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         recentReadings = recentDomain,
                         settings = userSettings
                     )
+                    if (userSettings.alertSettings.isLastChanceAlertEnabled) {
+                        val calendar = java.util.Calendar.getInstance().apply {
+                            set(java.util.Calendar.HOUR_OF_DAY, 0)
+                            set(java.util.Calendar.MINUTE, 0)
+                            set(java.util.Calendar.SECOND, 0)
+                            set(java.util.Calendar.MILLISECOND, 0)
+                        }
+                        val todayEntities = app.database.glucoseReadingDao().getReadingsBetweenSync(
+                            calendar.timeInMillis,
+                            System.currentTimeMillis() + 60_000L
+                        )
+                        val todayDomain = todayEntities.map { it.toDomain() }
+                        if (todayDomain.isNotEmpty()) {
+                            com.tirup.app.data.alert.GlucoseAlertManager.checkLastChanceAlert(
+                                context = context.applicationContext,
+                                todayReadings = todayDomain,
+                                latestReading = todayDomain.last(),
+                                settings = userSettings
+                            )
+                        }
+                    }
                     com.tirup.app.data.backup.AutoBackupManager.maybeTriggerAutoBackup(
                         context = context.applicationContext,
                         database = app.database,

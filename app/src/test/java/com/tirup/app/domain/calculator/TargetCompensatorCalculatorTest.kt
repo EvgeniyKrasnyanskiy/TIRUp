@@ -156,4 +156,46 @@ class TargetCompensatorCalculatorTest {
         org.junit.Assert.assertTrue(goal.recommendationRu.contains("Сбор данных за сегодня"))
         org.junit.Assert.assertTrue(goal.recommendationRu.contains("требуется ≥6 ч"))
     }
+
+    @org.junit.Test
+    fun testDailyCompensatorLastChanceSlack() {
+        val ranges = com.tirup.app.domain.model.TargetRanges()
+        val calendar = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 19)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val refTime = calendar.timeInMillis
+        calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        val startOfDay = calendar.timeInMillis
+
+        // Readings from 00:00 to 19:00 every 5 minutes (228 readings)
+        // 154 points in range (~67% of elapsed day), last points out of range (11.5)
+        val readings = (0..228).map { i ->
+            val t = startOfDay + i * 5 * 60_000L
+            com.tirup.app.domain.model.GlucoseReading(
+                timestamp = t,
+                valueMmol = if (i < 154) 5.5 else 11.5
+            )
+        }
+        val latest = readings.last()
+
+        val goal = TargetCompensatorCalculator.calculateDailyCompensator(
+            targetMode = TargetMode.TIR,
+            targetPercent = 70.0,
+            latestReading = latest,
+            recentReadings = readings,
+            targetRanges = ranges,
+            language = "RU",
+            referenceTimestamp = refTime
+        )
+
+        org.junit.Assert.assertFalse(goal.isCurrentlyInRange)
+        org.junit.Assert.assertTrue(goal.neededMinutesToday > 0)
+        org.junit.Assert.assertTrue(goal.neededMinutesToday <= goal.remainingMinutesToday)
+        val slack = goal.remainingMinutesToday - goal.neededMinutesToday
+        org.junit.Assert.assertTrue("Slack should be non-negative", slack >= 0)
+        org.junit.Assert.assertTrue("Slack should be critical <= 65 min", slack <= 65)
+    }
 }

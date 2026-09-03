@@ -20,7 +20,9 @@ import com.tirup.app.domain.calculator.DetectedPattern
 import com.tirup.app.domain.calculator.GlucoseTrendPredictor
 import com.tirup.app.domain.calculator.PatternSeverity
 import com.tirup.app.domain.calculator.PredictedEvent
+import com.tirup.app.domain.calculator.TargetCompensatorCalculator
 import com.tirup.app.domain.model.GlucoseReading
+import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.presentation.MainActivity
 import kotlinx.coroutines.CoroutineScope
@@ -31,8 +33,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 enum class AlertTier {
     PREDICTIVE,  // Tier 1: Soft / Упреждающий за 15 мин
@@ -50,11 +54,13 @@ object GlucoseAlertManager {
     const val CHANNEL_CRITICAL = "tirup_alert_critical_v2"
     const val CHANNEL_SIGNAL_LOSS = "tirup_alert_signal_loss_v2"
     const val CHANNEL_PATTERNS = "tirup_patterns_v1"
+    const val CHANNEL_COMPENSATOR = "tirup_compensator_v1"
 
     private const val NOTIFICATION_ID_PREDICTIVE = 1001
     private const val NOTIFICATION_ID_MAIN = 1002
     private const val NOTIFICATION_ID_CRITICAL = 1003
     private const val NOTIFICATION_ID_SIGNAL_LOSS = 1004
+    private const val NOTIFICATION_ID_LAST_CHANCE = 1005
 
     // Timestamps for Smart Snooze / Anti-spam
     @Volatile
@@ -140,10 +146,22 @@ object GlucoseAlertManager {
             enableVibration(false)
         }
 
+        // Tier 5: Daily Compensator (Last Chance TIR)
+        val compensatorChannel = NotificationChannel(
+            CHANNEL_COMPENSATOR,
+            "5. Компенсатор цели (Суточный TIR)",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Мотивирующие уведомления о критическом запасе времени для достижения суточного TIR"
+            setSound(null, null)
+            enableVibration(false)
+        }
+
         nm.createNotificationChannel(predictiveChannel)
         nm.createNotificationChannel(mainChannel)
         nm.createNotificationChannel(criticalChannel)
         nm.createNotificationChannel(signalLossChannel)
+        nm.createNotificationChannel(compensatorChannel)
     }
 
     /**
@@ -308,6 +326,103 @@ object GlucoseAlertManager {
             .build()
 
         nm.notify(5000 + kotlin.math.abs(pattern.id.hashCode() % 100), notification)
+    }
+
+    /**
+     * Inspects daily readings against daily TIR/TING target and triggers a motivational "Last Chance" alert
+     * when the error margin before failing the daily target drops below the critical threshold (e.g. <= 60 min).
+     * Rate-limited to strictly at most once per calendar day in the evening (after 16:00).
+     */
+    fun checkLastChanceAlert(
+        context: Context,
+        todayReadings: List<GlucoseReading>,
+        latestReading: GlucoseReading,
+        settings: UserSettings
+    ) {
+        val alerts = settings.alertSettings
+        if (!alerts.isAlertsMasterEnabled || !alerts.isLastChanceAlertEnabled) return
+
+        val calendar = Calendar.getInstance()
+        val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
+        // Only evaluate in late afternoon / evening (16:00 to 23:59)
+        if (currentHour < 16) return
+
+        val prefs = context.getSharedPreferences("tirup_compensator_alerts", Context.MODE_PRIVATE)
+        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(calendar.time)
+        val lastSentDate = prefs.getString("last_chance_date", null)
+        if (lastSentDate == todayStr) {
+            return // Already alerted today
+        }
+
+        val targetPercent = if (settings.targetMode == TargetMode.TIR) {
+            settings.targetRanges.tirGoalPercent.toDouble()
+        } else {
+            settings.targetRanges.tingGoalPercent.toDouble()
+        }
+
+        val compensator = TargetCompensatorCalculator.calculateDailyCompensator(
+            targetMode = settings.targetMode,
+            targetPercent = targetPercent,
+            latestReading = latestReading,
+            recentReadings = todayReadings,
+            targetRanges = settings.targetRanges,
+            language = settings.language
+        )
+
+        // If currently in range, no need to alert
+        if (compensator.isCurrentlyInRange) return
+
+        // If target already achieved, no need to alert
+        if (compensator.neededMinutesToday <= 0) return
+
+        // If already mathematically impossible (unrealistic), it's too late for a "last chance"
+        if (compensator.neededMinutesToday > compensator.remainingMinutesToday) return
+
+        // Calculate slack: remaining minutes of allowed error
+        val slackMinutes = compensator.remainingMinutesToday - compensator.neededMinutesToday
+        val bufferThreshold = alerts.lastChanceBufferMinutes.coerceAtLeast(15)
+
+        if (slackMinutes <= bufferThreshold) {
+            // Record as sent today to prevent spam
+            prefs.edit().putString("last_chance_date", todayStr).apply()
+
+            val isRu = settings.language.equals("RU", ignoreCase = true)
+            val remainStr = TargetCompensatorCalculator.formatHoursMins(compensator.remainingMinutesToday, isRu)
+            val needStr = TargetCompensatorCalculator.formatHoursMins(compensator.neededMinutesToday, isRu)
+            val slackStr = TargetCompensatorCalculator.formatHoursMins(slackMinutes, isRu)
+            val targetName = settings.targetMode.name
+            val targetGoalInt = targetPercent.toInt()
+
+            val title = if (isRu) {
+                "⏳ Последний шанс спасти цель $targetName (≥$targetGoalInt%)!"
+            } else {
+                "⏳ Last Chance to reach daily $targetName (≥$targetGoalInt%)!"
+            }
+
+            val isMmol = settings.unit == com.tirup.app.domain.model.GlucoseUnit.MMOL_L
+            val glucoseStr = if (isMmol) {
+                String.format(Locale.US, "%.1f ммоль/л", latestReading.valueMmol)
+            } else {
+                "${(latestReading.valueMmol * 18.0182).roundToInt()} mg/dL"
+            }
+
+            val text = if (isRu) {
+                "Сахар $glucoseStr вне нормы. До полуночи $remainStr, из них $needStr нужно провести в диапазоне. Запас на ошибку — всего $slackStr! Вернитесь в норму прямо сейчас."
+            } else {
+                "Glucose $glucoseStr is out of range. $remainStr left today, $needStr must be in range. Error margin is only $slackStr! Return to target range now."
+            }
+
+            sendNotification(
+                context = context,
+                channelId = CHANNEL_COMPENSATOR,
+                notificationId = NOTIFICATION_ID_LAST_CHANCE,
+                title = title,
+                text = text,
+                tier = AlertTier.MAIN,
+                vibrate = true,
+                flash = false
+            )
+        }
     }
 
     /**
