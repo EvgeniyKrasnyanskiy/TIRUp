@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="12dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="8dp">
+
+    <!-- 1. Left: Glucose & 5-min Trend Dynamics -->
+    <LinearLayout
+        android:id="@+id/widget_glucose_section"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_glucose_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="6.4"
+                android:textColor="#10B981"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_trend_arrow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="4dp"
+                android:text="→"
+                android:textColor="#10B981"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_delta_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+0.3"
+                android:textColor="#94A3B8"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="•"
+                android:textColor="#64748B"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/widget_time_ago"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="2м назад"
+                android:textColor="#94A3B8"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <View
+        android:layout_width="1dp"
+        android:layout_height="32dp"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:background="#26FFFFFF" />
+
+    <!-- 2. Middle: Daily TIR Compensator Bar & Time Left -->
+    <LinearLayout
+        android:id="@+id/widget_compensator_section"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:id="@+id/widget_tir_score"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                android:text="TIR: 78%"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_tir_target"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:text="цель ≥70%"
+                android:textColor="#94A3B8"
+                android:textSize="11sp" />
+        </RelativeLayout>
+
+        <ProgressBar
+            android:id="@+id/widget_tir_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_marginTop="3dp"
+            android:layout_marginBottom="3dp"
+            android:max="100"
+            android:progress="78"
+            android:progressDrawable="@drawable/widget_progress_bar" />
+
+        <TextView
+            android:id="@+id/widget_compensator_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="В норме ещё 2 ч 15 мин"
+            android:textColor="#38BDF8"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- 3. Right: IoB / CoB Badges (prominent on 5x1) + Nightstand Button -->
+    <LinearLayout
+        android:id="@+id/widget_actions_section"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/widget_iob_cob_layout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_iob_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/widget_badge_bg"
+                android:paddingStart="4dp"
+                android:paddingTop="1dp"
+                android:paddingEnd="4dp"
+                android:paddingBottom="1dp"
+                android:text="💉 1.2 U"
+                android:textColor="#38BDF8"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_cob_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:background="@drawable/widget_badge_bg"
+                android:paddingStart="4dp"
+                android:paddingTop="1dp"
+                android:paddingEnd="4dp"
+                android:paddingBottom="1dp"
+                android:text="🍞 25 g"
+                android:textColor="#F59E0B"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/widget_btn_nightstand"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@drawable/widget_button_bg"
+            android:gravity="center"
+            android:text="🌙"
+            android:textSize="16sp" />
+    </LinearLayout>
+
+</LinearLayout>

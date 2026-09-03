@@ -106,6 +106,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         database = app.database,
                         settingsRepository = app.settingsRepository
                     )
+                    com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context.applicationContext)
                 } else {
                     Log.e(TAG, "TirupApplication or repository instance is null.")
                 }

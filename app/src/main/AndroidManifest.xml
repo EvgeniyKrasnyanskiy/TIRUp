@@ -93,6 +93,45 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- AppWidget Provider: 4x1 ↔ 5x1 Glycemic Strip -->
+        <receiver
+            android:name=".presentation.widget.TirupStripWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_strip_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_strip_info" />
+        </receiver>
+
+        <!-- AppWidget Provider: 4x2 ↔ 5x2 Bento Dashboard -->
+        <receiver
+            android:name=".presentation.widget.TirupDashboardWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_dashboard_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_dashboard_info" />
+        </receiver>
+
+        <!-- AppWidget Provider: 2x2 Compact Focus -->
+        <receiver
+            android:name=".presentation.widget.TirupCompactWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_compact_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_compact_info" />
+        </receiver>
+
     </application>
 
 </manifest>

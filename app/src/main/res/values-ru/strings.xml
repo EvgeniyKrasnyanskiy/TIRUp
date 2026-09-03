@@ -87,4 +87,12 @@
     <string name="action_cancel">Отмена</string>
     <string name="action_confirm">Подтвердить</string>
     <string name="action_close">Закрыть</string>
+
+    <!-- Widgets -->
+    <string name="widget_strip_label">TIRUp: Полоса гликемии (4x1/5x1)</string>
+    <string name="widget_strip_description">Текущий сахар, 5-мин дельта, полоса суточного компенсатора TIR и запуск ночника</string>
+    <string name="widget_dashboard_label">TIRUp: Bento Дашборд (4x2/5x2)</string>
+    <string name="widget_dashboard_description">Полный дашборд с мини-графиком за 3–4 ч, компенсатором TIR и счётчиком дней в цели</string>
+    <string name="widget_compact_label">TIRUp: Фокус (2x2)</string>
+    <string name="widget_compact_description">Компактный квадратный виджет с текущим сахаром, дельтой, TIR и кнопкой ночника</string>
 </resources>
