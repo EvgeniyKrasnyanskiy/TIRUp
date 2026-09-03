@@ -36,5 +36,5 @@ data class AlertSettings(
 
     // Daily Compensator: Last Chance Alert (Последний шанс спасти суточный TIR)
     val isLastChanceAlertEnabled: Boolean = true,
-    val lastChanceBufferMinutes: Int = 60
+    val lastChanceBufferMinutes: Int = 90
 )
