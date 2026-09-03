@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import com.tirup.app.R
 import com.tirup.app.domain.calculator.PatternRecognitionEngine
 import com.tirup.app.domain.calculator.PatternSeverity
+import com.tirup.app.domain.calculator.TirAdvisorEngine
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.presentation.components.BentoCard
 import com.tirup.app.presentation.components.BentoMetricCompact
@@ -91,6 +92,13 @@ fun TrendsScreen(
 
     val visiblePatterns = remember(detectedPatterns, dismissedPatternIds) {
         detectedPatterns.filter { it.id !in dismissedPatternIds }
+    }
+
+    val tirInsights = remember(state.percentileBins, state.statistics) {
+        TirAdvisorEngine.generateInsights(
+            bins = state.percentileBins,
+            stats = state.statistics
+        )
     }
 
     LaunchedEffect(detectedPatterns) {
@@ -408,13 +416,105 @@ fun TrendsScreen(
             }
         }
 
+        // 3. Actionable Clinical Guidance to Boost TIR
+        if (tirInsights.isNotEmpty()) {
+            item {
+                BentoCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadius = 24.dp
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = "💡", fontSize = 18.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isRu) "Фокусы для роста TIR" else "Actionable TIR Focus",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = onSurface
+                                )
+                            }
+                            Text(
+                                text = "${tirInsights.size} ${if (isRu) "совета" else "tips"}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = onSurfaceVariant
+                            )
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            tirInsights.forEach { insight ->
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.25f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        Text(
+                                            text = insight.icon,
+                                            fontSize = 18.sp,
+                                            modifier = Modifier.padding(end = 10.dp, top = 2.dp)
+                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = if (isRu) insight.titleRu else insight.titleEn,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = onSurface,
+                                                    modifier = Modifier.weight(1f, fill = false)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = ActionBlue.copy(alpha = 0.15f)
+                                                ) {
+                                                    Text(
+                                                        text = if (isRu) insight.badgeRu else insight.badgeEn,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = ActionBlue,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        fontSize = 10.sp,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = if (isRu) insight.adviceRu else insight.adviceEn,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = onSurfaceVariant,
+                                                lineHeight = 17.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         item { Spacer(modifier = Modifier.height(20.dp)) }
     }
     }
 
     // Detail Popups
     if (detailDialogInfo != null) {
-        val isRu = state.userSettings.language.equals("RU", ignoreCase = true)
         AlertDialog(
             onDismissRequest = { detailDialogInfo = null },
             title = {
