@@ -379,7 +379,7 @@ fun FocusScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (isRu) "📊 Клинические параметры суток (12)" else "📊 Daily Clinical Metrics (12)",
+                            text = if (isRu) "📊 Клинические параметры суток" else "📊 Daily Clinical Metrics (12)",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
