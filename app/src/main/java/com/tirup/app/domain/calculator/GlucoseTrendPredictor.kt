@@ -53,10 +53,9 @@ object GlucoseTrendPredictor {
             )
         }
 
-        // Take the latest 10-15 readings, sorted ascending by timestamp
+        // Take readings from the last 25-30 minutes, sorted ascending by timestamp
         val sorted = readings.sortedBy { it.timestamp }
-        val window = sorted.takeLast(DEFAULT_LOOKBACK_POINTS)
-        val latest = window.last()
+        val latest = sorted.last()
 
         // Check for time gaps: if latest reading is older than 20 minutes, don't predict
         val now = System.currentTimeMillis()
@@ -70,6 +69,11 @@ object GlucoseTrendPredictor {
                 currentReading = latest
             )
         }
+
+        // Time-based lookback window: 30 minutes ensures robust regression on both 1-min and 5-min sensors
+        val windowStartTime = latest.timestamp - 30 * 60 * 1000L
+        val timeBasedWindow = sorted.filter { it.timestamp >= windowStartTime }
+        val window = if (timeBasedWindow.size >= MIN_POINTS) timeBasedWindow else sorted.takeLast(MIN_POINTS)
 
         // Convert timestamps to elapsed minutes from the earliest point in window
         val t0 = window.first().timestamp

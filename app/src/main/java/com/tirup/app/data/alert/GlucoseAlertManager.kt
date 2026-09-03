@@ -591,16 +591,31 @@ object GlucoseAlertManager {
         }
 
         // ----------------------------------------------------
-        // TIER 2: MAIN (5 CONSECUTIVE POINTS OUT OF RANGE)
+        // TIER 2: MAIN (CONFIRMED OUT OF RANGE)
         // ----------------------------------------------------
-        if (alerts.isMainEnabled && sorted.size >= alerts.mainConsecutivePoints) {
+        if (alerts.isMainEnabled && sorted.size >= 2) {
             val lastPoints = sorted.takeLast(alerts.mainConsecutivePoints)
-            val allLow = lastPoints.all { it.valueMmol < tirLow }
-            val allHigh = lastPoints.all { it.valueMmol > tirHigh }
+            val is5MinCadence = (sorted.last().timestamp - sorted[sorted.size - 2].timestamp >= 3 * 60_000L)
 
-            if (allLow && now - lastHypoAlertTimestamp >= alerts.snoozeHypoMinutes * 60000L) {
+            val isLowConfirmed = if (is5MinCadence) {
+                sorted.size >= alerts.mainConsecutivePoints && lastPoints.all { it.valueMmol < tirLow }
+            } else {
+                // 1-minute cadence: require at least 15 minutes of readings below tirLow
+                val lowPoints = sorted.takeLastWhile { it.valueMmol < tirLow }
+                lowPoints.size >= 2 && (latest.timestamp - lowPoints.first().timestamp >= 15 * 60_000L)
+            }
+
+            val isHighConfirmed = if (is5MinCadence) {
+                sorted.size >= alerts.mainConsecutivePoints && lastPoints.all { it.valueMmol > tirHigh }
+            } else {
+                // 1-minute cadence: require at least 15 minutes of readings above tirHigh
+                val highPoints = sorted.takeLastWhile { it.valueMmol > tirHigh }
+                highPoints.size >= 2 && (latest.timestamp - highPoints.first().timestamp >= 15 * 60_000L)
+            }
+
+            if (isLowConfirmed && now - lastHypoAlertTimestamp >= alerts.snoozeHypoMinutes * 60000L) {
                 lastHypoAlertTimestamp = now
-                val title = if (isRu) "🔻 Низкий сахар (подтверждено 5 точек)" else "🔻 Low Glucose (5 points confirmed)"
+                val title = if (isRu) "🔻 Низкий сахар (подтверждено)" else "🔻 Low Glucose (Confirmed)"
                 val text = String.format(
                     Locale.US,
                     if (isRu) "Глюкоза: %.1f ммоль/л ниже порога %.1f."
@@ -610,9 +625,9 @@ object GlucoseAlertManager {
                 )
                 sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash)
                 return
-            } else if (allHigh && now - lastHyperAlertTimestamp >= alerts.snoozeHyperMinutes * 60000L) {
+            } else if (isHighConfirmed && now - lastHyperAlertTimestamp >= alerts.snoozeHyperMinutes * 60000L) {
                 lastHyperAlertTimestamp = now
-                val title = if (isRu) "🔺 Высокий сахар (подтверждено 5 точек)" else "🔺 High Glucose (5 points confirmed)"
+                val title = if (isRu) "🔺 Высокий сахар (подтверждено)" else "🔺 High Glucose (Confirmed)"
                 val text = String.format(
                     Locale.US,
                     if (isRu) "Глюкоза: %.1f ммоль/л выше нормы %.1f."

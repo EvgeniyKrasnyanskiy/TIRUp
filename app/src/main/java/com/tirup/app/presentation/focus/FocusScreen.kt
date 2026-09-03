@@ -1,6 +1,7 @@
 package com.tirup.app.presentation.focus
 
 import android.text.format.DateUtils
+import kotlin.math.roundToInt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -782,42 +783,62 @@ private fun HeroGlucoseCard(
     val now = System.currentTimeMillis()
     val diffMinutes = if (latestReading != null) ((now - latestReading.timestamp) / 60000L).toInt().coerceAtLeast(0) else 0
 
+    val sorted = remember(recentReadings) { recentReadings.sortedBy { it.timestamp } }
+
+    // Clinical 5-minute velocity delta (find point ~5 minutes ago in window 3.5..7.5 min)
+    val delta5Min = remember(latestReading, sorted) {
+        if (latestReading == null || sorted.size < 2) null
+        else {
+            val targetTime = latestReading.timestamp - 5 * 60_000L
+            val candidate = sorted
+                .filter { it.timestamp in (targetTime - 120_000L)..(targetTime + 120_000L) && it.timestamp != latestReading.timestamp }
+                .minByOrNull { kotlin.math.abs(it.timestamp - targetTime) }
+            val reference = candidate ?: sorted.filter { it.timestamp < latestReading.timestamp }.maxByOrNull { it.timestamp }
+            if (reference != null) {
+                val dtMin = ((latestReading.timestamp - reference.timestamp) / 60_000.0).coerceAtLeast(1.0)
+                val diff = latestReading.valueMmol - reference.valueMmol
+                val ratePerMin = diff / dtMin
+                Triple(ratePerMin, diff, dtMin)
+            } else null
+        }
+    }
+
     // Operational clinical status notification
-    val statusInfo: Pair<String, Color>? = remember(latestReading, recentReadings, isRu) {
+    val statusInfo: Pair<String, Color>? = remember(latestReading, sorted, delta5Min, isRu) {
         if (latestReading == null) null
         else {
             val v = latestReading.valueMmol
-            val sorted = recentReadings.sortedBy { it.timestamp }
-            val rate = if (sorted.size >= 2) {
-                val prev = sorted[sorted.size - 2]
-                val dtMin = ((latestReading.timestamp - prev.timestamp) / 60000.0).coerceAtLeast(1.0)
-                (latestReading.valueMmol - prev.valueMmol) / dtMin
-            } else 0.0
+            val rate = delta5Min?.first ?: 0.0
 
             when {
                 v < 3.0 -> Pair(if (isRu) "🚨 Тяжёлая гипогликемия! Быстрые углеводы!" else "🚨 Severe low! Fast carbs now!", ColorVeryLow)
                 v < 3.9 -> Pair(if (isRu) "🔻 Ниже целевого диапазона" else "🔻 Below target range", ColorLow)
                 v > 13.9 -> Pair(if (isRu) "⚠️ Экстремальный сахар! Проверьте кетоны" else "⚠️ Very high! Check ketones", ColorVeryHigh)
                 v > 10.0 -> Pair(if (isRu) "🔺 Выше целевого диапазона" else "🔺 Above target range", ColorHigh)
-                rate <= -0.12 -> Pair(
+                rate <= -0.11 -> Pair(
                     if (isRu) String.format(Locale.US, "⚡ Быстро падает (%.2f ммоль/л/мин)", rate)
                     else String.format(Locale.US, "⚡ Dropping fast (%.2f mmol/L/min)", rate),
                     ColorLow
                 )
-                rate >= 0.12 -> Pair(
+                rate >= 0.11 -> Pair(
                     if (isRu) String.format(Locale.US, "⚡ Быстро растёт (+%.2f ммоль/л/мин)", rate)
                     else String.format(Locale.US, "⚡ Rising fast (+%.2f mmol/L/min)", rate),
                     ColorHigh
                 )
                 else -> {
-                    val inRangeCount = sorted.takeLastWhile { it.valueMmol in 3.9..10.0 }.size
-                    if (inRangeCount >= 12) {
-                        val hours = inRangeCount * 5 / 60.0
-                        Pair(
-                            if (isRu) String.format(Locale.US, "✨ В норме последние %.1f ч", hours)
-                            else String.format(Locale.US, "✨ In target for last %.1f h", hours),
-                            PrimaryEmerald
-                        )
+                    val inRangeReadings = sorted.takeLastWhile { it.valueMmol in 3.9..10.0 }
+                    if (inRangeReadings.isNotEmpty()) {
+                        val spanMs = latestReading.timestamp - inRangeReadings.first().timestamp
+                        val spanHours = spanMs / 3_600_000.0
+                        if (spanHours >= 1.0) {
+                            Pair(
+                                if (isRu) String.format(Locale.US, "✨ В норме последние %.1f ч", spanHours)
+                                else String.format(Locale.US, "✨ In target for last %.1f h", spanHours),
+                                PrimaryEmerald
+                            )
+                        } else {
+                            Pair(if (isRu) "В целевом диапазоне" else "In target range", PrimaryEmerald)
+                        }
                     } else {
                         Pair(if (isRu) "В целевом диапазоне" else "In target range", PrimaryEmerald)
                     }
@@ -888,7 +909,7 @@ private fun HeroGlucoseCard(
                 Spacer(modifier = Modifier.height(4.dp))
             }
 
-            // Large Hero Value with Trend Arrow
+            // Large Hero Value with Trend Arrow and Delta
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -931,13 +952,31 @@ private fun HeroGlucoseCard(
                         style = MaterialTheme.typography.bodyMedium,
                         color = onSurfaceVariant
                     )
-                    if (latestReading?.trendArrow?.isNotEmpty() == true) {
-                        Text(
-                            text = latestReading.trendArrow,
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = valueColor,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (latestReading?.trendArrow?.isNotEmpty() == true) {
+                            Text(
+                                text = latestReading.trendArrow,
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = valueColor,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        if (delta5Min != null) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            val deltaVal = delta5Min.second
+                            val deltaFormatted = if (unit == GlucoseUnit.MMOL_L) {
+                                String.format(Locale.US, "%+.1f", deltaVal)
+                            } else {
+                                val mg = (deltaVal * 18.0182).roundToInt()
+                                "${if (mg > 0) "+" else ""}$mg"
+                            }
+                            Text(
+                                text = deltaFormatted,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = onSurfaceVariant,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }
