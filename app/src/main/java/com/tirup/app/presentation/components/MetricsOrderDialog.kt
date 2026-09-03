@@ -20,6 +20,8 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -66,8 +68,9 @@ fun getMetricTitle(id: String, isRu: Boolean): String {
 @Composable
 fun MetricsOrderDialog(
     currentOrder: List<String>,
+    hiddenMetrics: List<String> = emptyList(),
     isRu: Boolean,
-    onSave: (List<String>) -> Unit,
+    onSave: (order: List<String>, hidden: List<String>) -> Unit,
     onDismiss: () -> Unit
 ) {
     var orderList by remember(currentOrder) {
@@ -77,6 +80,10 @@ fun MetricsOrderDialog(
             DEFAULT_METRICS_ORDER
         }
         mutableStateOf(safeOrder)
+    }
+
+    var hiddenSet by remember(hiddenMetrics) {
+        mutableStateOf(hiddenMetrics.map { it.lowercase() }.toSet())
     }
 
     Dialog(
@@ -113,15 +120,16 @@ fun MetricsOrderDialog(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isRu) "Порядок параметров" else "Metrics Order",
+                            text = if (isRu) "Настройка параметров" else "Metrics Configuration",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
+                    val visibleCount = orderList.size - hiddenSet.size
                     Text(
-                        text = "12",
+                        text = "$visibleCount / ${orderList.size}",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -129,13 +137,13 @@ fun MetricsOrderDialog(
                 }
 
                 Text(
-                    text = if (isRu) "Настройте приоритет параметров стрелками ▲ / ▼ под ваши задачи:"
-                           else "Adjust parameter order using ▲ / ▼ arrows:",
+                    text = if (isRu) "Стрелками ▲/▼ меняйте порядок, а иконкой 👁️ скрывайте неактуальные параметры:"
+                           else "Use ▲/▼ arrows to reorder and 👁️ to toggle visibility:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                // Reorderable list
+                // Reorderable & hideable list
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -144,10 +152,17 @@ fun MetricsOrderDialog(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     itemsIndexed(orderList) { index, id ->
+                        val isHidden = hiddenSet.contains(id.lowercase())
+
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            border = BorderStroke(0.6.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                            color = if (isHidden) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                                   else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = BorderStroke(
+                                0.6.dp,
+                                if (isHidden) MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                            ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -163,7 +178,8 @@ fun MetricsOrderDialog(
                                 ) {
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
-                                        color = ActionBlue.copy(alpha = 0.12f),
+                                        color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.08f)
+                                               else ActionBlue.copy(alpha = 0.12f),
                                         modifier = Modifier.size(24.dp)
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
@@ -171,7 +187,7 @@ fun MetricsOrderDialog(
                                                 text = "${index + 1}",
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = ActionBlue
+                                                color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else ActionBlue
                                             )
                                         }
                                     }
@@ -179,12 +195,34 @@ fun MetricsOrderDialog(
                                     Text(
                                         text = getMetricTitle(id, isRu),
                                         style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        fontWeight = if (isHidden) FontWeight.Normal else FontWeight.Medium,
+                                        color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                                else MaterialTheme.colorScheme.onSurface
                                     )
                                 }
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // Visibility Toggle Button
+                                    IconButton(
+                                        onClick = {
+                                            hiddenSet = if (isHidden) {
+                                                hiddenSet - id.lowercase()
+                                            } else {
+                                                hiddenSet + id.lowercase()
+                                            }
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isHidden) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                            contentDescription = if (isHidden) "Hidden" else "Visible",
+                                            tint = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f) else ActionBlue,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(2.dp))
+
                                     IconButton(
                                         onClick = {
                                             if (index > 0) {
@@ -236,7 +274,10 @@ fun MetricsOrderDialog(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     OutlinedButton(
-                        onClick = { orderList = DEFAULT_METRICS_ORDER },
+                        onClick = {
+                            orderList = DEFAULT_METRICS_ORDER
+                            hiddenSet = emptySet()
+                        },
                         modifier = Modifier
                             .weight(1f)
                             .height(44.dp),
@@ -254,7 +295,7 @@ fun MetricsOrderDialog(
 
                     Button(
                         onClick = {
-                            onSave(orderList)
+                            onSave(orderList, hiddenSet.toList())
                             onDismiss()
                         },
                         modifier = Modifier

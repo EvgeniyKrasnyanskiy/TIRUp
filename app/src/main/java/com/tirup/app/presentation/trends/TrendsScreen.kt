@@ -102,30 +102,44 @@ fun TrendsScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Fixed Top Header
+        // Fixed Top Header with pinned Compact Period Selector
         Surface(
             color = MaterialTheme.colorScheme.background,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onOpenSettings) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "Settings Menu",
-                        tint = onSurface
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Settings Menu",
+                            tint = onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = stringResource(R.string.trends_title),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = onSurface
                     )
                 }
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = stringResource(R.string.trends_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = onSurface
-                )
+
+                // Pinned Compact Period Selector
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                ) {
+                    CompactPeriodSelector(
+                        selectedPeriod = selectedPeriod,
+                        onPeriodSelected = { viewModel.selectPeriod(it) }
+                    )
+                }
             }
         }
 
@@ -137,13 +151,7 @@ fun TrendsScreen(
         ) {
             item { Spacer(modifier = Modifier.height(2.dp)) }
 
-            // Compact Period Selector (4 Primary + More Dropdown)
-        item {
-            CompactPeriodSelector(
-                selectedPeriod = selectedPeriod,
-                onPeriodSelected = { viewModel.selectPeriod(it) }
-            )
-        }
+
 
         // 1. Detected Clinical Patterns (Placed at the very top under Period Selector)
         val hasSufficientData = state.statistics.daysCount >= 3 || state.statistics.totalCount >= 100

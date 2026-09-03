@@ -116,10 +116,19 @@ class FocusViewModel(
         }
     }
 
-    fun updateMetricsOrder(newOrder: List<String>) {
+    fun updateMetricsConfiguration(newOrder: List<String>, hidden: List<String>) {
         val currentSettings = _uiState.value.userSettings
         viewModelScope.launch {
-            settingsRepository.updateSettings(currentSettings.copy(metricsOrder = newOrder))
+            settingsRepository.updateSettings(
+                currentSettings.copy(
+                    metricsOrder = newOrder,
+                    hiddenMetrics = hidden
+                )
+            )
         }
+    }
+
+    fun updateMetricsOrder(newOrder: List<String>) {
+        updateMetricsConfiguration(newOrder, _uiState.value.userSettings.hiddenMetrics)
     }
 }

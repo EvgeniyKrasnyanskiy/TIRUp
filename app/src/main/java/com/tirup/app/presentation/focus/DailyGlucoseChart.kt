@@ -4,6 +4,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +20,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,7 +45,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.TargetRanges
@@ -71,6 +73,7 @@ import kotlin.math.max
  * - Tap on readings to inspect exact value, timestamp, delta, and IoB
  * - Clinical target corridor (3.9 - 10.0 mmol/L / 70 - 180 mg/dL)
  * - Real-time "Now" indicator line
+ * - Tab toggle between [📊 График] and [🔢 Параметры]
  */
 @Composable
 fun DailyGlucoseChart(
@@ -78,7 +81,11 @@ fun DailyGlucoseChart(
     targetRanges: TargetRanges,
     unit: GlucoseUnit,
     isRu: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    selectedMode: Int = 0,
+    onModeChange: (Int) -> Unit = {},
+    onConfigureMetricsClick: (() -> Unit)? = null,
+    metricsContent: (@Composable () -> Unit)? = null
 ) {
     val now = System.currentTimeMillis()
     val calendar = remember(now) {
@@ -93,20 +100,17 @@ fun DailyGlucoseChart(
     val startOfDay = calendar.timeInMillis
     val currentMinuteOfDay = ((now - startOfDay) / 60000f).coerceIn(0f, 1440f)
 
-    // Filter readings belonging to current calendar day (or fallback to recent if none today)
     val todayReadings = remember(readings, startOfDay) {
         val filtered = readings.filter { it.timestamp >= startOfDay }
         if (filtered.isNotEmpty()) filtered.sortedBy { it.timestamp }
         else readings.sortedBy { it.timestamp }
     }
 
-    // Visible window state: default 360 min (6 hours) anchored around current time
     var visibleMinutes by remember { mutableFloatStateOf(360f) }
     var windowStartMinute by remember {
         mutableFloatStateOf((currentMinuteOfDay - 300f).coerceIn(0f, (1440f - 360f).coerceAtLeast(0f)))
     }
 
-    // Interactive tooltip selection
     var selectedReading by remember { mutableStateOf<GlucoseReading?>(null) }
 
     val onSurface = MaterialTheme.colorScheme.onSurface
@@ -124,7 +128,7 @@ fun DailyGlucoseChart(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Header: Title, Zoom Scale Badge, and Selected Reading Tooltip
+            // Header: Title, Zoom Scale Badge, and Mode Toggle (Chart vs Metrics)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -141,95 +145,156 @@ fun DailyGlucoseChart(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (isRu) "Суточный график" else "24h Glucose Profile",
+                        text = if (selectedMode == 0) (if (isRu) "Суточный график" else "24h Glucose Profile")
+                               else (if (isRu) "Параметры суток" else "Daily Metrics"),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = onSurface
                     )
                 }
 
-                // Zoom window indicator (e.g. "🔍 6 ч", "🔍 24 ч")
-                val zoomHours = (visibleMinutes / 60f)
-                val zoomLabel = if (zoomHours >= 1f) {
-                    if (isRu) String.format(Locale.US, "🔍 %.0f ч", zoomHours)
-                    else String.format(Locale.US, "🔍 %.0fh", zoomHours)
-                } else {
-                    if (isRu) "${visibleMinutes.toInt()} мин" else "${visibleMinutes.toInt()}m"
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
-                    border = androidx.compose.foundation.BorderStroke(0.6.dp, outlineColor.copy(alpha = 0.3f))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = zoomLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = onSurfaceVariant,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-            }
+                    if (selectedMode == 0) {
+                        val zoomHours = (visibleMinutes / 60f)
+                        val zoomLabel = if (zoomHours >= 1f) {
+                            if (isRu) String.format(Locale.US, "🔍 %.0f ч", zoomHours)
+                            else String.format(Locale.US, "🔍 %.0fh", zoomHours)
+                        } else {
+                            if (isRu) "${visibleMinutes.toInt()} мин" else "${visibleMinutes.toInt()}m"
+                        }
 
-            // Selected Reading Inspector Banner
-            if (selectedReading != null) {
-                val sel = selectedReading!!
-                val selVal = if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", sel.valueMmol)
-                else "${(sel.valueMmol * 18.0182).toInt()}"
-                val selUnit = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL")
-                val selTime = timeFormatter.format(Date(sel.timestamp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
+                            border = androidx.compose.foundation.BorderStroke(0.6.dp, outlineColor.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                text = zoomLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = onSurfaceVariant,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
 
-                val selColor = when {
-                    sel.valueMmol < 3.0 -> ColorVeryLow
-                    sel.valueMmol < 3.9 -> ColorLow
-                    sel.valueMmol in 3.9..7.0 -> ColorTight
-                    sel.valueMmol in 7.01..7.8 -> ColorTargetSoft
-                    sel.valueMmol in 7.81..10.0 -> ColorTarget
-                    sel.valueMmol in 10.01..13.9 -> ColorHigh
-                    else -> ColorVeryHigh
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = selColor.copy(alpha = 0.12f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, selColor.copy(alpha = 0.4f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                    // Mode Selector Toggle
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.background)
+                            .padding(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (selectedMode == 0) ActionBlue else Color.Transparent,
+                            modifier = Modifier.clickable { onModeChange(0) }
+                        ) {
                             Text(
-                                text = "⏱ $selTime",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Bold,
-                                color = onSurface
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "$selVal $selUnit ${sel.trendArrow}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Bold,
-                                color = selColor
+                                text = if (isRu) "📊 График" else "📊 Chart",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (selectedMode == 0) Color.White else onSurfaceVariant,
+                                fontWeight = if (selectedMode == 0) FontWeight.Bold else FontWeight.Normal,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                             )
                         }
 
-                        if (sel.iob != null && sel.iob > 0.0) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (selectedMode == 1) ActionBlue else Color.Transparent,
+                            modifier = Modifier.clickable { onModeChange(1) }
+                        ) {
                             Text(
-                                text = String.format(Locale.US, "💉 %.2f U", sel.iob),
+                                text = if (isRu) "🔢 Параметры" else "🔢 Metrics",
                                 style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = ActionBlue
+                                color = if (selectedMode == 1) Color.White else onSurfaceVariant,
+                                fontWeight = if (selectedMode == 1) FontWeight.Bold else FontWeight.Normal,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    if (selectedMode == 1 && onConfigureMetricsClick != null) {
+                        IconButton(
+                            onClick = onConfigureMetricsClick,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = "Configure parameters",
+                                tint = onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
                 }
             }
+
+            if (selectedMode == 1) {
+                metricsContent?.invoke()
+            } else {
+                // Selected Reading Inspector Banner
+                if (selectedReading != null) {
+                    val sel = selectedReading!!
+                    val selVal = if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", sel.valueMmol)
+                    else "${(sel.valueMmol * 18.0182).toInt()}"
+                    val selUnit = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL")
+                    val selTime = timeFormatter.format(Date(sel.timestamp))
+
+                    val selColor = when {
+                        sel.valueMmol < 3.0 -> ColorVeryLow
+                        sel.valueMmol < 3.9 -> ColorLow
+                        sel.valueMmol in 3.9..7.0 -> ColorTight
+                        sel.valueMmol in 7.01..7.8 -> ColorTargetSoft
+                        sel.valueMmol in 7.81..10.0 -> ColorTarget
+                        sel.valueMmol in 10.01..13.9 -> ColorHigh
+                        else -> ColorVeryHigh
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = selColor.copy(alpha = 0.12f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, selColor.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "⏱ $selTime",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = onSurface
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "$selVal $selUnit ${sel.trendArrow}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = selColor
+                                )
+                            }
+
+                            if (sel.iob != null && sel.iob > 0.0) {
+                                Text(
+                                    text = String.format(Locale.US, "💉 %.2f U", sel.iob),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ActionBlue
+                                )
+                            }
+                        }
+                    }
+                }
 
             // Interactive Chart Canvas with Pinch-to-Zoom and Horizontal Drag
             Box(
@@ -494,6 +559,7 @@ fun DailyGlucoseChart(
                         )
                     }
                 }
+            }
             }
         }
     }

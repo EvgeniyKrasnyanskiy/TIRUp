@@ -36,6 +36,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +78,7 @@ fun FocusScreen(
     val state by viewModel.uiState.collectAsState()
     var detailDialogInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
     var showMetricsOrderDialog by remember { mutableStateOf(false) }
+    var focusCardMode by rememberSaveable { mutableStateOf(0) }
 
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
@@ -161,13 +163,376 @@ fun FocusScreen(
             )
         }
 
-        // 2. Interactive 24-Hour Daily Glucose Chart (Pinch-to-zoom & Pan)
+        // 2. Interactive 24-Hour Daily Glucose Chart (Pinch-to-zoom & Pan) with Metrics toggle
         item {
+            val minVal = if (state.recentReadings.isNotEmpty()) state.recentReadings.minOf { it.valueMmol } else 0.0
+            val maxVal = if (state.recentReadings.isNotEmpty()) state.recentReadings.maxOf { it.valueMmol } else 0.0
+
+            val meanValStr = if (state.statistics.meanMmol > 0.0) {
+                if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", state.statistics.meanMmol)
+                else String.format(Locale.US, "%d", (state.statistics.meanMmol * 18.0182).toInt())
+            } else "--"
+
+            val meanColor = when {
+                state.statistics.meanMmol <= 0.0 -> onSurfaceVariant
+                state.statistics.meanMmol <= 7.0 -> PrimaryEmerald
+                state.statistics.meanMmol <= 7.8 -> ColorTargetSoft
+                state.statistics.meanMmol <= 10.0 -> ColorHigh
+                else -> ColorVeryHigh
+            }
+
+            val sdVal = state.statistics.sdMmol
+            val sdValStr = if (sdVal > 0.0) {
+                if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", sdVal)
+                else "${(sdVal * 18.0182).toInt()}"
+            } else "--"
+            val isSdGood = sdVal in 0.01..(if (targetMode == TargetMode.TING) 1.5 else 2.0)
+
+            val cvValStr = if (state.statistics.cvPercent > 0.0) String.format(Locale.US, "%.1f%%", state.statistics.cvPercent) else "--"
+            val isCvGood = state.statistics.cvPercent in 0.01..36.0
+
+            val ea1cStr = if (state.statistics.gmiPercent > 0.0) String.format(Locale.US, "%.1f%%", state.statistics.gmiPercent) else "--"
+            val isEa1cGood = state.statistics.gmiPercent in 0.01..7.0
+
+            val tirValStr = if (state.statistics.tirPercent > 0.0) "${state.statistics.tirPercent.toInt()}%" else "--"
+            val tirColor = when {
+                state.statistics.tirPercent <= 0.0 -> onSurfaceVariant
+                state.statistics.tirPercent >= 70.0 -> PrimaryEmerald
+                state.statistics.tirPercent >= 50.0 -> ColorHigh
+                else -> ColorVeryHigh
+            }
+
+            val tingValStr = if (state.statistics.tingPercent > 0.0) "${state.statistics.tingPercent.toInt()}%" else "--"
+            val isTingGood = state.statistics.tingPercent >= 50.0
+
+            val tbrVal = state.statistics.tbrLowPercent + state.statistics.tbrVeryLowPercent
+            val tbrValStr = if (tbrVal > 0.0) String.format(Locale.US, "%.1f%%", tbrVal) else "0%"
+            val isTbrGood = tbrVal <= 4.0
+
+            val tarVal = state.statistics.tarHighPercent + state.statistics.tarVeryHighPercent
+            val tarValStr = if (tarVal > 0.0) "${tarVal.toInt()}%" else "0%"
+            val isTarGood = tarVal <= 25.0
+
+            val griValStr = if (state.statistics.gri > 0.0) "${state.statistics.gri.toInt()}" else "--"
+            val griColor = when {
+                state.statistics.gri <= 0.0 -> onSurfaceVariant
+                state.statistics.gri <= 20.0 -> PrimaryEmerald
+                state.statistics.gri <= 40.0 -> ColorTargetSoft
+                else -> ColorHigh
+            }
+
+            val gviValStr = if (state.statistics.gvi > 0.0) String.format(Locale.US, "%.2f", state.statistics.gvi) else "--"
+            val isGviGood = state.statistics.gvi <= 1.2
+
+            val pgsValStr = if (state.statistics.pgs > 0.0) String.format(Locale.US, "%.1f", state.statistics.pgs) else "--"
+            val isPgsGood = state.statistics.pgs <= 35.0
+
+            val minMaxValStr = if (minVal > 0.0) {
+                if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", minVal)}–${String.format(Locale.US, "%.1f", maxVal)}"
+                else "${(minVal * 18.0182).toInt()}–${(maxVal * 18.0182).toInt()}"
+            } else "--"
+            val isMinMaxGood = maxVal <= 10.0 && minVal >= 3.9
+
+            val glucoseUnitStr = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль" else "mmol") else (if (isRu) "мг/дл" else "mg/dl")
+
             DailyGlucoseChart(
                 readings = state.recentReadings,
                 targetRanges = userSettings.targetRanges,
                 unit = unit,
-                isRu = isRu
+                isRu = isRu,
+                selectedMode = focusCardMode,
+                onModeChange = { focusCardMode = it },
+                onConfigureMetricsClick = { showMetricsOrderDialog = true },
+                metricsContent = {
+                    @Composable
+                    fun RenderMetricWidget(id: String, modifier: Modifier) {
+                        when (id.lowercase()) {
+                            "mean" -> BentoMetricCompact(
+                                title = "Mean",
+                                value = meanValStr,
+                                unit = glucoseUnitStr,
+                                valueColor = meanColor,
+                                modifier = modifier,
+                                onClick = {
+                                    val targetVal = if (unit == GlucoseUnit.MMOL_L) "≤7.0–7.8 ммоль/л" else "≤126–140 мг/дл"
+                                    val healthyMean = if (unit == GlucoseUnit.MMOL_L) "4.5–5.8 ммоль/л" else "80–105 мг/дл"
+                                    val healthyFasting = if (unit == GlucoseUnit.MMOL_L) "3.3–5.5 ммоль/л" else "60–100 мг/дл"
+                                    detailDialogInfo = Pair(
+                                        if (isRu) "Средний сахар за сегодня (Mean)" else "Today's Mean Glucose",
+                                        if (isRu) "Среднее арифметическое измерений с 00:00 до текущей минуты.\n\n" +
+                                                "• Клиническая цель при диабете: $targetVal.\n" +
+                                                "• У здоровых людей без диабета: средний сахар $healthyMean (натощак $healthyFasting).\n\n" +
+                                                "💡 Факт о нормогликемии: у людей без диабета после углеводной еды сахар может кратковременно подскакивать до 8.5–10.0 ммоль/л, но быстро снижается за 20–30 минут."
+                                        else "24h average glucose from 00:00 to now.\n\n" +
+                                                "• Clinical target in diabetes: $targetVal.\n" +
+                                                "• Healthy non-diabetic baseline: average $healthyMean (fasting $healthyFasting).\n\n" +
+                                                "💡 CGM fact: healthy individuals can briefly touch 8.5–10.0 mmol/L after high-carb meals, returning to baseline quickly."
+                                    )
+                                }
+                            )
+                            "ea1c" -> BentoMetricCompact(
+                                title = "eA1c",
+                                value = ea1cStr,
+                                unit = if (isRu) "гликир." else "est.",
+                                valueColor = if (isEa1cGood) PrimaryEmerald else ColorHigh,
+                                modifier = modifier,
+                                onClick = {
+                                    detailDialogInfo = Pair(
+                                        if (isRu) "Расчётный гликированный гемоглобин (eA1c)" else "Estimated Glycated Hemoglobin (eA1c)",
+                                        if (isRu) "Расчётный HbA1c по формуле ADAG на основе сегодняшнего среднего сахара.\n\n" +
+                                                "• Клиническая цель: ≤7.0% (при высокой вариабельности или у пожилых до 7.5–8.0%).\n" +
+                                                "• У здоровых людей: 4.0–5.6%.\n\n" +
+                                                "💡 Клинический нюанс: лабораторный HbA1c отражает средний сахар за 90-120 дней жизни эритроцитов, тогда как eA1c в TIRUp показывает проекцию сегодняшнего гликемического тренда."
+                                        else "Calculated ADAG HbA1c from today's mean.\n\n" +
+                                                "• Clinical target: ≤7.0%.\n" +
+                                                "• Healthy non-diabetic baseline: 4.0–5.6%.\n\n" +
+                                                "💡 Clinical note: lab HbA1c reflects 90-120 days of RBC turnover, while TIRUp eA1c reflects today's trend trajectory."
+                                    )
+                                }
+                            )
+                            "sd" -> BentoMetricCompact(
+                                title = "SD",
+                                value = sdValStr,
+                                unit = glucoseUnitStr,
+                                valueColor = if (isSdGood) PrimaryEmerald else ColorHigh,
+                                modifier = modifier,
+                                onClick = {
+                                    val sdTarget = if (unit == GlucoseUnit.MMOL_L) "≤2.0 ммоль/л (или ≤1.5 в узком режиме TING)" else "≤36 мг/дл"
+                                    detailDialogInfo = Pair(
+                                        if (isRu) "Стандартное отклонение (SD)" else "Standard Deviation (SD)",
+                                        if (isRu) "Показывает разброс (амплитуду качелей) сахара вокруг среднего значения.\n\n" +
+                                                "• Клиническая цель: $sdTarget.\n" +
+                                                "• У здоровых людей: 0.7–1.2 ммоль/л (разброс минимален).\n\n" +
+                                                "💡 Почему это важно: даже при хорошем среднем сахаре высокий SD означает скрытые риски ночных гипогликемий и постпрандиальных пиков."
+                                        else "Measures glucose swing amplitude around the mean.\n\n" +
+                                                "• Clinical target: $sdTarget.\n" +
+                                                "• Healthy non-diabetic baseline: 0.7–1.2 mmol/L.\n\n" +
+                                                "💡 Clinical value: a good mean with high SD indicates high vulnerability to post-meal spikes and night hypos."
+                                    )
+                                }
+                            )
+                            "cv" -> BentoMetricCompact(
+                                title = "%CV",
+                                value = cvValStr,
+                                unit = if (isRu) "вариаб." else "var.",
+                                valueColor = if (isCvGood) PrimaryEmerald else ColorHigh,
+                                modifier = modifier,
+                                onClick = {
+                                    detailDialogInfo = Pair(
+                                        if (isRu) "Коэффициент вариабельности (%CV)" else "Coefficient of Variation (%CV)",
+                                        if (isRu) "Относительная стабильность сахара: (SD / Mean) × 100%.\n\n" +
+                                                "• Международный консенсус ATTD/ADA: ≤36% указывает на стабильную гликемию. При >36% диабет считается нестабильным (лабильным) с высоким риском тяжелых гипогликемий.\n" +
+                                                "• У здоровых людей без диабета: вариабельность составляет всего 10–18%.\n\n" +
+                                                "💡 Золотое правило диабетологии: сначала стабилизируем %CV ≤36%, и лишь затем безопасно снижаем средний сахар!"
+                                        else "Relative glycemic stability: (SD / Mean) × 100%.\n\n" +
+                                                "• ATTD/ADA Consensus: ≤36% is stable. >36% indicates unstable diabetes with high hypo risk.\n" +
+                                                "• Healthy non-diabetic baseline: 10–18%.\n\n" +
+                                                "💡 Rule of thumb: stabilize %CV below 36% before aggressively lowering mean glucose!"
+                                    )
+                                }
+                            )
+                            "tir" -> BentoMetricCompact(
+                                title = "TIR",
+                                value = tirValStr,
+                                unit = if (isRu) "в норме" else "in range",
+                                valueColor = tirColor,
+                                modifier = modifier,
+                                onClick = {
+                                    val tirLowStr = if (unit == GlucoseUnit.MMOL_L) "3.9" else "70"
+                                    val tirHighStr = if (unit == GlucoseUnit.MMOL_L) "10.0" else "180"
+                                    detailDialogInfo = Pair(
+                                        if (isRu) "Время в целевом диапазоне (TIR)" else "Time in Range (TIR)",
+                                        if (isRu) "Процент времени, когда сахар находился в границах $tirLowStr–$tirHighStr.\n\n" +
+                                                "• Международная клиническая цель: ≥70% (каждые +10% TIR снижают риск диабетической ретинопатии на 64% и микроальбуминурии на 40%).\n" +
+                                                "• У здоровых людей без диабета: TIR составляет 96–99% времени суток.\n\n" +
+                                                "💡 Полноценный анализ требует непрерывного ношения сенсора."
+                                        else "Percent of time glucose remained within $tirLowStr–$tirHighStr.\n\n" +
+                                                "• Clinical goal: ≥70% (each +10% TIR cuts retinopathy risk by 64% and kidney damage by 40%).\n" +
+                                                "• Healthy non-diabetic baseline: 96–99% of 24h period."
+                                    )
+                                }
+                            )
+                            "ting" -> BentoMetricCompact(
+                                title = "TING",
+                                value = tingValStr,
+                                unit = if (isRu) "узкий" else "tight",
+                                valueColor = if (isTingGood) PrimaryEmerald else ColorHigh,
+                                modifier = modifier,
+                                onClick = {
+                                    val tingLowStr = if (unit == GlucoseUnit.MMOL_L) "3.9" else "70"
+                                    val tingHighStr = if (unit == GlucoseUnit.MMOL_L) "7.8" else "140"
+                                    detailDialogInfo = Pair(
+                                        if (isRu) "Время в узком диапазоне (TING)" else "Time in Tight Range (TING)",
+                                        if (isRu) "Процент времени в строгом нормогликемическом окне $tingLowStr–$tingHighStr.\n\n" +
+                                                "• Клиническая цель: ≥50% (особенно важна при беременности и для продвинутых систем AID/петля).\n" +
+                                                "• У здоровых людей без диабета: TING составляет 88–95% времени.\n\n" +
+                                                "💡 TING отражает филигранную компенсацию без постпрандиальных скачков."
+                                        else "Percent of time within strict physiological range $tingLowStr–$tingHighStr.\n\n" +
+                                                "• Clinical target: ≥50% (vital during pregnancy and automated insulin delivery).\n" +
+                                                "• Healthy non-diabetic baseline: 88–95%."
+                                    )
+                                }
+                            )
+                            "tbr" -> BentoMetricCompact(
+                                title = "TBR",
+                                value = tbrValStr,
+                                unit = if (isRu) "гипо" else "low",
+                                valueColor = if (isTbrGood) onSurfaceVariant else ColorVeryHigh,
+                                modifier = modifier,
+                                onClick = {
+                                    val tbrLowStr = if (unit == GlucoseUnit.MMOL_L) "<3.9 ммоль/л" else "<70 мг/дл"
+                                    val tbrVeryLowStr = if (unit == GlucoseUnit.MMOL_L) "<3.0 ммоль/л" else "<54 мг/дл"
+                                    detailDialogInfo = Pair(
+                                        if (isRu) "Время ниже диапазона / Гипогликемия (TBR)" else "Time Below Range (TBR)",
+                                        if (isRu) "Суммарный процент времени в гипогликемии ($tbrLowStr):\n\n" +
+                                                "• Общий TBR (<3.9): строгая цель <4.0% (<1 часа в сутки).\n" +
+                                                "• Тяжёлая гипогликемия ($tbrVeryLowStr, 2-й уровень): цель <1.0% (<15 минут в сутки).\n" +
+                                                "• У здоровых людей: физиологические ночные просадки могут составлять 1.1–1.5%, но они безопасны благодаря сохранной контррегуляции глюкагона.\n\n" +
+                                                "⚠️ Главный приоритет безопасности: сначала устраняем TBR, затем работаем над TAR!"
+                                        else "Percent of time in hypoglycemia ($tbrLowStr):\n\n" +
+                                                "• TBR (<3.9): target <4.0% (<1h/day).\n" +
+                                                "• Severe Hypo ($tbrVeryLowStr): target <1.0% (<15m/day).\n" +
+                                                "• Healthy baseline: 1.1–1.5% during sleep.\n\n" +
+                                                "⚠️ First rule of CGM safety: eliminate hypos before attacking hypers!"
+                                    )
+                                }
+                            )
+                            "tar" -> BentoMetricCompact(
+                                title = "TAR",
+                                value = tarValStr,
+                                unit = if (isRu) "гипер" else "high",
+                                valueColor = if (isTarGood) onSurfaceVariant else ColorHigh,
+                                modifier = modifier,
+                                onClick = {
+                                    val tarHighStr = if (unit == GlucoseUnit.MMOL_L) ">10.0 ммоль/л" else ">180 мг/дл"
+                                    val tarVeryHighStr = if (unit == GlucoseUnit.MMOL_L) ">13.9 ммоль/л" else ">250 мг/дл"
+                                    detailDialogInfo = Pair(
+                                        if (isRu) "Время выше диапазона / Гипергликемия (TAR)" else "Time Above Range (TAR)",
+                                        if (isRu) "Суммарный процент времени в гипергликемии ($tarHighStr):\n\n" +
+                                                "• Общий TAR (>10.0): цель <25.0% (<6 часов в сутки).\n" +
+                                                "• Тяжёлая гипергликемия ($tarVeryHighStr, 2-й уровень): цель <5.0% (<1.2 часа в сутки).\n" +
+                                                "• У здоровых людей: TAR обычно <1-2%.\n\n" +
+                                                "💡 Снижение TAR защищает эндотелий сосудов от глюкозотоксичности."
+                                        else "Percent of time in hyperglycemia ($tarHighStr):\n\n" +
+                                                "• Total TAR (>10.0): target <25.0% (<6h/day).\n" +
+                                                "• Severe Hyper ($tarVeryHighStr): target <5.0% (<1.2h/day).\n" +
+                                                "• Healthy baseline: <1–2%."
+                                    )
+                                }
+                            )
+                            "gri" -> BentoMetricCompact(
+                                title = "GRI",
+                                value = griValStr,
+                                unit = if (isRu) "риск" else "risk",
+                                valueColor = griColor,
+                                modifier = modifier,
+                                onClick = {
+                                    detailDialogInfo = Pair(
+                                        if (isRu) "Индекс гликемического риска (GRI)" else "Glycemia Risk Index (GRI)",
+                                        if (isRu) "Формула Kovatchev (0-100 баллов). Взвешивает риски гипогликемии (с весом ×2.5) и гипергликемии.\n\n" +
+                                                "• 0–20: Отлично (A, минимальный риск).\n" +
+                                                "• 21–40: Хорошо (B).\n" +
+                                                "• 41–60: Средний риск (C).\n" +
+                                                "• 61–80: Высокий риск (D).\n" +
+                                                "• 81–100: Очень высокий риск (E)."
+                                        else "Kovatchev formula (0-100 pts), weighting hypo risk (×2.5) and hyper risk.\n\n" +
+                                                "• 0–20: Excellent (A, lowest risk).\n" +
+                                                "• 21–40: Good (B).\n" +
+                                                "• 41–60: Moderate risk (C).\n" +
+                                                "• 61–80: High risk (D).\n" +
+                                                "• 81–100: Very high risk (E)."
+                                    )
+                                }
+                            )
+                            "gvi" -> BentoMetricCompact(
+                                title = "GVI",
+                                value = gviValStr,
+                                unit = if (isRu) "линия" else "line",
+                                valueColor = if (isGviGood) PrimaryEmerald else ColorHigh,
+                                modifier = modifier,
+                                onClick = {
+                                    detailDialogInfo = Pair(
+                                        if (isRu) "Индекс лабильности (GVI)" else "Glycemic Variability Index (GVI)",
+                                        if (isRu) "Отношение реальной длины кривой сахара к идеальной гладкой траектории. Идеал здорового человека: ≤1.20."
+                                        else "Curve trajectory length ratio. Healthy baseline: ≤1.20."
+                                    )
+                                }
+                            )
+                            "pgs" -> BentoMetricCompact(
+                                title = "PGS",
+                                value = pgsValStr,
+                                unit = if (isRu) "статус" else "status",
+                                valueColor = if (isPgsGood) PrimaryEmerald else ColorHigh,
+                                modifier = modifier,
+                                onClick = {
+                                    detailDialogInfo = Pair(
+                                        if (isRu) "Гликемический статус (PGS)" else "Patient Glycemic Status (PGS)",
+                                        if (isRu) "Комплексный балл качества контроля (TIR + Mean + CV). Чем ниже балл, тем ближе гликемия к норме (цель: ≤35.0)."
+                                        else "Comprehensive management score (TIR + Mean + CV). Target: ≤35.0."
+                                    )
+                                }
+                            )
+                            "minmax" -> BentoMetricCompact(
+                                title = "Min/Max",
+                                value = minMaxValStr,
+                                unit = glucoseUnitStr,
+                                valueColor = if (isMinMaxGood) PrimaryEmerald else ColorHigh,
+                                modifier = modifier,
+                                onClick = {
+                                    val minStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", minVal)} ммоль/л" else "${(minVal * 18.0182).toInt()} мг/дл"
+                                    val maxStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", maxVal)} ммоль/л" else "${(maxVal * 18.0182).toInt()} мг/дл"
+                                    val healthySpan = if (unit == GlucoseUnit.MMOL_L) "4.0–7.8 ммоль/л" else "72–140 мг/дл"
+                                    val healthyFasting = if (unit == GlucoseUnit.MMOL_L) "3.3–5.5 ммоль/л" else "60–100 мг/дл"
+                                    detailDialogInfo = Pair(
+                                        if (isRu) "Суточный диапазон сахара (Min / Max)" else "Daily Glucose Range",
+                                        if (isRu) "Экстремумы сахара за сегодня:\n" +
+                                                "• Минимум: $minStr\n" +
+                                                "• Максимум: $maxStr\n\n" +
+                                                "• У здоровых людей без диабета: 96% времени сахар находится в коридоре $healthySpan (натощак $healthyFasting, ночью во сне возможны кратковременные физиологические спады до 3.3–3.8 ммоль/л).\n" +
+                                                "• Клиническая цель при диабете: исключать падения <3.9 и купировать пики >10.0 ммоль/л."
+                                        else "Extremes for today:\n" +
+                                                "• Min: $minStr\n" +
+                                                "• Max: $maxStr\n\n" +
+                                                "• Healthy non-diabetic baseline: 96% within $healthySpan (fasting $healthyFasting).\n" +
+                                                "• Clinical target in diabetes: avoid dips <3.9 and flatten spikes >10.0 mmol/L."
+                                    )
+                                }
+                            )
+                        }
+                    }
+
+                    val safeMetricsOrder = if (userSettings.metricsOrder.isNotEmpty()) userSettings.metricsOrder
+                    else com.tirup.app.domain.model.DEFAULT_METRICS_ORDER
+                    val visibleMetrics = safeMetricsOrder.filterNot { id ->
+                        userSettings.hiddenMetrics.any { it.equals(id, ignoreCase = true) }
+                    }
+
+                    if (visibleMetrics.isEmpty()) {
+                        Text(
+                            text = if (isRu) "Все параметры скрыты в настройках" else "All metrics are hidden in settings",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
+                    } else {
+                        val chunkedMetrics = visibleMetrics.chunked(4)
+                        for (chunk in chunkedMetrics) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                for (metricId in chunk) {
+                                    RenderMetricWidget(id = metricId, modifier = Modifier.weight(1f))
+                                }
+                                if (chunk.size < 4) {
+                                    for (i in 0 until (4 - chunk.size)) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             )
         }
 
@@ -315,347 +680,6 @@ fun FocusScreen(
             }
         }
 
-        // 4. Compact 3x4 Metrics Grid (12 Core Clinical Parameters)
-        item {
-            val minVal = if (state.recentReadings.isNotEmpty()) state.recentReadings.minOf { it.valueMmol } else 0.0
-            val maxVal = if (state.recentReadings.isNotEmpty()) state.recentReadings.maxOf { it.valueMmol } else 0.0
-
-            val meanValStr = if (state.statistics.meanMmol > 0.0) {
-                if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", state.statistics.meanMmol)
-                else String.format(Locale.US, "%d", (state.statistics.meanMmol * 18.0182).toInt())
-            } else "--"
-
-            val meanColor = when {
-                state.statistics.meanMmol <= 0.0 -> onSurfaceVariant
-                state.statistics.meanMmol <= 7.0 -> PrimaryEmerald
-                state.statistics.meanMmol <= 7.8 -> ColorTargetSoft
-                state.statistics.meanMmol <= 10.0 -> ColorHigh
-                else -> ColorVeryHigh
-            }
-
-            val sdVal = state.statistics.sdMmol
-            val sdValStr = if (sdVal > 0.0) {
-                if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", sdVal)
-                else "${(sdVal * 18.0182).toInt()}"
-            } else "--"
-            val isSdGood = sdVal in 0.01..(if (targetMode == TargetMode.TING) 1.5 else 2.0)
-
-            val cvValStr = if (state.statistics.cvPercent > 0.0) String.format(Locale.US, "%.1f%%", state.statistics.cvPercent) else "--"
-            val isCvGood = state.statistics.cvPercent in 0.01..36.0
-
-            val ea1cStr = if (state.statistics.gmiPercent > 0.0) String.format(Locale.US, "%.1f%%", state.statistics.gmiPercent) else "--"
-            val isEa1cGood = state.statistics.gmiPercent in 0.01..7.0
-
-            val tirValStr = if (state.statistics.tirPercent > 0.0) "${state.statistics.tirPercent.toInt()}%" else "--"
-            val tirColor = when {
-                state.statistics.tirPercent <= 0.0 -> onSurfaceVariant
-                state.statistics.tirPercent >= 70.0 -> PrimaryEmerald
-                state.statistics.tirPercent >= 50.0 -> ColorHigh
-                else -> ColorVeryHigh
-            }
-
-            val tingValStr = if (state.statistics.tingPercent > 0.0) "${state.statistics.tingPercent.toInt()}%" else "--"
-            val isTingGood = state.statistics.tingPercent >= 50.0
-
-            val tbrVal = state.statistics.tbrLowPercent + state.statistics.tbrVeryLowPercent
-            val tbrValStr = if (tbrVal > 0.0) String.format(Locale.US, "%.1f%%", tbrVal) else "0%"
-            val isTbrGood = tbrVal <= 4.0
-
-            val tarVal = state.statistics.tarHighPercent + state.statistics.tarVeryHighPercent
-            val tarValStr = if (tarVal > 0.0) "${tarVal.toInt()}%" else "0%"
-            val isTarGood = tarVal <= 25.0
-
-            val griValStr = if (state.statistics.gri > 0.0) "${state.statistics.gri.toInt()}" else "--"
-            val griColor = when {
-                state.statistics.gri <= 0.0 -> onSurfaceVariant
-                state.statistics.gri <= 20.0 -> PrimaryEmerald
-                state.statistics.gri <= 40.0 -> ColorTargetSoft
-                else -> ColorHigh
-            }
-
-            val gviValStr = if (state.statistics.gvi > 0.0) String.format(Locale.US, "%.2f", state.statistics.gvi) else "--"
-            val isGviGood = state.statistics.gvi <= 1.2
-
-            val pgsValStr = if (state.statistics.pgs > 0.0) String.format(Locale.US, "%.1f", state.statistics.pgs) else "--"
-            val isPgsGood = state.statistics.pgs <= 35.0
-
-            val minMaxValStr = if (minVal > 0.0) {
-                if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", minVal)}–${String.format(Locale.US, "%.1f", maxVal)}"
-                else "${(minVal * 18.0182).toInt()}–${(maxVal * 18.0182).toInt()}"
-            } else "--"
-            val isMinMaxGood = maxVal <= 10.0 && minVal >= 3.9
-
-            val glucoseUnitStr = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль" else "mmol") else (if (isRu) "мг/дл" else "mg/dl")
-
-            BentoCard(
-                modifier = Modifier.fillMaxWidth(),
-                padding = 12.dp
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (isRu) "📊 Клинические параметры суток" else "📊 Daily Clinical Metrics (12)",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-
-                        IconButton(
-                            onClick = { showMetricsOrderDialog = true },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Tune,
-                                contentDescription = "Reorder parameters",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-
-                    @Composable
-                    fun RenderMetricWidget(id: String, modifier: Modifier) {
-                        when (id.lowercase()) {
-                            "mean" -> BentoMetricCompact(
-                                title = "Mean",
-                                value = meanValStr,
-                                unit = glucoseUnitStr,
-                                valueColor = meanColor,
-                                modifier = modifier,
-                                onClick = {
-                                    val targetVal = if (unit == GlucoseUnit.MMOL_L) "≤7.0–7.8 ммоль/л" else "≤126–140 мг/дл"
-                                    val healthyMean = if (unit == GlucoseUnit.MMOL_L) "4.5–5.8 ммоль/л" else "80–105 мг/дл"
-                                    val healthyFasting = if (unit == GlucoseUnit.MMOL_L) "3.3–5.5 ммоль/л" else "60–100 мг/дл"
-                                    detailDialogInfo = Pair(
-                                        if (isRu) "Средний сахар за сегодня (Mean)" else "Today's Mean Glucose",
-                                        if (isRu) "Среднее арифметическое измерений с 00:00 до текущей минуты.\n\n" +
-                                                "• Клиническая цель при диабете: $targetVal.\n" +
-                                                "• У здоровых людей без диабета: средний сахар $healthyMean (натощак $healthyFasting).\n\n" +
-                                                "💡 Факт о нормогликемии: у людей без диабета после углеводной еды сахар может кратковременно подскакивать до 8.5–10.0 ммоль/л, но быстро снижается за 20–30 минут."
-                                        else "24h average glucose from 00:00 to now.\n\n" +
-                                                "• Clinical target in diabetes: $targetVal.\n" +
-                                                "• Healthy non-diabetic baseline: average $healthyMean (fasting $healthyFasting).\n\n" +
-                                                "💡 CGM fact: healthy individuals can briefly touch 8.5–10.0 mmol/L after high-carb meals, returning to baseline quickly."
-                                    )
-                                }
-                            )
-                            "ea1c" -> BentoMetricCompact(
-                                title = "eA1c",
-                                value = ea1cStr,
-                                unit = if (isRu) "гликир." else "est.",
-                                valueColor = if (isEa1cGood) PrimaryEmerald else ColorHigh,
-                                modifier = modifier,
-                                onClick = {
-                                    detailDialogInfo = Pair(
-                                        if (isRu) "Расчётный гликированный гемоглобин (eA1c)" else "Estimated Glycated Hemoglobin (eA1c)",
-                                        if (isRu) "Расчётный HbA1c по формуле ADAG на основе сегодняшнего среднего сахара.\n\n" +
-                                                "• У людей без диабета: 4.0–5.6% (20–38 ммоль/моль).\n" +
-                                                "• Предиабет: 5.7–6.4%.\n" +
-                                                "• Клинический ориентир при диабете: ≤6.5–7.0%."
-                                        else "Estimated glycated hemoglobin (ADAG formula) from today's mean.\n\n" +
-                                                "• Healthy non-diabetic baseline: 4.0–5.6% (20–38 mmol/mol).\n" +
-                                                "• Prediabetes range: 5.7–6.4%.\n" +
-                                                "• Clinical target in diabetes: ≤6.5–7.0%."
-                                    )
-                                }
-                            )
-                            "sd" -> BentoMetricCompact(
-                                title = "SD",
-                                value = sdValStr,
-                                unit = glucoseUnitStr,
-                                valueColor = if (isSdGood) PrimaryEmerald else ColorHigh,
-                                modifier = modifier,
-                                onClick = {
-                                    val targetSdStr = if (unit == GlucoseUnit.MMOL_L) "≤2.0–2.5 ммоль/л" else "≤36–45 мг/дл"
-                                    val healthySdStr = if (unit == GlucoseUnit.MMOL_L) "≤1.0–1.2 ммоль/л" else "≤18–22 мг/дл"
-                                    detailDialogInfo = Pair(
-                                        if (isRu) "Разброс сахара (SD)" else "Standard Deviation (SD)",
-                                        if (isRu) "Стандартное отклонение сахара за сутки. Отражает амплитуду дневных колебаний.\n\n" +
-                                                "• Клиническая цель при диабете: $targetSdStr.\n" +
-                                                "• У здоровых людей без диабета: $healthySdStr (высокая плавность)."
-                                        else "Daily standard deviation. Reflects amplitude of glucose swings.\n\n" +
-                                                "• Clinical target in diabetes: $targetSdStr.\n" +
-                                                "• Healthy non-diabetic baseline: $healthySdStr."
-                                    )
-                                }
-                            )
-                            "cv" -> BentoMetricCompact(
-                                title = "%CV",
-                                value = cvValStr,
-                                unit = if (isRu) "вариац." else "var.",
-                                valueColor = if (isCvGood) PrimaryEmerald else ColorHigh,
-                                modifier = modifier,
-                                onClick = {
-                                    detailDialogInfo = Pair(
-                                        if (isRu) "Вариабельность (%CV)" else "Glucose Variability (%CV)",
-                                        if (isRu) "Коэффициент вариации (%CV = SD / Mean * 100%). Международный консенсус ATTD: норма ≤36.0% (стабильный профиль без резких скачков).\n\n" +
-                                                "• У здоровых людей без диабета: 12–20%."
-                                        else "Coefficient of variation. Consensus target: ≤36.0%.\n\n" +
-                                                "• Healthy non-diabetic baseline: 12–20%."
-                                    )
-                                }
-                            )
-                            "tir" -> BentoMetricCompact(
-                                title = "TIR",
-                                value = tirValStr,
-                                unit = if (isRu) "норма" else "target",
-                                valueColor = tirColor,
-                                modifier = modifier,
-                                onClick = {
-                                    detailDialogInfo = Pair(
-                                        if (isRu) "Время в целевом диапазоне (TIR)" else "Time in Range (TIR)",
-                                        if (isRu) "Диапазон 3.9–10.0 ммоль/л (70–180 мг/дл).\n\n" +
-                                                "• Международный консенсус ATTD/ADA: норма ≥70% времени (не менее 16 ч 48 мин в сутки).\n" +
-                                                "• У здоровых людей без диабета: 99–100% времени суток."
-                                        else "Range 3.9–10.0 mmol/L (70–180 mg/dL). Clinical target: ≥70% (at least 16h 48m per day).\n\n" +
-                                                "• Healthy non-diabetic baseline: 99–100%."
-                                    )
-                                }
-                            )
-                            "ting" -> BentoMetricCompact(
-                                title = "TING",
-                                value = tingValStr,
-                                unit = if (isRu) "узкий" else "tight",
-                                valueColor = if (isTingGood) PrimaryEmerald else ColorHigh,
-                                modifier = modifier,
-                                onClick = {
-                                    detailDialogInfo = Pair(
-                                        if (isRu) "Узкий целевой диапазон (TING)" else "Time in Tight Range (TING)",
-                                        if (isRu) "Диапазон строгой нормогликемии 3.9–7.8 ммоль/л (70–140 мг/дл).\n\n" +
-                                                "• У здоровых людей без диабета: 95–99% времени суток.\n" +
-                                                "• Клинический ориентир при диабете: ≥50% времени (не менее 12 часов в сутки).\n\n" +
-                                                "💡 Примечание: даже у здоровых людей после плотного приёма простых углеводов сахар может кратковременно выходить до 8.5–9.5 ммоль/л, но быстро снижается."
-                                        else "Tight range 3.9–7.8 mmol/L (70–140 mg/dL). Target: ≥50% (≥12h per day).\n\n" +
-                                                "• Healthy non-diabetic baseline: 95–99%."
-                                    )
-                                }
-                            )
-                            "tbr" -> BentoMetricCompact(
-                                title = "TBR",
-                                value = tbrValStr,
-                                unit = if (isRu) "гипо" else "hypo",
-                                valueColor = if (isTbrGood) PrimaryEmerald else ColorVeryHigh,
-                                modifier = modifier,
-                                onClick = {
-                                    detailDialogInfo = Pair(
-                                        if (isRu) "Время в гипогликемии (TBR)" else "Time Below Range (TBR)",
-                                        if (isRu) "Уровень глюкозы ниже 3.9 ммоль/л (<70 мг/дл).\n\nСтрогая норма безопасности: <4% (не более 58 минут в сутки), а для уровня ниже 3.0 ммоль/л — менее 1% (не более 14 минут)."
-                                        else "Glucose < 3.9 mmol/L (<70 mg/dL). Safety target: <4% (<58 min/day)."
-                                    )
-                                }
-                            )
-                            "tar" -> BentoMetricCompact(
-                                title = "TAR",
-                                value = tarValStr,
-                                unit = if (isRu) "гипер" else "hyper",
-                                valueColor = if (isTarGood) PrimaryEmerald else ColorHigh,
-                                modifier = modifier,
-                                onClick = {
-                                    detailDialogInfo = Pair(
-                                        if (isRu) "Время в гипергликемии (TAR)" else "Time Above Range (TAR)",
-                                        if (isRu) "Уровень глюкозы выше 10.0 ммоль/л (>180 мг/дл).\n\nКлинический ориентир консенсуса ATTD: <25% времени (не более 6 часов в сутки)."
-                                        else "Glucose > 10.0 mmol/L (>180 mg/dL). Clinical target: <25% (<6h/day)."
-                                    )
-                                }
-                            )
-                            "gri" -> BentoMetricCompact(
-                                title = "GRI",
-                                value = griValStr,
-                                unit = if (isRu) "риск" else "risk",
-                                valueColor = griColor,
-                                modifier = modifier,
-                                onClick = {
-                                    detailDialogInfo = Pair(
-                                        if (isRu) "Индекс гликемического риска (GRI)" else "Glycemia Risk Index (GRI)",
-                                        if (isRu) "Интегральная оценка риска гипо- и гипергликемий (0–100 баллов). Зона A (низкий риск): ≤20 баллов."
-                                        else "Composite score of hypoglycemia and hyperglycemia risk (0–100). Low risk (Zone A): ≤20."
-                                    )
-                                }
-                            )
-                            "gvi" -> BentoMetricCompact(
-                                title = "GVI",
-                                value = gviValStr,
-                                unit = if (isRu) "лабильн." else "lability",
-                                valueColor = if (isGviGood) PrimaryEmerald else ColorHigh,
-                                modifier = modifier,
-                                onClick = {
-                                    detailDialogInfo = Pair(
-                                        if (isRu) "Индекс лабильности (GVI)" else "Glycemic Variability Index (GVI)",
-                                        if (isRu) "Отношение реальной длины кривой сахара к идеальной гладкой траектории. Идеал здорового человека: ≤1.20."
-                                        else "Curve trajectory length ratio. Healthy baseline: ≤1.20."
-                                    )
-                                }
-                            )
-                            "pgs" -> BentoMetricCompact(
-                                title = "PGS",
-                                value = pgsValStr,
-                                unit = if (isRu) "статус" else "status",
-                                valueColor = if (isPgsGood) PrimaryEmerald else ColorHigh,
-                                modifier = modifier,
-                                onClick = {
-                                    detailDialogInfo = Pair(
-                                        if (isRu) "Гликемический статус (PGS)" else "Patient Glycemic Status (PGS)",
-                                        if (isRu) "Комплексный балл качества контроля (TIR + Mean + CV). Чем ниже балл, тем ближе гликемия к норме (цель: ≤35.0)."
-                                        else "Comprehensive management score (TIR + Mean + CV). Target: ≤35.0."
-                                    )
-                                }
-                            )
-                            "minmax" -> BentoMetricCompact(
-                                title = "Min/Max",
-                                value = minMaxValStr,
-                                unit = glucoseUnitStr,
-                                valueColor = if (isMinMaxGood) PrimaryEmerald else ColorHigh,
-                                modifier = modifier,
-                                onClick = {
-                                    val minStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", minVal)} ммоль/л" else "${(minVal * 18.0182).toInt()} мг/дл"
-                                    val maxStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", maxVal)} ммоль/л" else "${(maxVal * 18.0182).toInt()} мг/дл"
-                                    val healthySpan = if (unit == GlucoseUnit.MMOL_L) "4.0–7.8 ммоль/л" else "72–140 мг/дл"
-                                    val healthyFasting = if (unit == GlucoseUnit.MMOL_L) "3.3–5.5 ммоль/л" else "60–100 мг/дл"
-                                    detailDialogInfo = Pair(
-                                        if (isRu) "Суточный диапазон сахара (Min / Max)" else "Daily Glucose Range",
-                                        if (isRu) "Экстремумы сахара за сегодня:\n" +
-                                                "• Минимум: $minStr\n" +
-                                                "• Максимум: $maxStr\n\n" +
-                                                "• У здоровых людей без диабета: 96% времени сахар находится в коридоре $healthySpan (натощак $healthyFasting, ночью во сне возможны кратковременные физиологические спады до 3.3–3.8 ммоль/л).\n" +
-                                                "• Клиническая цель при диабете: исключать падения <3.9 и купировать пики >10.0 ммоль/л."
-                                        else "Extremes for today:\n" +
-                                                "• Min: $minStr\n" +
-                                                "• Max: $maxStr\n\n" +
-                                                "• Healthy non-diabetic baseline: 96% within $healthySpan (fasting $healthyFasting).\n" +
-                                                "• Clinical target in diabetes: avoid dips <3.9 and flatten spikes >10.0 mmol/L."
-                                    )
-                                }
-                            )
-                        }
-                    }
-
-                    val safeMetricsOrder = if (userSettings.metricsOrder.isNotEmpty()) userSettings.metricsOrder
-                    else com.tirup.app.domain.model.DEFAULT_METRICS_ORDER
-                    val chunkedMetrics = safeMetricsOrder.chunked(4)
-
-                    for (chunk in chunkedMetrics) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            for (metricId in chunk) {
-                                RenderMetricWidget(id = metricId, modifier = Modifier.weight(1f))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         item { Spacer(modifier = Modifier.height(20.dp)) }
     }
     }
@@ -702,8 +726,11 @@ fun FocusScreen(
     if (showMetricsOrderDialog) {
         MetricsOrderDialog(
             currentOrder = userSettings.metricsOrder,
+            hiddenMetrics = userSettings.hiddenMetrics,
             isRu = isRu,
-            onSave = { newOrder -> viewModel.updateMetricsOrder(newOrder) },
+            onSave = { newOrder, hidden ->
+                viewModel.updateMetricsConfiguration(newOrder, hidden)
+            },
             onDismiss = { showMetricsOrderDialog = false }
         )
     }

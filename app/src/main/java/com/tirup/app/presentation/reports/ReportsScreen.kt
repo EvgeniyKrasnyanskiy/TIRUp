@@ -198,8 +198,9 @@ fun ReportsScreen(
     if (showMetricsOrderDialog) {
         MetricsOrderDialog(
             currentOrder = state.userSettings.metricsOrder,
+            hiddenMetrics = state.userSettings.hiddenMetrics,
             isRu = isRu,
-            onSave = { newOrder -> viewModel.updateMetricsOrder(newOrder) },
+            onSave = { newOrder, hidden -> viewModel.updateMetricsConfiguration(newOrder, hidden) },
             onDismiss = { showMetricsOrderDialog = false }
         )
     }
@@ -386,6 +387,7 @@ private fun LiveReportCard(
                 unit = state.userSettings.unit,
                 language = state.userSettings.language,
                 metricsOrder = state.userSettings.metricsOrder,
+                hiddenMetrics = state.userSettings.hiddenMetrics,
                 onReorderClick = onReorderClick
             )
 
@@ -400,13 +402,13 @@ private fun LiveReportCard(
                         .weight(1f)
                         .height(40.dp),
                     shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, ActionBlue),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onSurface
+                        contentColor = ActionBlue
                     ),
                     enabled = state.liveReadings.isNotEmpty() && !state.isGeneratingLive
                 ) {
-                    Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp), tint = ActionBlue)
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(text = if (isRu) "Сохранить" else "Save PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
@@ -599,6 +601,7 @@ private fun HistoricalReportCard(
                     unit = state.userSettings.unit,
                     language = state.userSettings.language,
                     metricsOrder = state.userSettings.metricsOrder,
+                    hiddenMetrics = state.userSettings.hiddenMetrics,
                     onReorderClick = onReorderClick
                 )
 
@@ -630,12 +633,12 @@ private fun HistoricalReportCard(
                                 .weight(1f)
                                 .height(40.dp),
                             shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            border = BorderStroke(1.dp, ActionBlue),
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.onSurface
+                                contentColor = ActionBlue
                             )
                         ) {
-                            Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp), tint = ActionBlue)
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(text = if (isRu) "Сохранить" else "Save PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
@@ -706,6 +709,7 @@ private fun ReportMetricsColumn(
     unit: GlucoseUnit,
     language: String = "RU",
     metricsOrder: List<String> = com.tirup.app.domain.model.DEFAULT_METRICS_ORDER,
+    hiddenMetrics: List<String> = emptyList(),
     onReorderClick: (() -> Unit)? = null
 ) {
     val isRu = language.equals("RU", ignoreCase = true)
@@ -807,7 +811,10 @@ private fun ReportMetricsColumn(
 
         // 2. User-ordered parameters
         val safeOrder = if (metricsOrder.isNotEmpty()) metricsOrder else com.tirup.app.domain.model.DEFAULT_METRICS_ORDER
-        for (id in safeOrder) {
+        val visibleOrder = safeOrder.filterNot { id ->
+            hiddenMetrics.any { it.equals(id, ignoreCase = true) }
+        }
+        for (id in visibleOrder) {
             when (id.lowercase()) {
                 "mean" -> ReportMetricRow(
                     label = if (isRu) "Mean BG (средний сахар)" else "Mean BG (average glucose)",

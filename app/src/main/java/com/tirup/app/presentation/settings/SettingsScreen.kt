@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Send
@@ -467,10 +468,13 @@ fun SettingsScreen(
                         }
 
                         // Tier 3: Critical (Prolonged / Extreme)
+                        val isCriticalInPauseState = isCriticalPaused && !alerts.isCriticalHypoPermanentDisabled
+                        val isCriticalEffectiveEnabled = if (isCriticalInPauseState) true else (isMaster && alerts.isCriticalEnabled && !alerts.isCriticalHypoPermanentDisabled)
+
                         AlertTierConfigRow(
                             title = if (isRu) "3. Критические и затяжные («кричащие»)" else "3. Critical & Prolonged (Alarms)",
                             subtitle = criticalSub,
-                            enabled = isMaster && alerts.isCriticalEnabled && !isCriticalPaused && !alerts.isCriticalHypoPermanentDisabled,
+                            enabled = isCriticalEffectiveEnabled,
                             onEnabledChange = { isEnabled ->
                                 if (!isEnabled) {
                                     showCriticalHypoSafetyDialog = true
@@ -489,10 +493,11 @@ fun SettingsScreen(
                             onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalVibrate = it)) },
                             flash = alerts.isCriticalFlash,
                             onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalFlash = it)) },
-                            accentColor = ColorVeryLow,
+                            accentColor = if (isCriticalInPauseState) ColorHigh else ColorVeryLow,
                             onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.CRITICAL) },
                             isRu = isRu,
-                            timerBadge = criticalBadge
+                            timerBadge = criticalBadge,
+                            isPaused = isCriticalInPauseState
                         )
                         
                         Spacer(modifier = Modifier.height(6.dp))
@@ -897,28 +902,55 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Button(
-                        onClick = {
-                            viewModel.updateAlertSettings(
-                                alerts.copy(
-                                    isCriticalEnabled = false,
-                                    criticalHypoPauseUntilTimestamp = System.currentTimeMillis() + 2 * 3600 * 1000L,
-                                    isCriticalHypoPermanentDisabled = false
+                    if (alerts.criticalHypoPauseUntilTimestamp > System.currentTimeMillis()) {
+                        Button(
+                            onClick = {
+                                viewModel.updateAlertSettings(
+                                    alerts.copy(
+                                        isAlertsMasterEnabled = true,
+                                        isCriticalEnabled = true,
+                                        criticalHypoPauseUntilTimestamp = 0L,
+                                        isCriticalHypoPermanentDisabled = false
+                                    )
                                 )
+                                showCriticalHypoSafetyDialog = false
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald)
+                        ) {
+                            Text(
+                                text = if (isRu) "▶️ Снять паузу и включить сейчас" else "▶️ Resume and Enable Now",
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
                             )
-                            showCriticalHypoSafetyDialog = false
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
-                    ) {
-                        Text(
-                            text = if (isRu) "⏸️ Приостановить на 2 часа" else "⏸️ Pause for 2 Hours",
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                        }
+                    } else {
+                        Button(
+                            onClick = {
+                                viewModel.updateAlertSettings(
+                                    alerts.copy(
+                                        isCriticalEnabled = false,
+                                        criticalHypoPauseUntilTimestamp = System.currentTimeMillis() + 2 * 3600 * 1000L,
+                                        isCriticalHypoPermanentDisabled = false
+                                    )
+                                )
+                                showCriticalHypoSafetyDialog = false
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
+                        ) {
+                            Text(
+                                text = if (isRu) "⏸️ Приостановить на 2 часа" else "⏸️ Pause for 2 Hours",
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
                     }
 
                     if (isAcknowledged) {
@@ -1570,13 +1602,14 @@ private fun AlertTierConfigRow(
     accentColor: Color,
     onTestClick: () -> Unit,
     isRu: Boolean,
-    timerBadge: String? = null
+    timerBadge: String? = null,
+    isPaused: Boolean = false
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = accentColor.copy(alpha = 0.08f),
-        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f))
+        color = (if (isPaused) ColorHigh else accentColor).copy(alpha = 0.08f),
+        border = BorderStroke(1.dp, (if (isPaused) ColorHigh else accentColor).copy(alpha = 0.35f))
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -1592,7 +1625,7 @@ private fun AlertTierConfigRow(
                         text = title,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = accentColor
+                        color = if (isPaused) ColorHigh else accentColor
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
@@ -1605,14 +1638,14 @@ private fun AlertTierConfigRow(
                     if (timerBadge != null) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = accentColor.copy(alpha = 0.16f),
-                            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.45f))
+                            color = (if (isPaused) ColorHigh else accentColor).copy(alpha = 0.16f),
+                            border = BorderStroke(1.dp, (if (isPaused) ColorHigh else accentColor).copy(alpha = 0.45f))
                         ) {
                             Text(
                                 text = timerBadge,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = accentColor,
+                                color = if (isPaused) ColorHigh else accentColor,
                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
                             )
                         }
@@ -1621,9 +1654,19 @@ private fun AlertTierConfigRow(
                     Switch(
                         checked = enabled,
                         onCheckedChange = onEnabledChange,
+                        thumbContent = if (isPaused) {
+                            {
+                                Icon(
+                                    imageVector = Icons.Default.Pause,
+                                    contentDescription = "Paused",
+                                    tint = ColorHigh,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        } else null,
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
-                            checkedTrackColor = accentColor
+                            checkedTrackColor = if (isPaused) ColorHigh else accentColor
                         )
                     )
                 }

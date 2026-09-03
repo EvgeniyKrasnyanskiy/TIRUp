@@ -53,6 +53,7 @@ class SettingsRepositoryImpl(
             .putBoolean(KEY_HAS_SEEN_ONBOARDING, settings.hasSeenOnboarding)
             .putInt(KEY_LAST_STREAK_CELEBRATED_DAYS, settings.lastStreakCelebratedDays)
             .putString(KEY_METRICS_ORDER, settings.metricsOrder.joinToString(","))
+            .putString(KEY_HIDDEN_METRICS, settings.hiddenMetrics.joinToString(","))
             // Alert Settings
             .putBoolean(KEY_ALERT_MASTER_ENABLED, settings.alertSettings.isAlertsMasterEnabled)
             .putBoolean(KEY_ALERT_PREDICTIVE_ENABLED, settings.alertSettings.isPredictiveEnabled)
@@ -147,6 +148,8 @@ class SettingsRepositoryImpl(
             lastStreakCelebratedDays = prefs.getInt(KEY_LAST_STREAK_CELEBRATED_DAYS, 0),
             metricsOrder = prefs.getString(KEY_METRICS_ORDER, null)?.split(",")?.filter { it.isNotBlank() }
                 ?: com.tirup.app.domain.model.DEFAULT_METRICS_ORDER,
+            hiddenMetrics = prefs.getString(KEY_HIDDEN_METRICS, null)?.split(",")?.filter { it.isNotBlank() }
+                ?: emptyList(),
             alertSettings = AlertSettings(
                 isAlertsMasterEnabled = prefs.getBoolean(KEY_ALERT_MASTER_ENABLED, true),
                 isPredictiveEnabled = prefs.getBoolean(KEY_ALERT_PREDICTIVE_ENABLED, true),
@@ -198,6 +201,7 @@ class SettingsRepositoryImpl(
         private const val KEY_HAS_SEEN_ONBOARDING = "key_has_seen_onboarding"
         private const val KEY_LAST_STREAK_CELEBRATED_DAYS = "key_last_streak_celebrated_days"
         private const val KEY_METRICS_ORDER = "key_metrics_order"
+        private const val KEY_HIDDEN_METRICS = "key_hidden_metrics"
 
         private const val KEY_ALERT_MASTER_ENABLED = "key_alert_master_enabled"
         private const val KEY_ALERT_PREDICTIVE_ENABLED = "key_alert_predictive_enabled"
