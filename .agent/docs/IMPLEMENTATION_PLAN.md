@@ -921,7 +921,7 @@
 ## 41. Перспективный RoadMap проекта (Актуализированный)
 
 - [x] **41.1. Метки инсулина и приёмов пищи на суточном графике (Treatments Overlay)** [Completed в Фазе 44]
-- [ ] **41.2. Критические СМС-оповещения доверенным контактам** (В процессе реализации в Фазе 46):
+- [x] **41.2. Критические СМС-оповещения доверенным контактам** [Completed в Фазе 46]:
   - Отправка экстренного СМС с координатами и текущим уровнем сахара при подтверждённой тяжёлой гипогликемии (< 3.0 ммоль/л) при отсутствии реакции пользователя на сирену в течение заданного времени.
 - [x] **41.3. Воскресный аналитический дайджест компенсации** [Completed в Фазе 45]
 - [ ] **41.4. Финальная вычитка и приведение всей документации в чистовой вид (Clean Docs & Final Polishing)**:
@@ -929,37 +929,37 @@
 
 ---
 
-## 46. Фаза 46: Критические СМС-оповещения доверенным контактам (Emergency SMS Alerts)
+## 46. Фаза 46: Критические СМС-оповещения доверенным контактам (Emergency SMS Alerts) [Completed]
 
-### 46.1. Подзадача 1: Манифест, разрешения и построитель экстренных сообщений (Data / Domain Layer):
-- [ ] В `AndroidManifest.xml` объявить разрешения `SEND_SMS`, `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`.
-- [ ] Создать `EmergencySmsBuilder`:
+### 46.1. Подзадача 1: Манифест, разрешения и построитель экстренных сообщений (Data / Domain Layer) [Completed]:
+- [x] В `AndroidManifest.xml` объявить разрешения `SEND_SMS`, `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`.
+- [x] Создать `EmergencySmsBuilder`:
   - Форматирование текста СМС (имя пациента, уровень сахара, стрелка динамики, время отсутствия реакции, ссылка на координаты Google Maps).
   - Поддержка русского и английского языков (`RU`/`EN`).
   - Форматирование под единицы `ммоль/л` и `mg/dL`.
   - Защита от сбоя при отсутствии GPS-координат (отправка сведений о сахаре без ссылки на карту).
-- [ ] Написать модульные тесты `EmergencySmsBuilderTest` (100% success).
+- [x] Написать модульные тесты `EmergencySmsBuilderTest` (100% success).
 
-### 46.2. Подзадача 2: Модель настроек и системный сервис отправки (Alert & Service Layer):
-- [ ] В `AlertSettings.kt`, `UserSettings.kt` и `SettingsRepositoryImpl.kt` добавить поля:
+### 46.2. Подзадача 2: Модель настроек и системный сервис отправки (Alert & Service Layer) [Completed]:
+- [x] В `AlertSettings.kt`, `UserSettings.kt` и `SettingsRepositoryImpl.kt` добавить поля:
   - `isEmergencySmsEnabled: Boolean = false`
   - `emergencyContactPhone: String = ""`
   - `emergencyContactName: String = ""`
   - `emergencySmsDelayMinutes: Int = 5` (3, 5, 10 мин)
   - `includeLocationInEmergencySms: Boolean = true`
   - `lastEmergencySmsTimestamp: Long = 0L`
-- [ ] Создать `EmergencySmsManager`:
+- [x] Создать `EmergencySmsManager`:
   - Получение последнего известного местоположения (`LocationManager`).
   - Отправка через `SmsManager` (`sendMultipartTextMessage`).
   - Кулдаун 30 минут между отправками СМС при непрерывной гипогликемии.
   - Метод отправки тестового СМС.
-- [ ] В `GlucoseAlertManager.kt`:
+- [x] В `GlucoseAlertManager.kt`:
   - Инициация таймера нереакции при наступлении критической сирены Tier 3 (<3.0 ммоль/л).
-  - Гарантированная отмена таймера при подтверждении пользователем (`dismissCriticalAlarm`).
+  - Гарантированная отмена таймера при подтверждении пользователем (`dismissCriticalAlarm`, `silenceCurrentSoundOnly`, или нормализации сахара).
 
-### 46.3. Подзадача 3: Интерфейс настроек (UI Layer):
-- [ ] В `SettingsViewModel.kt` добавить методы обновления настроек СМС и тестовой отправки.
-- [ ] В `SettingsScreen.kt` добавить карточку настройки экстренных СМС:
+### 46.3. Подзадача 3: Интерфейс настроек (UI Layer) [Completed]:
+- [x] В `SettingsViewModel.kt` добавить методы обновления настроек СМС и тестовой отправки.
+- [x] В `SettingsScreen.kt` добавить карточку настройки экстренных СМС:
   - Мастер-тумблер включения.
   - Поля ввода телефона доверенного лица и имени.
   - Сегментный переключатель времени ожидания (3 мин / 5 мин / 10 мин).
