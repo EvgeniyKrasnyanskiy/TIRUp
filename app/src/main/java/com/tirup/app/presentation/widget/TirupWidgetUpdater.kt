@@ -188,7 +188,8 @@ object TirupWidgetUpdater {
                     recent = recent,
                     todayReadings = todayReadings,
                     settings = settings,
-                    mainIntent = mainPendingIntent
+                    mainIntent = mainPendingIntent,
+                    nightstandIntent = nightstandPendingIntent
                 )
                 appWidgetManager.updateAppWidget(widget3x1Ids, views)
             }
@@ -242,7 +243,7 @@ object TirupWidgetUpdater {
                     build2x1Views(context, latest, recent, todayReadings, settings, mainPendingIntent)
                 }
                 providerName.endsWith("Tirup3x1WidgetProvider") -> {
-                    build3x1Views(context, latest, recent, todayReadings, settings, mainPendingIntent)
+                    build3x1Views(context, latest, recent, todayReadings, settings, mainPendingIntent, nightstandPendingIntent)
                 }
                 minHeight >= 100 && minWidth >= 240 -> {
                     // Expanded 4x2 or 5x2 Bento Dashboard with 4h sparkline chart
@@ -758,11 +759,13 @@ object TirupWidgetUpdater {
         recent: List<GlucoseReading>,
         todayReadings: List<GlucoseReading>,
         settings: UserSettings,
-        mainIntent: PendingIntent
+        mainIntent: PendingIntent,
+        nightstandIntent: PendingIntent
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_3x1)
         applyWidgetBackground(views, settings)
         views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
+        views.setOnClickPendingIntent(R.id.widget_btn_nightstand, nightstandIntent)
 
         if (latest == null) {
             views.setTextViewText(R.id.widget_glucose_value, "--")
@@ -1107,18 +1110,17 @@ object TirupWidgetUpdater {
         timeLabelPaint.textAlign = Paint.Align.RIGHT
         canvas.drawText(if (isRu) "сейчас" else "now", nowX, heightPx - 4f, timeLabelPaint)
 
-        // 4. Draw Trajectory Line (colors: Pale Green 3.9..7.8, Emerald 7.9..10.0)
-        val curveColor = when {
-            latest.valueMmol < 3.0 -> Color.parseColor("#EF4444")
-            latest.valueMmol < low -> Color.parseColor("#F59E0B")
-            latest.valueMmol <= 7.8 -> Color.parseColor("#4ADE80") // Pale Green 3.9..7.8
-            latest.valueMmol <= high -> Color.parseColor("#10B981") // Emerald 7.9..10.0
-            latest.valueMmol <= 13.9 -> Color.parseColor("#F59E0B")
+        // 4. Draw Trajectory Line (color segments dynamically by range)
+        fun getReadingColor(value: Double): Int = when {
+            value < 3.0 -> Color.parseColor("#EF4444")
+            value < low -> Color.parseColor("#F59E0B")
+            value <= 7.8 -> Color.parseColor("#4ADE80") // Pale Green 3.9..7.8
+            value <= high -> Color.parseColor("#10B981") // Emerald 7.9..10.0
+            value <= 13.9 -> Color.parseColor("#F59E0B")
             else -> Color.parseColor("#EF4444")
         }
 
         val solidPaint = Paint().apply {
-            color = curveColor
             style = Paint.Style.STROKE
             strokeWidth = 4.5f
             strokeCap = Paint.Cap.ROUND
@@ -1146,6 +1148,7 @@ object TirupWidgetUpdater {
                     // Gap > 20 min: draw dashed connection
                     canvas.drawLine(prevX, prevY, x, y, gapPaint)
                 } else {
+                    solidPaint.color = getReadingColor(reading.valueMmol)
                     canvas.drawLine(prevX, prevY, x, y, solidPaint)
                 }
             }
@@ -1153,11 +1156,12 @@ object TirupWidgetUpdater {
         }
 
         // 5. Draw Current Glucose Glowing Head Dot
+        val headColor = getReadingColor(latest.valueMmol)
         val lastX = getX(latest.timestamp)
         val lastY = getY(latest.valueMmol)
 
         val glowPaint = Paint().apply {
-            color = curveColor
+            color = headColor
             alpha = 80
             style = Paint.Style.FILL
             isAntiAlias = true
@@ -1165,7 +1169,7 @@ object TirupWidgetUpdater {
         canvas.drawCircle(lastX, lastY, 10f, glowPaint)
 
         val dotPaint = Paint().apply {
-            color = curveColor
+            color = headColor
             style = Paint.Style.FILL
             isAntiAlias = true
         }

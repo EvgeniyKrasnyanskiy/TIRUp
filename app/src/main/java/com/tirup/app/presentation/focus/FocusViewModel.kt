@@ -1,5 +1,6 @@
 package com.tirup.app.presentation.focus
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tirup.app.data.alert.ActiveAlertBanner
@@ -25,7 +26,8 @@ import kotlin.math.abs
 
 class FocusViewModel(
     private val glucoseRepository: GlucoseRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val context: Context? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FocusUiState(isLoading = true))
@@ -70,11 +72,6 @@ class FocusViewModel(
                     settings.targetRanges.tingGoalPercent.toDouble()
                 }
 
-                val currentScore = if (settings.targetMode == TargetMode.TIR) {
-                    stats.tirPercent
-                } else {
-                    stats.tingPercent
-                }
 
                 val compensator = TargetCompensatorCalculator.calculateDailyCompensator(
                     targetMode = settings.targetMode,
@@ -144,6 +141,15 @@ class FocusViewModel(
                 )
             }.collect { newState ->
                 _uiState.value = newState
+                val latest = newState.latestReading
+                if (context != null && latest != null && newState.userSettings.isLockscreenNotificationEnabled) {
+                    GlucoseAlertManager.updateLockscreenNotification(
+                        context = context,
+                        latestReading = latest,
+                        todayReadings = newState.recentReadings,
+                        settings = newState.userSettings
+                    )
+                }
             }
         }
     }

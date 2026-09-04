@@ -365,18 +365,9 @@ object GlucoseAlertManager {
         )
 
         val patternColor = Color.parseColor("#38BDF8")
-        val alertViews = android.widget.RemoteViews(context.packageName, R.layout.notification_glucose_alert).apply {
-            setTextViewText(R.id.notif_alert_title, title)
-            setTextColor(R.id.notif_alert_title, patternColor)
-            setTextViewText(R.id.notif_alert_body, text)
-            setOnClickPendingIntent(R.id.notif_alert_ok_btn, dismissPendingIntent)
-        }
-
         val notification = NotificationCompat.Builder(context, CHANNEL_PATTERNS)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setColor(patternColor)
-            .setCustomContentView(alertViews)
-            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setContentTitle(titleSpanned)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
@@ -777,6 +768,26 @@ object GlucoseAlertManager {
         }
     }
 
+    private fun formatAlertBodyWithColor(text: String): CharSequence {
+        val regex = Regex("""(\d{1,2}[.,]\d+)\s*(ммоль/л|mmol/L|mg/dL)?""")
+        val match = regex.find(text) ?: return text
+        val numStr = match.groupValues[1].replace(',', '.')
+        val value = numStr.toDoubleOrNull() ?: return text
+
+        val colorHex = when {
+            value < 3.0 -> "#EF4444"
+            value < 3.9 -> "#F59E0B"
+            value <= 10.0 -> "#10B981"
+            value <= 13.9 -> "#F59E0B"
+            else -> "#EF4444"
+        }
+
+        val matchedStr = match.value
+        val replacement = "<font color='$colorHex'><b>$matchedStr</b></font>"
+        val htmlText = text.replaceFirst(matchedStr, replacement)
+        return HtmlCompat.fromHtml(htmlText, HtmlCompat.FROM_HTML_MODE_LEGACY)
+    }
+
     private fun sendNotification(
         context: Context,
         channelId: String,
@@ -809,14 +820,14 @@ object GlucoseAlertManager {
 
         val alertHex = when (tier) {
             AlertTier.CRITICAL -> "#EF4444"
-            AlertTier.MAIN -> if (title.contains("гипо", true) || title.contains("low", true)) "#EF4444" else "#A855F7"
-            AlertTier.PREDICTIVE -> if (title.contains("гипо", true) || title.contains("low", true)) "#F59E0B" else "#A855F7"
+            AlertTier.MAIN -> if (title.contains("гипо", true) || title.contains("low", true)) "#EF4444" else "#F59E0B"
+            AlertTier.PREDICTIVE -> if (title.contains("гипо", true) || title.contains("low", true)) "#F59E0B" else "#F59E0B"
             AlertTier.SIGNAL_LOSS -> "#F59E0B"
         }
 
         val alertColor = Color.parseColor(alertHex)
 
-        // Add direct "ОК" button to dismiss/silence notification right from shade
+        // Add direct native "ОК" button to dismiss/silence notification right from shade
         val dismissIntent = Intent(context, AlertActionReceiver::class.java).apply {
             action = AlertActionReceiver.ACTION_DISMISS_CRITICAL
             putExtra("notification_id", notificationId)
@@ -828,20 +839,14 @@ object GlucoseAlertManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val alertViews = android.widget.RemoteViews(context.packageName, R.layout.notification_glucose_alert).apply {
-            setTextViewText(R.id.notif_alert_title, title)
-            setTextColor(R.id.notif_alert_title, alertColor)
-            setTextViewText(R.id.notif_alert_body, text)
-            setOnClickPendingIntent(R.id.notif_alert_ok_btn, dismissPendingIntent)
-        }
+        val formattedBody = formatAlertBodyWithColor(text)
 
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setColor(alertColor)
-            .setCustomContentView(alertViews)
-            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setContentTitle(title)
-            .setContentText(text)
+            .setContentText(formattedBody)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(formattedBody))
             .setPriority(priority)
             .setContentIntent(pendingIntent)
             .setSilent(true)
@@ -1150,7 +1155,6 @@ object GlucoseAlertManager {
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setContentTitle(titleSpanned)
             .setContentText(bodySpanned)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(bodySpanned))
             .setOngoing(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(true)

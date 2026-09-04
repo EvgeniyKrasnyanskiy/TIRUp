@@ -118,7 +118,7 @@ class MainActivity : ComponentActivity() {
         val settingsRepo = app.settingsRepository
         val importer = app.streamingImporter
 
-        val focusViewModel = FocusViewModel(glucoseRepo, settingsRepo)
+        val focusViewModel = FocusViewModel(glucoseRepo, settingsRepo, this.applicationContext)
         val trendsViewModel = TrendsViewModel(glucoseRepo, settingsRepo, this.applicationContext)
         val reportsViewModel = ReportsViewModel(this, glucoseRepo, settingsRepo, importer, database)
         val settingsViewModel = SettingsViewModel(this, settingsRepo, glucoseRepo, database)

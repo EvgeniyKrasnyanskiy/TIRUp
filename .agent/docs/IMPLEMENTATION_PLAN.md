@@ -930,6 +930,30 @@
 - [ ] **41.4. Финальная вычитка и приведение всей документации в чистовой вид (Clean Docs & Final Polishing)**:
   - Полная ревизия всех справок, онбординга, медицинского руководства пользователя в PDF и технического описания репозитория перед релизом.
 
+---
+
+## 42. Доработка виджетов 3х1, графика Sparkline, постоянных и обычных уведомлений [Completed]
+
+### 42.1. Кнопка запуска ночника «Дианайт» на виджете 3х1:
+- [x] В `widget_3x1.xml` добавлена кнопка `widget_btn_nightstand` (`🌙`) с фоном `@drawable/widget_button_bg`.
+- [x] В `TirupWidgetUpdater.kt` в метод `build3x1Views` добавлен параметр `nightstandIntent: PendingIntent` и привязан запуск `NightstandActivity` по клику.
+- [x] В `updateAllWidgets()` и `updateAppWidgetForOptions()` передан интент ночника.
+
+### 42.2. Сегментная окраска кривой на виджетах (Sparkline):
+- [x] В `TirupWidgetUpdater.drawSparklineBitmap` устранена проблема сплошной окраски всей 4-часовой линии цветом последнего замера.
+- [x] Реализована динамическая функция `getReadingColor(value)`: каждый отрезок окрашивается в соответствии с реальным значением сахара в этой точке (3.9–7.8 салатовый, 7.9–10.0 изумрудный, гипо/гипер — янтарный и красный).
+- [x] Головная светящаяся точка сахара (`lastX`, `lastY`) окрашивается в цвет текущего замера.
+
+### 42.3. Восстановление постоянных уведомлений в шторке (Lockscreen Notification):
+- [x] В `notification_glucose_lockscreen.xml` заменён неподдерживаемый в `RemoteViews` тег `<View>` на `<FrameLayout>`.
+- [x] В `GlucoseAlertManager.updateLockscreenNotification()` удалён вызов `.setStyle(BigTextStyle)`, который перезаписывал и ломал `DecoratedCustomViewStyle()`.
+- [x] В `UserSettings.kt` и `SettingsRepositoryImpl.kt` значение по умолчанию для `isLockscreenNotificationEnabled` установлено в `true`.
+- [x] В `FocusViewModel.kt` добавлен автоматический вызов `GlucoseAlertManager.updateLockscreenNotification()` при получении новых замеров и обновлении экрана Focus.
+
+### 42.4. Возврат стандартного стиля обычных уведомлений (алертов) и удаление дубликата кнопки «ОК»:
+- [x] Из `sendNotification` полностью удалена кастомная разметка `alertViews` и фиолетовый акцент `#A855F7`.
+- [x] Использован нативный `NotificationCompat.Builder` со стандартным системным заголовком и подсветкой только значения уровня сахара через HTML-разметку по диапазонам (`<font color='...'>`).
+- [x] Удалена дублирующаяся кнопка «ОК» внутри плашки — оставлена одна стандартная нативная кнопка действия через `builder.addAction(0, "ОК", dismissPendingIntent)`.
 
 
 

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -137,6 +137,17 @@
             android:textSize="11sp"
             android:textStyle="bold"
             android:includeFontPadding="false" />
+
+        <!-- Nightstand Action Button -->
+        <TextView
+            android:id="@+id/widget_btn_nightstand"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/widget_button_bg"
+            android:gravity="center"
+            android:text="🌙"
+            android:textSize="14sp" />
     </LinearLayout>
 
 </RelativeLayout>
