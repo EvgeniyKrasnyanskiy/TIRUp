@@ -137,6 +137,14 @@ class TrendsViewModel(
                         language = latestSettings.language
                     )
 
+                    val actualDaysCount = if (readings.isNotEmpty()) {
+                        val cal = java.util.Calendar.getInstance()
+                        readings.map { r ->
+                            cal.timeInMillis = r.timestamp
+                            cal.get(java.util.Calendar.YEAR) * 1000 + cal.get(java.util.Calendar.DAY_OF_YEAR)
+                        }.distinct().size
+                    } else 0
+
                     TrendsUiState(
                         selectedPeriod = period,
                         statistics = stats,
@@ -144,6 +152,7 @@ class TrendsViewModel(
                         percentileBins = agpBins,
                         heatmapData = heatmap,
                         userSettings = latestSettings,
+                        actualDaysCount = actualDaysCount,
                         isLoading = false
                     )
                 }

@@ -245,6 +245,7 @@ object TirupWidgetUpdater {
         nightstandIntent: PendingIntent
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_strip)
+        applyWidgetBackground(views, settings)
         views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
         views.setOnClickPendingIntent(R.id.widget_btn_nightstand, nightstandIntent)
 
@@ -262,7 +263,7 @@ object TirupWidgetUpdater {
         }
 
         bindCommonMetrics(views, latest, recent, settings)
-        bindCompensator(views, latest, todayReadings, settings)
+        bindCompensator(views, latest, todayReadings, settings, isStrip = true)
         bindIobCob(views, latest)
 
         return views
@@ -279,6 +280,7 @@ object TirupWidgetUpdater {
         nightstandIntent: PendingIntent
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_dashboard)
+        applyWidgetBackground(views, settings)
         views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
         views.setOnClickPendingIntent(R.id.widget_btn_nightstand, nightstandIntent)
 
@@ -297,7 +299,7 @@ object TirupWidgetUpdater {
         }
 
         bindCommonMetrics(views, latest, recent, settings)
-        bindCompensator(views, latest, todayReadings, settings)
+        bindCompensator(views, latest, todayReadings, settings, isStrip = false)
 
         // Streak badge
         val isRu = settings.language.equals("RU", ignoreCase = true)
@@ -346,6 +348,7 @@ object TirupWidgetUpdater {
         nightstandIntent: PendingIntent
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_compact)
+        applyWidgetBackground(views, settings)
         views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
         views.setOnClickPendingIntent(R.id.widget_btn_nightstand, nightstandIntent)
 
@@ -387,6 +390,7 @@ object TirupWidgetUpdater {
         mainIntent: PendingIntent
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_minimal)
+        applyWidgetBackground(views, settings)
         views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
 
         if (latest == null) {
@@ -466,6 +470,7 @@ object TirupWidgetUpdater {
         mainIntent: PendingIntent
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_vertical)
+        applyWidgetBackground(views, settings)
         views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
 
         if (latest == null) {
@@ -532,6 +537,7 @@ object TirupWidgetUpdater {
         nightstandIntent: PendingIntent
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_dashboard_medium)
+        applyWidgetBackground(views, settings)
         views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
         views.setOnClickPendingIntent(R.id.widget_btn_nightstand, nightstandIntent)
 
@@ -550,7 +556,7 @@ object TirupWidgetUpdater {
         }
 
         bindCommonMetrics(views, latest, recent, settings)
-        bindCompensator(views, latest, todayReadings, settings)
+        bindCompensator(views, latest, todayReadings, settings, isStrip = false)
 
         // Streak badge
         val isRu = settings.language.equals("RU", ignoreCase = true)
@@ -656,7 +662,8 @@ object TirupWidgetUpdater {
         views: RemoteViews,
         latest: GlucoseReading,
         todayReadings: List<GlucoseReading>,
-        settings: UserSettings
+        settings: UserSettings,
+        isStrip: Boolean = false
     ) {
         val isRu = settings.language.equals("RU", ignoreCase = true)
         val targetPercent = if (settings.targetMode == TargetMode.TIR) {
@@ -689,28 +696,49 @@ object TirupWidgetUpdater {
         views.setTextViewText(R.id.widget_tir_score, "$targetName: $currentPercent%")
         views.setProgressBar(R.id.widget_tir_progress, 100, currentPercent.coerceIn(0, 100), false)
 
-        val recText = formatCompactCompensator(compensator, isRu)
+        val recText = if (isStrip) {
+            formatStripCompensator(compensator, isRu)
+        } else {
+            if (isRu) compensator.recommendationRu else compensator.recommendationEn
+        }
         views.setTextViewText(R.id.widget_compensator_text, recText)
     }
 
-    private fun formatCompactCompensator(compensator: com.tirup.app.domain.model.CompensatorGoal, isRu: Boolean): String {
+    private fun formatStripCompensator(compensator: com.tirup.app.domain.model.CompensatorGoal, isRu: Boolean): String {
         return when {
-            compensator.neededMinutesToday <= 0 -> if (isRu) "В норме!" else "In target!"
-            compensator.neededMinutesToday > compensator.remainingMinutesToday -> if (isRu) "< цели" else "< goal"
+            compensator.neededMinutesToday <= 0 -> if (isRu) "Цель достигнута! (100%)" else "Goal reached! (100%)"
+            compensator.neededMinutesToday > compensator.remainingMinutesToday -> if (isRu) "Недостижимо (< цели)" else "Off target (< goal)"
             else -> {
                 val hours = compensator.neededMinutesToday / 60
                 val mins = compensator.neededMinutesToday % 60
                 if (hours > 0) {
                     if (mins > 0) {
-                        if (isRu) "+${hours}ч ${mins}м" else "+${hours}h ${mins}m"
+                        if (isRu) "В норме ещё ${hours}ч ${mins}м" else "In range ${hours}h ${mins}m"
                     } else {
-                        if (isRu) "+${hours}ч" else "+${hours}h"
+                        if (isRu) "В норме ещё ${hours}ч" else "In range ${hours}h"
                     }
                 } else {
-                    if (isRu) "+${mins}м" else "+${mins}m"
+                    if (isRu) "В норме ещё ${mins}м" else "In range ${mins}m"
                 }
             }
         }
+    }
+
+    fun getBackgroundResourceForOpacity(opacityPercent: Int): Int {
+        return when {
+            opacityPercent >= 95 -> R.drawable.widget_background_100
+            opacityPercent >= 80 -> R.drawable.widget_background_85
+            opacityPercent >= 60 -> R.drawable.widget_background_70
+            opacityPercent >= 40 -> R.drawable.widget_background_50
+            opacityPercent >= 20 -> R.drawable.widget_background_30
+            opacityPercent >= 5 -> R.drawable.widget_background_15
+            else -> R.drawable.widget_background_0
+        }
+    }
+
+    private fun applyWidgetBackground(views: RemoteViews, settings: UserSettings) {
+        val bgRes = getBackgroundResourceForOpacity(settings.widgetBackgroundOpacity)
+        views.setInt(R.id.widget_root, "setBackgroundResource", bgRes)
     }
 
     private fun bindIobCob(views: RemoteViews, latest: GlucoseReading) {

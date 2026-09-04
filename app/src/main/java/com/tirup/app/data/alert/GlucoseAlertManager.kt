@@ -608,23 +608,25 @@ object GlucoseAlertManager {
         // ----------------------------------------------------
         // TIER 2: MAIN (CONFIRMED OUT OF RANGE)
         // ----------------------------------------------------
+        val mainLow = alerts.mainLowThresholdMmol
+        val mainHigh = alerts.mainHighThresholdMmol
         if (alerts.isMainEnabled && sorted.size >= 2) {
             val lastPoints = sorted.takeLast(alerts.mainConsecutivePoints)
             val is5MinCadence = (sorted.last().timestamp - sorted[sorted.size - 2].timestamp >= 3 * 60_000L)
 
             val isLowConfirmed = if (is5MinCadence) {
-                sorted.size >= alerts.mainConsecutivePoints && lastPoints.all { it.valueMmol < tirLow }
+                sorted.size >= alerts.mainConsecutivePoints && lastPoints.all { it.valueMmol < mainLow }
             } else {
-                // 1-minute cadence: require at least 15 minutes of readings below tirLow
-                val lowPoints = sorted.takeLastWhile { it.valueMmol < tirLow }
+                // 1-minute cadence: require at least 15 minutes of readings below mainLow
+                val lowPoints = sorted.takeLastWhile { it.valueMmol < mainLow }
                 lowPoints.size >= 2 && (latest.timestamp - lowPoints.first().timestamp >= 15 * 60_000L)
             }
 
             val isHighConfirmed = if (is5MinCadence) {
-                sorted.size >= alerts.mainConsecutivePoints && lastPoints.all { it.valueMmol > tirHigh }
+                sorted.size >= alerts.mainConsecutivePoints && lastPoints.all { it.valueMmol > mainHigh }
             } else {
-                // 1-minute cadence: require at least 15 minutes of readings above tirHigh
-                val highPoints = sorted.takeLastWhile { it.valueMmol > tirHigh }
+                // 1-minute cadence: require at least 15 minutes of readings above mainHigh
+                val highPoints = sorted.takeLastWhile { it.valueMmol > mainHigh }
                 highPoints.size >= 2 && (latest.timestamp - highPoints.first().timestamp >= 15 * 60_000L)
             }
 
@@ -636,7 +638,7 @@ object GlucoseAlertManager {
                     if (isRu) "Глюкоза: %.1f ммоль/л ниже порога %.1f."
                     else "Glucose: %.1f mmol/L below threshold %.1f.",
                     latest.valueMmol,
-                    tirLow
+                    mainLow
                 )
                 sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash)
                 return
@@ -648,7 +650,7 @@ object GlucoseAlertManager {
                     if (isRu) "Глюкоза: %.1f ммоль/л выше нормы %.1f."
                     else "Glucose: %.1f mmol/L above threshold %.1f.",
                     latest.valueMmol,
-                    tirHigh
+                    mainHigh
                 )
                 sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash)
                 return

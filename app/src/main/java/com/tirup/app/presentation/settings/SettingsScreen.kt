@@ -48,6 +48,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -116,6 +122,7 @@ fun SettingsScreen(
     var showAdvancedSettings by rememberSaveable { mutableStateOf(false) }
     var showProfileDialog by rememberSaveable { mutableStateOf(false) }
     var showCriticalHypoSafetyDialog by rememberSaveable { mutableStateOf(false) }
+    var showMainThresholdDialog by rememberSaveable { mutableStateOf(false) }
     var masterOffHintVisible by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(masterOffHintVisible) {
@@ -440,7 +447,9 @@ fun SettingsScreen(
                             onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isMainFlash = it)) },
                             accentColor = ColorHigh,
                             onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.MAIN) },
-                            isRu = isRu
+                            isRu = isRu,
+                            thresholdBadge = "< ${alerts.mainLowThresholdMmol}  |  > ${alerts.mainHighThresholdMmol}",
+                            onThresholdClick = { showMainThresholdDialog = true }
                         )
 
                         Spacer(modifier = Modifier.height(6.dp))
@@ -817,6 +826,222 @@ fun SettingsScreen(
             }
         }
 
+        // Section: Floating Glucose Bubble (Плавающий пузырёк поверх всех окон)
+        item {
+            val context = LocalContext.current
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isRu) "Плавающий пузырёк с сахаром" else "Floating Glucose Bubble",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isRu) "Компактный кружок поверх всех приложений. Можно перетаскивать, тап открывает TIRUp, пульсирует при гипо"
+                                else "Compact bubble over apps. Draggable, tap opens app, pulses on low glucose",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Switch(
+                            checked = settings.isFloatingBubbleEnabled,
+                            onCheckedChange = { isChecked ->
+                                if (isChecked) {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
+                                        val intent = Intent(
+                                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                            Uri.parse("package:${context.packageName}")
+                                        )
+                                        context.startActivity(intent)
+                                    } else {
+                                        viewModel.toggleFloatingBubble(true)
+                                    }
+                                } else {
+                                    viewModel.toggleFloatingBubble(false)
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = PrimaryEmerald
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        // Section: Widget Background Opacity with Live Interactive Preview
+        item {
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isRu) "Прозрачность подложки виджетов" else "Widget Background Opacity",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isRu) "Плавная регулировка прозрачности под ваши обои" else "Adjust transparency to match your home wallpaper",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = PrimaryEmerald.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = "${settings.widgetBackgroundOpacity}%",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = PrimaryEmerald,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    // Live Interactive Preview Box on simulated wallpaper
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(105.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFF0F2027),
+                                        Color(0xFF203A43),
+                                        Color(0xFF2C5364)
+                                    )
+                                )
+                            )
+                            .padding(10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = Color(0xFF0F172A).copy(alpha = settings.widgetBackgroundOpacity / 100f),
+                            border = BorderStroke(
+                                1.dp,
+                                Color.White.copy(alpha = (settings.widgetBackgroundOpacity / 100f) * 0.22f)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(76.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(verticalArrangement = Arrangement.Center) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "5.8",
+                                            fontSize = 22.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "→",
+                                            fontSize = 17.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = PrimaryEmerald
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "+0.2",
+                                            fontSize = 11.sp,
+                                            color = Color(0xFF94A3B8)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (isRu) "В норме ещё 2ч 15м" else "In range 2h 15m left",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF38BDF8)
+                                    )
+                                }
+
+                                Column(
+                                    horizontalAlignment = Alignment.End,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = "TIR 84%",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PrimaryEmerald
+                                    )
+                                    Text(
+                                        text = "IoB 1.2 U",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFFCBD5E1)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Slider from 0 to 100%
+                    Slider(
+                        value = settings.widgetBackgroundOpacity.toFloat(),
+                        onValueChange = { newVal ->
+                            viewModel.updateWidgetBackgroundOpacity(newVal.toInt())
+                        },
+                        valueRange = 0f..100f,
+                        steps = 19,
+                        colors = SliderDefaults.colors(
+                            thumbColor = PrimaryEmerald,
+                            activeTrackColor = PrimaryEmerald,
+                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = if (isRu) "0% (Текст)" else "0% (Text)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = if (isRu) "85% (Стандарт)" else "85% (Default)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = PrimaryEmerald
+                        )
+                        Text(
+                            text = if (isRu) "100% (Глубокий)" else "100% (Solid)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
         // Section 4: Auto-Backup
         item {
             BentoCard(modifier = Modifier.fillMaxWidth()) {
@@ -834,7 +1059,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = if (isRu) "Ежедневно в 23:59:59 в Android/data/.../Backups" else "Daily at 23:59:59 in Android/data/.../Backups",
+                                text = if (isRu) "Ежедневно в 00:00 в Android/data/.../Backups" else "Daily at 00:00 in Android/data/.../Backups",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -851,7 +1076,7 @@ fun SettingsScreen(
 
                     if (settings.isAutoBackupEnabled) {
                         if (settings.lastBackupTimestamp > 0L) {
-                            val fmt = SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.getDefault())
+                            val fmt = SimpleDateFormat("dd.MM.yyyy 'в' HH:mm", Locale.getDefault())
                             val lastDateStr = fmt.format(Date(settings.lastBackupTimestamp))
                             Text(
                                 text = if (isRu) "Последний бэкап: $lastDateStr" else "Last backup: $lastDateStr",
@@ -860,11 +1085,44 @@ fun SettingsScreen(
                             )
                         } else {
                             Text(
-                                text = if (isRu) "Запланирован на сегодня в 23:59:59" else "Scheduled for today at 23:59:59",
+                                text = if (isRu) "Запланирован на сегодня в 00:00" else "Scheduled for today at 00:00",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ActionBlue
                             )
                         }
+                    }
+                }
+            }
+        }
+
+        // Section: Data Source Integration & App Info
+        item {
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = if (isRu) "ℹ️ Источник данных и синхронизация" else "ℹ️ Data Source & Sync",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Text(
+                        text = if (isRu) "Для непрерывной передачи сахара, а также активного инсулина (IoB) и углеводов (CoB), в приложении xDrip+ необходимо активировать:\n• Broadcast Locally (Локальный броадкаст)\n• Broadcast Service API (в Inter-app settings)\n• Pebble Broadcast / веб-сервер (порт 17580)"
+                        else "For uninterrupted streaming of glucose, active insulin (IoB) and carbs (CoB), enable in xDrip+:\n• Broadcast Locally\n• Broadcast Service API (in Inter-app settings)\n• Pebble Broadcast / web server (port 17580)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedButton(
+                        onClick = { showHelpDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.5f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = ActionBlue)
+                    ) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.Help, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = if (isRu) "Инструкция по настройке xDrip+ / GDH" else "xDrip+ / GDH Setup Instructions")
                     }
                 }
             }
@@ -973,6 +1231,116 @@ fun SettingsScreen(
             isRu = isRu,
             onPrintManual = { viewModel.printOrShareUserManual() },
             onDismiss = { showHelpDialog = false }
+        )
+    }
+
+    if (showMainThresholdDialog) {
+        var lowVal by remember { mutableStateOf(settings.alertSettings.mainLowThresholdMmol) }
+        var highVal by remember { mutableStateOf(settings.alertSettings.mainHighThresholdMmol) }
+
+        AlertDialog(
+            onDismissRequest = { showMainThresholdDialog = false },
+            title = {
+                Text(
+                    text = if (isRu) "Диапазон основных тревог" else "Main Alert Thresholds",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text(
+                        text = if (isRu) "Срабатывает при подтверждении 5 точек подряд за пределами заданного диапазона."
+                        else "Triggers when 5 consecutive readings fall outside this range.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // Low threshold
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (isRu) "Порог гипогликемии:" else "Low threshold:",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = String.format(Locale.US, "%.1f ммоль/л", lowVal),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = ColorLow
+                            )
+                        }
+                        Slider(
+                            value = lowVal.toFloat(),
+                            onValueChange = { lowVal = (Math.round(it * 10.0) / 10.0) },
+                            valueRange = 3.0f..5.0f,
+                            steps = 19,
+                            colors = SliderDefaults.colors(
+                                thumbColor = ColorLow,
+                                activeTrackColor = ColorLow
+                            )
+                        )
+                    }
+
+                    // High threshold
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (isRu) "Порог гипергликемии:" else "High threshold:",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = String.format(Locale.US, "%.1f ммоль/л", highVal),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = ColorHigh
+                            )
+                        }
+                        Slider(
+                            value = highVal.toFloat(),
+                            onValueChange = { highVal = (Math.round(it * 10.0) / 10.0) },
+                            valueRange = 7.0f..15.0f,
+                            steps = 15,
+                            colors = SliderDefaults.colors(
+                                thumbColor = ColorHigh,
+                                activeTrackColor = ColorHigh
+                            )
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.updateAlertSettings(
+                            settings.alertSettings.copy(
+                                mainLowThresholdMmol = lowVal,
+                                mainHighThresholdMmol = highVal
+                            )
+                        )
+                        showMainThresholdDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald)
+                ) {
+                    Text(if (isRu) "Сохранить" else "Save")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        lowVal = 3.9
+                        highVal = 10.0
+                    }
+                ) {
+                    Text(if (isRu) "Сброс к норме (3.9 - 10.0)" else "Default (3.9 - 10.0)")
+                }
+            }
         )
     }
 
@@ -1744,7 +2112,9 @@ private fun AlertTierConfigRow(
     onTestClick: () -> Unit,
     isRu: Boolean,
     timerBadge: String? = null,
-    isPaused: Boolean = false
+    isPaused: Boolean = false,
+    thresholdBadge: String? = null,
+    onThresholdClick: (() -> Unit)? = null
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1774,6 +2144,34 @@ private fun AlertTierConfigRow(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (thresholdBadge != null && onThresholdClick != null) {
+                        Spacer(modifier = Modifier.height(5.dp))
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = accentColor.copy(alpha = 0.14f),
+                            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.4f)),
+                            modifier = Modifier.clickable { onThresholdClick() }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = thresholdBadge,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = accentColor
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = null,
+                                    tint = accentColor,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
+                    }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (timerBadge != null) {

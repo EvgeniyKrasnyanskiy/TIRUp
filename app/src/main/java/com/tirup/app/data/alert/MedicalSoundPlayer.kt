@@ -19,6 +19,7 @@ object MedicalSoundPlayer {
 
     @Volatile
     private var isCriticalActive = false
+    private var previousAlarmVolume: Int? = null
 
     private var currentAudioTrack: AudioTrack? = null
 
@@ -28,12 +29,46 @@ object MedicalSoundPlayer {
                 when (tier) {
                     AlertTier.PREDICTIVE -> playPredictiveChime()
                     AlertTier.MAIN -> playTripleMainBeep()
-                    AlertTier.CRITICAL -> playCriticalAlarmSeries()
+                    AlertTier.CRITICAL -> {
+                        boostAlarmVolumeIfNeeded()
+                        playCriticalAlarmSeries()
+                    }
                     AlertTier.SIGNAL_LOSS -> playSignalLossTone()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to play synthesized medical sound for tier=$tier: ${e.message}")
             }
+        }
+    }
+
+    private fun boostAlarmVolumeIfNeeded() {
+        try {
+            val context = try { com.tirup.app.TirupApplication.instance } catch (_: Exception) { null } ?: return
+            val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager ?: return
+            val maxVol = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM)
+            val currentVol = audioManager.getStreamVolume(android.media.AudioManager.STREAM_ALARM)
+            val minDesiredVol = (maxVol * 0.80).toInt().coerceAtLeast(1)
+            if (currentVol < minDesiredVol) {
+                previousAlarmVolume = currentVol
+                audioManager.setStreamVolume(android.media.AudioManager.STREAM_ALARM, minDesiredVol, 0)
+                Log.i(TAG, "Alarm volume boosted from $currentVol to $minDesiredVol for Tier 3 Critical Alert")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to boost alarm volume: ${e.message}")
+        }
+    }
+
+    private fun restoreAlarmVolumeIfNeeded() {
+        val prev = previousAlarmVolume ?: return
+        try {
+            val context = try { com.tirup.app.TirupApplication.instance } catch (_: Exception) { null } ?: return
+            val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager ?: return
+            audioManager.setStreamVolume(android.media.AudioManager.STREAM_ALARM, prev, 0)
+            Log.i(TAG, "Restored alarm volume to $prev")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to restore alarm volume: ${e.message}")
+        } finally {
+            previousAlarmVolume = null
         }
     }
 
@@ -57,6 +92,7 @@ object MedicalSoundPlayer {
             currentAudioTrack?.release()
             currentAudioTrack = null
         } catch (_: Exception) {}
+        restoreAlarmVolumeIfNeeded()
     }
 
     /**
@@ -132,6 +168,7 @@ object MedicalSoundPlayer {
             playRawPcm(burstData, usage = AudioAttributes.USAGE_ALARM)
         }
         isCriticalActive = false
+        restoreAlarmVolumeIfNeeded()
     }
 
     private fun generateSineWave(freq: Double, durationMs: Int, volume: Float): ShortArray {

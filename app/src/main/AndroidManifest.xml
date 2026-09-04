@@ -2,12 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Permissions: local loopback communication with xDrip+ web service (127.0.0.1:17580) and background alarms -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.FLASHLIGHT" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <queries>
         <package android:name="com.eveningoutpost.dexdrip" />
@@ -84,6 +84,11 @@
                 <action android:name="com.tirup.app.ACTION_DISMISS_CRITICAL" />
             </intent-filter>
         </receiver>
+
+        <!-- Floating Glucose Bubble Overlay Service -->
+        <service
+            android:name=".presentation.overlay.FloatingBubbleService"
+            android:exported="false" />
 
         <!-- FileProvider for secure offline sharing of generated PDF medical reports -->
         <provider

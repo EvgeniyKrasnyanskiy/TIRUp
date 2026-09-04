@@ -161,6 +161,11 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         todayReadings = todayDomain,
                         settings = userSettings
                     )
+
+                    if (userSettings.isFloatingBubbleEnabled && android.provider.Settings.canDrawOverlays(context)) {
+                        com.tirup.app.presentation.overlay.FloatingBubbleService.start(context.applicationContext)
+                    }
+
                     com.tirup.app.data.backup.AutoBackupManager.maybeTriggerAutoBackup(
                         context = context.applicationContext,
                         database = app.database,

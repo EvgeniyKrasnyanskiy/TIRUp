@@ -15,6 +15,8 @@ data class AlertSettings(
     val mainConsecutivePoints: Int = 5,
     val isMainVibrate: Boolean = true,
     val isMainFlash: Boolean = false,
+    val mainLowThresholdMmol: Double = 3.9,
+    val mainHighThresholdMmol: Double = 10.0,
 
     // Tier 3: Critical (Prolonged out of range / Затяжные «кричащие»)
     val isCriticalEnabled: Boolean = true,

@@ -53,8 +53,9 @@ class SettingsRepositoryImpl(
             .putBoolean(KEY_HAS_SEEN_ONBOARDING, settings.hasSeenOnboarding)
             .putInt(KEY_LAST_STREAK_CELEBRATED_DAYS, settings.lastStreakCelebratedDays)
             .putString(KEY_METRICS_ORDER, settings.metricsOrder.joinToString(","))
-            .putString(KEY_HIDDEN_METRICS, settings.hiddenMetrics.joinToString(","))
             .putBoolean(KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED, settings.isLockscreenNotificationEnabled)
+            .putInt(KEY_WIDGET_BACKGROUND_OPACITY, settings.widgetBackgroundOpacity)
+            .putBoolean(KEY_IS_FLOATING_BUBBLE_ENABLED, settings.isFloatingBubbleEnabled)
             // Alert Settings
             .putBoolean(KEY_ALERT_MASTER_ENABLED, settings.alertSettings.isAlertsMasterEnabled)
             .putBoolean(KEY_ALERT_PREDICTIVE_ENABLED, settings.alertSettings.isPredictiveEnabled)
@@ -65,6 +66,8 @@ class SettingsRepositoryImpl(
             .putInt(KEY_ALERT_MAIN_POINTS, settings.alertSettings.mainConsecutivePoints)
             .putBoolean(KEY_ALERT_MAIN_VIBRATE, settings.alertSettings.isMainVibrate)
             .putBoolean(KEY_ALERT_MAIN_FLASH, settings.alertSettings.isMainFlash)
+            .putFloat(KEY_ALERT_MAIN_LOW_THRESHOLD, settings.alertSettings.mainLowThresholdMmol.toFloat())
+            .putFloat(KEY_ALERT_MAIN_HIGH_THRESHOLD, settings.alertSettings.mainHighThresholdMmol.toFloat())
             .putBoolean(KEY_ALERT_CRITICAL_ENABLED, settings.alertSettings.isCriticalEnabled)
             .putInt(KEY_ALERT_CRITICAL_HYPO_MIN, settings.alertSettings.criticalHypoMinutes)
             .putInt(KEY_ALERT_CRITICAL_HYPER_MIN, settings.alertSettings.criticalHyperMinutes)
@@ -155,6 +158,8 @@ class SettingsRepositoryImpl(
             hiddenMetrics = prefs.getString(KEY_HIDDEN_METRICS, null)?.split(",")?.filter { it.isNotBlank() }
                 ?: emptyList(),
             isLockscreenNotificationEnabled = prefs.getBoolean(KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED, false),
+            widgetBackgroundOpacity = prefs.getInt(KEY_WIDGET_BACKGROUND_OPACITY, 85),
+            isFloatingBubbleEnabled = prefs.getBoolean(KEY_IS_FLOATING_BUBBLE_ENABLED, false),
             alertSettings = AlertSettings(
                 isAlertsMasterEnabled = prefs.getBoolean(KEY_ALERT_MASTER_ENABLED, true),
                 isPredictiveEnabled = prefs.getBoolean(KEY_ALERT_PREDICTIVE_ENABLED, true),
@@ -165,6 +170,8 @@ class SettingsRepositoryImpl(
                 mainConsecutivePoints = prefs.getInt(KEY_ALERT_MAIN_POINTS, 5),
                 isMainVibrate = prefs.getBoolean(KEY_ALERT_MAIN_VIBRATE, true),
                 isMainFlash = prefs.getBoolean(KEY_ALERT_MAIN_FLASH, false),
+                mainLowThresholdMmol = prefs.getFloat(KEY_ALERT_MAIN_LOW_THRESHOLD, 3.9f).toDouble(),
+                mainHighThresholdMmol = prefs.getFloat(KEY_ALERT_MAIN_HIGH_THRESHOLD, 10.0f).toDouble(),
                 isCriticalEnabled = prefs.getBoolean(KEY_ALERT_CRITICAL_ENABLED, true),
                 criticalHypoMinutes = prefs.getInt(KEY_ALERT_CRITICAL_HYPO_MIN, 20),
                 criticalHyperMinutes = prefs.getInt(KEY_ALERT_CRITICAL_HYPER_MIN, 90),
@@ -211,6 +218,8 @@ class SettingsRepositoryImpl(
         private const val KEY_METRICS_ORDER = "key_metrics_order"
         private const val KEY_HIDDEN_METRICS = "key_hidden_metrics"
         private const val KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED = "key_is_lockscreen_notification_enabled"
+        private const val KEY_WIDGET_BACKGROUND_OPACITY = "key_widget_background_opacity"
+        private const val KEY_IS_FLOATING_BUBBLE_ENABLED = "key_is_floating_bubble_enabled"
 
         private const val KEY_ALERT_MASTER_ENABLED = "key_alert_master_enabled"
         private const val KEY_ALERT_PREDICTIVE_ENABLED = "key_alert_predictive_enabled"
@@ -221,6 +230,8 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_MAIN_POINTS = "key_alert_main_points"
         private const val KEY_ALERT_MAIN_VIBRATE = "key_alert_main_vibrate"
         private const val KEY_ALERT_MAIN_FLASH = "key_alert_main_flash"
+        private const val KEY_ALERT_MAIN_LOW_THRESHOLD = "key_alert_main_low_threshold"
+        private const val KEY_ALERT_MAIN_HIGH_THRESHOLD = "key_alert_main_high_threshold"
         private const val KEY_ALERT_CRITICAL_ENABLED = "key_alert_critical_enabled"
         private const val KEY_ALERT_CRITICAL_HYPO_MIN = "key_alert_critical_hypo_min"
         private const val KEY_ALERT_CRITICAL_HYPER_MIN = "key_alert_critical_hyper_min"

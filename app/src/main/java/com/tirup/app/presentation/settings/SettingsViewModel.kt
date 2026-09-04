@@ -172,6 +172,28 @@ class SettingsViewModel(
         }
     }
 
+    fun updateWidgetBackgroundOpacity(opacity: Int) {
+        viewModelScope.launch {
+            val updated = _uiState.value.userSettings.copy(widgetBackgroundOpacity = opacity)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+            com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context)
+        }
+    }
+
+    fun toggleFloatingBubble(enabled: Boolean) {
+        viewModelScope.launch {
+            val updated = _uiState.value.userSettings.copy(isFloatingBubbleEnabled = enabled)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+            if (enabled) {
+                com.tirup.app.presentation.overlay.FloatingBubbleService.start(context)
+            } else {
+                com.tirup.app.presentation.overlay.FloatingBubbleService.stop(context)
+            }
+        }
+    }
+
     fun testAlert(tier: com.tirup.app.data.alert.AlertTier) {
         val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
         com.tirup.app.data.alert.GlucoseAlertManager.sendTestAlert(context, tier, isRu)

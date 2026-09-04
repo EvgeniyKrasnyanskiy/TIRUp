@@ -6,6 +6,7 @@ import android.util.JsonWriter
 import android.util.Log
 import com.tirup.app.data.local.AppDatabase
 import com.tirup.app.data.local.entity.GlucoseReadingEntity
+import com.tirup.app.domain.model.AlertSettings
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.domain.model.TargetMode
@@ -313,6 +314,43 @@ object AutoBackupManager {
                     writer.name("therapyType").value(p.therapyType)
                     writer.endObject()
 
+                    writer.name("isAutoBackupEnabled").value(settings.isAutoBackupEnabled)
+                    writer.name("isLockscreenNotificationEnabled").value(settings.isLockscreenNotificationEnabled)
+                    writer.name("widgetBackgroundOpacity").value(settings.widgetBackgroundOpacity)
+                    writer.name("isFloatingBubbleEnabled").value(settings.isFloatingBubbleEnabled)
+
+                    // Alert Settings
+                    val a = settings.alertSettings
+                    writer.name("alertSettings")
+                    writer.beginObject()
+                    writer.name("isAlertsMasterEnabled").value(a.isAlertsMasterEnabled)
+                    writer.name("isPredictiveEnabled").value(a.isPredictiveEnabled)
+                    writer.name("predictiveMinutesAhead").value(a.predictiveMinutesAhead)
+                    writer.name("isPredictiveVibrate").value(a.isPredictiveVibrate)
+                    writer.name("isPredictiveFlash").value(a.isPredictiveFlash)
+                    writer.name("isMainEnabled").value(a.isMainEnabled)
+                    writer.name("mainConsecutivePoints").value(a.mainConsecutivePoints)
+                    writer.name("isMainVibrate").value(a.isMainVibrate)
+                    writer.name("isMainFlash").value(a.isMainFlash)
+                    writer.name("mainLowThresholdMmol").value(a.mainLowThresholdMmol)
+                    writer.name("mainHighThresholdMmol").value(a.mainHighThresholdMmol)
+                    writer.name("isCriticalEnabled").value(a.isCriticalEnabled)
+                    writer.name("criticalHypoMinutes").value(a.criticalHypoMinutes)
+                    writer.name("criticalHyperMinutes").value(a.criticalHyperMinutes)
+                    writer.name("isCriticalVibrate").value(a.isCriticalVibrate)
+                    writer.name("isCriticalFlash").value(a.isCriticalFlash)
+                    writer.name("criticalHypoPauseUntilTimestamp").value(a.criticalHypoPauseUntilTimestamp)
+                    writer.name("isCriticalHypoPermanentDisabled").value(a.isCriticalHypoPermanentDisabled)
+                    writer.name("isSignalLossEnabled").value(a.isSignalLossEnabled)
+                    writer.name("signalLossMinutes").value(a.signalLossMinutes)
+                    writer.name("isSignalLossVibrate").value(a.isSignalLossVibrate)
+                    writer.name("isSignalLossFlash").value(a.isSignalLossFlash)
+                    writer.name("snoozeHypoMinutes").value(a.snoozeHypoMinutes)
+                    writer.name("snoozeHyperMinutes").value(a.snoozeHyperMinutes)
+                    writer.name("isLastChanceAlertEnabled").value(a.isLastChanceAlertEnabled)
+                    writer.name("lastChanceBufferMinutes").value(a.lastChanceBufferMinutes)
+                    writer.endObject()
+
                     writer.endObject() // end settings
 
                     // Readings array
@@ -323,6 +361,8 @@ object AutoBackupManager {
                         writer.name("t").value(r.timestamp)
                         writer.name("v").value(r.valueMmol)
                         if (!r.trendArrow.isNullOrEmpty()) writer.name("a").value(r.trendArrow)
+                        if (r.iob != null) writer.name("iob").value(r.iob)
+                        if (r.cob != null) writer.name("cob").value(r.cob)
                         writer.endObject()
                     }
                     writer.endArray()
@@ -480,6 +520,12 @@ object AutoBackupManager {
         var targetRanges = TargetRanges()
         var profile = PatientProfile()
 
+        var isAutoBackupEnabled = true
+        var isLockscreenEnabled = false
+        var widgetOpacity = 85
+        var isFloatingBubble = false
+        var alertSettings = AlertSettings()
+
         reader.beginObject()
         while (reader.hasNext()) {
             when (reader.nextName()) {
@@ -490,6 +536,10 @@ object AutoBackupManager {
                 "nightStartHour" -> nightStart = reader.nextInt()
                 "nightEndHour" -> nightEnd = reader.nextInt()
                 "themeMode" -> themeMode = try { ThemeMode.valueOf(reader.nextString()) } catch (_: Exception) { ThemeMode.DARK }
+                "isAutoBackupEnabled" -> isAutoBackupEnabled = reader.nextBoolean()
+                "isLockscreenNotificationEnabled" -> isLockscreenEnabled = reader.nextBoolean()
+                "widgetBackgroundOpacity" -> widgetOpacity = reader.nextInt()
+                "isFloatingBubbleEnabled" -> isFloatingBubble = reader.nextBoolean()
                 "targetRanges" -> {
                     var tirLow = 3.9
                     var tirHigh = 10.0
@@ -544,6 +594,96 @@ object AutoBackupManager {
                     reader.endObject()
                     profile = PatientProfile(name, gender, bYear, bMonth, height, weight, diabType, diagYear, therapy)
                 }
+                "alertSettings" -> {
+                    var alertsMaster = true
+                    var predEnabled = true
+                    var predMin = 15
+                    var predVib = true
+                    var predFlash = false
+                    var mainEnabled = true
+                    var mainPoints = 5
+                    var mainVib = true
+                    var mainFlash = false
+                    var mainLow = 3.9
+                    var mainHigh = 10.0
+                    var critEnabled = true
+                    var critHypoMin = 20
+                    var critHyperMin = 90
+                    var critVib = true
+                    var critFlash = true
+                    var critPause = 0L
+                    var critPermDisabled = false
+                    var sigLossEnabled = true
+                    var sigLossMin = 20
+                    var sigLossVib = true
+                    var sigLossFlash = false
+                    var snoozeHypo = 15
+                    var snoozeHyper = 45
+                    var lastChanceEnabled = true
+                    var lastChanceBuffer = 90
+
+                    reader.beginObject()
+                    while (reader.hasNext()) {
+                        when (reader.nextName()) {
+                            "isAlertsMasterEnabled" -> alertsMaster = reader.nextBoolean()
+                            "isPredictiveEnabled" -> predEnabled = reader.nextBoolean()
+                            "predictiveMinutesAhead" -> predMin = reader.nextInt()
+                            "isPredictiveVibrate" -> predVib = reader.nextBoolean()
+                            "isPredictiveFlash" -> predFlash = reader.nextBoolean()
+                            "isMainEnabled" -> mainEnabled = reader.nextBoolean()
+                            "mainConsecutivePoints" -> mainPoints = reader.nextInt()
+                            "isMainVibrate" -> mainVib = reader.nextBoolean()
+                            "isMainFlash" -> mainFlash = reader.nextBoolean()
+                            "mainLowThresholdMmol" -> mainLow = reader.nextDouble()
+                            "mainHighThresholdMmol" -> mainHigh = reader.nextDouble()
+                            "isCriticalEnabled" -> critEnabled = reader.nextBoolean()
+                            "criticalHypoMinutes" -> critHypoMin = reader.nextInt()
+                            "criticalHyperMinutes" -> critHyperMin = reader.nextInt()
+                            "isCriticalVibrate" -> critVib = reader.nextBoolean()
+                            "isCriticalFlash" -> critFlash = reader.nextBoolean()
+                            "criticalHypoPauseUntilTimestamp" -> critPause = reader.nextLong()
+                            "isCriticalHypoPermanentDisabled" -> critPermDisabled = reader.nextBoolean()
+                            "isSignalLossEnabled" -> sigLossEnabled = reader.nextBoolean()
+                            "signalLossMinutes" -> sigLossMin = reader.nextInt()
+                            "isSignalLossVibrate" -> sigLossVib = reader.nextBoolean()
+                            "isSignalLossFlash" -> sigLossFlash = reader.nextBoolean()
+                            "snoozeHypoMinutes" -> snoozeHypo = reader.nextInt()
+                            "snoozeHyperMinutes" -> snoozeHyper = reader.nextInt()
+                            "isLastChanceAlertEnabled" -> lastChanceEnabled = reader.nextBoolean()
+                            "lastChanceBufferMinutes" -> lastChanceBuffer = reader.nextInt()
+                            else -> reader.skipValue()
+                        }
+                    }
+                    reader.endObject()
+                    alertSettings = AlertSettings(
+                        isAlertsMasterEnabled = alertsMaster,
+                        isPredictiveEnabled = predEnabled,
+                        predictiveMinutesAhead = predMin,
+                        isPredictiveVibrate = predVib,
+                        isPredictiveFlash = predFlash,
+                        isMainEnabled = mainEnabled,
+                        mainConsecutivePoints = mainPoints,
+                        isMainVibrate = mainVib,
+                        isMainFlash = mainFlash,
+                        mainLowThresholdMmol = mainLow,
+                        mainHighThresholdMmol = mainHigh,
+                        isCriticalEnabled = critEnabled,
+                        criticalHypoMinutes = critHypoMin,
+                        criticalHyperMinutes = critHyperMin,
+                        isCriticalVibrate = critVib,
+                        isCriticalFlash = critFlash,
+                        criticalHypoPauseUntilTimestamp = critPause,
+                        isCriticalHypoPermanentDisabled = critPermDisabled,
+                        isSignalLossEnabled = sigLossEnabled,
+                        signalLossMinutes = sigLossMin,
+                        isSignalLossVibrate = sigLossVib,
+                        isSignalLossFlash = sigLossFlash,
+                        snoozeHypoMinutes = snoozeHypo,
+                        snoozeHyperMinutes = snoozeHyper,
+                        isLastChanceAlertEnabled = lastChanceEnabled,
+                        lastChanceBufferMinutes = lastChanceBuffer
+                    )
+                }
                 else -> reader.skipValue()
             }
         }
@@ -559,7 +699,11 @@ object AutoBackupManager {
             nightEndHour = nightEnd,
             themeMode = themeMode,
             patientProfile = profile,
-            isAutoBackupEnabled = true,
+            isAutoBackupEnabled = isAutoBackupEnabled,
+            isLockscreenNotificationEnabled = isLockscreenEnabled,
+            widgetBackgroundOpacity = widgetOpacity,
+            isFloatingBubbleEnabled = isFloatingBubble,
+            alertSettings = alertSettings,
             hasSeenOnboarding = true
         )
     }
@@ -570,12 +714,16 @@ object AutoBackupManager {
             var timestamp = 0L
             var value = 0.0
             var arrow = ""
+            var iob: Double? = null
+            var cob: Double? = null
             reader.beginObject()
             while (reader.hasNext()) {
                 when (reader.nextName()) {
                     "t" -> timestamp = reader.nextLong()
                     "v" -> value = reader.nextDouble()
                     "a" -> arrow = reader.nextString()
+                    "iob" -> iob = reader.nextDouble()
+                    "cob" -> cob = reader.nextDouble()
                     else -> reader.skipValue()
                 }
             }
@@ -585,7 +733,9 @@ object AutoBackupManager {
                     GlucoseReadingEntity(
                         timestamp = timestamp,
                         valueMmol = value,
-                        trendArrow = if (arrow.isNotBlank()) arrow else null
+                        trendArrow = if (arrow.isNotBlank()) arrow else null,
+                        iob = iob,
+                        cob = cob
                     )
                 )
             }

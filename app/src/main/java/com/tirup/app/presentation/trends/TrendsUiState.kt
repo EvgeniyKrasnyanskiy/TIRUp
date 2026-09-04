@@ -22,5 +22,6 @@ data class TrendsUiState(
     val percentileBins: List<AGPPercentileBin> = emptyList(),
     val heatmapData: List<List<HeatmapCell>> = emptyList(),
     val userSettings: UserSettings = UserSettings(),
+    val actualDaysCount: Int = 0,
     val isLoading: Boolean = false
 )

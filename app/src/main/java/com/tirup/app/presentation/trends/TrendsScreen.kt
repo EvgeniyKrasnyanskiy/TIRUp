@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material3.AlertDialog
@@ -150,6 +151,38 @@ fun TrendsScreen(
                         selectedPeriod = selectedPeriod,
                         onPeriodSelected = { viewModel.selectPeriod(it) }
                     )
+                }
+
+                // Incomplete Period Banner
+                if (state.actualDaysCount > 0 && selectedPeriod.days > 0 && state.actualDaysCount < selectedPeriod.days) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 2.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = ActionBlue,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isRu) "Доступны данные за ${state.actualDaysCount} дн. (из ${selectedPeriod.days})"
+                                else "Data available for ${state.actualDaysCount} days (of ${selectedPeriod.days})",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = onSurfaceVariant,
+                                fontSize = 11.5.sp
+                            )
+                        }
+                    }
                 }
             }
         }

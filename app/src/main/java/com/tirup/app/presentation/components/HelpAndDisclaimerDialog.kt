@@ -119,15 +119,21 @@ fun HelpAndDisclaimerDialog(
                     iconTint = PrimaryEmerald,
                     title = if (isRu) "Настройка связи с xDrip+" else "xDrip+ Connection Guide",
                     content = if (isRu) {
-                        "1. Откройте приложение xDrip+ на смартфоне.\n" +
-                        "2. Перейдите в: Настройки (Settings) ➔ Межпрограммная интеграция (Inter-app settings).\n" +
-                        "3. Включите опцию: «Широковещательный показ данных» (Broadcast locally).\n" +
-                        "4. TIRUp начнёт мгновенно принимать каждое новое измерение в фоне без интернета."
+                        "Для полной интеграции выполните настройку в xDrip+:\n" +
+                        "1. Настройки ➔ Межпрограммная интеграция:\n" +
+                        "   • Включите «Широковещательный показ данных» (Broadcast locally) для приёма сахара;\n" +
+                        "   • Включите «API службы трансляции» (Broadcast Service API) для получения активного инсулина (IoB) и углеводов (CoB).\n" +
+                        "2. Настройки ➔ Интеграция со смарт-часами ➔ Настройки веб-службы Pebble:\n" +
+                        "   • Убедитесь, что веб-служба включена (порт 17580) для мгновенной локальной синхронизации.\n" +
+                        "3. TIRUp будет автоматически принимать замеры, стрелки тренда и IoB/CoB в фоне без интернета."
                     } else {
-                        "1. Open the xDrip+ application on your phone.\n" +
-                        "2. Navigate to: Settings ➔ Inter-app settings.\n" +
-                        "3. Enable: 'Broadcast locally' toggle.\n" +
-                        "4. TIRUp will automatically capture every glucose reading in the background locally."
+                        "For complete integration, configure the following in xDrip+:\n" +
+                        "1. Settings ➔ Inter-app settings:\n" +
+                        "   • Enable 'Broadcast locally' for real-time glucose readings;\n" +
+                        "   • Enable 'Broadcast Service API' to receive Insulin on Board (IoB) & Carbs (CoB).\n" +
+                        "2. Settings ➔ Smart Watch Integration ➔ Pebble Watch Integration:\n" +
+                        "   • Ensure Pebble Web Service is enabled (port 17580) for instant local sync.\n" +
+                        "3. TIRUp will automatically receive readings, trend arrows, and IoB/CoB in the background locally."
                     }
                 )
 
