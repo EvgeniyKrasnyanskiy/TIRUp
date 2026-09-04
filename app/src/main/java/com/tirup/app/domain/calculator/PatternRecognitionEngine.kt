@@ -72,9 +72,9 @@ object PatternRecognitionEngine {
             )
         }
 
-        // 2. Феномен «Утренней зари» (05:00–09:00: minuteOfDay in 300..540)
+        // 2. Феномен «Утренней зари» (06:00–09:00: minuteOfDay in 360..540)
         val earlyNightBins = bins.filter { it.minuteOfDay in 60..240 && it.readingsCount > 0 }
-        val dawnBins = bins.filter { it.minuteOfDay in 330..540 && it.readingsCount > 0 }
+        val dawnBins = bins.filter { it.minuteOfDay in 360..540 && it.readingsCount > 0 }
         val earlyNightMedian = if (earlyNightBins.isNotEmpty()) earlyNightBins.map { it.p50 }.average() else 6.0
         val dawnMedian = if (dawnBins.isNotEmpty()) dawnBins.map { it.p50 }.maxOrNull() ?: 0.0 else 0.0
 

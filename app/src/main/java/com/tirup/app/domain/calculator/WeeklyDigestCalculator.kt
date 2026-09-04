@@ -11,7 +11,7 @@ import kotlin.math.roundToInt
 
 object WeeklyDigestCalculator {
 
-    private const val MGDL_FACTOR = 18.0182
+    private const val MGDL_FACTOR = 18.01559
     const val MIN_CGM_ACTIVE_PERCENT = 70.0
     const val MIN_POINTS_FOR_ANALYSIS = 200 // Safety minimum for 7 days
 
@@ -143,11 +143,13 @@ object WeeklyDigestCalculator {
         referenceTime: Long,
         settings: UserSettings
     ): WeeklyDigest {
-        val weekMs = 7L * 24 * 60 * 60 * 1000L
+        val cal = Calendar.getInstance().apply { timeInMillis = referenceTime }
         val currentEnd = referenceTime
-        val currentStart = currentEnd - weekMs
+        cal.add(Calendar.DAY_OF_YEAR, -7)
+        val currentStart = cal.timeInMillis
         val prevEnd = currentStart
-        val prevStart = prevEnd - weekMs
+        cal.add(Calendar.DAY_OF_YEAR, -7)
+        val prevStart = cal.timeInMillis
 
         val currentReadings = allReadings.filter { it.timestamp in currentStart..currentEnd }
         val prevReadings = allReadings.filter { it.timestamp in prevStart until currentStart }

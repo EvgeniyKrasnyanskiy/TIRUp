@@ -161,21 +161,20 @@ val isDroppingDangerously = when {
 **Статус**: ✅ Исправлено (для USAGE_ALARM выставляется CONTENT_TYPE_ALARM).
 
 ### 🟡 MED-02 · ANR-риск в BackupAlarmReceiver (goAsync 10s timeout)
-**Файл**: `BackupAlarmReceiver.kt`
-**Решение**: Делегировать в WorkManager.
-**Статус**: ⏳ Оставлено
+**Файл**: `BackupAlarmReceiver.kt`, `AutoBackupWorker.kt`
+**Статус**: ✅ Исправлено (бэкап делегирован в WorkManager через AutoBackupWorker, исключая ANR в BroadcastReceiver).
 
 ### 🟡 MED-03 · collectAsState() вместо collectAsStateWithLifecycle()
 **Файл**: `MainActivity.kt`
-**Статус**: ⏳ Оставлено
+**Статус**: ⏳ Требует добавления androidx.lifecycle:lifecycle-runtime-compose
 
 ---
 
 ## Раздел 5. Низкие / Информационные (LOW / INFO)
 
-- **LOW-01**: Конвертационная константа 18.0182 vs стандартная 18.01559
-- **INFO-01**: Dawn Phenomenon window 05:30 vs текст 06:00 (`PatternRecognitionEngine.kt`)
-- **INFO-02**: DST не учтён в `WeeklyDigestCalculator.kt`
+- **LOW-01**: Конвертационная константа 18.0182 vs стандартная 18.01559 — ✅ Исправлено
+- **INFO-01**: Dawn Phenomenon window 06:00–09:00 (`PatternRecognitionEngine.kt`) — ✅ Исправлено (диапазон 360..540 синхронизирован с заголовком)
+- **INFO-02**: DST учтён в `WeeklyDigestCalculator.kt` через Calendar.add(Calendar.DAY_OF_YEAR, -7) — ✅ Исправлено
 
 ---
 
@@ -227,4 +226,5 @@ val isDroppingDangerously = when {
 | 8 | HIGH-05 | ViewModel recreation | ✅ Исправлено |
 | 9 | HIGH-06 | TIR boundary mismatch | ✅ Исправлено |
 | 10 | MED-01 | AudioTrack DND bypass | ✅ Исправлено |
-| 11 | MED-02..03 | Остальные средние риски | ⏳ |
+| 11 | MED-02 | WorkManager auto-backup | ✅ Исправлено |
+| 12 | MED-03 | collectAsStateWithLifecycle | ⏳ |
