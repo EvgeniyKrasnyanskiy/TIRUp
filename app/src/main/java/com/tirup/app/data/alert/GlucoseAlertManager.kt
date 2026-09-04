@@ -1023,45 +1023,79 @@ object GlucoseAlertManager {
 
         val isRu = settings.language.equals("RU", ignoreCase = true)
         val isMmol = settings.unit == com.tirup.app.domain.model.GlucoseUnit.MMOL_L
-        val glucoseStr = if (isMmol) {
+
+        val now = System.currentTimeMillis()
+        val elapsedMs = (now - latestReading.timestamp).coerceAtLeast(0L)
+        val elapsedMin = (elapsedMs / 60_000L).toInt()
+
+        val signalLossThresholdMin = settings.alertSettings.signalLossMinutes.coerceIn(10, 60)
+        val isSignalLost = elapsedMin >= signalLossThresholdMin
+        val isStale = elapsedMin > 5
+
+        val lastKnownGlucose = if (isMmol) {
             String.format(Locale.US, "%.1f", latestReading.valueMmol)
         } else {
             "${(latestReading.valueMmol * 18.0182).roundToInt()}"
         }
-        val arrow = latestReading.trendArrow
 
-        // Delta
-        val sorted = todayReadings.sortedBy { it.timestamp }
+        val glucoseStr: String
+        val arrow: String
+        val hexColor: String
+        val timeStr: String
         var deltaStr = ""
-        if (sorted.size >= 2) {
-            val targetTime = latestReading.timestamp - 5 * 60_000L
-            val candidate = sorted
-                .filter { it.timestamp in (targetTime - 120_000L)..(targetTime + 120_000L) && it.timestamp != latestReading.timestamp }
-                .minByOrNull { kotlin.math.abs(it.timestamp - targetTime) }
-            val reference = candidate ?: sorted.filter { it.timestamp < latestReading.timestamp }.maxByOrNull { it.timestamp }
-            if (reference != null) {
-                val diff = latestReading.valueMmol - reference.valueMmol
-                deltaStr = if (isMmol) {
-                    String.format(Locale.US, "%+.1f", diff)
-                } else {
-                    val dMg = (diff * 18.0182).roundToInt()
-                    "${if (dMg > 0) "+" else ""}$dMg"
+
+        if (isSignalLost) {
+            glucoseStr = "--"
+            arrow = ""
+            hexColor = "#94A3B8"
+            val lastTimeFormatted = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(latestReading.timestamp))
+            timeStr = if (isRu) "посл: $lastTimeFormatted" else "last: $lastTimeFormatted"
+        } else if (isStale) {
+            glucoseStr = lastKnownGlucose
+            arrow = latestReading.trendArrow ?: ""
+            hexColor = "#94A3B8"
+            timeStr = if (isRu) "${elapsedMin}м назад" else "${elapsedMin}m ago"
+        } else {
+            glucoseStr = lastKnownGlucose
+            arrow = latestReading.trendArrow ?: ""
+            timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(latestReading.timestamp))
+
+            val v = latestReading.valueMmol
+            hexColor = when {
+                v < 3.9 -> "#EF4444"
+                v <= 7.8 -> "#4ADE80"
+                v <= 10.0 -> "#10B981"
+                v <= 13.9 -> "#F59E0B"
+                else -> "#A855F7"
+            }
+
+            // Delta
+            val sorted = todayReadings.sortedBy { it.timestamp }
+            if (sorted.size >= 2) {
+                val targetTime = latestReading.timestamp - 5 * 60_000L
+                val candidate = sorted
+                    .filter { it.timestamp in (targetTime - 120_000L)..(targetTime + 120_000L) && it.timestamp != latestReading.timestamp }
+                    .minByOrNull { kotlin.math.abs(it.timestamp - targetTime) }
+                val reference = candidate ?: sorted.filter { it.timestamp < latestReading.timestamp }.maxByOrNull { it.timestamp }
+                if (reference != null) {
+                    val diff = latestReading.valueMmol - reference.valueMmol
+                    deltaStr = if (isMmol) {
+                        String.format(Locale.US, "%+.1f", diff)
+                    } else {
+                        val dMg = (diff * 18.0182).roundToInt()
+                        "${if (dMg > 0) "+" else ""}$dMg"
+                    }
                 }
             }
         }
 
-        val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(latestReading.timestamp))
-        val v = latestReading.valueMmol
-        val hexColor = when {
-            v < 3.9 -> "#EF4444"
-            v <= 7.8 -> "#4ADE80"
-            v <= 10.0 -> "#10B981"
-            v <= 13.9 -> "#F59E0B"
-            else -> "#A855F7"
+        val titleHtml = if (isSignalLost) {
+            val signalLostLabel = if (isRu) "📡 Потеря связи ($elapsedMin мин)" else "📡 Signal Lost ($elapsedMin min)"
+            "<font color='#94A3B8'><b>-- $signalLostLabel</b></font> &nbsp;&nbsp; <font color='#64748B'>$timeStr</font>"
+        } else {
+            val deltaHtml = if (deltaStr.isNotEmpty()) " <font color='$hexColor'>($deltaStr)</font>" else ""
+            "<font color='$hexColor'><b>$glucoseStr $arrow</b></font>$deltaHtml &nbsp;&nbsp; <font color='#94A3B8'>$timeStr</font>"
         }
-
-        val deltaHtml = if (deltaStr.isNotEmpty()) " <font color='$hexColor'>($deltaStr)</font>" else ""
-        val titleHtml = "<font color='$hexColor'><b>$glucoseStr $arrow</b></font>$deltaHtml &nbsp;&nbsp; <font color='#94A3B8'>$timeStr</font>"
         val titleSpanned = HtmlCompat.fromHtml(titleHtml, HtmlCompat.FROM_HTML_MODE_LEGACY)
 
         // Body with TIR, IoB and CoB
@@ -1077,15 +1111,19 @@ object GlucoseAlertManager {
         val tirColor = if (tirPercent >= 70) "#10B981" else if (tirPercent >= 50) "#F59E0B" else "#EF4444"
 
         val extrasList = mutableListOf<String>()
+        if (isSignalLost) {
+            val lastLabel = if (isRu) "Посл: $lastKnownGlucose" else "Last: $lastKnownGlucose"
+            extrasList.add("<font color='#94A3B8'><b>$lastLabel</b></font>")
+        }
         extrasList.add("<font color='$tirColor'><b>$targetName: $tirPercent%</b></font>")
 
-        val hasIob = latestReading.iob != null && latestReading.iob > 0.05
+        val hasIob = !isSignalLost && latestReading.iob != null && latestReading.iob > 0.05
         val iobFormatted = if (hasIob) String.format(Locale.US, if (isRu) "💉 %.2f Ед" else "💉 %.2f U", latestReading.iob) else ""
         if (hasIob) {
             extrasList.add("<font color='#38BDF8'><b>$iobFormatted</b></font>")
         }
 
-        val hasCob = latestReading.cob != null && latestReading.cob > 0.5
+        val hasCob = !isSignalLost && latestReading.cob != null && latestReading.cob > 0.5
         val cobFormatted = if (hasCob) String.format(Locale.US, if (isRu) "🍞 %.0f г" else "🍞 %.0f g", latestReading.cob) else ""
         if (hasCob) {
             extrasList.add("<font color='#FBBF24'><b>$cobFormatted</b></font>")
@@ -1111,7 +1149,7 @@ object GlucoseAlertManager {
             setTextViewText(R.id.notif_arrow, arrow)
             setTextColor(R.id.notif_arrow, Color.parseColor(hexColor))
 
-            if (deltaStr.isNotEmpty()) {
+            if (deltaStr.isNotEmpty() && !isSignalLost) {
                 setViewVisibility(R.id.notif_delta, android.view.View.VISIBLE)
                 setTextViewText(R.id.notif_delta, "Δ $deltaStr")
             } else {
@@ -1119,31 +1157,42 @@ object GlucoseAlertManager {
             }
 
             setTextViewText(R.id.notif_time, timeStr)
-            setTextViewText(R.id.notif_tir, "$targetName: $tirPercent%")
-            setTextColor(R.id.notif_tir, Color.parseColor(tirColor))
 
-            if (hasIob) {
-                setViewVisibility(R.id.notif_dot1, android.view.View.VISIBLE)
-                setViewVisibility(R.id.notif_iob, android.view.View.VISIBLE)
-                setTextViewText(R.id.notif_iob, iobFormatted)
-            } else {
+            if (isSignalLost) {
+                val signalLostText = if (isRu) "📡 Потеря связи ($elapsedMin мин)" else "📡 Signal Lost ($elapsedMin min)"
+                setTextViewText(R.id.notif_tir, signalLostText)
+                setTextColor(R.id.notif_tir, Color.parseColor("#94A3B8"))
+                setViewVisibility(R.id.notif_dot1, android.view.View.GONE)
                 setViewVisibility(R.id.notif_iob, android.view.View.GONE)
-            }
-
-            if (hasCob) {
-                setViewVisibility(R.id.notif_cob, android.view.View.VISIBLE)
-                setTextViewText(R.id.notif_cob, cobFormatted)
-                if (hasIob) {
-                    setViewVisibility(R.id.notif_dot2, android.view.View.VISIBLE)
-                } else {
-                    setViewVisibility(R.id.notif_dot1, android.view.View.VISIBLE)
-                    setViewVisibility(R.id.notif_dot2, android.view.View.GONE)
-                }
-            } else {
                 setViewVisibility(R.id.notif_dot2, android.view.View.GONE)
                 setViewVisibility(R.id.notif_cob, android.view.View.GONE)
-                if (!hasIob) {
-                    setViewVisibility(R.id.notif_dot1, android.view.View.GONE)
+            } else {
+                setTextViewText(R.id.notif_tir, "$targetName: $tirPercent%")
+                setTextColor(R.id.notif_tir, Color.parseColor(tirColor))
+
+                if (hasIob) {
+                    setViewVisibility(R.id.notif_dot1, android.view.View.VISIBLE)
+                    setViewVisibility(R.id.notif_iob, android.view.View.VISIBLE)
+                    setTextViewText(R.id.notif_iob, iobFormatted)
+                } else {
+                    setViewVisibility(R.id.notif_iob, android.view.View.GONE)
+                }
+
+                if (hasCob) {
+                    setViewVisibility(R.id.notif_cob, android.view.View.VISIBLE)
+                    setTextViewText(R.id.notif_cob, cobFormatted)
+                    if (hasIob) {
+                        setViewVisibility(R.id.notif_dot2, android.view.View.VISIBLE)
+                    } else {
+                        setViewVisibility(R.id.notif_dot1, android.view.View.VISIBLE)
+                        setViewVisibility(R.id.notif_dot2, android.view.View.GONE)
+                    }
+                } else {
+                    setViewVisibility(R.id.notif_dot2, android.view.View.GONE)
+                    setViewVisibility(R.id.notif_cob, android.view.View.GONE)
+                    if (!hasIob) {
+                        setViewVisibility(R.id.notif_dot1, android.view.View.GONE)
+                    }
                 }
             }
         }
@@ -1264,6 +1313,30 @@ object GlucoseAlertManager {
                 alerts = settings.alertSettings,
                 settings = settings
             )
+
+            // Keep persistent notification in sync with signal state even when no new sensor broadcasts arrive
+            if (settings.isLockscreenNotificationEnabled) {
+                val calendar = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                val todayEntities = app.database.glucoseReadingDao().getReadingsBetweenSync(
+                    calendar.timeInMillis,
+                    System.currentTimeMillis() + 60_000L
+                )
+                val todayDomain = todayEntities.map { it.toDomain() }
+                updateLockscreenNotification(
+                    context = context,
+                    latestReading = latestEntity.toDomain(),
+                    todayReadings = todayDomain,
+                    settings = settings
+                )
+            }
+
+            // Also keep widgets updated with latest staleness/signal state
+            com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context)
         } catch (e: Exception) {
             Log.e(TAG, "Error in checkSignalLossDirectly: ${e.message}", e)
         }
@@ -1311,6 +1384,9 @@ object GlucoseAlertManager {
                 // Schedule next check based on day/night interval
                 val nextIntervalMs = getNextSignalLossIntervalMs(signalLossAlertCount, isNightNow(settings))
                 scheduleNextSignalLossCheck(context, now + nextIntervalMs)
+            } else if (settings.isLockscreenNotificationEnabled) {
+                // Keep periodic check alive to update elapsed minutes in lockscreen notification
+                scheduleNextSignalLossCheck(context, now + 5 * 60 * 1000L)
             }
             return true
         } else {
@@ -1321,7 +1397,7 @@ object GlucoseAlertManager {
                 val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
                 nm?.cancel(NOTIFICATION_ID_SIGNAL_LOSS)
             }
-            if (alerts.isSignalLossEnabled) {
+            if (alerts.isSignalLossEnabled || settings.isLockscreenNotificationEnabled) {
                 scheduleNextSignalLossCheck(context, latestTimestamp + thresholdMs + 1000L)
             } else {
                 cancelSignalLossCheck(context)
