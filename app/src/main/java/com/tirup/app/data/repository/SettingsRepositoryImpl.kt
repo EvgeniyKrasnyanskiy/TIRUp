@@ -56,6 +56,8 @@ class SettingsRepositoryImpl(
             .putBoolean(KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED, settings.isLockscreenNotificationEnabled)
             .putInt(KEY_WIDGET_BACKGROUND_OPACITY, settings.widgetBackgroundOpacity)
             .putBoolean(KEY_IS_FLOATING_BUBBLE_ENABLED, settings.isFloatingBubbleEnabled)
+            .putBoolean(KEY_IS_WEEKLY_DIGEST_ENABLED, settings.isWeeklyDigestEnabled)
+            .putLong(KEY_DISMISSED_WEEKLY_DIGEST_TIMESTAMP, settings.dismissedWeeklyDigestTimestamp)
             // Alert Settings
             .putBoolean(KEY_ALERT_MASTER_ENABLED, settings.alertSettings.isAlertsMasterEnabled)
             .putBoolean(KEY_ALERT_PREDICTIVE_ENABLED, settings.alertSettings.isPredictiveEnabled)
@@ -160,6 +162,8 @@ class SettingsRepositoryImpl(
             isLockscreenNotificationEnabled = prefs.getBoolean(KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED, true),
             widgetBackgroundOpacity = prefs.getInt(KEY_WIDGET_BACKGROUND_OPACITY, 85),
             isFloatingBubbleEnabled = prefs.getBoolean(KEY_IS_FLOATING_BUBBLE_ENABLED, false),
+            isWeeklyDigestEnabled = prefs.getBoolean(KEY_IS_WEEKLY_DIGEST_ENABLED, true),
+            dismissedWeeklyDigestTimestamp = prefs.getLong(KEY_DISMISSED_WEEKLY_DIGEST_TIMESTAMP, 0L),
             alertSettings = AlertSettings(
                 isAlertsMasterEnabled = prefs.getBoolean(KEY_ALERT_MASTER_ENABLED, true),
                 isPredictiveEnabled = prefs.getBoolean(KEY_ALERT_PREDICTIVE_ENABLED, true),
@@ -220,6 +224,8 @@ class SettingsRepositoryImpl(
         private const val KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED = "key_is_lockscreen_notification_enabled"
         private const val KEY_WIDGET_BACKGROUND_OPACITY = "key_widget_background_opacity"
         private const val KEY_IS_FLOATING_BUBBLE_ENABLED = "key_is_floating_bubble_enabled"
+        private const val KEY_IS_WEEKLY_DIGEST_ENABLED = "key_is_weekly_digest_enabled"
+        private const val KEY_DISMISSED_WEEKLY_DIGEST_TIMESTAMP = "key_dismissed_weekly_digest_timestamp"
 
         private const val KEY_ALERT_MASTER_ENABLED = "key_alert_master_enabled"
         private const val KEY_ALERT_PREDICTIVE_ENABLED = "key_alert_predictive_enabled"

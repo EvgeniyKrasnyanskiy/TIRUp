@@ -74,6 +74,7 @@ object GlucoseAlertManager {
     const val CHANNEL_PATTERNS = "tirup_patterns_v1"
     const val CHANNEL_COMPENSATOR = "tirup_compensator_v1"
     const val CHANNEL_LOCKSCREEN = "tirup_lockscreen_status_v1"
+    const val CHANNEL_WEEKLY_DIGEST = "tirup_weekly_digest_v1"
 
     const val NOTIFICATION_ID_LOCKSCREEN = 1000
     const val NOTIFICATION_ID_PREDICTIVE = 1001
@@ -81,6 +82,9 @@ object GlucoseAlertManager {
     const val NOTIFICATION_ID_CRITICAL = 1003
     const val NOTIFICATION_ID_SIGNAL_LOSS = 1004
     const val NOTIFICATION_ID_LAST_CHANCE = 1005
+    const val NOTIFICATION_ID_WEEKLY_DIGEST = 6000
+
+    const val EXTRA_GOTO_WEEKLY_DIGEST = "com.tirup.app.GOTO_WEEKLY_DIGEST"
 
     // Timestamps for Smart Snooze / Anti-spam
     @Volatile
@@ -190,12 +194,72 @@ object GlucoseAlertManager {
             lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
         }
 
+        // Weekly Sunday Digest
+        val weeklyDigestChannel = NotificationChannel(
+            CHANNEL_WEEKLY_DIGEST,
+            "Воскресный дайджест компенсации",
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Еженедельная аналитическая сводка прогресса TIR, вариабельности и стабильности"
+            setSound(null, null)
+            enableVibration(false)
+        }
+
         nm.createNotificationChannel(predictiveChannel)
         nm.createNotificationChannel(mainChannel)
         nm.createNotificationChannel(criticalChannel)
         nm.createNotificationChannel(signalLossChannel)
         nm.createNotificationChannel(compensatorChannel)
         nm.createNotificationChannel(lockscreenChannel)
+        nm.createNotificationChannel(weeklyDigestChannel)
+    }
+
+    /**
+     * Posts a notification for the Sunday Weekly Digest.
+     */
+    fun showWeeklyDigestNotification(
+        context: Context,
+        digest: com.tirup.app.domain.model.WeeklyDigest,
+        isRu: Boolean
+    ) {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        initChannels(context)
+
+        val appIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(EXTRA_GOTO_WEEKLY_DIGEST, true)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            NOTIFICATION_ID_WEEKLY_DIGEST,
+            appIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val title = digest.headline
+        val bigText = buildString {
+            if (isRu) append("Сводка за неделю:\n") else append("Week summary:\n")
+            digest.keyInsights.forEach { insight ->
+                append("• ").append(insight).append("\n")
+            }
+            if (digest.recommendation.isNotBlank()) {
+                append("\n💡 ").append(digest.recommendation)
+            }
+        }.trim()
+
+        val shortText = digest.keyInsights.firstOrNull() ?: digest.recommendation
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_WEEKLY_DIGEST)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setColor(Color.parseColor("#38BDF8"))
+            .setContentTitle(title)
+            .setContentText(shortText)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+
+        nm.notify(NOTIFICATION_ID_WEEKLY_DIGEST, builder.build())
     }
 
     /**
