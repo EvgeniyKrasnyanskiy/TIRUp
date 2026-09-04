@@ -1094,6 +1094,73 @@
 - [x] Синхронизация экранных координат меток с жестами зума (pinch) и горизонтального скролла (pan).
 - [x] Модульные unit-тесты `TreatmentModelTest` (100% success).
 
+---
+
+## 45. Фаза 45: Воскресный аналитический дайджест компенсации (Weekly Sunday Digest) [Completed]
+
+### 45.1. Аналитическое ядро (Domain Layer):
+- [x] Создана доменная модель `WeeklyDigest`:
+  - Сравнение параметров текущей и предыдущей недели (TIR, TING, TBR, TAR, CV, SD, Mean BG).
+  - Кластеризация гипогликемий (ночные, утренние, дневные, вечерние окна).
+  - Динамические инсайты и клинические рекомендации на основе тренда.
+- [x] Разработан `WeeklyDigestCalculator` и 5 комплексных unit-тестов `WeeklyDigestCalculatorTest` (100% success).
+
+### 45.2. Фоновое расписание (WorkManager Layer):
+- [x] Создан `WeeklyDigestWorker` (`PeriodicWorkRequestBuilder`) с запуском каждое воскресенье в 20:00.
+- [x] Отправка тихого push-уведомления с переходом в дайджест при клике (`EXTRA_GOTO_WEEKLY_DIGEST`).
+
+### 45.3. Презентационный слой (UI Layer):
+- [x] Создан интерактивный `WeeklyDigestSheet` с визуальным сравнением двух недель (дельты со стрелками и цветами прогресса), разбивкой гипогликемий и кнопкой «Поделиться».
+- [x] В `TrendsScreen.kt` интегрирован заметный баннер с кнопкой закрытия `✕` (`dismissWeeklyDigestBanner()`, с запоминанием недели закрытия в `SharedPreferences`).
+- [x] В `SettingsScreen.kt` добавлен тумблер вкл/выкл дайджеста и кнопка немедленного ручного предпросмотра.
+
+---
+
+## 46. Фаза 46: Критические SMS-оповещения доверенным контактам при тяжелой затяжной гипогликемии [Completed]
+
+### 46.1. Манифест и разрешения (Security & Manifest):
+- [x] В `AndroidManifest.xml` добавлены разрешения:
+  - `android.permission.SEND_SMS`
+  - `android.permission.ACCESS_COARSE_LOCATION`
+  - `android.permission.ACCESS_FINE_LOCATION`
+
+### 46.2. Шаблон сообщений и форматирование (Domain Layer):
+- [x] Создан `EmergencySmsBuilder`:
+  - `buildEmergencyMessage()`: генерация экстренного текста с именем пациента, текущим сахаром, стрелкой тренда, длительностью сирены и геоссылкой Google Maps.
+  - `buildTestMessage()`: проверочный текст для тестирования канала доставки из Настроек.
+- [x] Создан `EmergencySmsBuilderTest` с 4 модульными тестами (100% success).
+
+### 46.3. Менеджер отправки и защита от спама (Data Layer):
+- [x] Расширена модель `AlertSettings` новыми полями:
+  - `isEmergencySmsEnabled: Boolean`
+  - `emergencyContactPhone: String`
+  - `emergencyContactName: String`
+  - `emergencySmsDelayMinutes: Int` (3, 5, 10 мин)
+  - `includeLocationInEmergencySms: Boolean`
+  - `lastEmergencySmsTimestamp: Long`
+- [x] Сериализация и десериализация полей в `SettingsRepositoryImpl`.
+- [x] Разработан `EmergencySmsManager`:
+  - Проверка кулдауна 30 минут (`COOLDOWN_MILLIS = 30 * 60 * 1000L`).
+  - Совместимость с Android 12+ (`context.getSystemService(SmsManager::class.java)` и fallback).
+  - Поддержка составных SMS (`divideMessage` / `sendMultipartTextMessage`) для длинных текстов и координат.
+  - Безопасное определение геопозиции через `LocationManager` (при отсутствии GPS SMS отправляется без координат, не блокируя экстренную помощь).
+  - Ручная отправка проверочного SMS `sendTestSms()`.
+
+### 46.4. Интеграция триггеров сирены (Alerts Lifecycle):
+- [x] В `GlucoseAlertManager.kt`:
+  - При запуске критической гипо-сирены (Tier 3) планируется корутина таймера `scheduleEmergencySmsIfEnabled()` на выбранную задержку (3/5/10 минут).
+  - При любом осознанном действии пользователя (клик «ОК» в шторке, разблокировка экрана, физическая кнопка громкости/питания `silenceCurrentSoundOnly`) или возвращении сахара в целевой диапазон таймер немедленно аннулируется (`cancelEmergencySmsTimer()`), исключая ложные тревоги.
+  - SMS отправляется строго при отсутствии реакции на сирену (подозрение на нейрогликопению, потерю сознания или диабетическую кому).
+
+### 46.5. Пользовательский интерфейс настроек (UI Layer):
+- [x] В `SettingsScreen.kt` добавлен выделенный BentoCard:
+  - Тумблер включения экстренных SMS с автоматическим запросом runtime permission на `SEND_SMS`.
+  - Поле ввода телефонного номера близкого человека (`+7...`) с валидацией и маской.
+  - Поле ввода имени доверенного лица.
+  - Сегментный переключатель таймера ожидания реакции (3 мин / 5 мин / 10 мин).
+  - Тумблер прикрепления GPS-координат с запросом `ACCESS_FINE_LOCATION`.
+  - Кнопка «Отправить проверочное SMS» с мгновенным Toast-отчётом об успехе или причине сбоя.
+
 
 
 
