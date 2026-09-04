@@ -216,7 +216,7 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Цветовое кодирование гликемии" else "Glycemic Range Color Standards",
                         if (isRu) "Цвета" else "Colors",
-                        if (isRu) "<3.9 ммоль/л — красный; 3.9..7.8 — бледно-зелёный (#4ADE80); 7.9..10.0 — насыщенный изумрудный (#10B981); 10.1..13.9 — оранжевый; >13.9 — фиолетовый. Фирменный синий убран."
+                        if (isRu) "<3.9 ммоль/л — красный; 3.9..7.8 — бледно-зелёный (#4ADE80); 7.9..10.0 — насыщенный изумрудный (#10B981); 10.1..13.9 — оранжевый; >13.9 — фиолетовый."
                         else "<3.9 mmol/L Red; 3.9..7.8 Pale Green (#4ADE80); 7.9..10.0 Saturated Emerald (#10B981); 10.1..13.9 Orange; >13.9 Purple. Syncs across all widgets."
                     ),
                     Triple(
@@ -374,7 +374,7 @@ class UserManualPdfGenerator(private val context: Context) {
                         else "Detects hidden nocturnal dips during user sleep window, dawn phenomenon, and post-meal spikes with individual per-event dismiss (✕)."
                     ),
                     Triple(
-                        if (isRu) "Ежедневный автономный автобэкап в 23:59:59" else "Daily Exact Auto-Backup at 23:59:59",
+                        if (isRu) "Ежедневный автономный автобэкап в 00:00" else "Daily Exact Auto-Backup at 00:00",
                         if (isRu) "Автобэкап" else "Backup",
                         if (isRu) "Точный будильник сохраняет настройки, пороги тревог и базу данных в изолированную песочницу без запроса опасных системных разрешений на доступ к файлам."
                         else "Exact RTC AlarmManager backs up settings, alert thresholds, and database into app sandbox at 23:59:59 without dangerous storage permissions."

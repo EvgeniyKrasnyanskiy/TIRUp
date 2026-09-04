@@ -49,6 +49,42 @@ object MedicalSoundPlayer {
         }
     }
 
+    /**
+     * Plays a short gentle ascending "beep" (pop-in) when the floating bubble appears during hypoglycemia.
+     */
+    fun playBubblePopIn() {
+        audioScope.launch {
+            try {
+                val p1 = generateSineWave(freq = 880.0, durationMs = 45, volume = 0.55f)
+                val p2 = generateSineWave(freq = 1174.66, durationMs = 65, volume = 0.65f)
+                val audioData = ShortArray(p1.size + p2.size)
+                System.arraycopy(p1, 0, audioData, 0, p1.size)
+                System.arraycopy(p2, 0, audioData, p1.size, p2.size)
+                playRawPcm(audioData, AudioAttributes.USAGE_NOTIFICATION)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to play bubble pop-in: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Plays a short soft descending "bob" (reverse pop-out) when tapping the floating bubble to dismiss/snooze.
+     */
+    fun playBubblePopOut() {
+        audioScope.launch {
+            try {
+                val p1 = generateSineWave(freq = 659.25, durationMs = 45, volume = 0.55f)
+                val p2 = generateSineWave(freq = 369.99, durationMs = 65, volume = 0.50f)
+                val audioData = ShortArray(p1.size + p2.size)
+                System.arraycopy(p1, 0, audioData, 0, p1.size)
+                System.arraycopy(p2, 0, audioData, p1.size, p2.size)
+                playRawPcm(audioData, AudioAttributes.USAGE_NOTIFICATION)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to play bubble pop-out: ${e.message}")
+            }
+        }
+    }
+
     private fun boostAlarmVolumeIfNeeded() {
         try {
             val context = try { com.tirup.app.TirupApplication.instance } catch (_: Exception) { null } ?: return

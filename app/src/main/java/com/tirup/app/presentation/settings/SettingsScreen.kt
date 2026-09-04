@@ -1676,6 +1676,8 @@ private fun PatientProfileEditDialog(
 
     var showBmiGuide by remember { mutableStateOf(false) }
     var showCarbGuide by remember { mutableStateOf(false) }
+    var isBmiExpanded by rememberSaveable { mutableStateOf(false) }
+    var isCarbExpanded by rememberSaveable { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1827,7 +1829,7 @@ private fun PatientProfileEditDialog(
                             border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.35f)),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { showBmiGuide = true }
+                                .clickable { isBmiExpanded = !isBmiExpanded }
                         ) {
                             Column(
                                 modifier = Modifier
@@ -1840,58 +1842,89 @@ private fun PatientProfileEditDialog(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(if (isRu) "ИМТ (индекс массы тела):" else "BMI:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    ) {
+                                        Text(
+                                            text = if (isRu) "ИМТ:" else "BMI:",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                         Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = String.format(Locale.US, "%.1f (%s)", bmi, if (isRu) category.labelRu else category.labelEn),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = catColor,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
                                         Surface(
-                                            shape = RoundedCornerShape(4.dp),
-                                            color = ActionBlue.copy(alpha = 0.15f)
+                                            shape = CircleShape,
+                                            color = ActionBlue.copy(alpha = 0.15f),
+                                            modifier = Modifier
+                                                .size(26.dp)
+                                                .clickable { showBmiGuide = true }
                                         ) {
-                                            Row(
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
+                                            Box(contentAlignment = Alignment.Center) {
                                                 Icon(
                                                     imageVector = Icons.Default.Info,
-                                                    contentDescription = null,
+                                                    contentDescription = "BMI Guide",
                                                     tint = ActionBlue,
-                                                    modifier = Modifier.size(12.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(3.dp))
-                                                Text(
-                                                    text = if (isRu) "Справка" else "Guide",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = ActionBlue
+                                                    modifier = Modifier.size(15.dp)
                                                 )
                                             }
                                         }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(
+                                            imageVector = if (isBmiExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
                                     }
-                                    Text(
-                                        text = String.format(Locale.US, "%.1f кг/м²", bmi),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        fontWeight = FontWeight.Bold
-                                    )
                                 }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(if (isRu) "Оценка ВОЗ:" else "WHO Assessment:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(
-                                        text = if (isRu) category.labelRu else category.labelEn,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = catColor,
-                                        fontWeight = FontWeight.Bold
-                                    )
+
+                                AnimatedVisibility(visible = isBmiExpanded) {
+                                    Column(
+                                        modifier = Modifier.padding(top = 4.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(if (isRu) "Точное значение:" else "Exact BMI:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(
+                                                text = String.format(Locale.US, "%.2f кг/м²", bmi),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(if (isRu) "Оценка ВОЗ:" else "WHO Assessment:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(
+                                                text = if (isRu) category.labelRu else category.labelEn,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = catColor,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        Text(
+                                            text = scaleNote,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
-                                Text(
-                                    text = scaleNote,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
                             }
                         }
                     }
@@ -1908,12 +1941,12 @@ private fun PatientProfileEditDialog(
                             border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.35f)),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { showCarbGuide = true }
+                                .clickable { isCarbExpanded = !isCarbExpanded }
                         ) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Row(
@@ -1921,7 +1954,10 @@ private fun PatientProfileEditDialog(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    ) {
                                         Icon(
                                             imageVector = Icons.Default.Restaurant,
                                             contentDescription = null,
@@ -1930,104 +1966,107 @@ private fun PatientProfileEditDialog(
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = if (isRu) "Рекомендуемые углеводы:" else "Recommended Carbs:",
+                                            text = carbRec.formatDailySummary(isRu),
                                             style = MaterialTheme.typography.bodySmall,
                                             fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            color = PrimaryEmerald
                                         )
                                     }
-                                    Surface(
-                                        shape = RoundedCornerShape(4.dp),
-                                        color = PrimaryEmerald.copy(alpha = 0.15f)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = PrimaryEmerald.copy(alpha = 0.15f),
+                                            modifier = Modifier
+                                                .size(26.dp)
+                                                .clickable { showCarbGuide = true }
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Info,
-                                                contentDescription = null,
-                                                tint = PrimaryEmerald,
-                                                modifier = Modifier.size(12.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(3.dp))
-                                            Text(
-                                                text = if (isRu) "Справка" else "Guide",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = PrimaryEmerald
-                                            )
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Info,
+                                                    contentDescription = "Carb Guide",
+                                                    tint = PrimaryEmerald,
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                            }
                                         }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(
+                                            imageVector = if (isCarbExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
                                     }
                                 }
 
-                                Text(
-                                    text = carbRec.formatDailySummary(isRu),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = PrimaryEmerald
-                                )
-
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
+                                AnimatedVisibility(visible = isCarbExpanded) {
                                     Column(
-                                        modifier = Modifier.padding(8.dp),
-                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        modifier = Modifier.padding(top = 4.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        Text(
-                                            text = if (isRu) "Ориентир по приёмам пищи:" else "Mealtime Distribution:",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                                            modifier = Modifier.fillMaxWidth()
                                         ) {
-                                            Text(if (isRu) "• Завтрак (20–25%):" else "• Breakfast:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
-                                            Text(carbRec.distribution.formatBreakfast(isRu), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                            Column(
+                                                modifier = Modifier.padding(8.dp),
+                                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (isRu) "Ориентир по приёмам пищи:" else "Mealtime Distribution:",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text(if (isRu) "• Завтрак (20–25%):" else "• Breakfast:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                                                    Text(carbRec.distribution.formatBreakfast(isRu), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                                }
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text(if (isRu) "• Обед (30–35%):" else "• Lunch:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                                                    Text(carbRec.distribution.formatLunch(isRu), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                                }
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text(if (isRu) "• Ужин (25–30%):" else "• Dinner:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                                                    Text(carbRec.distribution.formatDinner(isRu), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                                }
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text(if (isRu) "• Перекусы (10–15%):" else "• Snacks:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                                                    Text(carbRec.distribution.formatSnacks(isRu), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                                }
+                                            }
                                         }
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(if (isRu) "• Обед (30–35%):" else "• Lunch:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
-                                            Text(carbRec.distribution.formatLunch(isRu), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                                        }
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(if (isRu) "• Ужин (25–30%):" else "• Dinner:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
-                                            Text(carbRec.distribution.formatDinner(isRu), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                                        }
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(if (isRu) "• Перекусы (10–15%):" else "• Snacks:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
-                                            Text(carbRec.distribution.formatSnacks(isRu), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+
+                                        if (carbRec.clinicalWarningRu != null) {
+                                            Text(
+                                                text = if (isRu) carbRec.clinicalWarningRu else (carbRec.clinicalWarningEn ?: ""),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = ColorVeryHigh,
+                                                lineHeight = 14.sp
+                                            )
+                                        } else {
+                                            Text(
+                                                text = if (isRu) carbRec.clinicalRationaleRu else carbRec.clinicalRationaleEn,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                lineHeight = 14.sp
+                                            )
                                         }
                                     }
-                                }
-
-                                if (carbRec.clinicalWarningRu != null) {
-                                    Text(
-                                        text = if (isRu) carbRec.clinicalWarningRu else (carbRec.clinicalWarningEn ?: ""),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = ColorVeryHigh,
-                                        lineHeight = 14.sp
-                                    )
-                                } else {
-                                    Text(
-                                        text = if (isRu) carbRec.clinicalRationaleRu else carbRec.clinicalRationaleEn,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        lineHeight = 14.sp
-                                    )
                                 }
                             }
                         }
