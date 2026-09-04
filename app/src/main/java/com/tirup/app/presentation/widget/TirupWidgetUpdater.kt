@@ -11,6 +11,7 @@ import android.graphics.Color
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
+import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
@@ -42,15 +43,16 @@ object TirupWidgetUpdater {
             val stripIds = appWidgetManager.getAppWidgetIds(ComponentName(context, TirupStripWidgetProvider::class.java))
             val dashboardIds = appWidgetManager.getAppWidgetIds(ComponentName(context, TirupDashboardWidgetProvider::class.java))
             val compactIds = appWidgetManager.getAppWidgetIds(ComponentName(context, TirupCompactWidgetProvider::class.java))
+            val minimalIds = appWidgetManager.getAppWidgetIds(ComponentName(context, TirupMiniWidgetProvider::class.java))
 
-            if (stripIds.isEmpty() && dashboardIds.isEmpty() && compactIds.isEmpty()) {
+            if (stripIds.isEmpty() && dashboardIds.isEmpty() && compactIds.isEmpty() && minimalIds.isEmpty()) {
                 return@withContext
             }
 
             val app = context.applicationContext as? TirupApplication ?: return@withContext
             val settings = app.settingsRepository.getSettings().first()
             val latest = app.glucoseRepository.getLatestReading().first()
-            val recent = app.glucoseRepository.getRecentReadings(120).first()
+            val recent = app.glucoseRepository.getRecentReadings(280).first() // 4+ hours of 1-min readings
 
             val calendar = Calendar.getInstance().apply {
                 set(Calendar.HOUR_OF_DAY, 0)
@@ -74,7 +76,7 @@ object TirupWidgetUpdater {
             val mainPendingIntent = getMainPendingIntent(context)
             val nightstandPendingIntent = getNightstandPendingIntent(context)
 
-            // Update 4x1 / 5x1 Strip Widgets
+            // 1. Update 4x1 / 5x1 Strip Widgets
             if (stripIds.isNotEmpty()) {
                 val views = buildStripViews(
                     context = context,
@@ -88,7 +90,7 @@ object TirupWidgetUpdater {
                 appWidgetManager.updateAppWidget(stripIds, views)
             }
 
-            // Update 4x2 / 5x2 Dashboard Widgets
+            // 2. Update 4x2 / 5x2 Dashboard Widgets
             if (dashboardIds.isNotEmpty()) {
                 val views = buildDashboardViews(
                     context = context,
@@ -103,7 +105,7 @@ object TirupWidgetUpdater {
                 appWidgetManager.updateAppWidget(dashboardIds, views)
             }
 
-            // Update 2x2 Compact Widgets
+            // 3. Update 2x2 Compact Widgets
             if (compactIds.isNotEmpty()) {
                 val views = buildCompactViews(
                     context = context,
@@ -117,8 +119,81 @@ object TirupWidgetUpdater {
                 appWidgetManager.updateAppWidget(compactIds, views)
             }
 
+            // 4. Update 1x1 Minimal Widgets
+            if (minimalIds.isNotEmpty()) {
+                val views = buildMinimalViews(
+                    context = context,
+                    latest = latest,
+                    todayReadings = todayReadings,
+                    settings = settings,
+                    mainIntent = mainPendingIntent
+                )
+                appWidgetManager.updateAppWidget(minimalIds, views)
+            }
+
         } catch (e: Exception) {
             Log.e(TAG, "Error updating TIRUp homescreen widgets", e)
+        }
+    }
+
+    /**
+     * Handles dynamic widget resizing (e.g. morphing 4x1 -> 4x2 or 5x2 -> 5x1).
+     */
+    suspend fun updateAppWidgetForOptions(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) = withContext(Dispatchers.IO) {
+        try {
+            val app = context.applicationContext as? TirupApplication ?: return@withContext
+            val settings = app.settingsRepository.getSettings().first()
+            val latest = app.glucoseRepository.getLatestReading().first()
+            val recent = app.glucoseRepository.getRecentReadings(280).first()
+
+            val calendar = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val startOfDay = calendar.timeInMillis
+            val todayEntities = app.database.glucoseReadingDao().getReadingsBetweenSync(
+                startOfDay,
+                System.currentTimeMillis() + 60_000L
+            )
+            val todayReadings = todayEntities.map { it.toDomain() }
+            val streakDays = try { app.glucoseRepository.getStreakDays().first() } catch (_: Exception) { 0 }
+
+            val minHeight = newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT) ?: 0
+            val minWidth = newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH) ?: 0
+
+            val mainPendingIntent = getMainPendingIntent(context)
+            val nightstandPendingIntent = getNightstandPendingIntent(context)
+
+            // Dynamic layout selection based on current bounding box
+            val views = when {
+                minHeight >= 100 && minWidth >= 180 -> {
+                    // Expanded height: Bento Dashboard with 4h sparkline chart
+                    buildDashboardViews(context, latest, recent, todayReadings, settings, streakDays, mainPendingIntent, nightstandPendingIntent)
+                }
+                minWidth < 120 && minHeight < 100 -> {
+                    // 1x1 micro cell
+                    buildMinimalViews(context, latest, todayReadings, settings, mainPendingIntent)
+                }
+                minWidth < 180 && minHeight >= 100 -> {
+                    // 2x2 square focus
+                    buildCompactViews(context, latest, recent, todayReadings, settings, mainPendingIntent, nightstandPendingIntent)
+                }
+                else -> {
+                    // 1-row tall strip (4x1 or 5x1)
+                    buildStripViews(context, latest, recent, todayReadings, settings, mainPendingIntent, nightstandPendingIntent)
+                }
+            }
+
+            appWidgetManager.updateAppWidget(appWidgetId, views)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling widget resize options", e)
         }
     }
 
@@ -137,9 +212,10 @@ object TirupWidgetUpdater {
 
         if (latest == null) {
             views.setTextViewText(R.id.widget_glucose_value, "--")
+            views.setTextColor(R.id.widget_glucose_value, Color.parseColor("#94A3B8"))
             views.setTextViewText(R.id.widget_trend_arrow, "")
             views.setTextViewText(R.id.widget_delta_value, "--")
-            views.setTextViewText(R.id.widget_time_ago, "Нет данных")
+            views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
             views.setTextViewText(R.id.widget_compensator_text, "Ожидание данных CGM")
             views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
@@ -149,8 +225,6 @@ object TirupWidgetUpdater {
 
         bindCommonMetrics(views, latest, recent, settings)
         bindCompensator(views, latest, todayReadings, settings)
-
-        // IoB / CoB for 5x1
         bindIobCob(views, latest)
 
         return views
@@ -172,9 +246,10 @@ object TirupWidgetUpdater {
 
         if (latest == null) {
             views.setTextViewText(R.id.widget_glucose_value, "--")
+            views.setTextColor(R.id.widget_glucose_value, Color.parseColor("#94A3B8"))
             views.setTextViewText(R.id.widget_trend_arrow, "")
             views.setTextViewText(R.id.widget_delta_value, "--")
-            views.setTextViewText(R.id.widget_time_ago, "Нет данных")
+            views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
             views.setTextViewText(R.id.widget_compensator_text, "Ожидание данных CGM")
             views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
@@ -195,7 +270,7 @@ object TirupWidgetUpdater {
             views.setViewVisibility(R.id.widget_streak_text, View.GONE)
         }
 
-        // IoB
+        // IoB badge
         val iob = latest.iob ?: 0.0
         if (iob > 0.05) {
             views.setViewVisibility(R.id.widget_iob_text, View.VISIBLE)
@@ -204,16 +279,17 @@ object TirupWidgetUpdater {
             views.setViewVisibility(R.id.widget_iob_text, View.GONE)
         }
 
-        // Sparkline Canvas Chart
-        val chartBitmap = drawSparklineBitmap(
+        // Render 4-hour HD Canvas Sparkline with corridor and time scale
+        val sparklineBitmap = drawSparklineBitmap(
             readings = recent,
             latest = latest,
             widthPx = 640,
-            heightPx = 160,
-            ranges = settings.targetRanges
+            heightPx = 170,
+            ranges = settings.targetRanges,
+            isRu = isRu
         )
-        if (chartBitmap != null) {
-            views.setImageViewBitmap(R.id.widget_chart_image, chartBitmap)
+        if (sparklineBitmap != null) {
+            views.setImageViewBitmap(R.id.widget_chart_image, sparklineBitmap)
             views.setViewVisibility(R.id.widget_chart_image, View.VISIBLE)
         } else {
             views.setViewVisibility(R.id.widget_chart_image, View.GONE)
@@ -237,23 +313,103 @@ object TirupWidgetUpdater {
 
         if (latest == null) {
             views.setTextViewText(R.id.widget_glucose_value, "--")
+            views.setTextColor(R.id.widget_glucose_value, Color.parseColor("#94A3B8"))
             views.setTextViewText(R.id.widget_trend_arrow, "")
             views.setTextViewText(R.id.widget_delta_value, "--")
-            views.setTextViewText(R.id.widget_time_ago, "Нет данных")
+            views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
             return views
         }
 
         bindCommonMetrics(views, latest, recent, settings)
 
-        // Calculate TIR percent for badge
+        // TIR Score
         val inRangeCount = todayReadings.count {
-            it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tirHighMmol
+            if (settings.targetMode == TargetMode.TIR) {
+                it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tirHighMmol
+            } else {
+                it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tingHighMmol
+            }
         }
-        val tirPercent = if (todayReadings.isNotEmpty()) {
+        val currentPercent = if (todayReadings.isNotEmpty()) {
             (inRangeCount * 100.0 / todayReadings.size).roundToInt()
         } else 0
-        views.setTextViewText(R.id.widget_tir_score, "TIR: $tirPercent%")
+
+        val targetName = settings.targetMode.name
+        views.setTextViewText(R.id.widget_tir_score, "$targetName: $currentPercent%")
+
+        return views
+    }
+
+    private fun buildMinimalViews(
+        context: Context,
+        latest: GlucoseReading?,
+        todayReadings: List<GlucoseReading>,
+        settings: UserSettings,
+        mainIntent: PendingIntent
+    ): RemoteViews {
+        val views = RemoteViews(context.packageName, R.layout.widget_minimal)
+        views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
+
+        if (latest == null) {
+            views.setTextViewText(R.id.widget_glucose_value, "--")
+            views.setTextColor(R.id.widget_glucose_value, Color.parseColor("#94A3B8"))
+            views.setTextViewText(R.id.widget_trend_arrow, "")
+            views.setTextViewText(R.id.widget_tir_score, "TIR --")
+            views.setViewVisibility(R.id.widget_time_ago, View.GONE)
+            return views
+        }
+
+        val isMmol = settings.unit == GlucoseUnit.MMOL_L
+        val now = System.currentTimeMillis()
+        val diffMin = ((now - latest.timestamp).coerceAtLeast(0L) / 60_000L).toInt()
+        val isStale = diffMin > 5
+
+        // Glucose Value
+        val glucoseStr = if (isMmol) {
+            String.format(Locale.US, "%.1f", latest.valueMmol)
+        } else {
+            "${(latest.valueMmol * 18.0182).roundToInt()}"
+        }
+        views.setTextViewText(R.id.widget_glucose_value, glucoseStr)
+
+        // Range color (synchronized with FocusScreen: 7.9 - 10.0 is Good Blue!)
+        val glucoseColor = when {
+            isStale -> Color.parseColor("#94A3B8") // Gray when stale!
+            latest.valueMmol < 3.0 -> Color.parseColor("#EF4444")
+            latest.valueMmol < settings.targetRanges.tirLowMmol -> Color.parseColor("#F59E0B")
+            latest.valueMmol <= 7.0 -> Color.parseColor("#10B981")
+            latest.valueMmol <= 7.8 -> Color.parseColor("#84CC16")
+            latest.valueMmol <= settings.targetRanges.tirHighMmol -> Color.parseColor("#3B82F6") // Blue!
+            latest.valueMmol <= 13.9 -> Color.parseColor("#F59E0B")
+            else -> Color.parseColor("#EF4444")
+        }
+        views.setTextColor(R.id.widget_glucose_value, glucoseColor)
+        views.setTextColor(R.id.widget_trend_arrow, glucoseColor)
+        views.setTextViewText(R.id.widget_trend_arrow, latest.trendArrow)
+
+        // Time ago (hidden if fresh <= 1m)
+        if (diffMin <= 1) {
+            views.setViewVisibility(R.id.widget_time_ago, View.GONE)
+        } else {
+            views.setViewVisibility(R.id.widget_time_ago, View.VISIBLE)
+            views.setTextViewText(R.id.widget_time_ago, if (diffMin < 60) "${diffMin}м" else "${diffMin / 60}ч")
+        }
+
+        // TIR Score
+        val inRangeCount = todayReadings.count {
+            if (settings.targetMode == TargetMode.TIR) {
+                it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tirHighMmol
+            } else {
+                it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tingHighMmol
+            }
+        }
+        val currentPercent = if (todayReadings.isNotEmpty()) {
+            (inRangeCount * 100.0 / todayReadings.size).roundToInt()
+        } else 0
+
+        val targetName = settings.targetMode.name
+        views.setTextViewText(R.id.widget_tir_score, "$targetName $currentPercent%")
 
         return views
     }
@@ -265,7 +421,6 @@ object TirupWidgetUpdater {
         settings: UserSettings
     ) {
         val isMmol = settings.unit == GlucoseUnit.MMOL_L
-        val isRu = settings.language.equals("RU", ignoreCase = true)
         val now = System.currentTimeMillis()
 
         // 1. Glucose Value
@@ -276,18 +431,20 @@ object TirupWidgetUpdater {
         }
         views.setTextViewText(R.id.widget_glucose_value, glucoseStr)
 
-        // Color based on range and age
+        // Color based on range and age (matching FocusScreen exactly: 7.9-10.0 is Good Blue!)
         val diffMs = (now - latest.timestamp).coerceAtLeast(0L)
         val diffMin = (diffMs / 60_000L).toInt()
         val isStale = diffMin > 5
 
         val glucoseColor = when {
-            isStale -> Color.parseColor("#94A3B8") // Slate gray
-            latest.valueMmol < 3.0 -> Color.parseColor("#EF4444") // Critical hypo
-            latest.valueMmol < settings.targetRanges.tirLowMmol -> Color.parseColor("#F87171") // Mild hypo
-            latest.valueMmol <= settings.targetRanges.tirHighMmol -> Color.parseColor("#10B981") // In range
-            latest.valueMmol >= 14.0 -> Color.parseColor("#EF4444") // Critical hyper
-            else -> Color.parseColor("#F59E0B") // High
+            isStale -> Color.parseColor("#94A3B8") // Gray when stale!
+            latest.valueMmol < 3.0 -> Color.parseColor("#EF4444")
+            latest.valueMmol < settings.targetRanges.tirLowMmol -> Color.parseColor("#F59E0B")
+            latest.valueMmol <= 7.0 -> Color.parseColor("#10B981") // ColorTight
+            latest.valueMmol <= 7.8 -> Color.parseColor("#84CC16") // ColorTargetSoft
+            latest.valueMmol <= settings.targetRanges.tirHighMmol -> Color.parseColor("#3B82F6") // ColorTarget (Good Blue!)
+            latest.valueMmol <= 13.9 -> Color.parseColor("#F59E0B") // ColorHigh
+            else -> Color.parseColor("#EF4444") // ColorVeryHigh
         }
         views.setTextColor(R.id.widget_glucose_value, glucoseColor)
         views.setTextColor(R.id.widget_trend_arrow, glucoseColor)
@@ -309,17 +466,15 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_delta_value, "--")
         }
 
-        // 4. Time Ago
-        val timeAgoStr = when {
-            diffMin <= 1 -> if (isRu) "Только что" else "Just now"
-            diffMin < 60 -> if (isRu) "${diffMin}м назад" else "${diffMin}m ago"
-            else -> {
-                val h = diffMin / 60
-                val m = diffMin % 60
-                if (isRu) "${h}ч ${m}м назад" else "${h}h ${m}m ago"
-            }
+        // 4. Time Ago (hidden if <= 1m, compact "2м", "5м", "1ч" without "назад")
+        if (diffMin <= 1) {
+            views.setViewVisibility(R.id.widget_time_ago, View.GONE)
+            views.setTextViewText(R.id.widget_time_ago, "")
+        } else {
+            views.setViewVisibility(R.id.widget_time_ago, View.VISIBLE)
+            val timeAgoStr = if (diffMin < 60) "${diffMin}м" else "${diffMin / 60}ч"
+            views.setTextViewText(R.id.widget_time_ago, timeAgoStr)
         }
-        views.setTextViewText(R.id.widget_time_ago, timeAgoStr)
     }
 
     private fun bindCompensator(
@@ -375,6 +530,7 @@ object TirupWidgetUpdater {
             } else {
                 views.setViewVisibility(R.id.widget_iob_text, View.GONE)
             }
+
             if (cob > 0.5) {
                 views.setViewVisibility(R.id.widget_cob_text, View.VISIBLE)
                 views.setTextViewText(R.id.widget_cob_text, String.format(Locale.US, "🍞 %.0f g", cob))
@@ -387,45 +543,47 @@ object TirupWidgetUpdater {
     }
 
     /**
-     * Calculates the clinical 5-minute velocity delta.
-     * Looks for reading in a window of 3.5 to 7.5 minutes ago to ensure stability
-     * for both 1-minute and 5-minute sensors.
+     * Calculates clinical 5-minute velocity delta.
      */
-    fun calculate5MinDelta(latest: GlucoseReading, readings: List<GlucoseReading>): Double? {
-        if (readings.size < 2) return null
-        val targetTimestamp = latest.timestamp - 5 * 60_000L
+    fun calculate5MinDelta(latest: GlucoseReading, recent: List<GlucoseReading>): Double? {
+        if (recent.size < 2) return null
 
-        // Look for reading closest to targetTimestamp in window [3.5 min .. 7.5 min]
-        val candidate = readings
-            .filter { it.timestamp in (targetTimestamp - 120_000L)..(targetTimestamp + 120_000L) && it.timestamp != latest.timestamp }
-            .minByOrNull { abs(it.timestamp - targetTimestamp) }
+        val targetTime = latest.timestamp - 5 * 60 * 1000L
+        val minTargetTime = targetTime - 2 * 60 * 1000L // -7 min
+        val maxTargetTime = targetTime + 2 * 60 * 1000L // -3 min
 
-        val referenceReading = candidate ?: readings
+        val candidate = recent
+            .filter { it.timestamp in minTargetTime..maxTargetTime && it.timestamp != latest.timestamp }
+            .minByOrNull { abs(it.timestamp - targetTime) }
+
+        val reference = candidate ?: recent
             .filter { it.timestamp < latest.timestamp }
             .maxByOrNull { it.timestamp }
 
-        return if (referenceReading != null) {
-            latest.valueMmol - referenceReading.valueMmol
+        return if (reference != null) {
+            val delta = latest.valueMmol - reference.valueMmol
+            (delta * 10.0).roundToInt() / 10.0
         } else null
     }
 
     /**
-     * Draws a high-definition, anti-aliased Sparkline bitmap of glucose history
-     * over the last 3.5 hours with a shaded green target corridor.
+     * Draws a high-definition Sparkline bitmap of glucose history
+     * over the last 4 hours with shaded target corridor and time scale (-4ч, -2ч, сейчас).
      */
     fun drawSparklineBitmap(
         readings: List<GlucoseReading>,
         latest: GlucoseReading,
         widthPx: Int,
         heightPx: Int,
-        ranges: TargetRanges
+        ranges: TargetRanges,
+        isRu: Boolean = true
     ): Bitmap? {
         if (widthPx <= 0 || heightPx <= 0) return null
 
         val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
-        val windowMs = 12_600_000L // 3.5 hours window in milliseconds
+        val windowMs = 14_400_000L // 4 hours window in milliseconds
         val endTime = latest.timestamp
         val startTime = endTime - windowMs
 
@@ -442,10 +600,10 @@ object TirupWidgetUpdater {
         val maxGlucose = maxOf(windowReadings.maxOf { it.valueMmol }, high + 0.8).coerceAtLeast(11.5)
         val glucoseSpan = (maxGlucose - minGlucose).coerceAtLeast(4.0)
 
-        val paddingLeft = 12f
+        val paddingLeft = 14f
         val paddingRight = 18f
         val paddingTop = 10f
-        val paddingBottom = 10f
+        val paddingBottom = 24f // Space for bottom time scale labels
 
         val plotWidth = widthPx - paddingLeft - paddingRight
         val plotHeight = heightPx - paddingTop - paddingBottom
@@ -481,11 +639,45 @@ object TirupWidgetUpdater {
         canvas.drawLine(paddingLeft, yTargetLow, paddingLeft + plotWidth, yTargetLow, guidePaint)
         canvas.drawLine(paddingLeft, yTargetHigh, paddingLeft + plotWidth, yTargetHigh, guidePaint)
 
-        // 3. Draw Trajectory Line
+        // 3. Draw Bottom Time Scale: -4ч, -2ч, сейчас
+        val timeLabelPaint = Paint().apply {
+            color = Color.parseColor("#94A3B8")
+            textSize = 18f
+            isAntiAlias = true
+        }
+        val tickY = paddingTop + plotHeight
+        val tickPaint = Paint().apply {
+            color = Color.parseColor("#334155")
+            strokeWidth = 1.5f
+            isAntiAlias = true
+        }
+
+        // -4h tick & label
+        canvas.drawLine(paddingLeft, tickY, paddingLeft, tickY + 5f, tickPaint)
+        timeLabelPaint.textAlign = Paint.Align.LEFT
+        canvas.drawText(if (isRu) "-4ч" else "-4h", paddingLeft, heightPx - 4f, timeLabelPaint)
+
+        // -2h tick & label
+        val midX = paddingLeft + plotWidth / 2f
+        canvas.drawLine(midX, tickY, midX, tickY + 5f, tickPaint)
+        timeLabelPaint.textAlign = Paint.Align.CENTER
+        canvas.drawText(if (isRu) "-2ч" else "-2h", midX, heightPx - 4f, timeLabelPaint)
+
+        // Now tick & label
+        val nowX = paddingLeft + plotWidth
+        canvas.drawLine(nowX, tickY, nowX, tickY + 5f, tickPaint)
+        timeLabelPaint.textAlign = Paint.Align.RIGHT
+        canvas.drawText(if (isRu) "сейчас" else "now", nowX, heightPx - 4f, timeLabelPaint)
+
+        // 4. Draw Trajectory Line (color matching FocusScreen: 7.9-10.0 is Good Blue!)
         val curveColor = when {
-            latest.valueMmol < low -> Color.parseColor("#F87171")
-            latest.valueMmol > high -> Color.parseColor("#F59E0B")
-            else -> Color.parseColor("#10B981")
+            latest.valueMmol < 3.0 -> Color.parseColor("#EF4444")
+            latest.valueMmol < low -> Color.parseColor("#F59E0B")
+            latest.valueMmol <= 7.0 -> Color.parseColor("#10B981")
+            latest.valueMmol <= 7.8 -> Color.parseColor("#84CC16")
+            latest.valueMmol <= high -> Color.parseColor("#3B82F6") // Blue!
+            latest.valueMmol <= 13.9 -> Color.parseColor("#F59E0B")
+            else -> Color.parseColor("#EF4444")
         }
 
         val linePaint = Paint().apply {
@@ -511,7 +703,7 @@ object TirupWidgetUpdater {
         }
         canvas.drawPath(path, linePaint)
 
-        // 4. Draw Current Glucose Glowing Head Dot
+        // 5. Draw Current Glucose Glowing Head Dot
         val lastX = getX(latest.timestamp)
         val lastY = getY(latest.valueMmol)
 

@@ -7,49 +7,43 @@
     android:gravity="center_vertical"
     android:orientation="horizontal"
     android:paddingStart="12dp"
-    android:paddingTop="8dp"
+    android:paddingTop="6dp"
     android:paddingEnd="12dp"
-    android:paddingBottom="8dp">
+    android:paddingBottom="6dp">
 
-    <!-- 1. Left: Glucose & 5-min Trend Dynamics -->
+    <!-- 1. Left: Glucose & 5-min Dynamics (Compact) -->
     <LinearLayout
         android:id="@+id/widget_glucose_section"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:orientation="vertical">
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_glucose_value"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="9.1"
+            android:textColor="#3B82F6"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_trend_arrow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="2dp"
+            android:text="→"
+            android:textColor="#3B82F6"
+            android:textSize="20sp"
+            android:textStyle="bold" />
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/widget_glucose_value"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="6.4"
-                android:textColor="#10B981"
-                android:textSize="26sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/widget_trend_arrow"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingStart="4dp"
-                android:text="→"
-                android:textColor="#10B981"
-                android:textSize="20sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="vertical">
 
             <TextView
                 android:id="@+id/widget_delta_value"
@@ -57,31 +51,23 @@
                 android:layout_height="wrap_content"
                 android:text="+0.3"
                 android:textColor="#94A3B8"
-                android:textSize="11sp"
+                android:textSize="12sp"
                 android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingStart="4dp"
-                android:paddingEnd="4dp"
-                android:text="•"
-                android:textColor="#64748B"
-                android:textSize="10sp" />
 
             <TextView
                 android:id="@+id/widget_time_ago"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="2м назад"
-                android:textColor="#94A3B8"
-                android:textSize="11sp" />
+                android:text="2м"
+                android:textColor="#64748B"
+                android:textSize="10sp"
+                android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
 
     <FrameLayout
         android:layout_width="1dp"
-        android:layout_height="32dp"
+        android:layout_height="28dp"
         android:layout_marginStart="10dp"
         android:layout_marginEnd="10dp"
         android:background="#26FFFFFF" />
@@ -135,14 +121,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:ellipsize="end"
-            android:maxLines="1"
+            android:singleLine="true"
             android:text="В норме ещё 2 ч 15 мин"
             android:textColor="#38BDF8"
-            android:textSize="11sp"
+            android:textSize="10sp"
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- 3. Right: IoB / CoB Badges (prominent on 5x1) + Nightstand Button -->
+    <!-- 3. Right: IoB / CoB badges (visible on 5x1) & Nightstand Button -->
     <LinearLayout
         android:id="@+id/widget_actions_section"
         android:layout_width="wrap_content"
@@ -151,22 +137,24 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
+        <!-- IoB & CoB container for wider 5-column grids -->
         <LinearLayout
             android:id="@+id/widget_iob_cob_layout"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="6dp"
-            android:gravity="center_horizontal"
-            android:orientation="vertical">
+            android:gravity="center_vertical"
+            android:orientation="vertical"
+            android:visibility="gone">
 
             <TextView
                 android:id="@+id/widget_iob_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/widget_badge_bg"
-                android:paddingStart="4dp"
+                android:paddingStart="6dp"
                 android:paddingTop="1dp"
-                android:paddingEnd="4dp"
+                android:paddingEnd="6dp"
                 android:paddingBottom="1dp"
                 android:text="💉 1.2 U"
                 android:textColor="#38BDF8"
@@ -179,16 +167,18 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:background="@drawable/widget_badge_bg"
-                android:paddingStart="4dp"
+                android:paddingStart="6dp"
                 android:paddingTop="1dp"
-                android:paddingEnd="4dp"
+                android:paddingEnd="6dp"
                 android:paddingBottom="1dp"
                 android:text="🍞 25 g"
-                android:textColor="#F59E0B"
+                android:textColor="#10B981"
                 android:textSize="10sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:visibility="gone" />
         </LinearLayout>
 
+        <!-- Nightstand Action Button -->
         <TextView
             android:id="@+id/widget_btn_nightstand"
             android:layout_width="32dp"

@@ -3,12 +3,13 @@ package com.tirup.app.presentation.widget
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
+import android.os.Bundle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * 4x1 ↔ 5x1 Glycemic Strip Widget Provider
+ * 4x1 ↔ 5x1 Glycemic Strip Widget Provider (Morphs to Dashboard when resized to 2+ rows)
  */
 class TirupStripWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
@@ -22,10 +23,27 @@ class TirupStripWidgetProvider : AppWidgetProvider() {
             }
         }
     }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                TirupWidgetUpdater.updateAppWidgetForOptions(context, appWidgetManager, appWidgetId, newOptions)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
 }
 
 /**
- * 4x2 ↔ 5x2 Bento Dashboard Widget Provider with Sparkline Chart
+ * 4x2 ↔ 5x2 Bento Dashboard Widget Provider (Morphs to Strip when resized to 1 row)
  */
 class TirupDashboardWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
@@ -34,6 +52,23 @@ class TirupDashboardWidgetProvider : AppWidgetProvider() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 TirupWidgetUpdater.updateAllWidgets(context)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                TirupWidgetUpdater.updateAppWidgetForOptions(context, appWidgetManager, appWidgetId, newOptions)
             } finally {
                 pendingResult.finish()
             }
@@ -51,6 +86,57 @@ class TirupCompactWidgetProvider : AppWidgetProvider() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 TirupWidgetUpdater.updateAllWidgets(context)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                TirupWidgetUpdater.updateAppWidgetForOptions(context, appWidgetManager, appWidgetId, newOptions)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+}
+
+/**
+ * 1x1 Micro TIR-focused Glance Widget Provider
+ */
+class TirupMiniWidgetProvider : AppWidgetProvider() {
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                TirupWidgetUpdater.updateAllWidgets(context)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                TirupWidgetUpdater.updateAppWidgetForOptions(context, appWidgetManager, appWidgetId, newOptions)
             } finally {
                 pendingResult.finish()
             }

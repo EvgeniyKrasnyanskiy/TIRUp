@@ -7,7 +7,7 @@
     android:orientation="vertical"
     android:padding="12dp">
 
-    <!-- Top Row: Metrics & Quick Actions -->
+    <!-- Top Row: Metrics, Badges & Quick Actions -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -25,8 +25,8 @@
                 android:id="@+id/widget_glucose_value"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="6.4"
-                android:textColor="#10B981"
+                android:text="9.1"
+                android:textColor="#3B82F6"
                 android:textSize="26sp"
                 android:textStyle="bold" />
 
@@ -34,18 +34,20 @@
                 android:id="@+id/widget_trend_arrow"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:paddingStart="4dp"
+                android:paddingStart="3dp"
                 android:text="→"
-                android:textColor="#10B981"
+                android:textColor="#3B82F6"
                 android:textSize="20sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <!-- Delta & Time Ago -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:orientation="vertical">
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
             <TextView
                 android:id="@+id/widget_delta_value"
@@ -53,22 +55,40 @@
                 android:layout_height="wrap_content"
                 android:text="+0.3"
                 android:textColor="#94A3B8"
-                android:textSize="11sp"
+                android:textSize="12sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_time_ago"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="2м назад"
+                android:layout_marginStart="4dp"
+                android:text="2м"
                 android:textColor="#64748B"
-                android:textSize="10sp" />
+                android:textSize="11sp"
+                android:visibility="gone" />
         </LinearLayout>
 
         <FrameLayout
             android:layout_width="0dp"
             android:layout_height="1dp"
             android:layout_weight="1" />
+
+        <!-- Top Right Badges: TIR, Streak, IoB, Nightstand -->
+        <TextView
+            android:id="@+id/widget_tir_score"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/widget_badge_bg"
+            android:paddingStart="7dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="7dp"
+            android:paddingBottom="2dp"
+            android:text="TIR: 100%"
+            android:textColor="#10B981"
+            android:textSize="11sp"
+            android:textStyle="bold" />
 
         <!-- Streak Badge -->
         <TextView
@@ -81,7 +101,7 @@
             android:paddingTop="2dp"
             android:paddingEnd="6dp"
             android:paddingBottom="2dp"
-            android:text="🔥 4 дн"
+            android:text="🔥 2 дн"
             android:textColor="#F59E0B"
             android:textSize="11sp"
             android:textStyle="bold" />
@@ -113,7 +133,7 @@
             android:textSize="16sp" />
     </LinearLayout>
 
-    <!-- Middle: Sparkline Chart (3-4 hours trajectory with TIR band) -->
+    <!-- Middle: Sparkline Chart (4-hour window with TIR band & time scale) -->
     <ImageView
         android:id="@+id/widget_chart_image"
         android:layout_width="match_parent"
@@ -124,43 +144,29 @@
         android:contentDescription="Glucose Sparkline Chart"
         android:scaleType="fitXY" />
 
-    <!-- Bottom: Daily Compensator Goal -->
+    <!-- Bottom: Daily Compensator Goal (no overlap!) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <RelativeLayout
+        <TextView
+            android:id="@+id/widget_compensator_text"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-
-            <TextView
-                android:id="@+id/widget_tir_score"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentStart="true"
-                android:text="TIR за сегодня: 82%"
-                android:textColor="#FFFFFF"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/widget_compensator_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentEnd="true"
-                android:text="В норме ещё 2 ч 15 мин"
-                android:textColor="#38BDF8"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-        </RelativeLayout>
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:text="В норме ещё 14 ч 21 мин для цели ≥70%"
+            android:textColor="#38BDF8"
+            android:textSize="11sp"
+            android:textStyle="bold" />
 
         <ProgressBar
             android:id="@+id/widget_tir_progress"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
             android:layout_height="6dp"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="4dp"
             android:max="100"
             android:progress="82"
             android:progressTint="#10B981"

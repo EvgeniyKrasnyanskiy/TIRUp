@@ -95,4 +95,6 @@
     <string name="widget_dashboard_description">Полный дашборд с мини-графиком за 3–4 ч, компенсатором TIR и счётчиком дней в цели</string>
     <string name="widget_compact_label">TIRUp: Фокус (2x2)</string>
     <string name="widget_compact_description">Компактный квадратный виджет с текущим сахаром, дельтой, TIR и кнопкой ночника</string>
+    <string name="widget_minimal_label">TIRUp: Микро (1x1)</string>
+    <string name="widget_minimal_description">Ультракомпактный микро-виджет с текущим сахаром, трендом и суточным TIR</string>
 </resources>
