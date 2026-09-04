@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.filled.Help
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.CheckCircle
@@ -155,6 +156,16 @@ fun SettingsScreen(
     ) { isGranted ->
         if (isGranted) {
             Toast.makeText(context, if (isRu) "Доступ к геопозиции предоставлен" else "Location permission granted", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val receiveSmsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            Toast.makeText(context, if (isRu) "Разрешение на приём SMS-запросов предоставлено" else "RECEIVE_SMS permission granted", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, if (isRu) "Разрешение на приём SMS отклонено" else "RECEIVE_SMS permission denied", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -840,6 +851,37 @@ fun SettingsScreen(
                             )
                         }
 
+                        // SMS Query auto-reply toggle (offline internet fallback)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isRu) "Отвечать на SMS-запросы близких" else "Reply to SMS queries from contact",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isRu) "При отсутствии интернета отправляет сахар и TIR в ответ на SMS («сахар», «?»)"
+                                    else "Sends glucose and TIR via SMS when internet is down in reply to 'sugar' or '?'",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = alerts.isSmsQueryReplyEnabled,
+                                onCheckedChange = { isChecked ->
+                                    if (isChecked && ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
+                                        receiveSmsPermissionLauncher.launch(Manifest.permission.RECEIVE_SMS)
+                                    }
+                                    viewModel.updateAlertSettings(alerts.copy(isSmsQueryReplyEnabled = isChecked))
+                                }
+                            )
+                        }
+
                         // Send test verification SMS button
                         OutlinedButton(
                             onClick = {
@@ -854,7 +896,7 @@ fun SettingsScreen(
                             border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.6f))
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Send,
+                                imageVector = Icons.AutoMirrored.Filled.Send,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp),
                                 tint = PrimaryEmerald
