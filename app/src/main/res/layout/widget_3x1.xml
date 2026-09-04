@@ -9,7 +9,7 @@
     android:paddingEnd="10dp"
     android:paddingBottom="6dp">
 
-    <!-- 1. Left: Glucose, Arrow, Delta, Time -->
+    <!-- 1. Left: Large Glucose + Arrow -->
     <LinearLayout
         android:id="@+id/widget_glucose_section"
         android:layout_width="wrap_content"
@@ -25,7 +25,7 @@
             android:layout_height="wrap_content"
             android:text="5.4"
             android:textColor="#10B981"
-            android:textSize="26sp"
+            android:textSize="28sp"
             android:textStyle="bold"
             android:includeFontPadding="false" />
 
@@ -33,43 +33,28 @@
             android:id="@+id/widget_trend_arrow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingStart="2dp"
+            android:paddingStart="3dp"
             android:text="↗"
             android:textColor="#10B981"
-            android:textSize="20sp"
+            android:textSize="22sp"
             android:textStyle="bold"
             android:includeFontPadding="false" />
 
-        <LinearLayout
+        <!-- Hidden delta & time ago elements kept for safe binding -->
+        <TextView
+            android:id="@+id/widget_delta_value"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="5dp"
-            android:gravity="center_vertical"
-            android:orientation="vertical">
+            android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/widget_delta_value"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="+0.2"
-                android:textColor="#94A3B8"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:includeFontPadding="false" />
-
-            <TextView
-                android:id="@+id/widget_time_ago"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="2м"
-                android:textColor="#64748B"
-                android:textSize="10sp"
-                android:visibility="gone"
-                android:includeFontPadding="false" />
-        </LinearLayout>
+        <TextView
+            android:id="@+id/widget_time_ago"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
     </LinearLayout>
 
-    <!-- 2. Right: TIR Badge + IoB/CoB Layout -->
+    <!-- 2. Right: Vertical block with TIR on top, IoB + CoB below, and Nightstand button -->
     <LinearLayout
         android:id="@+id/widget_right_section"
         android:layout_width="wrap_content"
@@ -79,75 +64,83 @@
         android:gravity="end|center_vertical"
         android:orientation="horizontal">
 
-        <!-- IoB & CoB -->
+        <!-- Two rows: Line 1 = TIR, Line 2 = IoB + CoB -->
         <LinearLayout
-            android:id="@+id/widget_iob_cob_layout"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
             android:gravity="end|center_vertical"
-            android:orientation="vertical"
-            android:visibility="gone">
+            android:orientation="vertical">
 
+            <!-- TIR score badge: higher & larger (13sp) -->
             <TextView
-                android:id="@+id/widget_iob_text"
+                android:id="@+id/widget_tir_score"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/widget_badge_bg"
-                android:paddingStart="5dp"
-                android:paddingTop="1dp"
-                android:paddingEnd="5dp"
-                android:paddingBottom="1dp"
-                android:text="💉 1.2 U"
-                android:textColor="#38BDF8"
-                android:textSize="9sp"
-                android:textStyle="bold"
-                android:includeFontPadding="false" />
-
-            <TextView
-                android:id="@+id/widget_cob_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:background="@drawable/widget_badge_bg"
-                android:paddingStart="5dp"
-                android:paddingTop="1dp"
-                android:paddingEnd="5dp"
-                android:paddingBottom="1dp"
-                android:text="🍞 25 g"
+                android:paddingStart="7dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="7dp"
+                android:paddingBottom="2dp"
+                android:text="TIR: 97%"
                 android:textColor="#10B981"
-                android:textSize="9sp"
+                android:textSize="13sp"
                 android:textStyle="bold"
-                android:visibility="gone"
                 android:includeFontPadding="false" />
+
+            <!-- Second row: IoB & CoB horizontal chips -->
+            <LinearLayout
+                android:id="@+id/widget_iob_cob_layout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:gravity="end|center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/widget_iob_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/widget_badge_bg"
+                    android:paddingStart="4dp"
+                    android:paddingTop="1dp"
+                    android:paddingEnd="4dp"
+                    android:paddingBottom="1dp"
+                    android:text="💉 1.2 U"
+                    android:textColor="#38BDF8"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    android:includeFontPadding="false" />
+
+                <TextView
+                    android:id="@+id/widget_cob_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/widget_badge_bg"
+                    android:paddingStart="4dp"
+                    android:paddingTop="1dp"
+                    android:paddingEnd="4dp"
+                    android:paddingBottom="1dp"
+                    android:text="🍞 25 g"
+                    android:textColor="#10B981"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    android:includeFontPadding="false" />
+            </LinearLayout>
         </LinearLayout>
 
-        <!-- TIR score badge -->
-        <TextView
-            android:id="@+id/widget_tir_score"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/widget_badge_bg"
-            android:paddingStart="6dp"
-            android:paddingTop="3dp"
-            android:paddingEnd="6dp"
-            android:paddingBottom="3dp"
-            android:text="TIR: 97%"
-            android:textColor="#10B981"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:includeFontPadding="false" />
-
-        <!-- Nightstand Action Button -->
+        <!-- Nightstand Action Button (24dp x 24dp, 12sp) -->
         <TextView
             android:id="@+id/widget_btn_nightstand"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:layout_marginStart="6dp"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="8dp"
             android:background="@drawable/widget_button_bg"
             android:gravity="center"
             android:text="🌙"
-            android:textSize="14sp" />
+            android:textSize="12sp" />
     </LinearLayout>
 
 </RelativeLayout>

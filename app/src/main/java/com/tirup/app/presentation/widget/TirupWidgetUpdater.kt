@@ -771,7 +771,7 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_glucose_value, "--")
             views.setTextColor(R.id.widget_glucose_value, Color.parseColor("#94A3B8"))
             views.setTextViewText(R.id.widget_trend_arrow, "")
-            views.setTextViewText(R.id.widget_delta_value, "--")
+            views.setViewVisibility(R.id.widget_delta_value, View.GONE)
             views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
             views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
@@ -780,6 +780,10 @@ object TirupWidgetUpdater {
 
         bindCommonMetrics(views, latest, recent, settings)
         bindIobCob(views, latest)
+
+        // For 3x1, hide delta and time ago (orientation purely by gray color when stale)
+        views.setViewVisibility(R.id.widget_delta_value, View.GONE)
+        views.setViewVisibility(R.id.widget_time_ago, View.GONE)
 
         val targetName = settings.targetMode.name
         val targetPercent = if (settings.targetMode == TargetMode.TIR) {
