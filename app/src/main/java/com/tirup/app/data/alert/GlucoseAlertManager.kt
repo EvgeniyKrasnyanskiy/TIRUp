@@ -364,9 +364,19 @@ object GlucoseAlertManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val patternColor = Color.parseColor("#38BDF8")
+        val alertViews = android.widget.RemoteViews(context.packageName, R.layout.notification_glucose_alert).apply {
+            setTextViewText(R.id.notif_alert_title, title)
+            setTextColor(R.id.notif_alert_title, patternColor)
+            setTextViewText(R.id.notif_alert_body, text)
+            setOnClickPendingIntent(R.id.notif_alert_ok_btn, dismissPendingIntent)
+        }
+
         val notification = NotificationCompat.Builder(context, CHANNEL_PATTERNS)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setColor(Color.parseColor("#38BDF8"))
+            .setColor(patternColor)
+            .setCustomContentView(alertViews)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setContentTitle(titleSpanned)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
@@ -804,22 +814,40 @@ object GlucoseAlertManager {
             AlertTier.SIGNAL_LOSS -> "#F59E0B"
         }
 
-        val coloredTitle = HtmlCompat.fromHtml(
-            "<font color='$alertHex'><b>$title</b></font>",
-            HtmlCompat.FROM_HTML_MODE_LEGACY
+        val alertColor = Color.parseColor(alertHex)
+
+        // Add direct "ОК" button to dismiss/silence notification right from shade
+        val dismissIntent = Intent(context, AlertActionReceiver::class.java).apply {
+            action = AlertActionReceiver.ACTION_DISMISS_CRITICAL
+            putExtra("notification_id", notificationId)
+        }
+        val dismissPendingIntent = PendingIntent.getBroadcast(
+            context,
+            notificationId + 1000,
+            dismissIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+
+        val alertViews = android.widget.RemoteViews(context.packageName, R.layout.notification_glucose_alert).apply {
+            setTextViewText(R.id.notif_alert_title, title)
+            setTextColor(R.id.notif_alert_title, alertColor)
+            setTextViewText(R.id.notif_alert_body, text)
+            setOnClickPendingIntent(R.id.notif_alert_ok_btn, dismissPendingIntent)
+        }
 
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setColor(Color.parseColor(alertHex))
-            .setContentTitle(coloredTitle)
+            .setColor(alertColor)
+            .setCustomContentView(alertViews)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .setContentTitle(title)
             .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(priority)
             .setContentIntent(pendingIntent)
             .setSilent(true)
             .setSound(null)
             .setAutoCancel(true)
+            .addAction(0, "ОК", dismissPendingIntent)
 
         if (tier == AlertTier.PREDICTIVE) {
             // Unread predictive alert is only valid for 20 minutes
@@ -836,19 +864,6 @@ object GlucoseAlertManager {
         if (tier == AlertTier.CRITICAL) {
             isCriticalAlarmActive = true
         }
-
-        // Add direct "ОК" button to dismiss/silence notification right from shade
-        val dismissIntent = Intent(context, AlertActionReceiver::class.java).apply {
-            action = AlertActionReceiver.ACTION_DISMISS_CRITICAL
-            putExtra("notification_id", notificationId)
-        }
-        val dismissPendingIntent = PendingIntent.getBroadcast(
-            context,
-            notificationId + 1000,
-            dismissIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        builder.addAction(0, "ОК", dismissPendingIntent)
 
         if (vibrate) {
             triggerVibration(context, tier)
@@ -1022,10 +1037,10 @@ object GlucoseAlertManager {
             if (reference != null) {
                 val diff = latestReading.valueMmol - reference.valueMmol
                 deltaStr = if (isMmol) {
-                    String.format(Locale.US, " (%+.1f)", diff)
+                    String.format(Locale.US, "%+.1f", diff)
                 } else {
                     val dMg = (diff * 18.0182).roundToInt()
-                    " (${if (dMg > 0) "+" else ""}$dMg)"
+                    "${if (dMg > 0) "+" else ""}$dMg"
                 }
             }
         }
@@ -1040,7 +1055,7 @@ object GlucoseAlertManager {
             else -> "#A855F7"
         }
 
-        val deltaHtml = if (deltaStr.isNotEmpty()) " <font color='$hexColor'>$deltaStr</font>" else ""
+        val deltaHtml = if (deltaStr.isNotEmpty()) " <font color='$hexColor'>($deltaStr)</font>" else ""
         val titleHtml = "<font color='$hexColor'><b>$glucoseStr $arrow</b></font>$deltaHtml &nbsp;&nbsp; <font color='#94A3B8'>$timeStr</font>"
         val titleSpanned = HtmlCompat.fromHtml(titleHtml, HtmlCompat.FROM_HTML_MODE_LEGACY)
 
@@ -1059,12 +1074,15 @@ object GlucoseAlertManager {
         val extrasList = mutableListOf<String>()
         extrasList.add("<font color='$tirColor'><b>$targetName: $tirPercent%</b></font>")
 
-        if (latestReading.iob != null && latestReading.iob > 0.05) {
-            val iobFormatted = String.format(Locale.US, if (isRu) "💉 %.2f Ед" else "💉 %.2f U", latestReading.iob)
+        val hasIob = latestReading.iob != null && latestReading.iob > 0.05
+        val iobFormatted = if (hasIob) String.format(Locale.US, if (isRu) "💉 %.2f Ед" else "💉 %.2f U", latestReading.iob) else ""
+        if (hasIob) {
             extrasList.add("<font color='#38BDF8'><b>$iobFormatted</b></font>")
         }
-        if (latestReading.cob != null && latestReading.cob > 0.5) {
-            val cobFormatted = String.format(Locale.US, if (isRu) "🍞 %.0f г" else "🍞 %.0f g", latestReading.cob)
+
+        val hasCob = latestReading.cob != null && latestReading.cob > 0.5
+        val cobFormatted = if (hasCob) String.format(Locale.US, if (isRu) "🍞 %.0f г" else "🍞 %.0f g", latestReading.cob) else ""
+        if (hasCob) {
             extrasList.add("<font color='#FBBF24'><b>$cobFormatted</b></font>")
         }
 
@@ -1082,9 +1100,54 @@ object GlucoseAlertManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val lockViews = android.widget.RemoteViews(context.packageName, R.layout.notification_glucose_lockscreen).apply {
+            setTextViewText(R.id.notif_glucose, glucoseStr)
+            setTextColor(R.id.notif_glucose, Color.parseColor(hexColor))
+            setTextViewText(R.id.notif_arrow, arrow)
+            setTextColor(R.id.notif_arrow, Color.parseColor(hexColor))
+
+            if (deltaStr.isNotEmpty()) {
+                setViewVisibility(R.id.notif_delta, android.view.View.VISIBLE)
+                setTextViewText(R.id.notif_delta, "Δ $deltaStr")
+            } else {
+                setViewVisibility(R.id.notif_delta, android.view.View.GONE)
+            }
+
+            setTextViewText(R.id.notif_time, timeStr)
+            setTextViewText(R.id.notif_tir, "$targetName: $tirPercent%")
+            setTextColor(R.id.notif_tir, Color.parseColor(tirColor))
+
+            if (hasIob) {
+                setViewVisibility(R.id.notif_dot1, android.view.View.VISIBLE)
+                setViewVisibility(R.id.notif_iob, android.view.View.VISIBLE)
+                setTextViewText(R.id.notif_iob, iobFormatted)
+            } else {
+                setViewVisibility(R.id.notif_iob, android.view.View.GONE)
+            }
+
+            if (hasCob) {
+                setViewVisibility(R.id.notif_cob, android.view.View.VISIBLE)
+                setTextViewText(R.id.notif_cob, cobFormatted)
+                if (hasIob) {
+                    setViewVisibility(R.id.notif_dot2, android.view.View.VISIBLE)
+                } else {
+                    setViewVisibility(R.id.notif_dot1, android.view.View.VISIBLE)
+                    setViewVisibility(R.id.notif_dot2, android.view.View.GONE)
+                }
+            } else {
+                setViewVisibility(R.id.notif_dot2, android.view.View.GONE)
+                setViewVisibility(R.id.notif_cob, android.view.View.GONE)
+                if (!hasIob) {
+                    setViewVisibility(R.id.notif_dot1, android.view.View.GONE)
+                }
+            }
+        }
+
         val notification = NotificationCompat.Builder(context, CHANNEL_LOCKSCREEN)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setColor(Color.parseColor(hexColor))
+            .setCustomContentView(lockViews)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setContentTitle(titleSpanned)
             .setContentText(bodySpanned)
             .setStyle(NotificationCompat.BigTextStyle().bigText(bodySpanned))

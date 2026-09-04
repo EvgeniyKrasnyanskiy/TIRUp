@@ -695,8 +695,14 @@ fun DailyGlucoseChart(
                 val gapDurationStr = if (totalGapMinutes >= 60) {
                     val h = totalGapMinutes / 60
                     val m = totalGapMinutes % 60
-                    if (m > 0) "${h}ч ${m}м" else "${h}ч"
-                } else "${totalGapMinutes} мин"
+                    if (isRu) {
+                        if (m > 0) "${h}ч ${m}м" else "${h}ч"
+                    } else {
+                        if (m > 0) "${h}h ${m}m" else "${h}h"
+                    }
+                } else {
+                    if (isRu) "${totalGapMinutes} мин" else "${totalGapMinutes}m"
+                }
 
                 Row(
                     modifier = Modifier

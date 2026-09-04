@@ -703,8 +703,8 @@ fun SettingsScreen(
 
                     // Informational standard badge
                     val isMmol = settings.unit == GlucoseUnit.MMOL_L
-                    val tirRangeStr = if (isMmol) "3.9 — 10.0 ммоль/л" else "70 — 180 mg/dL"
-                    val tingRangeStr = if (isMmol) "3.9 — 7.8 ммоль/л" else "70 — 140 mg/dL"
+                    val tirRangeStr = if (isMmol) (if (isRu) "3.9 — 10.0 ммоль/л" else "3.9 — 10.0 mmol/L") else "70 — 180 mg/dL"
+                    val tingRangeStr = if (isMmol) (if (isRu) "3.9 — 7.8 ммоль/л" else "3.9 — 7.8 mmol/L") else "70 — 140 mg/dL"
 
                     Surface(
                         shape = RoundedCornerShape(12.dp),
@@ -721,7 +721,7 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "TIR (цель ≥70%):",
+                                    text = if (isRu) "TIR (цель ≥70%):" else "TIR (target ≥70%):",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -738,7 +738,7 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "TING (цель ≥50%):",
+                                    text = if (isRu) "TING (цель ≥50%):" else "TING (target ≥50%):",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -1568,13 +1568,14 @@ private fun PatientProfileSummaryCard(
     val bmi = profile.calculatedBmi
     val bmiStr = if (bmi != null) {
         val cat = BmiCategory.fromBmi(bmi, profile.calculatedAge, profile.gender)
-        String.format(Locale.US, "ИМТ %.1f (%s)", bmi, if (isRu) cat.labelRu else cat.labelEn)
+        val bmiLabel = if (isRu) "ИМТ" else "BMI"
+        String.format(Locale.US, "%s %.1f (%s)", bmiLabel, bmi, if (isRu) cat.labelRu else cat.labelEn)
     } else ""
     val carbStr = if (bmi != null) {
         val cat = BmiCategory.fromBmi(bmi, profile.calculatedAge, profile.gender)
         val carbRec = CarbRecommendationCalculator.calculate(profile.calculatedAge, profile.gender, cat)
-        val xeUnit = if (isRu) "ХЕ" else "BU"
-        String.format(Locale.US, "%.0f–%.0f %s/сут", carbRec.dailyXeRange.start, carbRec.dailyXeRange.endInclusive, xeUnit)
+        val xeUnit = if (isRu) "ХЕ/сут" else "BU/day"
+        String.format(Locale.US, "%.0f–%.0f %s", carbRec.dailyXeRange.start, carbRec.dailyXeRange.endInclusive, xeUnit)
     } else ""
 
     val subtitleParts = listOf(ageStr, diagStr, durStr, bmiStr, carbStr).filter { it.isNotBlank() }
@@ -1899,7 +1900,7 @@ private fun PatientProfileEditDialog(
                                         ) {
                                             Text(if (isRu) "Точное значение:" else "Exact BMI:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                             Text(
-                                                text = String.format(Locale.US, "%.2f кг/м²", bmi),
+                                                text = String.format(Locale.US, if (isRu) "%.2f кг/м²" else "%.2f kg/m²", bmi),
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 color = MaterialTheme.colorScheme.onSurface,
                                                 fontWeight = FontWeight.Bold

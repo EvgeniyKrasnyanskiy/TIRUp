@@ -280,9 +280,10 @@ fun FocusScreen(
                                 valueColor = meanColor,
                                 modifier = modifier,
                                 onClick = {
-                                    val targetVal = if (unit == GlucoseUnit.MMOL_L) "≤7.0–7.8 ммоль/л" else "≤126–140 мг/дл"
-                                    val healthyMean = if (unit == GlucoseUnit.MMOL_L) "4.5–5.8 ммоль/л" else "80–105 мг/дл"
-                                    val healthyFasting = if (unit == GlucoseUnit.MMOL_L) "3.3–5.5 ммоль/л" else "60–100 мг/дл"
+                                    val unitStr = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL")
+                                    val targetVal = if (unit == GlucoseUnit.MMOL_L) "≤7.0–7.8 $unitStr" else "≤126–140 $unitStr"
+                                    val healthyMean = if (unit == GlucoseUnit.MMOL_L) "4.5–5.8 $unitStr" else "80–105 $unitStr"
+                                    val healthyFasting = if (unit == GlucoseUnit.MMOL_L) "3.3–5.5 $unitStr" else "60–100 $unitStr"
                                     detailDialogInfo = Pair(
                                         if (isRu) "Средний сахар за сегодня (Mean)" else "Today's Mean Glucose",
                                         if (isRu) "Среднее арифметическое измерений с 00:00 до текущей минуты.\n\n" +
@@ -292,7 +293,7 @@ fun FocusScreen(
                                         else "24h average glucose from 00:00 to now.\n\n" +
                                                 "• Clinical target in diabetes: $targetVal.\n" +
                                                 "• Healthy non-diabetic baseline: average $healthyMean (fasting $healthyFasting).\n\n" +
-                                                "💡 CGM fact: healthy individuals can briefly touch 8.5–10.0 mmol/L after high-carb meals, returning to baseline quickly."
+                                                "💡 CGM fact: healthy individuals can briefly touch ${if (unit == GlucoseUnit.MMOL_L) "8.5–10.0 mmol/L" else "150–180 mg/dL"} after high-carb meals, returning to baseline quickly."
                                     )
                                 }
                             )
@@ -323,16 +324,25 @@ fun FocusScreen(
                                 valueColor = if (isSdGood) PrimaryEmerald else ColorHigh,
                                 modifier = modifier,
                                 onClick = {
-                                    val sdTarget = if (unit == GlucoseUnit.MMOL_L) "≤2.0 ммоль/л (или ≤1.5 в узком режиме TING)" else "≤36 мг/дл"
+                                    val sdTarget = if (unit == GlucoseUnit.MMOL_L) {
+                                        if (isRu) "≤2.0 ммоль/л (или ≤1.5 в узком режиме TING)" else "≤2.0 mmol/L (or ≤1.5 in TING mode)"
+                                    } else {
+                                        if (isRu) "≤36 мг/дл" else "≤36 mg/dL"
+                                    }
+                                    val sdHealthy = if (unit == GlucoseUnit.MMOL_L) {
+                                        if (isRu) "0.7–1.2 ммоль/л" else "0.7–1.2 mmol/L"
+                                    } else {
+                                        if (isRu) "12–22 мг/дл" else "12–22 mg/dL"
+                                    }
                                     detailDialogInfo = Pair(
                                         if (isRu) "Стандартное отклонение (SD)" else "Standard Deviation (SD)",
                                         if (isRu) "Показывает разброс (амплитуду качелей) сахара вокруг среднего значения.\n\n" +
                                                 "• Клиническая цель: $sdTarget.\n" +
-                                                "• У здоровых людей: 0.7–1.2 ммоль/л (разброс минимален).\n\n" +
+                                                "• У здоровых людей: $sdHealthy (разброс минимален).\n\n" +
                                                 "💡 Почему это важно: даже при хорошем среднем сахаре высокий SD означает скрытые риски ночных гипогликемий и постпрандиальных пиков."
                                         else "Measures glucose swing amplitude around the mean.\n\n" +
                                                 "• Clinical target: $sdTarget.\n" +
-                                                "• Healthy non-diabetic baseline: 0.7–1.2 mmol/L.\n\n" +
+                                                "• Healthy non-diabetic baseline: $sdHealthy.\n\n" +
                                                 "💡 Clinical value: a good mean with high SD indicates high vulnerability to post-meal spikes and night hypos."
                                     )
                                 }
@@ -406,8 +416,8 @@ fun FocusScreen(
                                 valueColor = if (isTbrGood) PrimaryEmerald else ColorVeryHigh,
                                 modifier = modifier,
                                 onClick = {
-                                    val tbrLowStr = if (unit == GlucoseUnit.MMOL_L) "<3.9 ммоль/л" else "<70 мг/дл"
-                                    val tbrVeryLowStr = if (unit == GlucoseUnit.MMOL_L) "<3.0 ммоль/л" else "<54 мг/дл"
+                                    val tbrLowStr = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "<3.9 ммоль/л" else "<3.9 mmol/L") else (if (isRu) "<70 мг/дл" else "<70 mg/dL")
+                                    val tbrVeryLowStr = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "<3.0 ммоль/л" else "<3.0 mmol/L") else (if (isRu) "<54 мг/дл" else "<54 mg/dL")
                                     detailDialogInfo = Pair(
                                         if (isRu) "Время ниже диапазона / Гипогликемия (TBR)" else "Time Below Range (TBR)",
                                         if (isRu) "Суммарный процент времени в гипогликемии ($tbrLowStr):\n\n" +
@@ -430,8 +440,8 @@ fun FocusScreen(
                                 valueColor = if (isTarGood) PrimaryEmerald else ColorHigh,
                                 modifier = modifier,
                                 onClick = {
-                                    val tarHighStr = if (unit == GlucoseUnit.MMOL_L) ">10.0 ммоль/л" else ">180 мг/дл"
-                                    val tarVeryHighStr = if (unit == GlucoseUnit.MMOL_L) ">13.9 ммоль/л" else ">250 мг/дл"
+                                    val tarHighStr = if (unit == GlucoseUnit.MMOL_L) (if (isRu) ">10.0 ммоль/л" else ">10.0 mmol/L") else (if (isRu) ">180 мг/дл" else ">180 mg/dL")
+                                    val tarVeryHighStr = if (unit == GlucoseUnit.MMOL_L) (if (isRu) ">13.9 ммоль/л" else ">13.9 mmol/L") else (if (isRu) ">250 мг/дл" else ">250 mg/dL")
                                     detailDialogInfo = Pair(
                                         if (isRu) "Время выше диапазона / Гипергликемия (TAR)" else "Time Above Range (TAR)",
                                         if (isRu) "Суммарный процент времени в гипергликемии ($tarHighStr):\n\n" +
@@ -505,22 +515,23 @@ fun FocusScreen(
                                 valueColor = if (isMinMaxGood) PrimaryEmerald else ColorHigh,
                                 modifier = modifier,
                                 onClick = {
-                                    val minStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", minVal)} ммоль/л" else "${(minVal * 18.0182).toInt()} мг/дл"
-                                    val maxStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", maxVal)} ммоль/л" else "${(maxVal * 18.0182).toInt()} мг/дл"
-                                    val healthySpan = if (unit == GlucoseUnit.MMOL_L) "4.0–7.8 ммоль/л" else "72–140 мг/дл"
-                                    val healthyFasting = if (unit == GlucoseUnit.MMOL_L) "3.3–5.5 ммоль/л" else "60–100 мг/дл"
+                                    val unitStr = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL")
+                                    val minStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", minVal)} $unitStr" else "${(minVal * 18.0182).toInt()} $unitStr"
+                                    val maxStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", maxVal)} $unitStr" else "${(maxVal * 18.0182).toInt()} $unitStr"
+                                    val healthySpan = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "4.0–7.8 ммоль/л" else "4.0–7.8 mmol/L") else (if (isRu) "72–140 мг/дл" else "72–140 mg/dL")
+                                    val healthyFasting = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "3.3–5.5 ммоль/л" else "3.3–5.5 mmol/L") else (if (isRu) "60–100 мг/дл" else "60–100 mg/dL")
                                     detailDialogInfo = Pair(
                                         if (isRu) "Суточный диапазон сахара (Min / Max)" else "Daily Glucose Range",
                                         if (isRu) "Экстремумы сахара за сегодня:\n" +
                                                 "• Минимум: $minStr\n" +
                                                 "• Максимум: $maxStr\n\n" +
                                                 "• У здоровых людей без диабета: 96% времени сахар находится в коридоре $healthySpan (натощак $healthyFasting, ночью во сне возможны кратковременные физиологические спады до 3.3–3.8 ммоль/л).\n" +
-                                                "• Клиническая цель при диабете: исключать падения <3.9 и купировать пики >10.0 ммоль/л."
+                                                "• Клиническая цель при диабете: исключать падения ${if (unit == GlucoseUnit.MMOL_L) "<3.9 ммоль/л" else "<70 мг/дл"} и купировать пики ${if (unit == GlucoseUnit.MMOL_L) ">10.0 ммоль/л" else ">180 мг/дл"}."
                                         else "Extremes for today:\n" +
                                                 "• Min: $minStr\n" +
                                                 "• Max: $maxStr\n\n" +
                                                 "• Healthy non-diabetic baseline: 96% within $healthySpan (fasting $healthyFasting).\n" +
-                                                "• Clinical target in diabetes: avoid dips <3.9 and flatten spikes >10.0 mmol/L."
+                                                "• Clinical target in diabetes: avoid dips ${if (unit == GlucoseUnit.MMOL_L) "<3.9 mmol/L" else "<70 mg/dL"} and flatten spikes ${if (unit == GlucoseUnit.MMOL_L) ">10.0 mmol/L" else ">180 mg/dL"}."
                                     )
                                 }
                             )
@@ -659,14 +670,15 @@ fun FocusScreen(
                             if (isRu) "Недостаточно данных для ночного анализа (<1 ч измерений во время сна)."
                             else "Insufficient data for night analysis (<1h readings during sleep)."
                         } else {
-                            val sdStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.2f", nightStability.sdMmol)} ммоль/л"
-                                        else "${(nightStability.sdMmol * 18.0182).toInt()} мг/дл"
-                            val meanStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", nightStability.meanMmol)} ммоль/л"
-                                          else "${(nightStability.meanMmol * 18.0182).toInt()} мг/дл"
+                            val unitStr = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL")
+                            val sdStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.2f", nightStability.sdMmol)} $unitStr"
+                                        else "${(nightStability.sdMmol * 18.0182).toInt()} $unitStr"
+                            val meanStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", nightStability.meanMmol)} $unitStr"
+                                          else "${(nightStability.meanMmol * 18.0182).toInt()} $unitStr"
                             val minStr = if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", nightStability.minMmol)
                                          else "${(nightStability.minMmol * 18.0182).toInt()}"
-                            val maxStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", nightStability.maxMmol)} ммоль/л"
-                                         else "${(nightStability.maxMmol * 18.0182).toInt()} мг/дл"
+                            val maxStr = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", nightStability.maxMmol)} $unitStr"
+                                         else "${(nightStability.maxMmol * 18.0182).toInt()} $unitStr"
 
                             val hormoneNote = if (nightStability.isGrowthHormoneSpike) {
                                 if (isRu) "\n\n🧬 Примечание: в первой половине ночи зафиксирован изолированный подъём сахара до $maxStr без предшествующей гипогликемии. У детей, подростков и людей до 25 лет это частый физиологический признак импульсного выброса соматотропного гормона (СТГ) в фазе глубокого сна."
@@ -842,13 +854,25 @@ private fun HeroGlucoseCard(
                 v > 13.9 -> Pair(if (isRu) "⚠️ Экстремальный сахар! Проверьте кетоны" else "⚠️ Very high! Check ketones", ColorVeryHigh)
                 v > 10.0 -> Pair(if (isRu) "🔺 Выше целевого диапазона" else "🔺 Above target range", ColorHigh)
                 rate <= -0.11 -> Pair(
-                    if (isRu) String.format(Locale.US, "⚡ Быстро падает (%.2f ммоль/л/мин)", rate)
-                    else String.format(Locale.US, "⚡ Dropping fast (%.2f mmol/L/min)", rate),
+                    if (unit == GlucoseUnit.MMOL_L) {
+                        if (isRu) String.format(Locale.US, "⚡ Быстро падает (%.2f ммоль/л/мин)", rate)
+                        else String.format(Locale.US, "⚡ Dropping fast (%.2f mmol/L/min)", rate)
+                    } else {
+                        val rateMg = rate * 18.0182
+                        if (isRu) String.format(Locale.US, "⚡ Быстро падает (%.1f мг/дл/мин)", rateMg)
+                        else String.format(Locale.US, "⚡ Dropping fast (%.1f mg/dL/min)", rateMg)
+                    },
                     ColorLow
                 )
                 rate >= 0.11 -> Pair(
-                    if (isRu) String.format(Locale.US, "⚡ Быстро растёт (+%.2f ммоль/л/мин)", rate)
-                    else String.format(Locale.US, "⚡ Rising fast (+%.2f mmol/L/min)", rate),
+                    if (unit == GlucoseUnit.MMOL_L) {
+                        if (isRu) String.format(Locale.US, "⚡ Быстро растёт (+%.2f ммоль/л/мин)", rate)
+                        else String.format(Locale.US, "⚡ Rising fast (+%.2f mmol/L/min)", rate)
+                    } else {
+                        val rateMg = rate * 18.0182
+                        if (isRu) String.format(Locale.US, "⚡ Быстро растёт (+%.1f мг/дл/мин)", rateMg)
+                        else String.format(Locale.US, "⚡ Rising fast (+%.1f mg/dL/min)", rateMg)
+                    },
                     ColorHigh
                 )
                 else -> {
