@@ -1401,14 +1401,24 @@ object GlucoseAlertManager {
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (alarmManager.canScheduleExactAlarms()) {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, pendingIntent)
+                } else {
+                    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, pendingIntent)
+                }
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, pendingIntent)
             } else {
                 alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMs, pendingIntent)
             }
             Log.i(TAG, "Scheduled next signal loss check at $triggerAtMs (in ${(triggerAtMs - System.currentTimeMillis()) / 1000}s)")
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to schedule signal loss alarm: ${e.message}")
+            try {
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, pendingIntent)
+            } catch (e2: Exception) {
+                Log.w(TAG, "Failed to schedule signal loss alarm: ${e2.message}")
+            }
         }
     }
 

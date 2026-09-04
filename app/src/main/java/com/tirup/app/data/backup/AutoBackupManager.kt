@@ -90,7 +90,21 @@ object AutoBackupManager {
         }
 
         try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                if (alarmManager.canScheduleExactAlarms()) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        android.app.AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.setAndAllowWhileIdle(
+                        android.app.AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                }
+            } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(
                     android.app.AlarmManager.RTC_WAKEUP,
                     calendar.timeInMillis,
@@ -257,10 +271,10 @@ object AutoBackupManager {
                 mainFile.copyTo(bakFile, overwrite = true)
             }
 
-            // Step 2: Query all live readings
-            val readings = database.glucoseReadingDao().getReadingsBetweenSync(0L, Long.MAX_VALUE)
-            val earliest = readings.minOfOrNull { it.timestamp } ?: 0L
-            val latest = readings.maxOfOrNull { it.timestamp } ?: 0L
+            // Step 2: Query metadata without loading all entities into RAM (prevents OOM on large datasets)
+            val totalCount = database.glucoseReadingDao().getTotalCount()
+            val earliest = database.glucoseReadingDao().getEarliestTimestamp() ?: 0L
+            val latest = database.glucoseReadingDao().getLatestTimestamp() ?: 0L
             val now = System.currentTimeMillis()
 
             // Step 3: Stream write to tmp file
@@ -274,7 +288,7 @@ object AutoBackupManager {
                     writer.name("version").value(1)
                     writer.name("appName").value("TIRUp")
                     writer.name("exportedAt").value(now)
-                    writer.name("readingsCount").value(readings.size)
+                    writer.name("readingsCount").value(totalCount)
                     writer.name("earliestTimestamp").value(earliest)
                     writer.name("latestTimestamp").value(latest)
 
@@ -353,17 +367,24 @@ object AutoBackupManager {
 
                     writer.endObject() // end settings
 
-                    // Readings array
+                    // Readings array - streamed in pages of 5000 to prevent OOM
                     writer.name("readings")
                     writer.beginArray()
-                    readings.forEach { r ->
-                        writer.beginObject()
-                        writer.name("t").value(r.timestamp)
-                        writer.name("v").value(r.valueMmol)
-                        if (!r.trendArrow.isNullOrEmpty()) writer.name("a").value(r.trendArrow)
-                        if (r.iob != null) writer.name("iob").value(r.iob)
-                        if (r.cob != null) writer.name("cob").value(r.cob)
-                        writer.endObject()
+                    val pageSize = 5000
+                    var offset = 0
+                    while (offset < totalCount) {
+                        val page = database.glucoseReadingDao().getReadingsPaginated(limit = pageSize, offset = offset)
+                        if (page.isEmpty()) break
+                        page.forEach { r ->
+                            writer.beginObject()
+                            writer.name("t").value(r.timestamp)
+                            writer.name("v").value(r.valueMmol)
+                            if (!r.trendArrow.isNullOrEmpty()) writer.name("a").value(r.trendArrow)
+                            if (r.iob != null) writer.name("iob").value(r.iob)
+                            if (r.cob != null) writer.name("cob").value(r.cob)
+                            writer.endObject()
+                        }
+                        offset += page.size
                     }
                     writer.endArray()
 

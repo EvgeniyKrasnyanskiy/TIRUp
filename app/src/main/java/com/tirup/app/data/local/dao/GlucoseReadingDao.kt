@@ -34,6 +34,9 @@ interface GlucoseReadingDao {
     @Query("SELECT MAX(timestamp) FROM glucose_readings")
     suspend fun getLatestTimestamp(): Long?
 
+    @Query("SELECT * FROM glucose_readings ORDER BY timestamp ASC LIMIT :limit OFFSET :offset")
+    suspend fun getReadingsPaginated(limit: Int, offset: Int): List<GlucoseReadingEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(reading: GlucoseReadingEntity): Long
 

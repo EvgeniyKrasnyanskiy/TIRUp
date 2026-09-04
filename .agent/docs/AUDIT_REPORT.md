@@ -86,7 +86,7 @@ val readings = database.glucoseReadingDao().getReadingsBetweenSync(0L, Long.MAX_
 
 **Решение**: Рефакторинг на пагинированный streaming export (по 5000 записей за раз). Требует изменений в DAO + BackupManager — рекомендуется как отдельная задача.
 
-**Статус**: ⏳ Оставлено для исполнителя (требует рефакторинг DAO + JSON writer).
+**Статус**: ✅ Исправлено (пагинированная выгрузка пачками по 5000 записей через JsonWriter, метаданные через агрегатные SQL-запросы).
 
 ---
 
@@ -157,7 +157,7 @@ if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleE
 }
 ```
 
-**Статус**: ⏳ Оставлено для исполнителя.
+**Статус**: ✅ Исправлено (проверка canScheduleExactAlarms() для Android 12+ / 14+ и fallback на setAndAllowWhileIdle в GlucoseAlertManager и AutoBackupManager).
 
 ---
 
@@ -244,8 +244,8 @@ val inRangeCount = rawMgdl.count { it >= 70.0 && it <= 180.0 }
 | 1 | CRIT-01 | Инверсия единиц при гипо | ✅ Исправлено |
 | 2 | HIGH-01 | SMS-таймер при hardware silence | ✅ Исправлено |
 | 3 | CRIT-02 | Миграции БД | ✅ Исправлено |
-| 4 | CRIT-03 | OOM бэкап | ⏳ Требует рефакторинг |
-| 5 | HIGH-04 | Exact Alarms Android 14+ | ⏳ |
+| 4 | CRIT-03 | OOM бэкап | ✅ Исправлено |
+| 5 | HIGH-04 | Exact Alarms Android 14+ | ✅ Исправлено |
 | 6 | HIGH-02 | Alarm fatigue снуза | ✅ Исправлено |
 | 7 | HIGH-03 | FloatingBubble lifecycle | ⏳ |
 | 8 | HIGH-05 | ViewModel recreation | ⏳ |
