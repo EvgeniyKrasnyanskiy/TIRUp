@@ -448,7 +448,7 @@ fun SettingsScreen(
                             accentColor = ColorHigh,
                             onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.MAIN) },
                             isRu = isRu,
-                            thresholdBadge = "< ${alerts.mainLowThresholdMmol}  |  > ${alerts.mainHighThresholdMmol}",
+                            thresholdBadge = "< ${String.format(Locale.US, "%.1f", alerts.mainLowThresholdMmol)}  |  > ${String.format(Locale.US, "%.1f", alerts.mainHighThresholdMmol)}",
                             onThresholdClick = { showMainThresholdDialog = true }
                         )
 
@@ -1095,39 +1095,6 @@ fun SettingsScreen(
             }
         }
 
-        // Section: Data Source Integration & App Info
-        item {
-            BentoCard(modifier = Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = if (isRu) "ℹ️ Источник данных и синхронизация" else "ℹ️ Data Source & Sync",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    Text(
-                        text = if (isRu) "Для непрерывной передачи сахара, а также активного инсулина (IoB) и углеводов (CoB), в приложении xDrip+ необходимо активировать:\n• Broadcast Locally (Локальный броадкаст)\n• Broadcast Service API (в Inter-app settings)\n• Pebble Broadcast / веб-сервер (порт 17580)"
-                        else "For uninterrupted streaming of glucose, active insulin (IoB) and carbs (CoB), enable in xDrip+:\n• Broadcast Locally\n• Broadcast Service API (in Inter-app settings)\n• Pebble Broadcast / web server (port 17580)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    OutlinedButton(
-                        onClick = { showHelpDialog = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.5f)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = ActionBlue)
-                    ) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.Help, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = if (isRu) "Инструкция по настройке xDrip+ / GDH" else "xDrip+ / GDH Setup Instructions")
-                    }
-                }
-            }
-        }
-
         // Section 5: Data Management (Clear Data)
         item {
             BentoCard(modifier = Modifier.fillMaxWidth()) {
@@ -1326,7 +1293,7 @@ fun SettingsScreen(
                         )
                         showMainThresholdDialog = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald)
+                    colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
                 ) {
                     Text(if (isRu) "Сохранить" else "Save")
                 }
@@ -1334,8 +1301,13 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(
                     onClick = {
-                        lowVal = 3.9
-                        highVal = 10.0
+                        viewModel.updateAlertSettings(
+                            settings.alertSettings.copy(
+                                mainLowThresholdMmol = 3.9,
+                                mainHighThresholdMmol = 10.0
+                            )
+                        )
+                        showMainThresholdDialog = false
                     }
                 ) {
                     Text(if (isRu) "Сброс к норме (3.9 - 10.0)" else "Default (3.9 - 10.0)")

@@ -66,6 +66,24 @@
         android:textSize="13sp"
         android:textStyle="bold" />
 
+    <!-- Streak Badge -->
+    <TextView
+        android:id="@+id/widget_streak_badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/widget_badge_bg"
+        android:includeFontPadding="false"
+        android:paddingStart="5dp"
+        android:paddingTop="1dp"
+        android:paddingEnd="5dp"
+        android:paddingBottom="1dp"
+        android:text="🔥 5 д."
+        android:textColor="#F59E0B"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
     <!-- Active Insulin (IoB) Badge -->
     <TextView
         android:id="@+id/widget_iob_text"

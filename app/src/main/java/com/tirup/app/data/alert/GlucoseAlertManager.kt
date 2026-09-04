@@ -1,5 +1,6 @@
 package com.tirup.app.data.alert
 
+import android.app.AlarmManager
 import android.app.KeyguardManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -30,6 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -52,7 +54,7 @@ object GlucoseAlertManager {
     const val CHANNEL_PREDICTIVE = "tirup_alert_predictive_v2"
     const val CHANNEL_MAIN = "tirup_alert_main_v2"
     const val CHANNEL_CRITICAL = "tirup_alert_critical_v2"
-    const val CHANNEL_SIGNAL_LOSS = "tirup_alert_signal_loss_v2"
+    const val CHANNEL_SIGNAL_LOSS = "tirup_alert_signal_loss_v3"
     const val CHANNEL_PATTERNS = "tirup_patterns_v1"
     const val CHANNEL_COMPENSATOR = "tirup_compensator_v1"
     const val CHANNEL_LOCKSCREEN = "tirup_lockscreen_status_v1"
@@ -78,7 +80,7 @@ object GlucoseAlertManager {
     private var lastSignalLossAlertTimestamp: Long = 0L
 
     @Volatile
-    private var currentSignalLossIntervalMs: Long = 20 * 60 * 1000L
+    private var signalLossAlertCount: Int = 0
 
     // Adaptive Snooze tracking
     @Volatile
@@ -98,8 +100,8 @@ object GlucoseAlertManager {
 
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
-        // Delete old v1 channels that had system sound attached
-        listOf("tirup_alert_predictive", "tirup_alert_main", "tirup_alert_critical").forEach { id ->
+        // Delete old v1/v2 channels that had system sound attached or didn't bypass DND
+        listOf("tirup_alert_predictive", "tirup_alert_main", "tirup_alert_critical", "tirup_alert_signal_loss_v2").forEach { id ->
             try { nm.deleteNotificationChannel(id) } catch (_: Exception) {}
         }
 
@@ -137,15 +139,16 @@ object GlucoseAlertManager {
             setBypassDnd(true)
         }
 
-        // Tier 4: Signal Loss (No readings >20 min)
+        // Tier 4: Signal Loss (No readings >20 min) - Critical Alarm, bypass DND
         val signalLossChannel = NotificationChannel(
             CHANNEL_SIGNAL_LOSS,
             "4. Потеря сигнала сенсора (>20 мин)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "Оповещения при отсутствии свежих данных от трансмиттера/сенсора"
+            description = "Оповещения при отсутствии свежих данных от трансмиттера/сенсора (пробуждение и настойчивые повторы)"
             setSound(null, null)
             enableVibration(false)
+            setBypassDnd(true)
         }
 
         // Tier 5: Daily Compensator (Last Chance TIR)
@@ -471,27 +474,11 @@ object GlucoseAlertManager {
         val isRu = settings.language.equals("RU", ignoreCase = true)
 
         // ----------------------------------------------------
-        // TIER 4: SIGNAL LOSS CHECK (Exponential Backoff: 20m -> 40m -> 80m -> 160m)
+        // TIER 4: SIGNAL LOSS CHECK (Day / Night Schedule)
         // ----------------------------------------------------
-        val elapsedSinceLatest = now - latest.timestamp
-        if (elapsedSinceLatest > alerts.signalLossMinutes * 60 * 1000L) {
-            if (alerts.isSignalLossEnabled) {
-                if (now - lastSignalLossAlertTimestamp >= currentSignalLossIntervalMs) {
-                    lastSignalLossAlertTimestamp = now
-                    currentSignalLossIntervalMs = (currentSignalLossIntervalMs * 2).coerceAtMost(160 * 60 * 1000L)
-                    val elapsedMin = (elapsedSinceLatest / 60000L).toInt()
-                    val title = if (isRu) "📡 Потеря связи с сенсором ($elapsedMin мин)" else "📡 Sensor Signal Lost ($elapsedMin min)"
-                    val text = if (isRu) "Нет данных от xDrip+ более $elapsedMin мин. Проверьте Bluetooth и трансмиттер."
-                    else "No CGM readings for $elapsedMin min. Check Bluetooth and transmitter."
-                    sendNotification(context, CHANNEL_SIGNAL_LOSS, NOTIFICATION_ID_SIGNAL_LOSS, title, text, AlertTier.SIGNAL_LOSS, alerts.isSignalLossVibrate, flash = alerts.isSignalLossFlash)
-                }
-            }
+        val isSignalLost = checkSignalLoss(context, latest.timestamp, alerts, settings)
+        if (isSignalLost) {
             return
-        } else {
-            // Signal is active! Reset backoff interval and dismiss signal loss notification
-            currentSignalLossIntervalMs = alerts.signalLossMinutes * 60 * 1000L
-            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            nm?.cancel(NOTIFICATION_ID_SIGNAL_LOSS)
         }
 
         val tirLow = targetRanges.tirLowMmol
@@ -770,8 +757,8 @@ object GlucoseAlertManager {
 
         val priority = when (tier) {
             AlertTier.CRITICAL -> NotificationCompat.PRIORITY_MAX
+            AlertTier.SIGNAL_LOSS -> NotificationCompat.PRIORITY_MAX
             AlertTier.MAIN -> NotificationCompat.PRIORITY_HIGH
-            AlertTier.SIGNAL_LOSS -> NotificationCompat.PRIORITY_HIGH
             AlertTier.PREDICTIVE -> NotificationCompat.PRIORITY_DEFAULT
         }
 
@@ -789,13 +776,16 @@ object GlucoseAlertManager {
         if (tier == AlertTier.PREDICTIVE) {
             // Unread predictive alert is only valid for 20 minutes
             builder.setTimeoutAfter(20 * 60 * 1000L)
-        } else if (tier != AlertTier.CRITICAL) {
-            // Automatically clear unread main/signal loss alerts after 60 minutes
+        } else if (tier == AlertTier.MAIN) {
+            // Automatically clear unread main alerts after 60 minutes
             builder.setTimeoutAfter(60 * 60 * 1000L)
         }
 
-        if (tier == AlertTier.CRITICAL) {
+        if (tier == AlertTier.CRITICAL || tier == AlertTier.SIGNAL_LOSS) {
             builder.setCategory(NotificationCompat.CATEGORY_ALARM)
+        }
+
+        if (tier == AlertTier.CRITICAL) {
             isCriticalAlarmActive = true
 
             // Add direct "✓ Принято" action button on notification
@@ -1044,5 +1034,160 @@ object GlucoseAlertManager {
     fun dismissLockscreenNotification(context: Context) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         nm?.cancel(NOTIFICATION_ID_LOCKSCREEN)
+    }
+
+    /**
+     * Determines whether current device time is within the user's sleep window.
+     */
+    fun isNightNow(settings: UserSettings): Boolean {
+        val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        val startHour = settings.nightStartHour
+        val endHour = settings.nightEndHour
+        return if (startHour < endHour) {
+            currentHour in startHour until endHour
+        } else {
+            currentHour >= startHour || currentHour < endHour
+        }
+    }
+
+    /**
+     * Day/night schedule for Signal Loss (Tier 4):
+     * Night (attempt to wake up user): 6x5m, 6x10m, 6x20m, then 30m until morning.
+     * Day: 3x5m, 3x20m, then 60m until night.
+     */
+    fun getNextSignalLossIntervalMs(alertCount: Int, isNight: Boolean): Long {
+        return if (isNight) {
+            when {
+                alertCount < 6 -> 5 * 60 * 1000L      // 1-6: 5 min
+                alertCount < 12 -> 10 * 60 * 1000L    // 7-12: 10 min
+                alertCount < 18 -> 20 * 60 * 1000L    // 13-18: 20 min
+                else -> 30 * 60 * 1000L               // 19+: 30 min until morning
+            }
+        } else {
+            when {
+                alertCount < 3 -> 5 * 60 * 1000L      // 1-3: 5 min
+                alertCount < 6 -> 20 * 60 * 1000L     // 4-6: 20 min
+                else -> 60 * 60 * 1000L               // 7+: 60 min until night
+            }
+        }
+    }
+
+    fun scheduleNextSignalLossCheck(context: Context, triggerAtMs: Long) {
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+            val intent = Intent(context, AlertActionReceiver::class.java).apply {
+                action = AlertActionReceiver.ACTION_CHECK_SIGNAL_LOSS
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                2005,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, pendingIntent)
+            } else {
+                alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMs, pendingIntent)
+            }
+            Log.i(TAG, "Scheduled next signal loss check at $triggerAtMs (in ${(triggerAtMs - System.currentTimeMillis()) / 1000}s)")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to schedule signal loss alarm: ${e.message}")
+        }
+    }
+
+    fun cancelSignalLossCheck(context: Context) {
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+            val intent = Intent(context, AlertActionReceiver::class.java).apply {
+                action = AlertActionReceiver.ACTION_CHECK_SIGNAL_LOSS
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                2005,
+                intent,
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+            )
+            if (pendingIntent != null) {
+                alarmManager.cancel(pendingIntent)
+                pendingIntent.cancel()
+            }
+        } catch (_: Exception) {}
+    }
+
+    suspend fun checkSignalLossDirectly(context: Context) {
+        try {
+            val app = context.applicationContext as? com.tirup.app.TirupApplication ?: return
+            val latestEntity = app.database.glucoseReadingDao().getRecentReadingsSync(1).firstOrNull() ?: return
+            val settings = app.settingsRepository.getSettings().first()
+            checkSignalLoss(
+                context = context,
+                latestTimestamp = latestEntity.timestamp,
+                alerts = settings.alertSettings,
+                settings = settings
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in checkSignalLossDirectly: ${e.message}", e)
+        }
+    }
+
+    fun checkSignalLoss(
+        context: Context,
+        latestTimestamp: Long,
+        alerts: com.tirup.app.domain.model.AlertSettings,
+        settings: UserSettings
+    ): Boolean {
+        val now = System.currentTimeMillis()
+        val elapsedSinceLatest = now - latestTimestamp
+        val thresholdMs = alerts.signalLossMinutes * 60 * 1000L
+
+        if (elapsedSinceLatest > thresholdMs) {
+            if (alerts.isSignalLossEnabled) {
+                val isNight = isNightNow(settings)
+                val requiredIntervalMs = if (signalLossAlertCount == 0) {
+                    0L
+                } else {
+                    getNextSignalLossIntervalMs(signalLossAlertCount, isNight)
+                }
+
+                if (now - lastSignalLossAlertTimestamp >= requiredIntervalMs) {
+                    signalLossAlertCount++
+                    lastSignalLossAlertTimestamp = now
+                    val elapsedMin = (elapsedSinceLatest / 60000L).toInt()
+                    val isRu = settings.language.equals("RU", ignoreCase = true)
+                    val title = if (isRu) "📡 Потеря связи с сенсором ($elapsedMin мин)" else "📡 Sensor Signal Lost ($elapsedMin min)"
+                    val text = if (isRu) "Нет данных от сенсора более $elapsedMin мин. Проверьте Bluetooth и трансмиттер."
+                    else "No CGM readings for $elapsedMin min. Check Bluetooth and transmitter."
+                    sendNotification(
+                        context = context,
+                        channelId = CHANNEL_SIGNAL_LOSS,
+                        notificationId = NOTIFICATION_ID_SIGNAL_LOSS,
+                        title = title,
+                        text = text,
+                        tier = AlertTier.SIGNAL_LOSS,
+                        vibrate = alerts.isSignalLossVibrate,
+                        flash = alerts.isSignalLossFlash
+                    )
+                }
+
+                // Schedule next check based on day/night interval
+                val nextIntervalMs = getNextSignalLossIntervalMs(signalLossAlertCount, isNightNow(settings))
+                scheduleNextSignalLossCheck(context, now + nextIntervalMs)
+            }
+            return true
+        } else {
+            // Signal is active! Reset backoff count and dismiss notification
+            if (signalLossAlertCount > 0 || lastSignalLossAlertTimestamp > 0L) {
+                signalLossAlertCount = 0
+                lastSignalLossAlertTimestamp = 0L
+                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                nm?.cancel(NOTIFICATION_ID_SIGNAL_LOSS)
+            }
+            if (alerts.isSignalLossEnabled) {
+                scheduleNextSignalLossCheck(context, latestTimestamp + thresholdMs + 1000L)
+            } else {
+                cancelSignalLossCheck(context)
+            }
+            return false
+        }
     }
 }

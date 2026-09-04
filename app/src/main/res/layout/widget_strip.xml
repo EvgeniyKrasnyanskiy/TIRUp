@@ -1,126 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
     android:paddingStart="12dp"
     android:paddingTop="6dp"
     android:paddingEnd="12dp"
     android:paddingBottom="6dp">
 
-    <!-- 1. Left: Glucose & 5-min Dynamics (Compact) -->
-    <LinearLayout
-        android:id="@+id/widget_glucose_section"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
-
-        <TextView
-            android:id="@+id/widget_glucose_value"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="9.1"
-            android:textColor="#3B82F6"
-            android:textSize="26sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/widget_trend_arrow"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:paddingStart="2dp"
-            android:text="→"
-            android:textColor="#3B82F6"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:gravity="center_vertical"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/widget_delta_value"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="+0.3"
-                android:textColor="#94A3B8"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/widget_time_ago"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="2м"
-                android:textColor="#64748B"
-                android:textSize="10sp"
-                android:visibility="gone" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <FrameLayout
-        android:layout_width="1dp"
-        android:layout_height="28dp"
-        android:layout_marginStart="10dp"
-        android:layout_marginEnd="10dp"
-        android:background="#26FFFFFF" />
-
-    <!-- 2. Middle: Daily TIR Compensator Bar & Time Left -->
-    <LinearLayout
-        android:id="@+id/widget_compensator_section"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical">
-
-        <TextView
-            android:id="@+id/widget_tir_score"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="TIR: 78%"
-            android:textColor="#FFFFFF"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-        <ProgressBar
-            android:id="@+id/widget_tir_progress"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent"
-            android:layout_height="6dp"
-            android:layout_marginTop="3dp"
-            android:layout_marginBottom="3dp"
-            android:max="100"
-            android:progress="78"
-            android:progressTint="#10B981"
-            android:progressBackgroundTint="#2E3A4B" />
-
-        <TextView
-            android:id="@+id/widget_compensator_text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:singleLine="true"
-            android:text="В норме ещё 2 ч 15 мин"
-            android:textColor="#38BDF8"
-            android:textSize="10sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <!-- 3. Right: IoB / CoB badges (visible on 5x1) & Nightstand Button -->
+    <!-- 1. Right Action Section (Pinned strictly to the right edge) -->
     <LinearLayout
         android:id="@+id/widget_actions_section"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        android:layout_marginStart="6dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
+
+        <!-- Streak badge -->
+        <TextView
+            android:id="@+id/widget_streak_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/widget_badge_bg"
+            android:paddingStart="5dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="5dp"
+            android:paddingBottom="2dp"
+            android:text="🔥 5 д."
+            android:textColor="#F59E0B"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
 
         <!-- IoB & CoB container for wider 5-column grids -->
         <LinearLayout
@@ -174,4 +89,114 @@
             android:textSize="16sp" />
     </LinearLayout>
 
-</LinearLayout>
+    <!-- 2. Left: Glucose & 5-min Dynamics -->
+    <LinearLayout
+        android:id="@+id/widget_glucose_section"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_centerVertical="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_glucose_value"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="9.1"
+            android:textColor="#3B82F6"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_trend_arrow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="2dp"
+            android:text="→"
+            android:textColor="#3B82F6"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:gravity="center_vertical"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_delta_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+0.3"
+                android:textColor="#94A3B8"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_time_ago"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="2м"
+                android:textColor="#64748B"
+                android:textSize="10sp"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Divider -->
+    <FrameLayout
+        android:id="@+id/widget_divider"
+        android:layout_width="1dp"
+        android:layout_height="28dp"
+        android:layout_toEndOf="@id/widget_glucose_section"
+        android:layout_centerVertical="true"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:background="#26FFFFFF" />
+
+    <!-- 3. Middle: Daily TIR Compensator Bar & Time Left -->
+    <LinearLayout
+        android:id="@+id/widget_compensator_section"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_toEndOf="@id/widget_divider"
+        android:layout_toStartOf="@id/widget_actions_section"
+        android:layout_centerVertical="true"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/widget_tir_score"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="TIR: 78%"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <ProgressBar
+            android:id="@+id/widget_tir_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_marginTop="3dp"
+            android:layout_marginBottom="3dp"
+            android:max="100"
+            android:progress="78"
+            android:progressTint="#10B981"
+            android:progressBackgroundTint="#2E3A4B" />
+
+        <TextView
+            android:id="@+id/widget_compensator_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:text="В норме ещё 2 ч 15 мин"
+            android:textColor="#38BDF8"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+</RelativeLayout>

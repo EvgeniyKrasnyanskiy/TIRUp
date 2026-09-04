@@ -30,10 +30,13 @@ import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.presentation.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -42,12 +45,16 @@ class FloatingBubbleService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var windowManager: WindowManager
     private var bubbleView: View? = null
+    private var bubbleRipple: View? = null
     private var bubbleContainer: View? = null
     private var tvGlucose: TextView? = null
     private var tvArrow: TextView? = null
     private var tvDelta: TextView? = null
 
-    private var pulseAnimatorSet: AnimatorSet? = null
+    private var rippleAnimatorSet: AnimatorSet? = null
+    private var snoozeJob: Job? = null
+    @Volatile
+    private var snoozeUntilTimestamp: Long = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -69,10 +76,14 @@ class FloatingBubbleService : Service() {
         val inflater = LayoutInflater.from(this)
         val view = inflater.inflate(R.layout.floating_glucose_bubble, null)
         bubbleView = view
+        bubbleRipple = view.findViewById(R.id.bubble_ripple)
         bubbleContainer = view.findViewById(R.id.bubble_container)
         tvGlucose = view.findViewById(R.id.tv_bubble_glucose)
         tvArrow = view.findViewById(R.id.tv_bubble_arrow)
         tvDelta = view.findViewById(R.id.tv_bubble_delta)
+
+        // Initially hidden until data indicates out-of-range
+        view.visibility = View.GONE
 
         val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -81,16 +92,17 @@ class FloatingBubbleService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
+        val bubbleSizePx = dpToPx(76)
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            bubbleSizePx,
+            bubbleSizePx,
             layoutType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = dpToPx(16)
+            x = dpToPx(12)
             y = dpToPx(200)
         }
 
@@ -123,11 +135,21 @@ class FloatingBubbleService : Service() {
                     val dx = kotlin.math.abs(event.rawX - initialTouchX)
                     val dy = kotlin.math.abs(event.rawY - initialTouchY)
                     if (duration < 250 && dx < 20 && dy < 20) {
-                        // Open main screen
+                        // Tap on bubble: snooze for 5 minutes and open main screen
+                        snoozeUntilTimestamp = System.currentTimeMillis() + 5 * 60 * 1000L
+                        bubbleView?.visibility = View.GONE
+                        setHypoRipple(false)
+
                         val intent = Intent(this@FloatingBubbleService, MainActivity::class.java).apply {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                         }
                         startActivity(intent)
+
+                        snoozeJob?.cancel()
+                        snoozeJob = serviceScope.launch {
+                            delay(5 * 60 * 1000L)
+                            recheckCurrentBubble()
+                        }
                     } else {
                         snapToEdge(params)
                     }
@@ -147,11 +169,11 @@ class FloatingBubbleService : Service() {
 
     private fun snapToEdge(params: WindowManager.LayoutParams) {
         val screenWidth = resources.displayMetrics.widthPixels
-        val bubbleWidth = bubbleView?.width ?: dpToPx(66)
+        val bubbleWidth = bubbleView?.width ?: dpToPx(76)
         val targetX = if (params.x + bubbleWidth / 2 < screenWidth / 2) {
-            dpToPx(8)
+            dpToPx(4)
         } else {
-            screenWidth - bubbleWidth - dpToPx(8)
+            screenWidth - bubbleWidth - dpToPx(4)
         }
 
         val startX = params.x
@@ -186,6 +208,9 @@ class FloatingBubbleService : Service() {
                     }
                     if (reading != null) {
                         updateBubble(reading, settings)
+                    } else {
+                        bubbleView?.visibility = View.GONE
+                        setHypoRipple(false)
                     }
                 }
             } catch (e: Exception) {
@@ -194,7 +219,37 @@ class FloatingBubbleService : Service() {
         }
     }
 
+    private fun recheckCurrentBubble() {
+        serviceScope.launch {
+            try {
+                val app = TirupApplication.instance
+                val latest = app.glucoseRepository.getLatestReading().first()
+                val settings = app.settingsRepository.getSettings().first()
+                if (latest != null && settings.isFloatingBubbleEnabled) {
+                    updateBubble(latest, settings)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to recheck bubble: ${e.message}")
+            }
+        }
+    }
+
     private fun updateBubble(reading: GlucoseReading, settings: UserSettings) {
+        val valueMmol = reading.valueMmol
+
+        // Bubble is visible ONLY when glucose is out of range (<3.9 or >10.0)
+        val isOutOfRange = valueMmol < 3.9 || valueMmol > 10.0
+        val now = System.currentTimeMillis()
+        val isSnoozed = now < snoozeUntilTimestamp
+
+        if (!isOutOfRange || isSnoozed) {
+            bubbleView?.visibility = View.GONE
+            setHypoRipple(false)
+            return
+        } else {
+            bubbleView?.visibility = View.VISIBLE
+        }
+
         val isMmol = settings.unit == GlucoseUnit.MMOL_L
         val displayVal = if (isMmol) {
             String.format(Locale.US, "%.1f", reading.valueMmol)
@@ -206,52 +261,77 @@ class FloatingBubbleService : Service() {
         tvGlucose?.text = displayVal
         tvArrow?.text = arrow
 
-        val valueMmol = reading.valueMmol
-        val tirLow = settings.targetRanges.tirLowMmol
-        val tirHigh = settings.targetRanges.tirHighMmol
-
+        // Range colors strictly adhering to requirements:
+        // <3.9 Red, 3.9..7.8 Pale Green (#4ADE80), 7.9..10.0 Emerald (#10B981), 10.1..13.9 Orange, >13.9 Purple
         val ringColor = when {
-            valueMmol < tirLow -> Color.parseColor("#EF4444") // Red
-            valueMmol > tirHigh -> Color.parseColor("#F59E0B") // Amber
-            else -> Color.parseColor("#10B981") // Green
+            valueMmol < 3.9 -> Color.parseColor("#EF4444")
+            valueMmol <= 7.8 -> Color.parseColor("#4ADE80")
+            valueMmol <= 10.0 -> Color.parseColor("#10B981")
+            valueMmol <= 13.9 -> Color.parseColor("#F59E0B")
+            else -> Color.parseColor("#A855F7")
         }
 
         val bg = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
-            setColor(Color.parseColor("#EE0F172A")) // Deep dark slate (93% opaque)
+            setColor(Color.parseColor("#F00F172A")) // Deep dark slate (94% opaque)
             setStroke(dpToPx(3), ringColor)
         }
         bubbleContainer?.background = bg
 
-        // Pulsing animation if hypo (< 3.9 mmol/L)
-        val isHypo = valueMmol < tirLow
-        setHypoPulse(isHypo)
+        // Water ripple waves on hypoglycemia (< 3.9 mmol/L)
+        val isHypo = valueMmol < 3.9
+        setHypoRipple(isHypo)
     }
 
-    private fun setHypoPulse(isHypo: Boolean) {
+    private fun setHypoRipple(isHypo: Boolean) {
         val container = bubbleContainer ?: return
+        val ripple = bubbleRipple ?: return
+
         if (isHypo) {
-            if (pulseAnimatorSet == null || !pulseAnimatorSet!!.isRunning) {
-                val animX = ObjectAnimator.ofFloat(container, "scaleX", 1.0f, 1.14f, 1.0f).apply {
-                    duration = 900
+            val rippleBg = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#26EF4444")) // Semi-transparent red wave
+                setStroke(dpToPx(2), Color.parseColor("#EF4444"))
+            }
+            ripple.background = rippleBg
+            ripple.visibility = View.VISIBLE
+
+            if (rippleAnimatorSet == null || !rippleAnimatorSet!!.isRunning) {
+                val scaleX = ObjectAnimator.ofFloat(ripple, "scaleX", 1.0f, 1.28f).apply {
                     repeatCount = ValueAnimator.INFINITE
                     repeatMode = ValueAnimator.RESTART
-                    interpolator = AccelerateDecelerateInterpolator()
                 }
-                val animY = ObjectAnimator.ofFloat(container, "scaleY", 1.0f, 1.14f, 1.0f).apply {
-                    duration = 900
+                val scaleY = ObjectAnimator.ofFloat(ripple, "scaleY", 1.0f, 1.28f).apply {
                     repeatCount = ValueAnimator.INFINITE
                     repeatMode = ValueAnimator.RESTART
-                    interpolator = AccelerateDecelerateInterpolator()
                 }
-                pulseAnimatorSet = AnimatorSet().apply {
-                    playTogether(animX, animY)
+                val alpha = ObjectAnimator.ofFloat(ripple, "alpha", 0.85f, 0.0f).apply {
+                    repeatCount = ValueAnimator.INFINITE
+                    repeatMode = ValueAnimator.RESTART
+                }
+                val pulseX = ObjectAnimator.ofFloat(container, "scaleX", 1.0f, 1.05f, 1.0f).apply {
+                    repeatCount = ValueAnimator.INFINITE
+                    repeatMode = ValueAnimator.RESTART
+                }
+                val pulseY = ObjectAnimator.ofFloat(container, "scaleY", 1.0f, 1.05f, 1.0f).apply {
+                    repeatCount = ValueAnimator.INFINITE
+                    repeatMode = ValueAnimator.RESTART
+                }
+
+                rippleAnimatorSet = AnimatorSet().apply {
+                    duration = 1200
+                    interpolator = DecelerateInterpolator()
+                    playTogether(scaleX, scaleY, alpha, pulseX, pulseY)
                     start()
                 }
             }
         } else {
-            pulseAnimatorSet?.cancel()
-            pulseAnimatorSet = null
+            rippleAnimatorSet?.cancel()
+            rippleAnimatorSet = null
+            ripple.visibility = View.GONE
+            ripple.scaleX = 1.0f
+            ripple.scaleY = 1.0f
+            ripple.alpha = 1.0f
             container.scaleX = 1.0f
             container.scaleY = 1.0f
         }
@@ -260,8 +340,9 @@ class FloatingBubbleService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
-        pulseAnimatorSet?.cancel()
-        pulseAnimatorSet = null
+        snoozeJob?.cancel()
+        rippleAnimatorSet?.cancel()
+        rippleAnimatorSet = null
         try {
             bubbleView?.let { bv ->
                 if (bv.isAttachedToWindow) {

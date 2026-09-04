@@ -24,9 +24,9 @@ val ActionBlue = Color(0xFF0284C7)
 // Range Colors (consistent across themes)
 val ColorVeryLow = Color(0xFFEF4444)      // Urgent Red < 3.0
 val ColorLow = Color(0xFFF59E0B)          // Warning Amber 3.0 - 3.8
-val ColorTight = Color(0xFF10B981)        // Ideal Emerald 3.9 - 7.0
-val ColorTargetSoft = Color(0xFF84CC16)   // Soft Yellowish-Green 7.1 - 7.8
-val ColorTarget = Color(0xFF3B82F6)       // Good Blue 7.9 - 10.0
+val ColorTight = Color(0xFF4ADE80)        // Pale Green (as in AGP report sheet) 3.9 - 7.8
+val ColorTargetSoft = Color(0xFF4ADE80)   // Pale Green 3.9 - 7.8
+val ColorTarget = Color(0xFF10B981)       // Saturated Green / Emerald 7.9 - 10.0
 val ColorHigh = Color(0xFFF59E0B)         // Warning Amber 10.1 - 13.9
 val ColorVeryHigh = Color(0xFFEF4444)     // Urgent Red >= 14.0
 

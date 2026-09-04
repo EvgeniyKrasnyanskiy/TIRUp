@@ -86,6 +86,7 @@ object TirupWidgetUpdater {
                     recent = recent,
                     todayReadings = todayReadings,
                     settings = settings,
+                    streakDays = streakDays,
                     mainIntent = mainPendingIntent,
                     nightstandIntent = nightstandPendingIntent
                 )
@@ -115,6 +116,7 @@ object TirupWidgetUpdater {
                     recent = recent,
                     todayReadings = todayReadings,
                     settings = settings,
+                    streakDays = streakDays,
                     mainIntent = mainPendingIntent,
                     nightstandIntent = nightstandPendingIntent
                 )
@@ -141,6 +143,7 @@ object TirupWidgetUpdater {
                     recent = recent,
                     todayReadings = todayReadings,
                     settings = settings,
+                    streakDays = streakDays,
                     mainIntent = mainPendingIntent
                 )
                 appWidgetManager.updateAppWidget(verticalIds, views)
@@ -213,7 +216,7 @@ object TirupWidgetUpdater {
                 }
                 minWidth < 100 && minHeight >= 90 -> {
                     // 1x2 Vertical Glance
-                    buildVerticalViews(context, latest, recent, todayReadings, settings, mainPendingIntent)
+                    buildVerticalViews(context, latest, recent, todayReadings, settings, streakDays, mainPendingIntent)
                 }
                 minWidth < 100 && minHeight < 90 -> {
                     // 1x1 micro cell
@@ -221,11 +224,11 @@ object TirupWidgetUpdater {
                 }
                 minWidth in 100..179 && minHeight >= 90 -> {
                     // 2x2 square focus
-                    buildCompactViews(context, latest, recent, todayReadings, settings, mainPendingIntent, nightstandPendingIntent)
+                    buildCompactViews(context, latest, recent, todayReadings, settings, streakDays, mainPendingIntent, nightstandPendingIntent)
                 }
                 else -> {
                     // 1-row tall strip (4x1 or 5x1)
-                    buildStripViews(context, latest, recent, todayReadings, settings, mainPendingIntent, nightstandPendingIntent)
+                    buildStripViews(context, latest, recent, todayReadings, settings, streakDays, mainPendingIntent, nightstandPendingIntent)
                 }
             }
 
@@ -241,6 +244,7 @@ object TirupWidgetUpdater {
         recent: List<GlucoseReading>,
         todayReadings: List<GlucoseReading>,
         settings: UserSettings,
+        streakDays: Int,
         mainIntent: PendingIntent,
         nightstandIntent: PendingIntent
     ): RemoteViews {
@@ -258,6 +262,7 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
             views.setTextViewText(R.id.widget_compensator_text, "Ожидание данных CGM")
             views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
+            views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
             views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
             return views
         }
@@ -265,6 +270,15 @@ object TirupWidgetUpdater {
         bindCommonMetrics(views, latest, recent, settings)
         bindCompensator(views, latest, todayReadings, settings, isStrip = true)
         bindIobCob(views, latest)
+
+        // Streak badge
+        val isRu = settings.language.equals("RU", ignoreCase = true)
+        if (streakDays > 0) {
+            views.setViewVisibility(R.id.widget_streak_badge, View.VISIBLE)
+            views.setTextViewText(R.id.widget_streak_badge, if (isRu) "🔥 $streakDays д." else "🔥 ${streakDays}d")
+        } else {
+            views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
+        }
 
         return views
     }
@@ -305,7 +319,7 @@ object TirupWidgetUpdater {
         val isRu = settings.language.equals("RU", ignoreCase = true)
         if (streakDays > 0) {
             views.setViewVisibility(R.id.widget_streak_text, View.VISIBLE)
-            views.setTextViewText(R.id.widget_streak_text, if (isRu) "🔥 $streakDays дн" else "🔥 $streakDays d")
+            views.setTextViewText(R.id.widget_streak_text, if (isRu) "🔥 $streakDays д." else "🔥 ${streakDays}d")
         } else {
             views.setViewVisibility(R.id.widget_streak_text, View.GONE)
         }
@@ -344,6 +358,7 @@ object TirupWidgetUpdater {
         recent: List<GlucoseReading>,
         todayReadings: List<GlucoseReading>,
         settings: UserSettings,
+        streakDays: Int,
         mainIntent: PendingIntent,
         nightstandIntent: PendingIntent
     ): RemoteViews {
@@ -359,10 +374,20 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_delta_value, "--")
             views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
+            views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
             return views
         }
 
         bindCommonMetrics(views, latest, recent, settings)
+
+        // Streak badge
+        val isRu = settings.language.equals("RU", ignoreCase = true)
+        if (streakDays > 0) {
+            views.setViewVisibility(R.id.widget_streak_badge, View.VISIBLE)
+            views.setTextViewText(R.id.widget_streak_badge, if (isRu) "🔥 $streakDays д." else "🔥 ${streakDays}d")
+        } else {
+            views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
+        }
 
         // TIR Score
         val inRangeCount = todayReadings.count {
@@ -467,6 +492,7 @@ object TirupWidgetUpdater {
         recent: List<GlucoseReading>,
         todayReadings: List<GlucoseReading>,
         settings: UserSettings,
+        streakDays: Int,
         mainIntent: PendingIntent
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_vertical)
@@ -481,11 +507,21 @@ object TirupWidgetUpdater {
             views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
             views.setViewVisibility(R.id.widget_iob_text, View.GONE)
+            views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
             views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
             return views
         }
 
         bindCommonMetrics(views, latest, recent, settings)
+
+        // Streak badge
+        val isRu = settings.language.equals("RU", ignoreCase = true)
+        if (streakDays > 0) {
+            views.setViewVisibility(R.id.widget_streak_badge, View.VISIBLE)
+            views.setTextViewText(R.id.widget_streak_badge, if (isRu) "🔥 $streakDays д." else "🔥 ${streakDays}d")
+        } else {
+            views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
+        }
 
         // TIR Score & Progress
         val inRangeCount = todayReadings.count {
@@ -562,7 +598,7 @@ object TirupWidgetUpdater {
         val isRu = settings.language.equals("RU", ignoreCase = true)
         if (streakDays > 0) {
             views.setViewVisibility(R.id.widget_streak_text, View.VISIBLE)
-            views.setTextViewText(R.id.widget_streak_text, if (isRu) "🔥 $streakDays дн" else "🔥 $streakDays d")
+            views.setTextViewText(R.id.widget_streak_text, if (isRu) "🔥 $streakDays д." else "🔥 ${streakDays}d")
         } else {
             views.setViewVisibility(R.id.widget_streak_text, View.GONE)
         }
@@ -621,9 +657,8 @@ object TirupWidgetUpdater {
             isStale -> Color.parseColor("#94A3B8") // Gray when stale!
             latest.valueMmol < 3.0 -> Color.parseColor("#EF4444")
             latest.valueMmol < settings.targetRanges.tirLowMmol -> Color.parseColor("#F59E0B")
-            latest.valueMmol <= 7.0 -> Color.parseColor("#10B981") // ColorTight
-            latest.valueMmol <= 7.8 -> Color.parseColor("#84CC16") // ColorTargetSoft
-            latest.valueMmol <= settings.targetRanges.tirHighMmol -> Color.parseColor("#3B82F6") // ColorTarget (Good Blue!)
+            latest.valueMmol <= 7.8 -> Color.parseColor("#4ADE80") // Pale Green 3.9 - 7.8
+            latest.valueMmol <= settings.targetRanges.tirHighMmol -> Color.parseColor("#10B981") // Saturated Emerald 7.9 - 10.0
             latest.valueMmol <= 13.9 -> Color.parseColor("#F59E0B") // ColorHigh
             else -> Color.parseColor("#EF4444") // ColorVeryHigh
         }
@@ -968,17 +1003,10 @@ object TirupWidgetUpdater {
     }
 
     private fun getNightstandPendingIntent(context: Context): PendingIntent {
-        val pm = context.packageManager
-        val nightstandIntent = pm.getLaunchIntentForPackage("com.diaclock.nightstand")
-        val intent = if (nightstandIntent != null) {
-            nightstandIntent.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
-        } else {
-            Intent(context, MainActivity::class.java).apply {
-                putExtra("EXTRA_OPEN_NIGHTSTAND", true)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            }
+        val intent = Intent(context, com.tirup.app.data.receiver.AlertActionReceiver::class.java).apply {
+            action = com.tirup.app.data.receiver.AlertActionReceiver.ACTION_LAUNCH_DIANIGHT
         }
-        return PendingIntent.getActivity(
+        return PendingIntent.getBroadcast(
             context,
             202,
             intent,

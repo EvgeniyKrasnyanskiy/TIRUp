@@ -19,11 +19,16 @@ object MedicalSoundPlayer {
 
     @Volatile
     private var isCriticalActive = false
+    @Volatile
+    private var isSignalLossActive = false
+    @Volatile
+    private var isPlayingActive = true
     private var previousAlarmVolume: Int? = null
 
     private var currentAudioTrack: AudioTrack? = null
 
     fun playSound(tier: AlertTier) {
+        isPlayingActive = true
         audioScope.launch {
             try {
                 when (tier) {
@@ -33,7 +38,10 @@ object MedicalSoundPlayer {
                         boostAlarmVolumeIfNeeded()
                         playCriticalAlarmSeries()
                     }
-                    AlertTier.SIGNAL_LOSS -> playSignalLossTone()
+                    AlertTier.SIGNAL_LOSS -> {
+                        boostAlarmVolumeIfNeeded()
+                        playSignalLossTone()
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to play synthesized medical sound for tier=$tier: ${e.message}")
@@ -51,7 +59,7 @@ object MedicalSoundPlayer {
             if (currentVol < minDesiredVol) {
                 previousAlarmVolume = currentVol
                 audioManager.setStreamVolume(android.media.AudioManager.STREAM_ALARM, minDesiredVol, 0)
-                Log.i(TAG, "Alarm volume boosted from $currentVol to $minDesiredVol for Tier 3 Critical Alert")
+                Log.i(TAG, "Alarm volume boosted from $currentVol to $minDesiredVol for AlertTier")
             }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to boost alarm volume: ${e.message}")
@@ -73,20 +81,36 @@ object MedicalSoundPlayer {
     }
 
     /**
-     * Tier 4: Signal loss descending notification tone (659 Hz -> 440 Hz).
+     * Tier 4: Signal loss urgent descending alarm tone (659 Hz -> 440 Hz) on USAGE_ALARM stream.
      */
     private fun playSignalLossTone() {
-        val note1 = generateSineWave(freq = 659.25, durationMs = 180, volume = 0.70f)
-        val note2 = generateSineWave(freq = 440.00, durationMs = 240, volume = 0.75f)
-        val audioData = ShortArray(note1.size + note2.size)
-        System.arraycopy(note1, 0, audioData, 0, note1.size)
-        System.arraycopy(note2, 0, audioData, note1.size, note2.size)
+        isSignalLossActive = true
+        try {
+            val note1 = generateSineWave(freq = 659.25, durationMs = 200, volume = 0.85f)
+            val note2 = generateSineWave(freq = 440.00, durationMs = 300, volume = 0.90f)
+            val singlePattern = ShortArray(note1.size + note2.size)
+            System.arraycopy(note1, 0, singlePattern, 0, note1.size)
+            System.arraycopy(note2, 0, singlePattern, note1.size, note2.size)
 
-        playRawPcm(audioData, usage = AudioAttributes.USAGE_NOTIFICATION)
+            val pause = ShortArray((SAMPLE_RATE * 0.4).toInt()) // 400ms pause
+            val totalLen = (singlePattern.size * 2) + pause.size
+            val audioData = ShortArray(totalLen)
+            var offset = 0
+            System.arraycopy(singlePattern, 0, audioData, offset, singlePattern.size); offset += singlePattern.size
+            System.arraycopy(pause, 0, audioData, offset, pause.size); offset += pause.size
+            System.arraycopy(singlePattern, 0, audioData, offset, singlePattern.size)
+
+            playRawPcm(audioData, usage = AudioAttributes.USAGE_ALARM)
+        } finally {
+            isSignalLossActive = false
+            restoreAlarmVolumeIfNeeded()
+        }
     }
 
     fun stopAll() {
         isCriticalActive = false
+        isSignalLossActive = false
+        isPlayingActive = false
         try {
             currentAudioTrack?.stop()
             currentAudioTrack?.release()
@@ -228,7 +252,7 @@ object MedicalSoundPlayer {
             val sleepTimeMs = (data.size.toDouble() / SAMPLE_RATE * 1000.0).toLong() + 30L
             val step = 100L
             var elapsed = 0L
-            while (elapsed < sleepTimeMs && (usage != AudioAttributes.USAGE_ALARM || isCriticalActive)) {
+            while (elapsed < sleepTimeMs && isPlayingActive && (usage != AudioAttributes.USAGE_ALARM || isCriticalActive || isSignalLossActive)) {
                 Thread.sleep(step)
                 elapsed += step
             }
