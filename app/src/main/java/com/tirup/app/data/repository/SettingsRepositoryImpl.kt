@@ -83,6 +83,12 @@ class SettingsRepositoryImpl(
             .putBoolean(KEY_ALERT_SIGNAL_LOSS_FLASH, settings.alertSettings.isSignalLossFlash)
             .putBoolean(KEY_ALERT_LAST_CHANCE_ENABLED, settings.alertSettings.isLastChanceAlertEnabled)
             .putInt(KEY_ALERT_LAST_CHANCE_BUFFER, settings.alertSettings.lastChanceBufferMinutes)
+            .putBoolean(KEY_ALERT_EMERGENCY_SMS_ENABLED, settings.alertSettings.isEmergencySmsEnabled)
+            .putString(KEY_ALERT_EMERGENCY_PHONE, settings.alertSettings.emergencyContactPhone)
+            .putString(KEY_ALERT_EMERGENCY_NAME, settings.alertSettings.emergencyContactName)
+            .putInt(KEY_ALERT_EMERGENCY_DELAY, settings.alertSettings.emergencySmsDelayMinutes)
+            .putBoolean(KEY_ALERT_EMERGENCY_LOCATION, settings.alertSettings.includeLocationInEmergencySms)
+            .putLong(KEY_ALERT_LAST_EMERGENCY_TIMESTAMP, settings.alertSettings.lastEmergencySmsTimestamp)
             .apply()
 
         _settingsFlow.value = settings
@@ -188,7 +194,13 @@ class SettingsRepositoryImpl(
                 isSignalLossEnabled = prefs.getBoolean(KEY_ALERT_SIGNAL_LOSS_ENABLED, true),
                 isSignalLossFlash = prefs.getBoolean(KEY_ALERT_SIGNAL_LOSS_FLASH, false),
                 isLastChanceAlertEnabled = prefs.getBoolean(KEY_ALERT_LAST_CHANCE_ENABLED, true),
-                lastChanceBufferMinutes = prefs.getInt(KEY_ALERT_LAST_CHANCE_BUFFER, 90)
+                lastChanceBufferMinutes = prefs.getInt(KEY_ALERT_LAST_CHANCE_BUFFER, 90),
+                isEmergencySmsEnabled = prefs.getBoolean(KEY_ALERT_EMERGENCY_SMS_ENABLED, false),
+                emergencyContactPhone = prefs.getString(KEY_ALERT_EMERGENCY_PHONE, "") ?: "",
+                emergencyContactName = prefs.getString(KEY_ALERT_EMERGENCY_NAME, "") ?: "",
+                emergencySmsDelayMinutes = prefs.getInt(KEY_ALERT_EMERGENCY_DELAY, 5),
+                includeLocationInEmergencySms = prefs.getBoolean(KEY_ALERT_EMERGENCY_LOCATION, true),
+                lastEmergencySmsTimestamp = prefs.getLong(KEY_ALERT_LAST_EMERGENCY_TIMESTAMP, 0L)
             )
         )
     }
@@ -251,5 +263,11 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_SIGNAL_LOSS_FLASH = "key_alert_signal_loss_flash"
         private const val KEY_ALERT_LAST_CHANCE_ENABLED = "key_alert_last_chance_enabled"
         private const val KEY_ALERT_LAST_CHANCE_BUFFER = "key_alert_last_chance_buffer"
+        private const val KEY_ALERT_EMERGENCY_SMS_ENABLED = "key_alert_emergency_sms_enabled"
+        private const val KEY_ALERT_EMERGENCY_PHONE = "key_alert_emergency_phone"
+        private const val KEY_ALERT_EMERGENCY_NAME = "key_alert_emergency_name"
+        private const val KEY_ALERT_EMERGENCY_DELAY = "key_alert_emergency_delay"
+        private const val KEY_ALERT_EMERGENCY_LOCATION = "key_alert_emergency_location"
+        private const val KEY_ALERT_LAST_EMERGENCY_TIMESTAMP = "key_alert_last_emergency_timestamp"
     }
 }
