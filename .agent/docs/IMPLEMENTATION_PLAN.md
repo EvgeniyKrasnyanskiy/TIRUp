@@ -683,6 +683,30 @@
 - [x] Класс провайдера `TirupMediumWidgetProvider` и регистрация в `AndroidManifest.xml`.
 - [x] Методы обновления в `TirupWidgetUpdater.kt`.
 
+---
+
+## 34. Двухканальное получение IoB/CoB (xDrip Settings + localhost:17580) и редизайн виджета 1х2 [Completed]
+
+### 34.1. Канал 1: Полноценное рукопожатие с xDrip+ BroadcastService через Settings.java:
+- [x] Создание Java-модели `com.eveningoutpost.dexdrip.services.broadcastservice.models.Settings` (Parcelable) для совместимости с `BroadcastService.java` в xDrip+.
+- [x] Передача `Settings(context.packageName, 4 * 60 * 60 * 1000L)` в `EXTRA_SETTINGS` при отправке `update_bg_force`.
+- [x] Гарантированное добавление `com.tirup.app` в реестр подписчиков xDrip+ `broadcastEntities`.
+
+### 34.2. Канал 2: Опрос локального веб-сервиса на порту 17580 (`http://127.0.0.1:17580/pebble`):
+- [x] Добавление разрешения `android.permission.INTERNET` и флага `android:usesCleartextTraffic="true"` в `AndroidManifest.xml`.
+- [x] Реализация легковесного асинхронного HTTP-клиента для опроса локального эндпоинта `http://127.0.0.1:17580/pebble` (таймаут 1.5 сек).
+- [x] Извлечение `iob` и `cob` из JSON (`jsonObject.optDouble("iob")` / `bgs[0].iob`) и объединение с текущим замером сахара.
+
+### 34.3. Оптимизация вертикального виджета 1х2 (Vertical Glance):
+- [x] Редизайн `widget_vertical.xml`:
+  - Крупный сахар (32sp вместо 24sp), стрелка тренда 22sp.
+  - Дельта сахара (13sp).
+  - Бейдж активного инсулина `widget_iob_text` (`💉 1.2 U`).
+  - Нижний бейдж `TIR XX%` (12sp) и компактный прогресс-бар `widget_tir_progress`.
+  - Верхняя плашка времени `widget_time_ago`.
+  - Сбалансированные отступы без пустых зон сверху и снизу.
+- [x] Обновление `TirupWidgetUpdater.buildVerticalViews` для связывания новых элементов (IoB и прогресс-бара).
+
 
 
 

@@ -475,12 +475,14 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_delta_value, "--")
             views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
+            views.setViewVisibility(R.id.widget_iob_text, View.GONE)
+            views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
             return views
         }
 
         bindCommonMetrics(views, latest, recent, settings)
 
-        // TIR Score
+        // TIR Score & Progress
         val inRangeCount = todayReadings.count {
             if (settings.targetMode == TargetMode.TIR) {
                 it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tirHighMmol
@@ -494,6 +496,27 @@ object TirupWidgetUpdater {
 
         val targetName = settings.targetMode.name
         views.setTextViewText(R.id.widget_tir_score, "$targetName: $currentPercent%")
+        views.setProgressBar(R.id.widget_tir_progress, 100, currentPercent.coerceIn(0, 100), false)
+
+        // IoB badge
+        val iob = latest.iob ?: 0.0
+        if (iob > 0.05) {
+            views.setViewVisibility(R.id.widget_iob_text, View.VISIBLE)
+            views.setTextViewText(R.id.widget_iob_text, String.format(Locale.US, "💉 %.1f U", iob))
+        } else {
+            views.setViewVisibility(R.id.widget_iob_text, View.GONE)
+        }
+
+        // Time indicator for 1x2 (show compact time if fresh, e.g. 12:45)
+        val now = System.currentTimeMillis()
+        val diffMin = ((now - latest.timestamp).coerceAtLeast(0L) / 60_000L).toInt()
+        views.setViewVisibility(R.id.widget_time_ago, View.VISIBLE)
+        if (diffMin <= 1) {
+            val timeFormat = java.text.SimpleDateFormat("HH:mm", Locale.getDefault())
+            views.setTextViewText(R.id.widget_time_ago, timeFormat.format(java.util.Date(latest.timestamp)))
+        } else {
+            views.setTextViewText(R.id.widget_time_ago, if (diffMin < 60) "${diffMin}м" else "${diffMin / 60}ч")
+        }
 
         return views
     }

@@ -58,14 +58,33 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         val trendArrow = slopeToArrow(slopeName)
 
         // 4. Extract IoB (Insulin on Board) & CoB (Carbs on Board) with 30-min cache
-        val iob = extractIob(extras)
-        val cob = extractCob(extras)
-
-        Log.i(TAG, "Saving glucose: $valueMmol mmol/L at $timestamp (trend: $trendArrow, iob: $iob, cob: $cob)")
+        var iob = extractIob(extras)
+        var cob = extractCob(extras)
 
         val pendingResult = goAsync()
         scope.launch {
             try {
+                // If IoB or CoB not found in broadcast extras, query local xDrip/Nightscout web service (port 17580)
+                if (iob == null || cob == null) {
+                    val pebbleData = fetchIobCobFromLocalPebbleService()
+                    if (pebbleData != null) {
+                        if (iob == null && pebbleData.first != null) {
+                            iob = pebbleData.first
+                            cachedIob = iob
+                            cachedIobTimestamp = System.currentTimeMillis()
+                            Log.i(TAG, "Fetched active IoB from local 17580 web service: $iob U")
+                        }
+                        if (cob == null && pebbleData.second != null) {
+                            cob = pebbleData.second
+                            cachedCob = cob
+                            cachedCobTimestamp = System.currentTimeMillis()
+                            Log.i(TAG, "Fetched active CoB from local 17580 web service: $cob g")
+                        }
+                    }
+                }
+
+                Log.i(TAG, "Saving glucose: $valueMmol mmol/L at $timestamp (trend: $trendArrow, iob: $iob, cob: $cob)")
+
                 val app = context.applicationContext as? TirupApplication
                 val repository = app?.glucoseRepository
                 if (repository != null) {
@@ -353,6 +372,72 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         }
     }
 
+    private fun fetchIobCobFromLocalPebbleService(): Pair<Double?, Double?>? {
+        var connection: java.net.HttpURLConnection? = null
+        return try {
+            val url = java.net.URL("http://127.0.0.1:17580/pebble")
+            connection = (url.openConnection() as java.net.HttpURLConnection).apply {
+                connectTimeout = 1500
+                readTimeout = 1500
+                requestMethod = "GET"
+                setRequestProperty("Accept", "application/json")
+            }
+            if (connection.responseCode == 200) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                parsePebbleJson(response)
+            } else {
+                null
+            }
+        } catch (_: Exception) {
+            // Local server not running or port 17580 disabled - expected when xDrip web service is off
+            null
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    private fun parsePebbleJson(jsonStr: String): Pair<Double?, Double?>? {
+        try {
+            val root = org.json.JSONObject(jsonStr)
+            var iob: Double? = null
+            var cob: Double? = null
+
+            // 1. Root level iob / cob
+            if (root.has("iob") && !root.isNull("iob")) {
+                val v = root.optDouble("iob")
+                if (!v.isNaN() && v >= 0.0) iob = v
+            }
+            if (root.has("cob") && !root.isNull("cob")) {
+                val v = root.optDouble("cob")
+                if (!v.isNaN() && v >= 0.0) cob = v
+            }
+
+            // 2. Nested in bgs array (Pebble format)
+            if ((iob == null || cob == null) && root.has("bgs")) {
+                val bgs = root.optJSONArray("bgs")
+                if (bgs != null && bgs.length() > 0) {
+                    val first = bgs.optJSONObject(0)
+                    if (first != null) {
+                        if (iob == null && first.has("iob") && !first.isNull("iob")) {
+                            val v = first.optDouble("iob")
+                            if (!v.isNaN() && v >= 0.0) iob = v
+                        }
+                        if (cob == null && first.has("cob") && !first.isNull("cob")) {
+                            val v = first.optDouble("cob")
+                            if (!v.isNaN() && v >= 0.0) cob = v
+                        }
+                    }
+                }
+            }
+            if (iob != null || cob != null) {
+                return Pair(iob, cob)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse local pebble JSON: ${e.message}")
+        }
+        return null
+    }
+
     companion object {
         private const val TAG = "DexdripReceiver"
         private const val IOB_COB_EXPIRY_MS = 30 * 60 * 1000L // 30 min cache like GDH
@@ -368,18 +453,19 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         private var cachedCobTimestamp: Long = 0L
 
         /**
-         * Send registration handshake to xDrip+ BroadcastService.
-         * Calling this prompts xDrip+ to register TIRUp and stream full BG, graph, IoB and CoB data.
+         * Send registration handshake to xDrip+ BroadcastService with required Settings Parcelable.
+         * Calling this prompts xDrip+ to register TIRUp in its subscriber table and stream full BG, graph, IoB and CoB data.
          */
         fun registerWithXdripBroadcastService(context: Context) {
             try {
                 val intent = Intent("com.eveningoutpost.dexdrip.watch.wearintegration.BROADCAST_SERVICE_RECEIVER").apply {
                     putExtra("FUNCTION", "update_bg_force")
                     putExtra("PACKAGE", context.packageName)
+                    putExtra("SETTINGS", com.eveningoutpost.dexdrip.services.broadcastservice.models.Settings(context.packageName, 4 * 60 * 60 * 1000L))
                     addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
                 }
                 context.sendBroadcast(intent)
-                Log.i(TAG, "Dispatched registration handshake to xDrip BroadcastService (PACKAGE=${context.packageName})")
+                Log.i(TAG, "Dispatched registration handshake to xDrip BroadcastService with Settings (PACKAGE=${context.packageName})")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send registration handshake to xDrip BroadcastService", e)
             }
