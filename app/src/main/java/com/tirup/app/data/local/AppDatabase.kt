@@ -34,6 +34,16 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        // No-op migration: schema was unchanged between v1 and v2
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) { /* no-op */ }
+        }
+
+        // No-op migration: schema was unchanged between v2 and v3
+        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) { /* no-op */ }
+        }
+
         val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE glucose_readings ADD COLUMN iob REAL DEFAULT NULL")
@@ -64,8 +74,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "tirup_database.db"
                 )
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .fallbackToDestructiveMigrationOnDowngrade()
                     .build()
                 INSTANCE = instance
                 instance

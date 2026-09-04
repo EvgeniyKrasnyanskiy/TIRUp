@@ -303,12 +303,13 @@ object GlucoseAlertManager {
     }
 
     /**
-     * Instantly silences any actively playing sound, vibration, and torch (e.g. on hardware volume/power key press)
-     * WITHOUT modifying user acknowledged timestamps or snooze intervals.
+     * Instantly silences audio and flashlight on hardware button press.
+     * IMPORTANT: Does NOT cancel the emergency SMS timer! If the user is unconscious
+     * and reflexively pressed a button, the SMS countdown must continue to alert
+     * the trusted contact. Only dismissCriticalAlarm(fromUser=true) cancels SMS.
      */
     fun silenceCurrentSoundOnly() {
-        Log.i(TAG, "silenceCurrentSoundOnly")
-        cancelEmergencySmsTimer()
+        Log.i(TAG, "silenceCurrentSoundOnly (audio only, SMS timer preserved)")
         MedicalSoundPlayer.stopAll()
         try {
             flashJob?.cancel()

@@ -67,11 +67,22 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             return
         }
 
-        // Convert mg/dL to mmol/L if needed (values > 35 are in mg/dL)
-        val valueMmol = if (glucoseVal > 35.0) {
-            glucoseVal / 18.0182
-        } else {
-            glucoseVal
+        // Convert mg/dL to mmol/L if needed.
+        // SAFETY: Values 10-35 can be either mg/dL (extreme hypo!) or mmol/L (hyper).
+        // Check explicit unit metadata from broadcast source first, then use context.
+        val valueMmol = when {
+            // Some sources send explicit unit indicator
+            extras.containsKey("glucoseLevelMmol") -> glucoseVal
+            extras.getString("units")?.contains("mg", ignoreCase = true) == true ->
+                glucoseVal / 18.01559
+            // Values above 35 are unambiguously mg/dL (35 mmol/L = 630 mg/dL, impossibly high)
+            glucoseVal > 35.0 -> glucoseVal / 18.01559
+            // Values <= 0.83 mmol/L (~15 mg/dL): treat as mmol/L — too low for mg/dL to be meaningful
+            glucoseVal <= 0.83 -> glucoseVal
+            // Ambiguous zone (0.83–35.0): could be mmol/L or extreme hypo mg/dL.
+            // Default to mmol/L since CGM sources (xDrip+, Juggluco, GDH) that send raw values
+            // in this numeric range almost always mean mmol/L. True mg/dL sources send > 35.
+            else -> glucoseVal
         }
 
         // 2. Extract timestamp
