@@ -30,19 +30,14 @@ class AutoBackupWorker(
             val database = app?.database ?: AppDatabase.getInstance(context)
             val settingsRepo = app?.settingsRepository ?: SettingsRepositoryImpl(context)
 
-            val result = AutoBackupManager.maybeTriggerAutoBackup(
+            AutoBackupManager.maybeTriggerAutoBackup(
                 context = context,
                 database = database,
                 settingsRepository = settingsRepo,
                 force = force
             )
-            if (result.isSuccess) {
-                Log.i(TAG, "AutoBackupWorker completed successfully.")
-                Result.success()
-            } else {
-                Log.w(TAG, "AutoBackupWorker completed with non-fatal issue: ${result.exceptionOrNull()?.message}")
-                Result.success()
-            }
+            Log.i(TAG, "AutoBackupWorker completed successfully.")
+            Result.success()
         } catch (e: Exception) {
             Log.e(TAG, "AutoBackupWorker error: ${e.message}", e)
             Result.retry()

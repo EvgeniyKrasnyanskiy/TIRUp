@@ -1390,17 +1390,17 @@ object GlucoseAlertManager {
     }
 
     fun scheduleNextSignalLossCheck(context: Context, triggerAtMs: Long) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val intent = Intent(context, AlertActionReceiver::class.java).apply {
+            action = AlertActionReceiver.ACTION_CHECK_SIGNAL_LOSS
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            2005,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         try {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-            val intent = Intent(context, AlertActionReceiver::class.java).apply {
-                action = AlertActionReceiver.ACTION_CHECK_SIGNAL_LOSS
-            }
-            val pendingIntent = PendingIntent.getBroadcast(
-                context,
-                2005,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (alarmManager.canScheduleExactAlarms()) {
                     alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, pendingIntent)

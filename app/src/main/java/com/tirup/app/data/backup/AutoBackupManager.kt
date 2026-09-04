@@ -408,7 +408,7 @@ object AutoBackupManager {
                 bakFile.delete()
             }
 
-            Log.i(TAG, "Auto-backup successfully saved ${readings.size} readings to ${mainFile.absolutePath}")
+            Log.i(TAG, "Auto-backup successfully saved $totalCount readings to ${mainFile.absolutePath}")
             Result.success(true)
         } catch (e: Exception) {
             Log.e(TAG, "Auto-backup failed: ${e.message}", e)
