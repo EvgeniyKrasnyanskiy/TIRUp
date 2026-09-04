@@ -186,10 +186,10 @@ class UserManualPdfGenerator(private val context: Context) {
                         else "xDrip+ ➔ Settings ➔ 'Inter-app settings' ➔ enable 'Broadcast locally'. Runs 100% offline without cloud servers upon every new sensor measurement."
                     ),
                     Triple(
-                        if (isRu) "Служба трансляции API (IoB / CoB)" else "Broadcast Service API (IoB / CoB)",
+                        if (isRu) "Служба трансляции API и Treatments" else "Broadcast Service API & Treatments",
                         if (isRu) "Шаг 2" else "Step 2",
-                        if (isRu) "xDrip+ ➔ «Межпрограммная интеграция» ➔ включите «API службы трансляции» (Broadcast Service API). Это позволяет передавать в TIRUp активный инсулин (IoB) и активные углеводы (CoB)."
-                        else "xDrip+ ➔ 'Inter-app settings' ➔ enable 'Broadcast Service API'. Enables real-time transmission of active insulin (IoB) and active carbs (CoB) to TIRUp."
+                        if (isRu) "xDrip+ ➔ «Межпрограммная интеграция» ➔ включите «API службы трансляции» (Broadcast Service API). Передаёт активный инсулин (IoB), углеводы (CoB) и маркеры болюсов/еды на Canvas."
+                        else "xDrip+ ➔ 'Inter-app settings' ➔ enable 'Broadcast Service API'. Enables real-time transmission of active insulin (IoB), carbs (CoB), and bolus/meal treatments to the Canvas."
                     ),
                     Triple(
                         if (isRu) "Бесперебойная работа в фоне (Батарея)" else "Unrestricted Background Running (Battery)",
@@ -236,7 +236,7 @@ class UserManualPdfGenerator(private val context: Context) {
             )
 
             // Section 3: Daily Compensator
-            y1 = drawSection(
+            drawSection(
                 canvas = canvas1,
                 startY = y1,
                 title = if (isRu) "3. Суточная математика компенсатора цели (TIR ≥70% / TING ≥50%)"
@@ -253,6 +253,12 @@ class UserManualPdfGenerator(private val context: Context) {
                         if (isRu) "Предупреждение" else "Warning",
                         if (isRu) "Срабатывает за 1ч, 1.5ч или 2ч до точки невозврата, когда суммарное оставшееся время суток становится меньше времени, необходимого для достижения целевого TIR ≥70%."
                         else "Alerts 1h, 1.5h or 2h before mathematical point of no return when remaining day time cannot mathematically rescue the daily 70% TIR target."
+                    ),
+                    Triple(
+                        if (isRu) "Воскресный аналитический дайджест (20:00)" else "Sunday Compensation Digest (20:00)",
+                        if (isRu) "Дайджест недели" else "Weekly Review",
+                        if (isRu) "Каждое воскресенье формирует интерактивный отчёт: средний сахар, TIR, вариабельность и динамику к прошлой неделе (±Δ%). Сохраняется в архиве отчётов."
+                        else "Every Sunday generates an interactive review: avg glucose, TIR, variability, and week-over-week comparison (±Δ%). Saved to persistent reports archive."
                     )
                 ),
                 cardHeight = 40f
@@ -320,6 +326,12 @@ class UserManualPdfGenerator(private val context: Context) {
                         if (isRu) "Будильник DND" else "Bypass DND",
                         if (isRu) "Приравнена к будильнику (USAGE_ALARM + Bypass DND). Ночью (в окне сна): 6 раз по 5м ➔ 6 раз по 10м ➔ 6 раз по 20м ➔ каждые 30м до утра для пробуждения. Днём: 3x5м ➔ 3x20м ➔ каждый 1 час."
                         else "Treated as alarm (USAGE_ALARM + Bypass DND). Night (sleep window): 6x5m ➔ 6x10m ➔ 6x20m ➔ 30m until morning to wake user. Day: 3x5m ➔ 3x20m ➔ 60m. Resets on new point."
+                    ),
+                    Triple(
+                        if (isRu) "Экстренное SOS SMS и Офлайн-запрос (при потере сознания / шатдауне)" else "Emergency SOS SMS & Offline SMS Query",
+                        if (isRu) "Близкие & SOS" else "SOS & Offline",
+                        if (isRu) "При тяжелой гипо (<3.0) и молчании сирены 5м отправляет близкому компактное SMS (≤67 симв.) с координатами. При шатдауне интернета контакт может запросить текущий сахар по SMS."
+                        else "Sends single-segment SMS (≤67 chars) with GPS if severe hypo (<3.0) siren is ignored for 5m. Trusted contact can query real-time glucose & TIR offline via SMS."
                     )
                 ),
                 cardHeight = 42f
@@ -355,7 +367,7 @@ class UserManualPdfGenerator(private val context: Context) {
             )
 
             // Section 6: Clinical AGP & Automated Backups
-            y2 = drawSection(
+            drawSection(
                 canvas = canvas2,
                 startY = y2,
                 title = if (isRu) "6. Клиническая аналитика AGP, паттерны и Автобэкап"
