@@ -250,4 +250,27 @@ class SettingsViewModel(
             }
         }
     }
+
+    fun sendTestEmergencySms() {
+        val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+        val phone = _uiState.value.userSettings.alertSettings.emergencyContactPhone
+        val patientName = _uiState.value.userSettings.patientProfile.fullName
+        com.tirup.app.data.alert.EmergencySmsManager.sendTestSms(
+            context = context,
+            phone = phone,
+            patientName = patientName,
+            isRu = isRu
+        ).fold(
+            onSuccess = {
+                val msg = if (isRu) "Тестовое SMS успешно отправлено на $phone" else "Test SMS successfully sent to $phone"
+                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                _uiState.update { it.copy(infoMessage = msg) }
+            },
+            onFailure = { error ->
+                val msg = if (isRu) "Ошибка отправки SMS: ${error.localizedMessage}" else "SMS send error: ${error.localizedMessage}"
+                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                _uiState.update { it.copy(infoMessage = msg) }
+            }
+        )
+    }
 }

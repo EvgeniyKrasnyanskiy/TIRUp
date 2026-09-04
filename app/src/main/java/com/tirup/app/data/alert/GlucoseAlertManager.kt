@@ -24,7 +24,10 @@ import com.tirup.app.domain.calculator.GlucoseTrendPredictor
 import com.tirup.app.domain.calculator.PatternSeverity
 import com.tirup.app.domain.calculator.PredictedEvent
 import com.tirup.app.domain.calculator.TargetCompensatorCalculator
+import com.tirup.app.domain.model.AlertSettings
 import com.tirup.app.domain.model.GlucoseReading
+import com.tirup.app.domain.model.GlucoseUnit
+import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.presentation.MainActivity
@@ -114,6 +117,7 @@ object GlucoseAlertManager {
         private set
 
     private var flashJob: Job? = null
+    private var emergencySmsJob: Job? = null
 
     fun initChannels(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -270,6 +274,7 @@ object GlucoseAlertManager {
         if (!isCriticalAlarmActive && !fromUser) return
         Log.i(TAG, "dismissCriticalAlarm fromUser=$fromUser")
 
+        cancelEmergencySmsTimer()
         isCriticalAlarmActive = false
         MedicalSoundPlayer.stopAll()
 
@@ -298,19 +303,74 @@ object GlucoseAlertManager {
     }
 
     /**
-     * Checks if user is currently interacting with the phone (screen ON and device UNLOCKED).
-     */
-    /**
      * Instantly silences any actively playing sound, vibration, and torch (e.g. on hardware volume/power key press)
      * WITHOUT modifying user acknowledged timestamps or snooze intervals.
      */
     fun silenceCurrentSoundOnly() {
         Log.i(TAG, "silenceCurrentSoundOnly")
+        cancelEmergencySmsTimer()
         MedicalSoundPlayer.stopAll()
         try {
             flashJob?.cancel()
             flashJob = null
         } catch (_: Exception) {}
+    }
+
+    /**
+     * Cancels any pending emergency SMS countdown when the user acknowledges or silences an alarm.
+     */
+    fun cancelEmergencySmsTimer() {
+        if (emergencySmsJob != null) {
+            Log.i(TAG, "Canceling emergency SMS countdown (user reacted or alarm silenced)")
+            emergencySmsJob?.cancel()
+            emergencySmsJob = null
+        }
+    }
+
+    /**
+     * Schedules an emergency SMS to trusted contact if the critical hypo alarm remains unacknowledged for the set delay.
+     */
+    private fun scheduleEmergencySmsIfEnabled(
+        context: Context,
+        glucoseValue: Double,
+        trendArrow: String,
+        alerts: AlertSettings,
+        patientProfile: PatientProfile,
+        isRu: Boolean,
+        unit: GlucoseUnit
+    ) {
+        if (!alerts.isEmergencySmsEnabled || alerts.emergencyContactPhone.isBlank()) {
+            return
+        }
+
+        // Keep existing timer running if already actively counting down for this unacknowledged alarm
+        if (emergencySmsJob?.isActive == true) {
+            return
+        }
+
+        val delayMinutes = alerts.emergencySmsDelayMinutes.coerceAtLeast(1)
+        val delayMillis = delayMinutes * 60_000L
+        Log.i(TAG, "Starting Emergency SMS countdown: $delayMinutes min until alert is sent to ${alerts.emergencyContactPhone}")
+
+        val appContext = context.applicationContext
+        emergencySmsJob = CoroutineScope(Dispatchers.IO).launch {
+            delay(delayMillis)
+            if (isCriticalAlarmActive) {
+                Log.w(TAG, "Critical hypo alarm timed out after $delayMinutes min without reaction! Sending emergency SMS...")
+                EmergencySmsManager.sendEmergencyAlert(
+                    context = appContext,
+                    glucoseValue = glucoseValue,
+                    trendArrow = trendArrow,
+                    delayMinutes = delayMinutes,
+                    settings = alerts,
+                    patientProfile = patientProfile,
+                    isRu = isRu,
+                    unit = unit
+                )
+            } else {
+                Log.i(TAG, "Critical alarm is no longer active after delay. Emergency SMS aborted.")
+            }
+        }
     }
 
     /**
@@ -585,6 +645,7 @@ object GlucoseAlertManager {
         // Auto-dismiss stale out-of-range notifications when back in normal range
         val isInNormalRange = latest.valueMmol in tirLow..tirHigh
         if (isInNormalRange) {
+            cancelEmergencySmsTimer()
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             nm?.cancel(NOTIFICATION_ID_PREDICTIVE)
             nm?.cancel(NOTIFICATION_ID_MAIN)
@@ -637,6 +698,7 @@ object GlucoseAlertManager {
                         iobText
                     )
                     sendNotification(context, CHANNEL_CRITICAL, NOTIFICATION_ID_CRITICAL, title, text, AlertTier.CRITICAL, alerts.isCriticalVibrate, alerts.isCriticalFlash)
+                    scheduleEmergencySmsIfEnabled(context, latest.valueMmol, latest.trendArrow ?: "→", alerts, settings.patientProfile, isRu, settings.unit)
                     return
                 }
             }

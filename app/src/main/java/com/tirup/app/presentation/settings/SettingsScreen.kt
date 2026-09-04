@@ -1,12 +1,21 @@
 package com.tirup.app.presentation.settings
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -120,6 +129,7 @@ fun SettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val settings = state.userSettings
+    val isRu = settings.language.equals("RU", ignoreCase = true)
     val profile = settings.patientProfile
     val currentYear = Calendar.getInstance().get(Calendar.YEAR)
     var showHelpDialog by remember { mutableStateOf(false) }
@@ -130,14 +140,30 @@ fun SettingsScreen(
     var masterOffHintVisible by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
+    val smsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            Toast.makeText(context, if (isRu) "Разрешение на отправку SMS предоставлено" else "SMS permission granted", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, if (isRu) "Разрешение на отправку SMS отклонено" else "SMS permission denied", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            Toast.makeText(context, if (isRu) "Доступ к геопозиции предоставлен" else "Location permission granted", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     LaunchedEffect(masterOffHintVisible) {
         if (masterOffHintVisible) {
             delay(3000L)
             masterOffHintVisible = false
         }
     }
-
-    val isRu = settings.language.equals("RU", ignoreCase = true)
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -639,6 +665,206 @@ fun SettingsScreen(
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section: Emergency SMS on Severe Hypo
+        item {
+            val alerts = settings.alertSettings
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "🚨",
+                                fontSize = 22.sp
+                            )
+                            Column {
+                                Text(
+                                    text = if (isRu) "Экстренное SMS при гипогликемии" else "Emergency Hypo SMS",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (isRu) "Авто-отправка SMS доверенному контакту, если сирена не отключена (подозрение на кому)"
+                                    else "Auto-send SMS to trusted contact if alarm is unacknowledged (coma suspicion)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Switch(
+                            checked = alerts.isEmergencySmsEnabled,
+                            onCheckedChange = { isChecked ->
+                                if (isChecked && ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                                    smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
+                                }
+                                viewModel.updateAlertSettings(alerts.copy(isEmergencySmsEnabled = isChecked))
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFFEF4444)
+                            )
+                        )
+                    }
+
+                    if (alerts.isEmergencySmsEnabled) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                        // Trusted contact phone input
+                        OutlinedTextField(
+                            value = alerts.emergencyContactPhone,
+                            onValueChange = { phone ->
+                                viewModel.updateAlertSettings(alerts.copy(emergencyContactPhone = phone))
+                            },
+                            label = { Text(if (isRu) "Телефон близкого человека (+7...)" else "Trusted contact phone (+...)") },
+                            placeholder = { Text("+7 900 123-45-67") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Phone,
+                                    contentDescription = null,
+                                    tint = PrimaryEmerald
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        // Trusted contact name (optional)
+                        OutlinedTextField(
+                            value = alerts.emergencyContactName,
+                            onValueChange = { name ->
+                                viewModel.updateAlertSettings(alerts.copy(emergencyContactName = name))
+                            },
+                            label = { Text(if (isRu) "Имя доверенного лица (необязательно)" else "Contact name (optional)") },
+                            placeholder = { Text(if (isRu) "Мама, Муж, Доктор..." else "Mom, Spouse, Doctor...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        // Delay picker (3 min / 5 min / 10 min)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (isRu) "Ожидание реакции:" else "Reaction timeout:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                val delayOptions = listOf(
+                                    3 to if (isRu) "3 мин" else "3 min",
+                                    5 to if (isRu) "5 мин" else "5 min",
+                                    10 to if (isRu) "10 мин" else "10 min"
+                                )
+                                delayOptions.forEach { (mins, label) ->
+                                    val isSelected = alerts.emergencySmsDelayMinutes == mins
+                                    Surface(
+                                        modifier = Modifier.clickable {
+                                            viewModel.updateAlertSettings(alerts.copy(emergencySmsDelayMinutes = mins))
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isSelected) Color(0x33EF4444) else Color.Transparent,
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (isSelected) Color(0xFFEF4444) else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                                        )
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) Color(0xFFF87171) else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Attach coordinates switch
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isRu) "Прикреплять геопозицию (GPS)" else "Attach GPS Location",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isRu) "Ссылка на Google Maps в SMS для экстренного поиска" else "Google Maps link in SMS for swift finding",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = alerts.includeLocationInEmergencySms,
+                                onCheckedChange = { isChecked ->
+                                    if (isChecked && ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                                    }
+                                    viewModel.updateAlertSettings(alerts.copy(includeLocationInEmergencySms = isChecked))
+                                }
+                            )
+                        }
+
+                        // Send test verification SMS button
+                        OutlinedButton(
+                            onClick = {
+                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                                    smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
+                                } else {
+                                    viewModel.sendTestEmergencySms()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.6f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Send,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = PrimaryEmerald
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isRu) "Отправить проверочное SMS" else "Send test SMS verification",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = PrimaryEmerald
+                            )
                         }
                     }
                 }
