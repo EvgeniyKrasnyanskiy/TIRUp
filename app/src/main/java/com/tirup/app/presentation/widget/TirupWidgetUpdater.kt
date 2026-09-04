@@ -46,8 +46,11 @@ object TirupWidgetUpdater {
             val minimalIds = appWidgetManager.getAppWidgetIds(ComponentName(context, TirupMiniWidgetProvider::class.java))
             val verticalIds = appWidgetManager.getAppWidgetIds(ComponentName(context, TirupVerticalWidgetProvider::class.java))
             val mediumIds = appWidgetManager.getAppWidgetIds(ComponentName(context, TirupMediumWidgetProvider::class.java))
+            val widget2x1Ids = appWidgetManager.getAppWidgetIds(ComponentName(context, Tirup2x1WidgetProvider::class.java))
+            val widget3x1Ids = appWidgetManager.getAppWidgetIds(ComponentName(context, Tirup3x1WidgetProvider::class.java))
 
-            if (stripIds.isEmpty() && dashboardIds.isEmpty() && compactIds.isEmpty() && minimalIds.isEmpty() && verticalIds.isEmpty() && mediumIds.isEmpty()) {
+            if (stripIds.isEmpty() && dashboardIds.isEmpty() && compactIds.isEmpty() && minimalIds.isEmpty() &&
+                verticalIds.isEmpty() && mediumIds.isEmpty() && widget2x1Ids.isEmpty() && widget3x1Ids.isEmpty()) {
                 return@withContext
             }
 
@@ -164,6 +167,32 @@ object TirupWidgetUpdater {
                 appWidgetManager.updateAppWidget(mediumIds, views)
             }
 
+            // 7. Update 2x1 Compact Widgets
+            if (widget2x1Ids.isNotEmpty()) {
+                val views = build2x1Views(
+                    context = context,
+                    latest = latest,
+                    recent = recent,
+                    todayReadings = todayReadings,
+                    settings = settings,
+                    mainIntent = mainPendingIntent
+                )
+                appWidgetManager.updateAppWidget(widget2x1Ids, views)
+            }
+
+            // 8. Update 3x1 Medium Widgets
+            if (widget3x1Ids.isNotEmpty()) {
+                val views = build3x1Views(
+                    context = context,
+                    latest = latest,
+                    recent = recent,
+                    todayReadings = todayReadings,
+                    settings = settings,
+                    mainIntent = mainPendingIntent
+                )
+                appWidgetManager.updateAppWidget(widget3x1Ids, views)
+            }
+
         } catch (e: Exception) {
             Log.e(TAG, "Error updating TIRUp homescreen widgets", e)
         }
@@ -204,8 +233,17 @@ object TirupWidgetUpdater {
             val mainPendingIntent = getMainPendingIntent(context)
             val nightstandPendingIntent = getNightstandPendingIntent(context)
 
-            // Dynamic layout selection based on current bounding box
+            val appWidgetInfo = appWidgetManager.getAppWidgetInfo(appWidgetId)
+            val providerName = appWidgetInfo?.provider?.className ?: ""
+
+            // Dynamic layout selection based on current provider or bounding box
             val views = when {
+                providerName.endsWith("Tirup2x1WidgetProvider") -> {
+                    build2x1Views(context, latest, recent, todayReadings, settings, mainPendingIntent)
+                }
+                providerName.endsWith("Tirup3x1WidgetProvider") -> {
+                    build3x1Views(context, latest, recent, todayReadings, settings, mainPendingIntent)
+                }
                 minHeight >= 100 && minWidth >= 240 -> {
                     // Expanded 4x2 or 5x2 Bento Dashboard with 4h sparkline chart
                     buildDashboardViews(context, latest, recent, todayReadings, settings, streakDays, mainPendingIntent, nightstandPendingIntent)
@@ -659,6 +697,110 @@ object TirupWidgetUpdater {
         } else {
             views.setViewVisibility(R.id.widget_chart_image, View.GONE)
         }
+
+        return views
+    }
+
+    private fun build2x1Views(
+        context: Context,
+        latest: GlucoseReading?,
+        recent: List<GlucoseReading>,
+        todayReadings: List<GlucoseReading>,
+        settings: UserSettings,
+        mainIntent: PendingIntent
+    ): RemoteViews {
+        val views = RemoteViews(context.packageName, R.layout.widget_2x1)
+        applyWidgetBackground(views, settings)
+        views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
+
+        if (latest == null) {
+            views.setTextViewText(R.id.widget_glucose_value, "--")
+            views.setTextColor(R.id.widget_glucose_value, Color.parseColor("#94A3B8"))
+            views.setTextViewText(R.id.widget_trend_arrow, "")
+            views.setTextViewText(R.id.widget_delta_value, "--")
+            views.setViewVisibility(R.id.widget_time_ago, View.GONE)
+            views.setTextViewText(R.id.widget_tir_score, "TIR: --")
+            return views
+        }
+
+        bindCommonMetrics(views, latest, recent, settings)
+
+        val targetName = settings.targetMode.name
+        val targetPercent = if (settings.targetMode == TargetMode.TIR) {
+            settings.targetRanges.tirGoalPercent.toDouble()
+        } else {
+            settings.targetRanges.tingGoalPercent.toDouble()
+        }
+        val inRangeCount = todayReadings.count {
+            if (settings.targetMode == TargetMode.TIR) {
+                it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tirHighMmol
+            } else {
+                it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tingHighMmol
+            }
+        }
+        val currentPercent = if (todayReadings.isNotEmpty()) {
+            (inRangeCount * 100.0 / todayReadings.size).roundToInt()
+        } else 0
+        val tirColor = when {
+            currentPercent >= targetPercent -> Color.parseColor("#10B981")
+            currentPercent >= (targetPercent - 15.0) -> Color.parseColor("#F59E0B")
+            else -> Color.parseColor("#EF4444")
+        }
+        views.setTextViewText(R.id.widget_tir_score, "$targetName: $currentPercent%")
+        views.setTextColor(R.id.widget_tir_score, tirColor)
+
+        return views
+    }
+
+    private fun build3x1Views(
+        context: Context,
+        latest: GlucoseReading?,
+        recent: List<GlucoseReading>,
+        todayReadings: List<GlucoseReading>,
+        settings: UserSettings,
+        mainIntent: PendingIntent
+    ): RemoteViews {
+        val views = RemoteViews(context.packageName, R.layout.widget_3x1)
+        applyWidgetBackground(views, settings)
+        views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
+
+        if (latest == null) {
+            views.setTextViewText(R.id.widget_glucose_value, "--")
+            views.setTextColor(R.id.widget_glucose_value, Color.parseColor("#94A3B8"))
+            views.setTextViewText(R.id.widget_trend_arrow, "")
+            views.setTextViewText(R.id.widget_delta_value, "--")
+            views.setViewVisibility(R.id.widget_time_ago, View.GONE)
+            views.setTextViewText(R.id.widget_tir_score, "TIR: --")
+            views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
+            return views
+        }
+
+        bindCommonMetrics(views, latest, recent, settings)
+        bindIobCob(views, latest)
+
+        val targetName = settings.targetMode.name
+        val targetPercent = if (settings.targetMode == TargetMode.TIR) {
+            settings.targetRanges.tirGoalPercent.toDouble()
+        } else {
+            settings.targetRanges.tingGoalPercent.toDouble()
+        }
+        val inRangeCount = todayReadings.count {
+            if (settings.targetMode == TargetMode.TIR) {
+                it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tirHighMmol
+            } else {
+                it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tingHighMmol
+            }
+        }
+        val currentPercent = if (todayReadings.isNotEmpty()) {
+            (inRangeCount * 100.0 / todayReadings.size).roundToInt()
+        } else 0
+        val tirColor = when {
+            currentPercent >= targetPercent -> Color.parseColor("#10B981")
+            currentPercent >= (targetPercent - 15.0) -> Color.parseColor("#F59E0B")
+            else -> Color.parseColor("#EF4444")
+        }
+        views.setTextViewText(R.id.widget_tir_score, "$targetName: $currentPercent%")
+        views.setTextColor(R.id.widget_tir_score, tirColor)
 
         return views
     }

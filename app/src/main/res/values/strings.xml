@@ -88,8 +88,11 @@
     <string name="action_confirm">Confirm</string>
     <string name="action_close">Close</string>
 
-    <!-- Widgets -->
-    <string name="widget_strip_label">TIRUp: Glycemic Strip (4x1/5x1)</string>
+    <string name="widget_2x1_label">TIRUp: 2x1 Compact</string>
+    <string name="widget_2x1_description">Compact 2x1 widget with current glucose, trend arrow, delta, and TIR score</string>
+    <string name="widget_3x1_label">TIRUp: 3x1 Medium</string>
+    <string name="widget_3x1_description">Medium 3x1 widget with glucose, trend, delta, IoB/CoB, and daily TIR score</string>
+    <string name="widget_strip_label">TIRUp: 4x1 Strip (Compensator)</string>
     <string name="widget_strip_description">Current glucose, 5-min velocity delta, daily TIR compensator bar, and Nightstand launcher</string>
     <string name="widget_dashboard_label">TIRUp: Bento Dashboard (4x2/5x2)</string>
     <string name="widget_dashboard_description">Full dashboard with 3-4h sparkline glucose chart, daily compensator, and streak counter</string>

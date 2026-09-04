@@ -180,6 +180,32 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_dashboard_medium_info" />
         </receiver>
+
+        <!-- AppWidget Provider: 2x1 Compact Focus -->
+        <receiver
+            android:name=".presentation.widget.Tirup2x1WidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_2x1_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_2x1_info" />
+        </receiver>
+
+        <!-- AppWidget Provider: 3x1 Medium Focus -->
+        <receiver
+            android:name=".presentation.widget.Tirup3x1WidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_3x1_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_3x1_info" />
+        </receiver>
     </application>
 
 </manifest>
