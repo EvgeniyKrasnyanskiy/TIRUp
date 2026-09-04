@@ -20,11 +20,11 @@ object EmergencySmsBuilder {
         unit: GlucoseUnit = GlucoseUnit.MMOL_L
     ): String {
         val name = patientName.trim().ifBlank {
-            if (isRu) "Пациента" else "Patient"
+            if (isRu) "пациент" else "Patient"
         }
 
         val glucoseStr = if (unit == GlucoseUnit.MMOL_L) {
-            String.format(Locale.US, "%.1f ммоль/л", glucoseValueMmol)
+            String.format(Locale.US, "%.1f ммоль", glucoseValueMmol)
         } else {
             "${(glucoseValueMmol * 18.0182).roundToInt()} mg/dL"
         }
@@ -33,13 +33,13 @@ object EmergencySmsBuilder {
 
         val locationPart = if (latitude != null && longitude != null) {
             val mapsUrl = String.format(Locale.US, "https://maps.google.com/?q=%.6f,%.6f", latitude, longitude)
-            if (isRu) "\nКоординаты: $mapsUrl" else "\nLocation: $mapsUrl"
+            "\n$mapsUrl"
         } else ""
 
         return if (isRu) {
-            "ВНИМАНИЕ! У $name критическая гипогликемия: сахар $glucoseStr$arrowPart. Сирена не подтверждена $delayMinutes мин! Возможна потеря сознания.$locationPart"
+            "SOS! $name - критич. гипо: $glucoseStr$arrowPart! Сирена ${delayMinutes}м без реакции$locationPart"
         } else {
-            "EMERGENCY! $name has critical hypoglycemia: glucose $glucoseStr$arrowPart. Alarm unacknowledged for $delayMinutes min! Possible loss of consciousness.$locationPart"
+            "SOS! $name - critical hypo: $glucoseStr$arrowPart! Alarm ${delayMinutes}m no reaction$locationPart"
         }
     }
 
@@ -51,9 +51,9 @@ object EmergencySmsBuilder {
             if (isRu) "пациента" else "patient"
         }
         return if (isRu) {
-            "TIRUp: Тестовое оповещение для $name. Канал экстренных СМС настроен и работает штатно."
+            "TIRUp: Тест SMS для $name. Канал экстренной связи работает штатно."
         } else {
-            "TIRUp: Test alert for $name. Emergency SMS delivery is verified and working properly."
+            "TIRUp: Test SMS for $name. Emergency alert channel verified."
         }
     }
 }
