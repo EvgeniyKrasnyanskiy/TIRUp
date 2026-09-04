@@ -189,17 +189,27 @@ val isDroppingDangerously = when {
 | GVI | xDrip-style | xDrip+ reference | ✅ |
 | PGS | `GVI × ⌊mean_mgdl⌋ × (1 − ⌊TIR%⌋/100)` | xDrip+ reference | ✅ |
 | AGP перцентили | Linear interpolation | ATTD standard | ✅ |
-| Boundary handling | exclusive upper | inclusive по ATTD | ⚠️ HIGH-06 |
+| Boundary handling | 70–180 inclusive | inclusive по ATTD | ✅ Верно |
 
 ---
 
 ## Раздел 7. Итоговый вердикт
 
-### Оценка зрелости: **6.5 / 10**
+### Оценка зрелости: **8.5 / 10**
 
-**Сильные стороны**: Клиническая математика, 4-уровневые тревоги, offline-подход, синтезатор звука, AGP/PDF генерация, SMS-протокол.
+**Сильные стороны**: Клиническая математика, 4-уровневые тревоги, offline-подход, синтезатор звука, AGP/PDF генерация, SMS-протокол, надёжная детекция единиц глюкозы, защита от OOM при бэкапе, безопасность миграций Room, корректный жизненный цикл ViewModels.
 
-**Блокеры**: Инверсия единиц (CRIT-01), деструктивная миграция (CRIT-02), OOM бэкапа (CRIT-03), SMS race condition (HIGH-01), Exact Alarms crash (HIGH-04), TIR boundary mismatch (HIGH-06).
+**Устранённые блокеры**: 
+- ✅ CRIT-01: Инверсия единиц устранена (привязка к метаданным протокола)
+- ✅ CRIT-02: Деструктивная миграция Room устранена (полная цепочка 1→5)
+- ✅ CRIT-03: OOM бэкапа устранён (пагинированный экспорт по 5000 записей)
+- ✅ HIGH-01: SMS-таймер при hardware silence сохранён
+- ✅ HIGH-02: Alarm fatigue снуза устранена
+- ✅ HIGH-03: FloatingBubbleService lifecycle защищён (START_STICKY)
+- ✅ HIGH-04: Exact Alarms SecurityException на Android 14+ устранён
+- ✅ HIGH-05: Сброс ViewModels при повороте экрана устранён
+- ✅ HIGH-06: Границы TIR согласованы с ATTD консенсусом (70 и 180 inclusive)
+- ✅ MED-01: AudioTrack DND bypass исправлен на CONTENT_TYPE_ALARM
 
 ---
 
