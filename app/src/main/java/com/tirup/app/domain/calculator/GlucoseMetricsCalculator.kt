@@ -19,7 +19,7 @@ import kotlin.math.sqrt
 
 object GlucoseMetricsCalculator {
 
-    private const val MGDL_FACTOR = 18.0182
+    private const val MGDL_FACTOR = 18.01559
     private const val CUTOFF_MGDL = 38.0 // xDrip & DiaKiaBot CUTOFF (~2.1 mmol/L)
     private const val CUTOFF_MMOL = CUTOFF_MGDL / MGDL_FACTOR // ~2.109 mmol/L
 
@@ -105,21 +105,21 @@ object GlucoseMetricsCalculator {
         // IFCC mmol/mol: (eA1c% - 2.15) * 10.929
         val hba1cMmolMol = ((ea1cAdag - 2.15) * 10.929).roundToInt().coerceAtLeast(0)
 
-        // 2. Ranges counting in mg/dL (exact thresholds matching glycemia_processor.py)
-        val lowMgdl = 3.9 * MGDL_FACTOR      // ~70.27 mg/dL
-        val highMgdl = 180.0                 // 180.0 mg/dL (~10.0 mmol/L)
-        val tightHighMgdl = 140.0            // 140.0 mg/dL (~7.8 mmol/L)
-        val tbr30Mgdl = 54.0                 // 54.0 mg/dL (~3.0 mmol/L)
-        val tar139Mgdl = 13.9 * MGDL_FACTOR  // ~250.45 mg/dL (~13.9 mmol/L)
+        // 2. Ranges counting in mg/dL (exact ATTD/ADA clinical consensus thresholds)
+        // ATTD consensus: TIR 70–180 mg/dL (3.9–10.0 mmol/L) inclusive, TING 70–140 mg/dL (3.9–7.8 mmol/L) inclusive
+        val lowMgdl = 70.0
+        val highMgdl = 180.0
+        val tightHighMgdl = 140.0
+        val tbr30Mgdl = 54.0
+        val tar139Mgdl = 250.0
 
-        // Диапазон [Low, High) - High исключается
-        val inRangeCount = rawMgdl.count { it >= lowMgdl && it < highMgdl }
+        val inRangeCount = rawMgdl.count { it in lowMgdl..highMgdl }
         val belowCount = rawMgdl.count { it < lowMgdl }
-        val aboveCount = rawMgdl.count { it >= highMgdl }
+        val aboveCount = rawMgdl.count { it > highMgdl }
 
-        val tightCount = rawMgdl.count { it >= lowMgdl && it < tightHighMgdl }
+        val tightCount = rawMgdl.count { it in lowMgdl..tightHighMgdl }
         val below30Count = rawMgdl.count { it < tbr30Mgdl }
-        // TAR > 13.9: строго выше 13.9 (точки = 13.9 остаются в диапазоне High 10.1-13.9)
+        // TAR > 13.9: strictly above 250 mg/dL (13.9 mmol/L)
         val above139Count = rawMgdl.count { it > tar139Mgdl }
 
         val nightReadings = mutableListOf<GlucoseReading>()

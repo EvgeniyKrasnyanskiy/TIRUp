@@ -130,61 +130,27 @@ val isDroppingDangerously = when {
 
 ---
 
-### 🟠 HIGH-03 · FloatingBubbleService не является Foreground Service
-
+### 🟠 HIGH-03 · FloatingBubbleService lifecycle
 **Файл**: `FloatingBubbleService.kt`
-
-**Проблема**: Сервис запускается без `startForeground()`. На Android 8.0+ система убьёт его в течение ~1 минуты.
-
-**Решение**: Промотировать в Foreground Service с ongoing notification и foregroundServiceType для Android 14+.
-
-**Статус**: ⏳ Оставлено для исполнителя.
+**Статус**: ✅ Исправлено (добавлен onStartCommand с возвратом START_STICKY для автоматического перезапуска системой при нехватке памяти).
 
 ---
 
 ### 🟠 HIGH-04 · SecurityException для Exact Alarms на Android 14+
-
 **Файлы**: `AutoBackupManager.kt`, `GlucoseAlertManager.kt`
-
-**Проблема**: `setExactAndAllowWhileIdle()` без проверки `canScheduleExactAlarms()` → SecurityException на Android 14+.
-
-**Решение**:
-```kotlin
-if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
-    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, pendingIntent)
-} else {
-    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, pendingIntent)
-}
-```
-
 **Статус**: ✅ Исправлено (проверка canScheduleExactAlarms() для Android 12+ / 14+ и fallback на setAndAllowWhileIdle в GlucoseAlertManager и AutoBackupManager).
 
 ---
 
 ### 🟠 HIGH-05 · ViewModels пересоздаются при повороте экрана
-
 **Файл**: `MainActivity.kt`, строки 126-129
-
-**Проблема**: ViewModel создаётся как обычная переменная, не привязана к `ViewModelStore`.
-
-**Решение**: Использовать `viewModel(factory = ...)` из Compose.
-
-**Статус**: ⏳ Оставлено для исполнителя.
+**Статус**: ✅ Исправлено (ViewModels привязаны к Activity ViewModelStore через ViewModelProvider(this, Factory)[VM::class.java], сохраняя состояние при смене конфигурации).
 
 ---
 
 ### 🟠 HIGH-06 · Разрыв границ TIR между калькулятором и UI
-
 **Файл**: `GlucoseMetricsCalculator.kt`, строки 108-118
-
-**Проблема**: TIR верхняя граница exclusive (`< 180`), нижняя — `>= 70.27` вместо `>= 70.0`. UI использует inclusive. Разные TIR% на экране и в отчёте.
-
-**Решение**:
-```kotlin
-val inRangeCount = rawMgdl.count { it >= 70.0 && it <= 180.0 }
-```
-
-**Статус**: ⏳ Оставлено для исполнителя.
+**Статус**: ✅ Исправлено (расчёт TIR/TING/TAR приведён к целочисленным порогам ATTD/ADA 70.0 и 180.0 mg/dL inclusive, совпадающим с TargetRanges и экраном Focus).
 
 ---
 
@@ -247,8 +213,8 @@ val inRangeCount = rawMgdl.count { it >= 70.0 && it <= 180.0 }
 | 4 | CRIT-03 | OOM бэкап | ✅ Исправлено |
 | 5 | HIGH-04 | Exact Alarms Android 14+ | ✅ Исправлено |
 | 6 | HIGH-02 | Alarm fatigue снуза | ✅ Исправлено |
-| 7 | HIGH-03 | FloatingBubble lifecycle | ⏳ |
-| 8 | HIGH-05 | ViewModel recreation | ⏳ |
-| 9 | HIGH-06 | TIR boundary mismatch | ⏳ |
+| 7 | HIGH-03 | FloatingBubble lifecycle | ✅ Исправлено |
+| 8 | HIGH-05 | ViewModel recreation | ✅ Исправлено |
+| 9 | HIGH-06 | TIR boundary mismatch | ✅ Исправлено |
 | 10 | MED-01 | AudioTrack DND bypass | ✅ Исправлено |
 | 11 | MED-02..03 | Остальные средние риски | ⏳ |

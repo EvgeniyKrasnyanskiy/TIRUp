@@ -123,10 +123,45 @@ class MainActivity : ComponentActivity() {
         val settingsRepo = app.settingsRepository
         val importer = app.streamingImporter
 
-        val focusViewModel = FocusViewModel(glucoseRepo, settingsRepo, this.applicationContext)
-        val trendsViewModel = TrendsViewModel(glucoseRepo, settingsRepo, this.applicationContext)
-        val reportsViewModel = ReportsViewModel(this.applicationContext, glucoseRepo, settingsRepo, importer, database)
-        val settingsViewModel = SettingsViewModel(this.applicationContext, settingsRepo, glucoseRepo, database)
+        val focusViewModel = androidx.lifecycle.ViewModelProvider(
+            this,
+            object : androidx.lifecycle.ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                    return FocusViewModel(glucoseRepo, settingsRepo, applicationContext) as T
+                }
+            }
+        )[FocusViewModel::class.java]
+
+        val trendsViewModel = androidx.lifecycle.ViewModelProvider(
+            this,
+            object : androidx.lifecycle.ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                    return TrendsViewModel(glucoseRepo, settingsRepo, applicationContext) as T
+                }
+            }
+        )[TrendsViewModel::class.java]
+
+        val reportsViewModel = androidx.lifecycle.ViewModelProvider(
+            this,
+            object : androidx.lifecycle.ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                    return ReportsViewModel(applicationContext, glucoseRepo, settingsRepo, importer, database) as T
+                }
+            }
+        )[ReportsViewModel::class.java]
+
+        val settingsViewModel = androidx.lifecycle.ViewModelProvider(
+            this,
+            object : androidx.lifecycle.ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                    return SettingsViewModel(applicationContext, settingsRepo, glucoseRepo, database) as T
+                }
+            }
+        )[SettingsViewModel::class.java]
 
         setContent {
             val settingsState by settingsViewModel.uiState.collectAsState()
