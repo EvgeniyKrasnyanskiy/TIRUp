@@ -42,9 +42,9 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         // 0. Extract potential treatment event (bolus insulin or carbs)
         val treatment = extractTreatment(extras, System.currentTimeMillis())
 
-        // 1. Extract glucose value
-        val glucoseVal = extractGlucoseValue(extras)
-        if (glucoseVal == null || glucoseVal <= 0.0) {
+        // 1. Extract glucose value and its source key
+        val extracted = extractGlucoseValue(extras)
+        if (extracted == null || extracted.first <= 0.0) {
             if (treatment != null) {
                 // Standalone treatment broadcast (e.g. from xDrip+ / AndroidAPS)
                 val pendingResult = goAsync()
@@ -67,23 +67,42 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             return
         }
 
-        // Convert mg/dL to mmol/L if needed.
-        // SAFETY: Values 10-35 can be either mg/dL (extreme hypo!) or mmol/L (hyper).
-        // Check explicit unit metadata from broadcast source first, then use context.
-        val valueMmol = when {
-            // Some sources send explicit unit indicator
-            extras.containsKey("glucoseLevelMmol") -> glucoseVal
-            extras.getString("units")?.contains("mg", ignoreCase = true) == true ->
-                glucoseVal / 18.01559
-            // Values above 35 are unambiguously mg/dL (35 mmol/L = 630 mg/dL, impossibly high)
-            glucoseVal > 35.0 -> glucoseVal / 18.01559
-            // Values <= 0.83 mmol/L (~15 mg/dL): treat as mmol/L — too low for mg/dL to be meaningful
-            glucoseVal <= 0.83 -> glucoseVal
-            // Ambiguous zone (0.83–35.0): could be mmol/L or extreme hypo mg/dL.
-            // Default to mmol/L since CGM sources (xDrip+, Juggluco, GDH) that send raw values
-            // in this numeric range almost always mean mmol/L. True mg/dL sources send > 35.
-            else -> glucoseVal
+        val (glucoseVal, matchedKey) = extracted
+
+        // Convert mg/dL to mmol/L safely based on key, action, metadata, and numerical range.
+        // SAFETY (IEC 62304): Avoid blind value thresholds (>35) alone because 10-35 mg/dL is severe hypo
+        // and must never be treated as mmol/L (severe hyper).
+        val isMgdl = when {
+            // Explicit mmol indicators from keys or broadcast extras
+            matchedKey.contains("mmol", ignoreCase = true) ||
+                extras.containsKey("glucoseLevelMmol") ||
+                extras.containsKey("com.eveningoutpost.dexdrip.Extras.BgEstimateMmol") ||
+                extras.getString("units")?.contains("mmol", ignoreCase = true) == true ||
+                extras.getString("glucodata.Minute.Unit")?.contains("mmol", ignoreCase = true) == true ||
+                extras.getString("unit")?.contains("mmol", ignoreCase = true) == true -> false
+
+            // Explicit mg/dL key indicators (xDrip, GlucoDataHandler, Nightscout)
+            matchedKey.contains("mgdl", ignoreCase = true) ||
+                matchedKey.equals("sgv", ignoreCase = true) ||
+                matchedKey.contains("bgestimate", ignoreCase = true) ||
+                matchedKey.contains("Extras.BgEstimate", ignoreCase = true) -> true
+
+            // Known mg/dL broadcast actions (xDrip BgEstimate and Nightscout SGV always send mg/dL)
+            action.contains("BgEstimate", ignoreCase = true) ||
+                action.contains("NEW_SGV", ignoreCase = true) ||
+                action.contains("dexcom", ignoreCase = true) -> true
+
+            // Explicit mg/dL string flags
+            extras.getString("units")?.contains("mg", ignoreCase = true) == true ||
+                extras.getString("glucodata.Minute.Unit")?.contains("mg", ignoreCase = true) == true -> true
+
+            // Values > 35 are unambiguously mg/dL (35 mmol/L = 630 mg/dL, impossibly high)
+            glucoseVal > 35.0 -> true
+
+            else -> false
         }
+
+        val valueMmol = if (isMgdl) glucoseVal / 18.01559 else glucoseVal
 
         // 2. Extract timestamp
         val timestamp = extractTimestamp(extras) ?: System.currentTimeMillis()
@@ -221,7 +240,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun extractGlucoseValue(extras: Bundle): Double? {
+    private fun extractGlucoseValue(extras: Bundle): Pair<Double, String>? {
         val candidateKeys = listOf(
             "bg.valueMgdl",
             "bg.value",
@@ -245,7 +264,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         for (key in candidateKeys) {
             if (extras.containsKey(key)) {
                 val num = getDoubleFromBundle(extras, key)
-                if (num != null && num > 0.0) return num
+                if (num != null && num > 0.0) return Pair(num, key)
             }
         }
 
@@ -254,7 +273,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             val kLower = key.lowercase()
             if (kLower.contains("estimate") || kLower.contains("glucose") || kLower.contains("sgv") || kLower == "bg" || kLower.contains("mgdl")) {
                 val num = getDoubleFromBundle(extras, key)
-                if (num != null && num > 0.0) return num
+                if (num != null && num > 0.0) return Pair(num, key)
             }
         }
 

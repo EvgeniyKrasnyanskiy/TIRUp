@@ -262,9 +262,15 @@ object MedicalSoundPlayer {
             AudioFormat.ENCODING_PCM_16BIT
         ).coerceAtLeast(data.size * 2)
 
+        val contentType = if (usage == AudioAttributes.USAGE_ALARM) {
+            AudioAttributes.CONTENT_TYPE_ALARM
+        } else {
+            AudioAttributes.CONTENT_TYPE_SONIFICATION
+        }
+
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(usage)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .setContentType(contentType)
             .build()
 
         val audioFormat = AudioFormat.Builder()

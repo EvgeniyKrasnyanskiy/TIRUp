@@ -666,9 +666,11 @@ object GlucoseAlertManager {
                 val timeSinceAck = now - userAcknowledgedHypoTimestamp
                 val isUnderSnooze = userAcknowledgedHypoTimestamp > 0 && timeSinceAck < alerts.snoozeHypoMinutes * 60000L
 
-                // Safety override: if under snooze, but sugar dropped critically (< 2.8 or drop rate <= -0.3 mmol/L)
-                val isDroppingDangerously = (latest.valueMmol < 2.8) ||
-                        (sorted.size >= 2 && (latest.valueMmol - sorted[sorted.size - 2].valueMmol) <= -0.3)
+                // Safety override: if under snooze, break early only if plummeting (drop rate <= -0.3 mmol/L)
+                // or if critically low (< 2.8) AND continuing to drop / stagnant.
+                // If glucose is rising after carbs, respect the clinical snooze.
+                val delta = if (sorted.size >= 2) latest.valueMmol - sorted[sorted.size - 2].valueMmol else 0.0
+                val isDroppingDangerously = (delta <= -0.3) || (latest.valueMmol < 2.8 && delta <= 0.0)
 
                 val shouldTriggerHypo = if (isUnderSnooze) {
                     isDroppingDangerously // break snooze early if plummeting!

@@ -126,7 +126,7 @@ val isDroppingDangerously = when {
 }
 ```
 
-**Статус**: ⏳ Оставлено для исполнителя.
+**Статус**: ✅ Исправлено (срыв снуза происходит только при продолжении падения или стагнации, рост после углеводов уважает снуз).
 
 ---
 
@@ -192,7 +192,7 @@ val inRangeCount = rawMgdl.count { it >= 70.0 && it <= 180.0 }
 
 ### 🟡 MED-01 · AudioTrack CONTENT_TYPE_SONIFICATION вместо CONTENT_TYPE_ALARM
 **Файл**: `MedicalSoundPlayer.kt`, строка 267
-**Статус**: ⏳ Оставлено
+**Статус**: ✅ Исправлено (для USAGE_ALARM выставляется CONTENT_TYPE_ALARM).
 
 ### 🟡 MED-02 · ANR-риск в BackupAlarmReceiver (goAsync 10s timeout)
 **Файл**: `BackupAlarmReceiver.kt`
@@ -246,8 +246,9 @@ val inRangeCount = rawMgdl.count { it >= 70.0 && it <= 180.0 }
 | 3 | CRIT-02 | Миграции БД | ✅ Исправлено |
 | 4 | CRIT-03 | OOM бэкап | ⏳ Требует рефакторинг |
 | 5 | HIGH-04 | Exact Alarms Android 14+ | ⏳ |
-| 6 | HIGH-02 | Alarm fatigue снуза | ⏳ |
+| 6 | HIGH-02 | Alarm fatigue снуза | ✅ Исправлено |
 | 7 | HIGH-03 | FloatingBubble lifecycle | ⏳ |
 | 8 | HIGH-05 | ViewModel recreation | ⏳ |
 | 9 | HIGH-06 | TIR boundary mismatch | ⏳ |
-| 10 | MED-* | Средние риски | ⏳ |
+| 10 | MED-01 | AudioTrack DND bypass | ✅ Исправлено |
+| 11 | MED-02..03 | Остальные средние риски | ⏳ |
