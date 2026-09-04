@@ -11,6 +11,7 @@ import com.tirup.app.domain.model.UserSettings
 data class FocusUiState(
     val latestReading: GlucoseReading? = null,
     val recentReadings: List<GlucoseReading> = emptyList(),
+    val treatments: List<com.tirup.app.domain.model.Treatment> = emptyList(),
     val statistics: GlucoseStatistics = GlucoseStatistics(),
     val compensatorGoal: CompensatorGoal = CompensatorGoal(),
     val streakDays: Int = 0,

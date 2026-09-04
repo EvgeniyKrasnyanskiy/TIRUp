@@ -972,6 +972,52 @@
 - [x] Все 38 модульных тестов (`testDebugUnitTest`) успешно пройдены (100% success rate, 0 failures).
 - [x] Полная компиляция Kotlin (`compileDebugKotlin`) завершена без ошибок.
 
+---
+
+## 44. Фаза 44: Метки инсулина и приёмов пищи на 24-часовом графике (Treatments Overlay) [Completed]
+
+> **Примечание по архитектуре**: Ручное добавление меток из TIRUp исключено по согласованию с пользователем во избежание коллизий и рассинхронизации с базой xDrip+ / AndroidAPS. Все Treatments поступают строго автоматически из внешних источников (широковещательные трансляции xDrip+/AAPS либо исторический импорт) и отображаются в TIRUp в режиме высокоточного аналитического оверлея.
+
+### 44.1. Подзадача 1: Слой данных (Data Layer):
+- [x] Создать доменную модель `Treatment`:
+  - `id: Long = 0`
+  - `timestamp: Long`
+  - `insulinUnits: Double?`
+  - `carbsGrams: Double?`
+  - `notes: String?`
+  - `source: String` (XDRIP, AAPS, IMPORT)
+- [x] Создать `TreatmentEntity` и `TreatmentDao`:
+  - `insert(entity: TreatmentEntity): Long`
+  - `insertBatch(entities: List<TreatmentEntity>)`
+  - `getTreatmentsBetween(start: Long, end: Long): Flow<List<TreatmentEntity>>`
+  - `getTreatmentsBetweenSync(start: Long, end: Long): List<TreatmentEntity>`
+  - `existsSimilar(timestamp: Long, insulin: Double?, carbs: Double?): Boolean`
+  - `clearAll()`
+- [x] Обновить `AppDatabase`: версия 5, миграция `MIGRATION_4_5`.
+- [x] Добавить методы работы с Treatments в `GlucoseRepository` и `GlucoseRepositoryImpl`.
+
+### 44.2. Подзадача 2: Приём и сохранение Treatments (Broadcast Layer):
+- [x] В `AndroidManifest.xml` добавить фильтры действий для приёма Treatments:
+  - `com.eveningoutpost.dexdrip.TREATMENT`
+  - `info.nightscout.androidaps.TREATMENT`
+  - `info.nightscout.androidaps.treatment`
+- [x] В `DexdripBroadcastReceiver.kt` реализовать извлечение и сохранение болюсов и углеводов:
+  - Парсинг из `extras` (`insulin`, `treatment.insulin`, `carbs`, `treatment.carbs`, `notes`).
+  - Защита от дубликатов (проверка временного окна $\pm 60$ секунд при одинаковых значениях через `countSimilar`).
+
+### 44.3. Подзадача 3: Интеграция во ViewModel и экран Focus:
+- [x] В `FocusViewModel.kt` добавить наблюдение `todayTreatments: StateFlow<List<Treatment>>` с фильтрацией с начала текущих суток (`startOfDay`).
+- [x] В `FocusScreen.kt` передавать `todayTreatments` в `DailyGlucoseChart`.
+
+### 44.4. Подзадача 4: Отрисовка на Canvas и инспектор в DailyGlucoseChart.kt:
+- [x] Отрисовка маркеров болюсов 💉 (сине-голубой пин `ActionBlue` с числом `X.X U` / `X.X Ед`) в верхней зоне графика с вертикальной пунктирной проекцией на кривую сахара.
+- [x] Отрисовка маркеров еды 🍽️ / 🍞 (тёплый янтарно-оранжевый пин с числом `XX g` / `XX г`) над временной шкалой.
+- [x] Сдвоенные маркеры при одновременном уколе под еду (комбинированный пин без наложения текста).
+- [x] Интерактивный тултип/инспектор при тапе на маркер (точное время, доза инсулина, количество углеводов, расчёт ХЕ, заметка).
+- [x] Синхронизация экранных координат меток с жестами зума (pinch) и горизонтального скролла (pan).
+- [x] Модульные unit-тесты `TreatmentModelTest` (100% success).
+
+
 
 
 

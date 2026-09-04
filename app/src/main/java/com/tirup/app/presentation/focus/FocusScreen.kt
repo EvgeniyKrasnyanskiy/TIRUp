@@ -266,6 +266,7 @@ fun FocusScreen(
                 targetRanges = userSettings.targetRanges,
                 unit = unit,
                 isRu = isRu,
+                treatments = state.treatments,
                 selectedMode = focusCardMode,
                 onModeChange = { focusCardMode = it },
                 onConfigureMetricsClick = { showMetricsOrderDialog = true },

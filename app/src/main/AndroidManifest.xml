@@ -64,6 +64,9 @@
                 <action android:name="com.dexcom.cgm.ACTION_NEW_BG" />
                 <action android:name="com.eveningoutpost.dexdrip.watch.wearintegration.BROADCAST_SERVICE_SENDER" />
                 <action android:name="info.nightscout.androidaps.status" />
+                <action android:name="com.eveningoutpost.dexdrip.TREATMENT" />
+                <action android:name="info.nightscout.androidaps.TREATMENT" />
+                <action android:name="info.nightscout.androidaps.treatment" />
             </intent-filter>
         </receiver>
 

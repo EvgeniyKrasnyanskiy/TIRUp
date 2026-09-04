@@ -3,10 +3,12 @@ package com.tirup.app.data.repository
 import com.tirup.app.data.local.AppDatabase
 import com.tirup.app.data.local.entity.DailySummaryEntity
 import com.tirup.app.data.local.entity.GlucoseReadingEntity
+import com.tirup.app.data.local.entity.TreatmentEntity
 import com.tirup.app.domain.calculator.GlucoseMetricsCalculator
 import com.tirup.app.domain.model.DailySummary
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.TargetRanges
+import com.tirup.app.domain.model.Treatment
 import com.tirup.app.domain.repository.GlucoseRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -21,6 +23,7 @@ class GlucoseRepositoryImpl(
 
     private val readingDao = database.glucoseReadingDao()
     private val summaryDao = database.dailySummaryDao()
+    private val treatmentDao = database.treatmentDao()
 
     override fun getLatestReading(): Flow<GlucoseReading?> {
         return readingDao.getLatestReading().map { it?.toDomain() }
@@ -34,6 +37,12 @@ class GlucoseRepositoryImpl(
 
     override fun getReadingsBetween(startTime: Long, endTime: Long): Flow<List<GlucoseReading>> {
         return readingDao.getReadingsBetween(startTime, endTime).map { list ->
+            list.map { it.toDomain() }
+        }
+    }
+
+    override fun getTreatmentsBetween(startTime: Long, endTime: Long): Flow<List<Treatment>> {
+        return treatmentDao.getTreatmentsBetween(startTime, endTime).map { list ->
             list.map { it.toDomain() }
         }
     }
@@ -87,7 +96,6 @@ class GlucoseRepositoryImpl(
         val allReadings = readingDao.getReadingsBetweenSync(startOfDay, endOfDay)
         if (allReadings.isEmpty()) return@withContext
 
-        val calendar = Calendar.getInstance(TimeZone.getDefault())
         val defaultTargets = TargetRanges()
 
         // Group by normalized day timestamp
@@ -117,9 +125,18 @@ class GlucoseRepositoryImpl(
         summaryDao.insertBatch(summaries)
     }
 
+    override suspend fun insertTreatment(treatment: Treatment): Long = withContext(Dispatchers.IO) {
+        treatmentDao.insert(TreatmentEntity.fromDomain(treatment))
+    }
+
+    override suspend fun insertTreatmentsBatch(treatments: List<Treatment>) = withContext(Dispatchers.IO) {
+        treatmentDao.insertBatch(treatments.map { TreatmentEntity.fromDomain(it) })
+    }
+
     override suspend fun clearAllData() = withContext(Dispatchers.IO) {
         readingDao.clearAll()
         summaryDao.clearAll()
+        treatmentDao.clearAll()
     }
 
     private fun getStartOfDay(timestamp: Long): Long {

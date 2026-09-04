@@ -39,20 +39,29 @@ class FocusViewModel(
 
     private fun observeData() {
         viewModelScope.launch {
-            combine(
+            val calendar = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            val startOfDay = calendar.timeInMillis
+            val endOfDay = startOfDay + 86400000L - 1
+
+            val glucoseDataFlow = combine(
                 glucoseRepository.getLatestReading(),
                 glucoseRepository.getRecentReadings(1440), // up to 24h of 1-min readings
+                glucoseRepository.getTreatmentsBetween(startOfDay, endOfDay + 60_000L)
+            ) { latest, recent, treatments ->
+                Triple(latest, recent, treatments)
+            }
+
+            combine(
+                glucoseDataFlow,
                 glucoseRepository.getStreakDays(),
                 settingsRepository.getSettings(),
                 GlucoseAlertManager.activeAlertBanner
-            ) { latest, recent, streak, settings, alertBanner ->
-                val calendar = java.util.Calendar.getInstance().apply {
-                    set(java.util.Calendar.HOUR_OF_DAY, 0)
-                    set(java.util.Calendar.MINUTE, 0)
-                    set(java.util.Calendar.SECOND, 0)
-                    set(java.util.Calendar.MILLISECOND, 0)
-                }
-                val startOfDay = calendar.timeInMillis
+            ) { (latest, recent, treatments), streak, settings, alertBanner ->
                 val todayReadings = recent.filter { it.timestamp >= startOfDay }
                 val effectiveReadings = if (todayReadings.isNotEmpty()) todayReadings else recent
 
@@ -132,6 +141,7 @@ class FocusViewModel(
                 FocusUiState(
                     latestReading = latest,
                     recentReadings = effectiveReadings,
+                    treatments = treatments,
                     statistics = stats,
                     compensatorGoal = compensator,
                     streakDays = streak,

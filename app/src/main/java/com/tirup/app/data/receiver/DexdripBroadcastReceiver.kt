@@ -6,7 +6,10 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import com.tirup.app.TirupApplication
+import com.tirup.app.data.local.AppDatabase
+import com.tirup.app.data.local.entity.TreatmentEntity
 import com.tirup.app.domain.model.GlucoseReading
+import com.tirup.app.domain.model.Treatment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -36,10 +39,31 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             registerWithXdripBroadcastService(context)
         }
 
+        // 0. Extract potential treatment event (bolus insulin or carbs)
+        val treatment = extractTreatment(extras, System.currentTimeMillis())
+
         // 1. Extract glucose value
         val glucoseVal = extractGlucoseValue(extras)
         if (glucoseVal == null || glucoseVal <= 0.0) {
-            Log.w(TAG, "Unable to extract valid glucose value from extras: ${extrasSummary(extras)}")
+            if (treatment != null) {
+                // Standalone treatment broadcast (e.g. from xDrip+ / AndroidAPS)
+                val pendingResult = goAsync()
+                scope.launch {
+                    try {
+                        val app = context.applicationContext as? TirupApplication
+                        val db = app?.database
+                        if (db != null) {
+                            saveTreatmentIfNew(db, treatment)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to save treatment: ${e.message}")
+                    } finally {
+                        pendingResult.finish()
+                    }
+                }
+                return
+            }
+            Log.w(TAG, "Unable to extract valid glucose or treatment from extras: ${extrasSummary(extras)}")
             return
         }
 
@@ -115,6 +139,9 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 val app = context.applicationContext as? TirupApplication
                 val repository = app?.glucoseRepository
                 if (repository != null) {
+                    if (treatment != null) {
+                        saveTreatmentIfNew(app.database, treatment)
+                    }
                     repository.insertReading(
                         GlucoseReading(
                             timestamp = timestamp,
@@ -500,6 +527,53 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             Log.w(TAG, "Failed to parse local pebble JSON: ${e.message}")
         }
         return null
+    }
+
+    private fun extractTreatment(extras: Bundle, defaultTimestamp: Long): Treatment? {
+        val insulin = getDoubleFromBundle(extras, "treatment.insulin")
+            ?: getDoubleFromBundle(extras, "insulin")
+            ?: getDoubleFromBundle(extras, "bolus")
+            ?: getDoubleFromBundle(extras, "insulin_units")
+
+        val carbs = getDoubleFromBundle(extras, "treatment.carbs")
+            ?: getDoubleFromBundle(extras, "carbs")
+            ?: getDoubleFromBundle(extras, "carbs_grams")
+
+        val notes = extras.getString("treatment.notes")
+            ?: extras.getString("notes")
+            ?: extras.getString("notes_text")
+
+        val ts = getLongFromBundle(extras, "treatment.timeStamp")
+            ?: getLongFromBundle(extras, "treatment.timestamp")
+            ?: getLongFromBundle(extras, "created_at")
+            ?: getLongFromBundle(extras, "timestamp")
+            ?: defaultTimestamp
+
+        val hasInsulin = insulin != null && insulin > 0.0
+        val hasCarbs = carbs != null && carbs > 0.0
+
+        if (!hasInsulin && !hasCarbs) return null
+
+        return Treatment(
+            timestamp = ts,
+            insulinUnits = if (hasInsulin) insulin else null,
+            carbsGrams = if (hasCarbs) carbs else null,
+            notes = notes,
+            source = "XDRIP"
+        )
+    }
+
+    private suspend fun saveTreatmentIfNew(database: AppDatabase, treatment: Treatment) {
+        val dao = database.treatmentDao()
+        val minTime = treatment.timestamp - 60_000L
+        val maxTime = treatment.timestamp + 60_000L
+        val count = dao.countSimilar(minTime, maxTime, treatment.insulinUnits, treatment.carbsGrams)
+        if (count == 0) {
+            dao.insert(TreatmentEntity.fromDomain(treatment))
+            Log.i(TAG, "Persisted new treatment: insulin=${treatment.insulinUnits} U, carbs=${treatment.carbsGrams} g at ${treatment.timestamp}")
+        } else {
+            Log.d(TAG, "Skipped duplicate treatment within 60s window: insulin=${treatment.insulinUnits}, carbs=${treatment.carbsGrams}")
+        }
     }
 
     companion object {
