@@ -89,6 +89,7 @@ class SettingsRepositoryImpl(
             .putInt(KEY_ALERT_EMERGENCY_DELAY, settings.alertSettings.emergencySmsDelayMinutes)
             .putBoolean(KEY_ALERT_EMERGENCY_LOCATION, settings.alertSettings.includeLocationInEmergencySms)
             .putLong(KEY_ALERT_LAST_EMERGENCY_TIMESTAMP, settings.alertSettings.lastEmergencySmsTimestamp)
+            .putBoolean(KEY_ALERT_SMS_QUERY_REPLY_ENABLED, settings.alertSettings.isSmsQueryReplyEnabled)
             .apply()
 
         _settingsFlow.value = settings
@@ -200,7 +201,8 @@ class SettingsRepositoryImpl(
                 emergencyContactName = prefs.getString(KEY_ALERT_EMERGENCY_NAME, "") ?: "",
                 emergencySmsDelayMinutes = prefs.getInt(KEY_ALERT_EMERGENCY_DELAY, 5),
                 includeLocationInEmergencySms = prefs.getBoolean(KEY_ALERT_EMERGENCY_LOCATION, true),
-                lastEmergencySmsTimestamp = prefs.getLong(KEY_ALERT_LAST_EMERGENCY_TIMESTAMP, 0L)
+                lastEmergencySmsTimestamp = prefs.getLong(KEY_ALERT_LAST_EMERGENCY_TIMESTAMP, 0L),
+                isSmsQueryReplyEnabled = prefs.getBoolean(KEY_ALERT_SMS_QUERY_REPLY_ENABLED, true)
             )
         )
     }
@@ -269,5 +271,6 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_EMERGENCY_DELAY = "key_alert_emergency_delay"
         private const val KEY_ALERT_EMERGENCY_LOCATION = "key_alert_emergency_location"
         private const val KEY_ALERT_LAST_EMERGENCY_TIMESTAMP = "key_alert_last_emergency_timestamp"
+        private const val KEY_ALERT_SMS_QUERY_REPLY_ENABLED = "key_alert_sms_query_reply_enabled"
     }
 }

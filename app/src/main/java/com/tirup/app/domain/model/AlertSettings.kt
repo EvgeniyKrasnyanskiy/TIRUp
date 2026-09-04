@@ -47,5 +47,8 @@ data class AlertSettings(
     val emergencyContactName: String = "",
     val emergencySmsDelayMinutes: Int = 5,
     val includeLocationInEmergencySms: Boolean = true,
-    val lastEmergencySmsTimestamp: Long = 0L
+    val lastEmergencySmsTimestamp: Long = 0L,
+
+    // SMS glucose query auto-reply for trusted contacts
+    val isSmsQueryReplyEnabled: Boolean = true
 )
