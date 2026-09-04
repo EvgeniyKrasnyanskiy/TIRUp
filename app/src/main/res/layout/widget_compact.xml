@@ -64,7 +64,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="9.1"
-            android:textColor="#3B82F6"
+            android:textColor="#10B981"
             android:textSize="32sp"
             android:textStyle="bold" />
 
@@ -74,7 +74,7 @@
             android:layout_height="wrap_content"
             android:paddingStart="4dp"
             android:text="→"
-            android:textColor="#3B82F6"
+            android:textColor="#10B981"
             android:textSize="22sp"
             android:textStyle="bold" />
     </LinearLayout>

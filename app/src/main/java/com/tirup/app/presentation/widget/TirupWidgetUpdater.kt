@@ -451,14 +451,13 @@ object TirupWidgetUpdater {
         }
         views.setTextViewText(R.id.widget_glucose_value, glucoseStr)
 
-        // Range color (synchronized with FocusScreen: 7.9 - 10.0 is Good Blue!)
+        // Range color (Pale Green for 3.9..7.8, Emerald for 7.9..10.0)
         val glucoseColor = when {
             isStale -> Color.parseColor("#94A3B8") // Gray when stale!
             latest.valueMmol < 3.0 -> Color.parseColor("#EF4444")
             latest.valueMmol < settings.targetRanges.tirLowMmol -> Color.parseColor("#F59E0B")
-            latest.valueMmol <= 7.0 -> Color.parseColor("#10B981")
-            latest.valueMmol <= 7.8 -> Color.parseColor("#84CC16")
-            latest.valueMmol <= settings.targetRanges.tirHighMmol -> Color.parseColor("#3B82F6") // Blue!
+            latest.valueMmol <= 7.8 -> Color.parseColor("#4ADE80") // Pale Green 3.9 - 7.8
+            latest.valueMmol <= settings.targetRanges.tirHighMmol -> Color.parseColor("#10B981") // Saturated Emerald 7.9 - 10.0
             latest.valueMmol <= 13.9 -> Color.parseColor("#F59E0B")
             else -> Color.parseColor("#EF4444")
         }
