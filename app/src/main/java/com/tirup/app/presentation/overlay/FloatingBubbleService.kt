@@ -24,6 +24,8 @@ import android.view.animation.DecelerateInterpolator
 import android.widget.TextView
 import com.tirup.app.R
 import com.tirup.app.TirupApplication
+import com.tirup.app.data.alert.GlucoseAlertManager
+import com.tirup.app.data.alert.MedicalSoundPlayer
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.UserSettings
@@ -55,6 +57,7 @@ class FloatingBubbleService : Service() {
     private var snoozeJob: Job? = null
     @Volatile
     private var snoozeUntilTimestamp: Long = 0L
+    private var wasHypoActive: Boolean = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -135,6 +138,13 @@ class FloatingBubbleService : Service() {
                     val dx = kotlin.math.abs(event.rawX - initialTouchX)
                     val dy = kotlin.math.abs(event.rawY - initialTouchY)
                     if (duration < 250 && dx < 20 && dy < 20) {
+                        // Play reverse "bob" pop-out sound feedback
+                        MedicalSoundPlayer.playBubblePopOut()
+
+                        // Instantly silence actively playing sound and dismiss alarm
+                        GlucoseAlertManager.silenceCurrentSoundOnly()
+                        GlucoseAlertManager.dismissCriticalAlarm(this@FloatingBubbleService, fromUser = true)
+
                         // Tap on bubble: snooze for 5 minutes only (without opening app)
                         snoozeUntilTimestamp = System.currentTimeMillis() + 5 * 60 * 1000L
                         bubbleView?.visibility = View.GONE
@@ -237,12 +247,27 @@ class FloatingBubbleService : Service() {
         val now = System.currentTimeMillis()
         val isSnoozed = now < snoozeUntilTimestamp
 
+        val isHypo = valueMmol < 3.9
+
         if (!isOutOfRange || isSnoozed) {
             bubbleView?.visibility = View.GONE
             setHypoRipple(false)
+            if (!isHypo) {
+                wasHypoActive = false
+            }
             return
         } else {
+            val wasGone = bubbleView?.visibility != View.VISIBLE
             bubbleView?.visibility = View.VISIBLE
+
+            if (isHypo) {
+                if (!wasHypoActive || wasGone) {
+                    MedicalSoundPlayer.playBubblePopIn()
+                    wasHypoActive = true
+                }
+            } else {
+                wasHypoActive = false
+            }
         }
 
         val isMmol = settings.unit == GlucoseUnit.MMOL_L
@@ -274,7 +299,6 @@ class FloatingBubbleService : Service() {
         bubbleContainer?.background = bg
 
         // Water ripple waves on hypoglycemia (< 3.9 mmol/L)
-        val isHypo = valueMmol < 3.9
         setHypoRipple(isHypo)
     }
 

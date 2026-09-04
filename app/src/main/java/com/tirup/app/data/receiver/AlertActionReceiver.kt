@@ -20,7 +20,18 @@ class AlertActionReceiver : BroadcastReceiver() {
 
         when (intent.action) {
             ACTION_DISMISS_CRITICAL -> {
+                val notifId = intent.getIntExtra("notification_id", -1)
+                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                if (notifId != -1) {
+                    nm?.cancel(notifId)
+                }
+                nm?.cancel(GlucoseAlertManager.NOTIFICATION_ID_CRITICAL)
+                nm?.cancel(GlucoseAlertManager.NOTIFICATION_ID_MAIN)
+                nm?.cancel(GlucoseAlertManager.NOTIFICATION_ID_PREDICTIVE)
+                nm?.cancel(GlucoseAlertManager.NOTIFICATION_ID_SIGNAL_LOSS)
+                GlucoseAlertManager.silenceCurrentSoundOnly()
                 GlucoseAlertManager.dismissCriticalAlarm(context, fromUser = true)
+                GlucoseAlertManager.clearActiveAlertBanner()
             }
             ACTION_CHECK_SIGNAL_LOSS -> {
                 val pendingResult = goAsync()

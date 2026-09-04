@@ -15,5 +15,6 @@ data class FocusUiState(
     val compensatorGoal: CompensatorGoal = CompensatorGoal(),
     val streakDays: Int = 0,
     val userSettings: UserSettings = UserSettings(),
+    val activeAlertBanner: com.tirup.app.data.alert.ActiveAlertBanner? = null,
     val isLoading: Boolean = false
 )

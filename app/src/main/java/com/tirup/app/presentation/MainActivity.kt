@@ -153,8 +153,25 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    companion object {
+        const val EXTRA_GOTO_FOCUS = "com.tirup.app.GOTO_FOCUS"
+        val navigateToFocusEvent = kotlinx.coroutines.flow.MutableSharedFlow<Long>(extraBufferCapacity = 1)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent?.getBooleanExtra(EXTRA_GOTO_FOCUS, false) == true) {
+            navigateToFocusEvent.tryEmit(System.currentTimeMillis())
+        }
+    }
+
     override fun onResume() {
         super.onResume()
+        if (intent?.getBooleanExtra(EXTRA_GOTO_FOCUS, false) == true) {
+            navigateToFocusEvent.tryEmit(System.currentTimeMillis())
+            intent.removeExtra(EXTRA_GOTO_FOCUS)
+        }
         GlucoseAlertManager.dismissCriticalAlarm(this, fromUser = true)
         DexdripBroadcastReceiver.registerWithXdripBroadcastService(this)
     }
@@ -230,6 +247,12 @@ fun AppNavigationRoot(
                 backupSummary = AutoBackupManager.getBackupSummary(context)
             }
             hasCheckedBackup = true
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        MainActivity.navigateToFocusEvent.collect {
+            navController.popBackStack("main_pager", inclusive = false)
         }
     }
 
@@ -367,6 +390,12 @@ fun MainPagerScaffold(
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })
     val coroutineScope = rememberCoroutineScope()
     var isBottomBarVisible by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        MainActivity.navigateToFocusEvent.collect {
+            pagerState.animateScrollToPage(0)
+        }
+    }
 
     val nestedScrollConnection = remember {
         object : NestedScrollConnection {

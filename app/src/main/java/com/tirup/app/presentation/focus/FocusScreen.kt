@@ -49,6 +49,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tirup.app.R
+import com.tirup.app.data.alert.ActiveAlertBanner
+import com.tirup.app.data.alert.AlertTier
 import com.tirup.app.domain.calculator.TargetCompensatorCalculator
 import com.tirup.app.domain.model.CompensatorStatus
 import com.tirup.app.domain.model.GlucoseReading
@@ -149,6 +151,7 @@ fun FocusScreen(
                 recentReadings = state.recentReadings,
                 unit = unit,
                 isRu = isRu,
+                activeAlertBanner = state.activeAlertBanner,
                 onClick = {
                     val r = state.latestReading
                     if (r != null) {
@@ -799,6 +802,7 @@ private fun HeroGlucoseCard(
     recentReadings: List<GlucoseReading>,
     unit: GlucoseUnit,
     isRu: Boolean,
+    activeAlertBanner: ActiveAlertBanner? = null,
     onClick: () -> Unit
 ) {
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1033,7 +1037,56 @@ private fun HeroGlucoseCard(
                 }
             }
 
-            if (statusInfo != null || timeLabel.isNotEmpty()) {
+            if (activeAlertBanner != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                val bannerColor = when (activeAlertBanner.tier) {
+                    AlertTier.CRITICAL -> ColorVeryLow
+                    AlertTier.MAIN -> if (activeAlertBanner.title.contains("гипо", ignoreCase = true) || activeAlertBanner.title.contains("low", ignoreCase = true)) ColorVeryLow else ColorHigh
+                    AlertTier.PREDICTIVE -> if (activeAlertBanner.title.contains("гипо", ignoreCase = true) || activeAlertBanner.title.contains("low", ignoreCase = true)) ColorLow else ColorHigh
+                    AlertTier.SIGNAL_LOSS -> ColorHigh
+                }
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = bannerColor.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, bannerColor.copy(alpha = 0.35f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = activeAlertBanner.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = bannerColor,
+                            textAlign = TextAlign.Center
+                        )
+                        if (activeAlertBanner.message.isNotBlank() && activeAlertBanner.message != activeAlertBanner.title) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = activeAlertBanner.message,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        if (timeLabel.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = timeLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = onSurfaceVariant.copy(alpha = 0.75f),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            } else if (statusInfo != null || timeLabel.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier

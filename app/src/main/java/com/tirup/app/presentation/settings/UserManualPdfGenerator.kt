@@ -192,10 +192,10 @@ class UserManualPdfGenerator(private val context: Context) {
                         else "xDrip+ ➔ 'Inter-app settings' ➔ enable 'Broadcast Service API'. Enables real-time transmission of active insulin (IoB) and active carbs (CoB) to TIRUp."
                     ),
                     Triple(
-                        if (isRu) "Локальная веб-служба Pebble (порт 17580)" else "Local Pebble Web Service (Port 17580)",
+                        if (isRu) "Бесперебойная работа в фоне (Батарея)" else "Unrestricted Background Running (Battery)",
                         if (isRu) "Шаг 3" else "Step 3",
-                        if (isRu) "xDrip+ ➔ «Службы данных часов» ➔ «Служба Pebble» ➔ включите веб-службу на порту 17580. Обеспечивает мгновенный доступ к метрикам компенсации для внешних модулей."
-                        else "xDrip+ ➔ 'Smart Watch Features' ➔ 'Pebble Watch Integration' ➔ enable Pebble web server on port 17580 for zero-latency metric sync."
+                        if (isRu) "В настройках Android для TIRUp и источника (xDrip+) отключите оптимизацию батареи и разрешите работу в фоне без ограничений. Это гарантирует надёжный приём данных и тревог."
+                        else "In Android settings for TIRUp and xDrip+, disable 'Battery Optimization' and allow unrestricted background execution. Guarantees uninterrupted data sync and instant alarms."
                     )
                 ),
                 cardHeight = 39f

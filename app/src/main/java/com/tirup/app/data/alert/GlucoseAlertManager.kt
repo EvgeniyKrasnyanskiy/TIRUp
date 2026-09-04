@@ -13,8 +13,10 @@ import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.graphics.Color
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.text.HtmlCompat
 import com.tirup.app.R
 import com.tirup.app.data.receiver.AlertActionReceiver
 import com.tirup.app.domain.calculator.DetectedPattern
@@ -47,9 +49,23 @@ enum class AlertTier {
     SIGNAL_LOSS  // Tier 4: Signal Loss / Потеря связи (>20 мин)
 }
 
+data class ActiveAlertBanner(
+    val tier: AlertTier,
+    val title: String,
+    val message: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
 object GlucoseAlertManager {
 
     private const val TAG = "GlucoseAlertManager"
+
+    private val _activeAlertBanner = kotlinx.coroutines.flow.MutableStateFlow<ActiveAlertBanner?>(null)
+    val activeAlertBanner: kotlinx.coroutines.flow.StateFlow<ActiveAlertBanner?> = _activeAlertBanner
+
+    fun clearActiveAlertBanner() {
+        _activeAlertBanner.value = null
+    }
 
     const val CHANNEL_PREDICTIVE = "tirup_alert_predictive_v2"
     const val CHANNEL_MAIN = "tirup_alert_main_v2"
@@ -59,12 +75,12 @@ object GlucoseAlertManager {
     const val CHANNEL_COMPENSATOR = "tirup_compensator_v1"
     const val CHANNEL_LOCKSCREEN = "tirup_lockscreen_status_v1"
 
-    private const val NOTIFICATION_ID_LOCKSCREEN = 1000
-    private const val NOTIFICATION_ID_PREDICTIVE = 1001
-    private const val NOTIFICATION_ID_MAIN = 1002
-    private const val NOTIFICATION_ID_CRITICAL = 1003
-    private const val NOTIFICATION_ID_SIGNAL_LOSS = 1004
-    private const val NOTIFICATION_ID_LAST_CHANCE = 1005
+    const val NOTIFICATION_ID_LOCKSCREEN = 1000
+    const val NOTIFICATION_ID_PREDICTIVE = 1001
+    const val NOTIFICATION_ID_MAIN = 1002
+    const val NOTIFICATION_ID_CRITICAL = 1003
+    const val NOTIFICATION_ID_SIGNAL_LOSS = 1004
+    const val NOTIFICATION_ID_LAST_CHANCE = 1005
 
     // Timestamps for Smart Snooze / Anti-spam
     @Volatile
@@ -213,6 +229,7 @@ object GlucoseAlertManager {
             val now = System.currentTimeMillis()
             userAcknowledgedHypoTimestamp = now
             userAcknowledgedHyperTimestamp = now
+            _activeAlertBanner.value = null
         }
     }
 
@@ -321,8 +338,10 @@ object GlucoseAlertManager {
         }
 
         val appIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(MainActivity.EXTRA_GOTO_FOCUS, true)
         }
+        val notifId = 5000 + kotlin.math.abs(pattern.id.hashCode() % 100)
         val pendingIntent = PendingIntent.getActivity(
             context,
             pattern.id.hashCode(),
@@ -332,15 +351,29 @@ object GlucoseAlertManager {
 
         val title = if (isRu) "🔍 Паттерн: ${pattern.titleRu}" else "🔍 Pattern: ${pattern.titleEn}"
         val text = if (isRu) pattern.descriptionRu else pattern.descriptionEn
+        val titleSpanned = HtmlCompat.fromHtml("<font color='#38BDF8'><b>$title</b></font>", HtmlCompat.FROM_HTML_MODE_LEGACY)
+
+        val dismissIntent = Intent(context, AlertActionReceiver::class.java).apply {
+            action = AlertActionReceiver.ACTION_DISMISS_CRITICAL
+            putExtra("notification_id", notifId)
+        }
+        val dismissPendingIntent = PendingIntent.getBroadcast(
+            context,
+            pattern.id.hashCode() + 2000,
+            dismissIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_PATTERNS)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(title)
+            .setColor(Color.parseColor("#38BDF8"))
+            .setContentTitle(titleSpanned)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .addAction(0, "ОК", dismissPendingIntent)
             .build()
 
         nm.notify(5000 + kotlin.math.abs(pattern.id.hashCode() % 100), notification)
@@ -490,6 +523,7 @@ object GlucoseAlertManager {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             nm?.cancel(NOTIFICATION_ID_PREDICTIVE)
             nm?.cancel(NOTIFICATION_ID_MAIN)
+            _activeAlertBanner.value = null
         }
 
         // ----------------------------------------------------
@@ -746,7 +780,8 @@ object GlucoseAlertManager {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
         val appIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(MainActivity.EXTRA_GOTO_FOCUS, true)
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -762,9 +797,22 @@ object GlucoseAlertManager {
             AlertTier.PREDICTIVE -> NotificationCompat.PRIORITY_DEFAULT
         }
 
+        val alertHex = when (tier) {
+            AlertTier.CRITICAL -> "#EF4444"
+            AlertTier.MAIN -> if (title.contains("гипо", true) || title.contains("low", true)) "#EF4444" else "#A855F7"
+            AlertTier.PREDICTIVE -> if (title.contains("гипо", true) || title.contains("low", true)) "#F59E0B" else "#A855F7"
+            AlertTier.SIGNAL_LOSS -> "#F59E0B"
+        }
+
+        val coloredTitle = HtmlCompat.fromHtml(
+            "<font color='$alertHex'><b>$title</b></font>",
+            HtmlCompat.FROM_HTML_MODE_LEGACY
+        )
+
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(title)
+            .setColor(Color.parseColor(alertHex))
+            .setContentTitle(coloredTitle)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(priority)
@@ -787,20 +835,20 @@ object GlucoseAlertManager {
 
         if (tier == AlertTier.CRITICAL) {
             isCriticalAlarmActive = true
-
-            // Add direct "✓ Принято" action button on notification
-            val dismissIntent = Intent(context, AlertActionReceiver::class.java).apply {
-                action = AlertActionReceiver.ACTION_DISMISS_CRITICAL
-            }
-            val dismissPendingIntent = PendingIntent.getBroadcast(
-                context,
-                2001,
-                dismissIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            val dismissTitle = if (context.resources.configuration.locales[0].language.equals("ru", true)) "✓ Принято (Снять тревогу)" else "✓ Dismiss Alarm"
-            builder.addAction(R.mipmap.ic_launcher, dismissTitle, dismissPendingIntent)
         }
+
+        // Add direct "ОК" button to dismiss/silence notification right from shade
+        val dismissIntent = Intent(context, AlertActionReceiver::class.java).apply {
+            action = AlertActionReceiver.ACTION_DISMISS_CRITICAL
+            putExtra("notification_id", notificationId)
+        }
+        val dismissPendingIntent = PendingIntent.getBroadcast(
+            context,
+            notificationId + 1000,
+            dismissIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        builder.addAction(0, "ОК", dismissPendingIntent)
 
         if (vibrate) {
             triggerVibration(context, tier)
@@ -811,6 +859,13 @@ object GlucoseAlertManager {
         }
 
         MedicalSoundPlayer.playSound(tier)
+
+        _activeAlertBanner.value = ActiveAlertBanner(
+            tier = tier,
+            title = title,
+            message = text,
+            timestamp = System.currentTimeMillis()
+        )
 
         try {
             nm.notify(notificationId, builder.build())
@@ -976,7 +1031,18 @@ object GlucoseAlertManager {
         }
 
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(latestReading.timestamp))
-        val title = "$glucoseStr $arrow$deltaStr   $timeStr"
+        val v = latestReading.valueMmol
+        val hexColor = when {
+            v < 3.9 -> "#EF4444"
+            v <= 7.8 -> "#4ADE80"
+            v <= 10.0 -> "#10B981"
+            v <= 13.9 -> "#F59E0B"
+            else -> "#A855F7"
+        }
+
+        val deltaHtml = if (deltaStr.isNotEmpty()) " <font color='$hexColor'>$deltaStr</font>" else ""
+        val titleHtml = "<font color='$hexColor'><b>$glucoseStr $arrow</b></font>$deltaHtml &nbsp;&nbsp; <font color='#94A3B8'>$timeStr</font>"
+        val titleSpanned = HtmlCompat.fromHtml(titleHtml, HtmlCompat.FROM_HTML_MODE_LEGACY)
 
         // Body with TIR, IoB and CoB
         val inRangeCount = todayReadings.count {
@@ -988,21 +1054,26 @@ object GlucoseAlertManager {
         }
         val tirPercent = if (todayReadings.isNotEmpty()) (inRangeCount * 100 / todayReadings.size) else 0
         val targetName = settings.targetMode.name
+        val tirColor = if (tirPercent >= 70) "#10B981" else if (tirPercent >= 50) "#F59E0B" else "#EF4444"
 
         val extrasList = mutableListOf<String>()
-        extrasList.add("$targetName: $tirPercent%")
+        extrasList.add("<font color='$tirColor'><b>$targetName: $tirPercent%</b></font>")
 
         if (latestReading.iob != null && latestReading.iob > 0.05) {
-            extrasList.add(String.format(Locale.US, if (isRu) "💉 %.2f Ед" else "💉 %.2f U", latestReading.iob))
+            val iobFormatted = String.format(Locale.US, if (isRu) "💉 %.2f Ед" else "💉 %.2f U", latestReading.iob)
+            extrasList.add("<font color='#38BDF8'><b>$iobFormatted</b></font>")
         }
         if (latestReading.cob != null && latestReading.cob > 0.5) {
-            extrasList.add(String.format(Locale.US, if (isRu) "🍞 %.0f г" else "🍞 %.0f g", latestReading.cob))
+            val cobFormatted = String.format(Locale.US, if (isRu) "🍞 %.0f г" else "🍞 %.0f g", latestReading.cob)
+            extrasList.add("<font color='#FBBF24'><b>$cobFormatted</b></font>")
         }
 
-        val body = extrasList.joinToString(" • ")
+        val bodyHtml = extrasList.joinToString(" &nbsp;<font color='#64748B'>•</font>&nbsp; ")
+        val bodySpanned = HtmlCompat.fromHtml(bodyHtml, HtmlCompat.FROM_HTML_MODE_LEGACY)
 
         val appIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(MainActivity.EXTRA_GOTO_FOCUS, true)
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -1013,9 +1084,10 @@ object GlucoseAlertManager {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_LOCKSCREEN)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(title)
-            .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setColor(Color.parseColor(hexColor))
+            .setContentTitle(titleSpanned)
+            .setContentText(bodySpanned)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(bodySpanned))
             .setOngoing(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(true)

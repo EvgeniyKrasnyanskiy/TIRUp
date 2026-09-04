@@ -2,7 +2,12 @@ package com.tirup.app.presentation.focus
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tirup.app.data.alert.ActiveAlertBanner
+import com.tirup.app.data.alert.AlertTier
+import com.tirup.app.data.alert.GlucoseAlertManager
 import com.tirup.app.domain.calculator.GlucoseMetricsCalculator
+import com.tirup.app.domain.calculator.GlucoseTrendPredictor
+import com.tirup.app.domain.calculator.PredictedEvent
 import com.tirup.app.domain.calculator.TargetCompensatorCalculator
 import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.domain.repository.GlucoseRepository
@@ -13,6 +18,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.math.abs
 
 class FocusViewModel(
     private val glucoseRepository: GlucoseRepository,
@@ -32,8 +41,9 @@ class FocusViewModel(
                 glucoseRepository.getLatestReading(),
                 glucoseRepository.getRecentReadings(1440), // up to 24h of 1-min readings
                 glucoseRepository.getStreakDays(),
-                settingsRepository.getSettings()
-            ) { latest, recent, streak, settings ->
+                settingsRepository.getSettings(),
+                GlucoseAlertManager.activeAlertBanner
+            ) { latest, recent, streak, settings, alertBanner ->
                 val calendar = java.util.Calendar.getInstance().apply {
                     set(java.util.Calendar.HOUR_OF_DAY, 0)
                     set(java.util.Calendar.MINUTE, 0)
@@ -75,6 +85,53 @@ class FocusViewModel(
                     language = settings.language
                 )
 
+                // Compute alert banner: if GlucoseAlertManager has an active banner, use it.
+                // Otherwise, calculate live predictive trend (e.g. "Быстро падает ... Возможна ГИПО в HH:mm")
+                val effectiveAlertBanner = alertBanner ?: run {
+                    if (latest != null && recent.size >= 5) {
+                        val sorted = recent.sortedBy { it.timestamp }
+                        val prediction = GlucoseTrendPredictor.predictTrend(
+                            readings = sorted.takeLast(12),
+                            targetRanges = settings.targetRanges,
+                            minutesAhead = 15,
+                            useTingForHigh = settings.targetMode == TargetMode.TING
+                        )
+                        val isRu = settings.language.equals("RU", ignoreCase = true)
+                        val now = latest.timestamp
+                        if (prediction.event == PredictedEvent.PREDICTED_LOW) {
+                            val minutesUntil = prediction.minutesUntilCrossing ?: 15
+                            val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(now + minutesUntil * 60_000L))
+                            val title = if (isRu) "📉 Скоро гипогликемия (в $timeStr)" else "📉 Predicted Low (at $timeStr)"
+                            val message = if (isRu) {
+                                String.format(Locale.US, "Быстро падает (%.2f ммоль/л/мин). Возможна ГИПО в %s", abs(prediction.rateOfChangeMmolPerMin), timeStr)
+                            } else {
+                                String.format(Locale.US, "Dropping fast (%.2f mmol/L/min). Possible low at %s", abs(prediction.rateOfChangeMmolPerMin), timeStr)
+                            }
+                            ActiveAlertBanner(
+                                tier = AlertTier.PREDICTIVE,
+                                title = title,
+                                message = message,
+                                timestamp = now
+                            )
+                        } else if (prediction.event == PredictedEvent.PREDICTED_HIGH) {
+                            val minutesUntil = prediction.minutesUntilCrossing ?: 15
+                            val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(now + minutesUntil * 60_000L))
+                            val title = if (isRu) "📈 Скоро гипергликемия (в $timeStr)" else "📈 Predicted High (at $timeStr)"
+                            val message = if (isRu) {
+                                String.format(Locale.US, "Быстро растёт (%.2f ммоль/л/мин). Выход из нормы в %s", prediction.rateOfChangeMmolPerMin, timeStr)
+                            } else {
+                                String.format(Locale.US, "Rising fast (%.2f mmol/L/min). Leaving target at %s", prediction.rateOfChangeMmolPerMin, timeStr)
+                            }
+                            ActiveAlertBanner(
+                                tier = AlertTier.PREDICTIVE,
+                                title = title,
+                                message = message,
+                                timestamp = now
+                            )
+                        } else null
+                    } else null
+                }
+
                 FocusUiState(
                     latestReading = latest,
                     recentReadings = effectiveReadings,
@@ -82,6 +139,7 @@ class FocusViewModel(
                     compensatorGoal = compensator,
                     streakDays = streak,
                     userSettings = settings,
+                    activeAlertBanner = effectiveAlertBanner,
                     isLoading = false
                 )
             }.collect { newState ->
