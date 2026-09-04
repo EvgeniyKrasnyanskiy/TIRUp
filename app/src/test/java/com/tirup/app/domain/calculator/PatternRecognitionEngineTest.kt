@@ -41,6 +41,30 @@ class PatternRecognitionEngineTest {
     }
 
     @Test
+    fun testNightHypoglycemiaWithCustomHoursCrossingMidnight() {
+        val bins = listOf(
+            AGPPercentileBin(
+                binIndex = 46,
+                minuteOfDay = 1410, // 23:30
+                formattedTime = "23:30",
+                p10 = 3.3,
+                p25 = 3.6,
+                p50 = 4.5,
+                p75 = 6.0,
+                p90 = 7.0,
+                readingsCount = 20
+            )
+        )
+        val patterns = PatternRecognitionEngine.analyze(
+            bins = bins,
+            stats = GlucoseStatistics(totalCount = 100),
+            nightStartHour = 23,
+            nightEndHour = 7
+        )
+        assertTrue(patterns.any { it.severity == PatternSeverity.ALERT && it.titleRu == "Ночные провалы (23:00–07:00)" })
+    }
+
+    @Test
     fun testDawnPhenomenonDetection() {
         val bins = listOf(
             AGPPercentileBin(

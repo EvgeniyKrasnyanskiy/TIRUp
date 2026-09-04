@@ -25,7 +25,9 @@ object PatternRecognitionEngine {
     fun analyze(
         bins: List<AGPPercentileBin>,
         stats: GlucoseStatistics,
-        isMmol: Boolean = true
+        isMmol: Boolean = true,
+        nightStartHour: Int = 0,
+        nightEndHour: Int = 6
     ): List<DetectedPattern> {
         if (bins.isEmpty() || stats.totalCount < 50) {
             return listOf(
@@ -43,15 +45,25 @@ object PatternRecognitionEngine {
 
         val patterns = mutableListOf<DetectedPattern>()
 
-        // 1. Ночные провалы (00:00–06:00: minuteOfDay in 0..360)
-        val nightBins = bins.filter { it.minuteOfDay in 0..360 && it.readingsCount > 0 }
+        // 1. Ночные провалы (пользовательское окно сна: nightStartHour..nightEndHour)
+        val nightStartMin = nightStartHour * 60
+        val nightEndMin = nightEndHour * 60
+        val nightBins = bins.filter { bin ->
+            bin.readingsCount > 0 && if (nightStartMin < nightEndMin) {
+                bin.minuteOfDay in nightStartMin..nightEndMin
+            } else {
+                bin.minuteOfDay >= nightStartMin || bin.minuteOfDay <= nightEndMin
+            }
+        }
+        val startStr = String.format(java.util.Locale.US, "%02d:00", nightStartHour)
+        val endStr = String.format(java.util.Locale.US, "%02d:00", nightEndHour)
         val hasNightHypo = nightBins.any { it.p10 < 3.9 || it.p25 < 3.5 }
         if (hasNightHypo) {
             patterns.add(
                 DetectedPattern(
                     id = "night_drops",
-                    titleRu = "Ночные провалы (00:00–06:00)",
-                    titleEn = "Night Drops (00:00–06:00)",
+                    titleRu = "Ночные провалы ($startStr–$endStr)",
+                    titleEn = "Night Drops ($startStr–$endStr)",
                     descriptionRu = "Обнаружена повторяющаяся склонность к гипогликемии в ночное время. Рекомендуется оценить дозу вечернего базального инсулина или лёгкий перекус перед сном.",
                     descriptionEn = "Repeating nocturnal hypoglycemia tendency detected. Consider reviewing evening basal insulin or having a light bedtime snack.",
                     severity = PatternSeverity.ALERT,

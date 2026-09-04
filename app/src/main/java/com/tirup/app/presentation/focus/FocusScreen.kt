@@ -154,10 +154,18 @@ fun FocusScreen(
                     if (r != null) {
                         val rVal = if (unit == GlucoseUnit.MMOL_L) "${String.format(Locale.US, "%.1f", r.valueMmol)} ${if (isRu) "ммоль/л" else "mmol/L"}"
                                    else "${(r.valueMmol * 18.0182).toInt()} ${if (isRu) "мг/дл" else "mg/dL"}"
+                        val iobInfo = if (r.iob != null && r.iob > 0.0) {
+                            if (isRu) "\n\n💉 IoB (активный инсулин): ${String.format(Locale.US, "%.2f Ед", r.iob)}\nКоличество болюсного инсулина, которое продолжает активно действовать и снижать глюкозу (остаточное действие)."
+                            else "\n\n💉 IoB (Insulin on Board): ${String.format(Locale.US, "%.2f U", r.iob)}\nActive bolus insulin remaining in the body that continues lowering glucose."
+                        } else ""
+                        val cobInfo = if (r.cob != null && r.cob > 0.0) {
+                            if (isRu) "\n\n🍞 CoB (углеводы на борту): ${String.format(Locale.US, "%.0f г", r.cob)}\nКоличество активных углеводов в процессе усвоения в ЖКТ или требуемое для купирования потенциальной гипогликемии."
+                            else "\n\n🍞 CoB (Carbs on Board): ${String.format(Locale.US, "%.0f g", r.cob)}\nActive carbohydrates currently digesting in the GI tract or required to treat potential low."
+                        } else ""
                         detailDialogInfo = Pair(
                             if (isRu) "Текущий уровень сахара" else "Current Glucose Level",
-                            if (isRu) "Значение: $rVal\nНаправление тренда: ${r.trendArrow}\nВремя измерения: ${DateUtils.getRelativeTimeSpanString(r.timestamp)}"
-                            else "Value: $rVal\nTrend direction: ${r.trendArrow}\nTime: ${DateUtils.getRelativeTimeSpanString(r.timestamp)}"
+                            if (isRu) "Значение: $rVal\nНаправление тренда: ${r.trendArrow}\nВремя измерения: ${DateUtils.getRelativeTimeSpanString(r.timestamp)}$iobInfo$cobInfo"
+                            else "Value: $rVal\nTrend direction: ${r.trendArrow}\nTime: ${DateUtils.getRelativeTimeSpanString(r.timestamp)}$iobInfo$cobInfo"
                         )
                     }
                 }
@@ -166,8 +174,21 @@ fun FocusScreen(
 
         // 2. Interactive 24-Hour Daily Glucose Chart (Pinch-to-zoom & Pan) with Metrics toggle
         item {
-            val minVal = if (state.recentReadings.isNotEmpty()) state.recentReadings.minOf { it.valueMmol } else 0.0
-            val maxVal = if (state.recentReadings.isNotEmpty()) state.recentReadings.maxOf { it.valueMmol } else 0.0
+            val cal = remember(state.recentReadings) {
+                java.util.Calendar.getInstance().apply {
+                    set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    set(java.util.Calendar.MINUTE, 0)
+                    set(java.util.Calendar.SECOND, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                }
+            }
+            val startOfDay = cal.timeInMillis
+            val todayOnlyReadings = remember(state.recentReadings, startOfDay) {
+                val filtered = state.recentReadings.filter { it.timestamp >= startOfDay }
+                if (filtered.isNotEmpty()) filtered else state.recentReadings
+            }
+            val minVal = if (todayOnlyReadings.isNotEmpty()) todayOnlyReadings.minOf { it.valueMmol } else 0.0
+            val maxVal = if (todayOnlyReadings.isNotEmpty()) todayOnlyReadings.maxOf { it.valueMmol } else 0.0
 
             val meanValStr = if (state.statistics.meanMmol > 0.0) {
                 if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", state.statistics.meanMmol)
@@ -214,9 +235,10 @@ fun FocusScreen(
             val tarValStr = if (tarVal > 0.0) "${tarVal.toInt()}%" else "0%"
             val isTarGood = tarVal <= 25.0
 
-            val griValStr = if (state.statistics.gri > 0.0) "${state.statistics.gri.toInt()}" else "--"
+            val hasData = state.recentReadings.isNotEmpty() || state.statistics.meanMmol > 0.0
+            val griValStr = if (hasData) "${state.statistics.gri.toInt()}" else "--"
             val griColor = when {
-                state.statistics.gri <= 0.0 -> onSurfaceVariant
+                !hasData -> onSurfaceVariant
                 state.statistics.gri <= 20.0 -> PrimaryEmerald
                 state.statistics.gri <= 40.0 -> ColorTargetSoft
                 else -> ColorHigh
@@ -225,7 +247,7 @@ fun FocusScreen(
             val gviValStr = if (state.statistics.gvi > 0.0) String.format(Locale.US, "%.2f", state.statistics.gvi) else "--"
             val isGviGood = state.statistics.gvi <= 1.2
 
-            val pgsValStr = if (state.statistics.pgs > 0.0) String.format(Locale.US, "%.1f", state.statistics.pgs) else "--"
+            val pgsValStr = if (hasData) String.format(Locale.US, "%.1f", state.statistics.pgs) else "--"
             val isPgsGood = state.statistics.pgs <= 35.0
 
             val minMaxValStr = if (minVal > 0.0) {
@@ -378,7 +400,7 @@ fun FocusScreen(
                                 title = "TBR",
                                 value = tbrValStr,
                                 unit = if (isRu) "гипо" else "low",
-                                valueColor = if (isTbrGood) onSurfaceVariant else ColorVeryHigh,
+                                valueColor = if (isTbrGood) PrimaryEmerald else ColorVeryHigh,
                                 modifier = modifier,
                                 onClick = {
                                     val tbrLowStr = if (unit == GlucoseUnit.MMOL_L) "<3.9 ммоль/л" else "<70 мг/дл"
@@ -402,7 +424,7 @@ fun FocusScreen(
                                 title = "TAR",
                                 value = tarValStr,
                                 unit = if (isRu) "гипер" else "high",
-                                valueColor = if (isTarGood) onSurfaceVariant else ColorHigh,
+                                valueColor = if (isTarGood) PrimaryEmerald else ColorHigh,
                                 modifier = modifier,
                                 onClick = {
                                     val tarHighStr = if (unit == GlucoseUnit.MMOL_L) ">10.0 ммоль/л" else ">180 мг/дл"

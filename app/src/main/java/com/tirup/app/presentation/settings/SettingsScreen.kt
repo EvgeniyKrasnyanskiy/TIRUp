@@ -517,120 +517,111 @@ fun SettingsScreen(
                             },
                             vibrate = alerts.isSignalLossVibrate,
                             onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isSignalLossVibrate = it)) },
-                            flash = false,
-                            onFlashChange = {},
+                            flash = alerts.isSignalLossFlash,
+                            onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isSignalLossFlash = it)) },
                             accentColor = Color(0xFF8B5CF6),
                             onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.SIGNAL_LOSS) },
                             isRu = isRu
                         )
+                    }
+                }
+            }
+        }
 
-                        Spacer(modifier = Modifier.height(6.dp))
+        // Section: Daily Compensator (Last Chance TIR) - Separate from Alerts
+        item {
+            val alerts = settings.alertSettings
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(horizontal = 2.dp, vertical = 2.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isRu) "⏳ Последний шанс для TIR" else "⏳ Last Chance for Daily TIR",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isRu) "Предупреждать вечером, если сахар вне нормы и запас времени до срыва цели на исходе (1 раз в сутки)"
+                                else "Alert in evening when out of range and margin before target failure is running out (once a day)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 16.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Switch(
+                            checked = alerts.isLastChanceAlertEnabled,
+                            onCheckedChange = { isChecked ->
+                                viewModel.updateAlertSettings(alerts.copy(isLastChanceAlertEnabled = isChecked))
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = PrimaryEmerald
+                            )
+                        )
+                    }
 
-                        // Daily Compensator: Last Chance Alert
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
-                            modifier = Modifier.fillMaxWidth()
+                    // 3 segmented buttons: 1ч, 1.5ч, 2ч
+                    if (alerts.isLastChanceAlertEnabled) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = if (isRu) "⏳ Последний шанс для TIR" else "⏳ Last Chance for Daily TIR",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = if (!isMaster) (if (isRu) "Выключено (общий тумблер выключен)" else "Disabled (master switch off)")
-                                            else if (isRu) "Предупреждать вечером, если сахар вне нормы и запас времени до срыва цели на исходе (1 раз в сутки)"
-                                            else "Alert in evening when out of range and margin before target failure is running out (once a day)",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            lineHeight = 16.sp
-                                        )
+                            Text(
+                                text = if (isRu) "Запас времени:" else "Time margin:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                val options = listOf(
+                                    Triple(60, if (isRu) "1 ч" else "1 h", "red"),
+                                    Triple(90, if (isRu) "1.5 ч" else "1.5 h", "pale_green"),
+                                    Triple(120, if (isRu) "2 ч" else "2 h", "green")
+                                )
+                                options.forEach { (mins, label, colorType) ->
+                                    val isSelected = alerts.lastChanceBufferMinutes == mins
+                                    val (bg, textColor, borderColor) = when (colorType) {
+                                        "red" -> if (isSelected) {
+                                            Triple(Color(0x33EF4444), Color(0xFFF87171), Color(0x80EF4444))
+                                        } else {
+                                            Triple(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                                        }
+                                        "pale_green" -> if (isSelected) {
+                                            Triple(Color(0x2E10B981), Color(0xFF34D399), Color(0x6610B981))
+                                        } else {
+                                            Triple(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                                        }
+                                        else -> if (isSelected) {
+                                            Triple(Color(0xFF059669), Color.White, Color(0xFF10B981))
+                                        } else {
+                                            Triple(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                                        }
                                     }
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Switch(
-                                        checked = isMaster && alerts.isLastChanceAlertEnabled,
-                                        onCheckedChange = { isChecked ->
-                                            if (isChecked) {
-                                                viewModel.updateAlertSettings(alerts.copy(isAlertsMasterEnabled = true, isLastChanceAlertEnabled = true))
-                                            } else {
-                                                viewModel.updateAlertSettings(alerts.copy(isLastChanceAlertEnabled = false))
-                                            }
-                                        },
-                                        colors = SwitchDefaults.colors(
-                                            checkedThumbColor = Color.White,
-                                            checkedTrackColor = PrimaryEmerald
-                                        )
-                                    )
-                                }
 
-                                // 3 segmented buttons: 1ч, 1.5ч, 2ч
-                                if (isMaster && alerts.isLastChanceAlertEnabled) {
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    Surface(
+                                        modifier = Modifier.clickable {
+                                            viewModel.updateAlertSettings(alerts.copy(lastChanceBufferMinutes = mins))
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = bg,
+                                        border = BorderStroke(1.dp, borderColor)
                                     ) {
                                         Text(
-                                            text = if (isRu) "Запас времени:" else "Time margin:",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontWeight = FontWeight.Medium
+                                            text = label,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = textColor
                                         )
-                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            val options = listOf(
-                                                Triple(60, if (isRu) "1 ч" else "1 h", "red"),
-                                                Triple(90, if (isRu) "1.5 ч" else "1.5 h", "pale_green"),
-                                                Triple(120, if (isRu) "2 ч" else "2 h", "green")
-                                            )
-                                            options.forEach { (mins, label, colorType) ->
-                                                val isSelected = alerts.lastChanceBufferMinutes == mins
-                                                val (bg, textColor, borderColor) = when (colorType) {
-                                                    "red" -> if (isSelected) {
-                                                        Triple(Color(0x33EF4444), Color(0xFFF87171), Color(0x80EF4444))
-                                                    } else {
-                                                        Triple(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
-                                                    }
-                                                    "pale_green" -> if (isSelected) {
-                                                        Triple(Color(0x2E10B981), Color(0xFF34D399), Color(0x6610B981))
-                                                    } else {
-                                                        Triple(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
-                                                    }
-                                                    else -> if (isSelected) {
-                                                        Triple(Color(0xFF059669), Color.White, Color(0xFF10B981))
-                                                    } else {
-                                                        Triple(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
-                                                    }
-                                                }
-
-                                                Surface(
-                                                    modifier = Modifier.clickable {
-                                                        viewModel.updateAlertSettings(alerts.copy(lastChanceBufferMinutes = mins))
-                                                    },
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    color = bg,
-                                                    border = BorderStroke(1.dp, borderColor)
-                                                ) {
-                                                    Text(
-                                                        text = label,
-                                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                                        style = MaterialTheme.typography.labelMedium,
-                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                        color = textColor
-                                                    )
-                                                }
-                                            }
-                                        }
                                     }
                                 }
                             }
@@ -782,6 +773,44 @@ fun SettingsScreen(
                                     nightEnd = newEnd
                                 )
                             }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Section: Lockscreen Notification (Постоянное уведомление на экране блокировки)
+        item {
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isRu) "Уведомление на экране блокировки" else "Lockscreen Notification",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isRu) "Постоянный статус с сахаром, стрелкой тренда и TIR на экране блокировки и в панели уведомлений (как в GDH)"
+                                else "Ongoing status with current glucose, trend arrow and TIR on lockscreen and notification shade",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Switch(
+                            checked = settings.isLockscreenNotificationEnabled,
+                            onCheckedChange = { viewModel.setLockscreenNotificationEnabled(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = PrimaryEmerald
+                            )
                         )
                     }
                 }

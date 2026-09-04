@@ -55,7 +55,9 @@ object GlucoseAlertManager {
     const val CHANNEL_SIGNAL_LOSS = "tirup_alert_signal_loss_v2"
     const val CHANNEL_PATTERNS = "tirup_patterns_v1"
     const val CHANNEL_COMPENSATOR = "tirup_compensator_v1"
+    const val CHANNEL_LOCKSCREEN = "tirup_lockscreen_status_v1"
 
+    private const val NOTIFICATION_ID_LOCKSCREEN = 1000
     private const val NOTIFICATION_ID_PREDICTIVE = 1001
     private const val NOTIFICATION_ID_MAIN = 1002
     private const val NOTIFICATION_ID_CRITICAL = 1003
@@ -157,11 +159,24 @@ object GlucoseAlertManager {
             enableVibration(false)
         }
 
+        // Lockscreen / Ongoing Glucose Status
+        val lockscreenChannel = NotificationChannel(
+            CHANNEL_LOCKSCREEN,
+            "Текущий сахар (экран блокировки / шторка)",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "Постоянный статус сахара, тренда и TIR на экране блокировки и в панели уведомлений"
+            setSound(null, null)
+            enableVibration(false)
+            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+        }
+
         nm.createNotificationChannel(predictiveChannel)
         nm.createNotificationChannel(mainChannel)
         nm.createNotificationChannel(criticalChannel)
         nm.createNotificationChannel(signalLossChannel)
         nm.createNotificationChannel(compensatorChannel)
+        nm.createNotificationChannel(lockscreenChannel)
     }
 
     /**
@@ -468,7 +483,7 @@ object GlucoseAlertManager {
                     val title = if (isRu) "📡 Потеря связи с сенсором ($elapsedMin мин)" else "📡 Sensor Signal Lost ($elapsedMin min)"
                     val text = if (isRu) "Нет данных от xDrip+ более $elapsedMin мин. Проверьте Bluetooth и трансмиттер."
                     else "No CGM readings for $elapsedMin min. Check Bluetooth and transmitter."
-                    sendNotification(context, CHANNEL_SIGNAL_LOSS, NOTIFICATION_ID_SIGNAL_LOSS, title, text, AlertTier.SIGNAL_LOSS, alerts.isSignalLossVibrate, flash = false)
+                    sendNotification(context, CHANNEL_SIGNAL_LOSS, NOTIFICATION_ID_SIGNAL_LOSS, title, text, AlertTier.SIGNAL_LOSS, alerts.isSignalLossVibrate, flash = alerts.isSignalLossFlash)
                 }
             }
             return
@@ -769,8 +784,11 @@ object GlucoseAlertManager {
             .setSound(null)
             .setAutoCancel(true)
 
-        if (tier != AlertTier.CRITICAL) {
-            // Automatically clear unread predictive/main/signal loss alerts after 60 minutes
+        if (tier == AlertTier.PREDICTIVE) {
+            // Unread predictive alert is only valid for 20 minutes
+            builder.setTimeoutAfter(20 * 60 * 1000L)
+        } else if (tier != AlertTier.CRITICAL) {
+            // Automatically clear unread main/signal loss alerts after 60 minutes
             builder.setTimeoutAfter(60 * 60 * 1000L)
         }
 
@@ -916,5 +934,113 @@ object GlucoseAlertManager {
             val cameraId = cameraManager.cameraIdList.firstOrNull() ?: return
             cameraManager.setTorchMode(cameraId, false)
         } catch (e: Exception) {}
+    }
+
+    /**
+     * Publishes or refreshes an ongoing lockscreen / status-bar notification with the latest glucose,
+     * trend arrow, velocity delta, TIR progress and active IoB / CoB (silent, public visibility).
+     */
+    fun updateLockscreenNotification(
+        context: Context,
+        latestReading: GlucoseReading?,
+        todayReadings: List<GlucoseReading>,
+        settings: UserSettings
+    ) {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        if (!settings.isLockscreenNotificationEnabled || latestReading == null) {
+            nm.cancel(NOTIFICATION_ID_LOCKSCREEN)
+            return
+        }
+
+        initChannels(context)
+
+        val isRu = settings.language.equals("RU", ignoreCase = true)
+        val isMmol = settings.unit == com.tirup.app.domain.model.GlucoseUnit.MMOL_L
+        val glucoseStr = if (isMmol) {
+            String.format(Locale.US, "%.1f", latestReading.valueMmol)
+        } else {
+            "${(latestReading.valueMmol * 18.0182).roundToInt()}"
+        }
+        val arrow = latestReading.trendArrow
+
+        // Delta
+        val sorted = todayReadings.sortedBy { it.timestamp }
+        var deltaStr = ""
+        if (sorted.size >= 2) {
+            val targetTime = latestReading.timestamp - 5 * 60_000L
+            val candidate = sorted
+                .filter { it.timestamp in (targetTime - 120_000L)..(targetTime + 120_000L) && it.timestamp != latestReading.timestamp }
+                .minByOrNull { kotlin.math.abs(it.timestamp - targetTime) }
+            val reference = candidate ?: sorted.filter { it.timestamp < latestReading.timestamp }.maxByOrNull { it.timestamp }
+            if (reference != null) {
+                val diff = latestReading.valueMmol - reference.valueMmol
+                deltaStr = if (isMmol) {
+                    String.format(Locale.US, " (%+.1f)", diff)
+                } else {
+                    val dMg = (diff * 18.0182).roundToInt()
+                    " (${if (dMg > 0) "+" else ""}$dMg)"
+                }
+            }
+        }
+
+        val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(latestReading.timestamp))
+        val title = "$glucoseStr $arrow$deltaStr   $timeStr"
+
+        // Body with TIR, IoB and CoB
+        val inRangeCount = todayReadings.count {
+            if (settings.targetMode == TargetMode.TIR) {
+                it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tirHighMmol
+            } else {
+                it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tingHighMmol
+            }
+        }
+        val tirPercent = if (todayReadings.isNotEmpty()) (inRangeCount * 100 / todayReadings.size) else 0
+        val targetName = settings.targetMode.name
+
+        val extrasList = mutableListOf<String>()
+        extrasList.add("$targetName: $tirPercent%")
+
+        if (latestReading.iob != null && latestReading.iob > 0.05) {
+            extrasList.add(String.format(Locale.US, if (isRu) "💉 %.2f Ед" else "💉 %.2f U", latestReading.iob))
+        }
+        if (latestReading.cob != null && latestReading.cob > 0.5) {
+            extrasList.add(String.format(Locale.US, if (isRu) "🍞 %.0f г" else "🍞 %.0f g", latestReading.cob))
+        }
+
+        val body = extrasList.joinToString(" • ")
+
+        val appIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            NOTIFICATION_ID_LOCKSCREEN,
+            appIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_LOCKSCREEN)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setOngoing(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setSound(null)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setContentIntent(pendingIntent)
+            .setShowWhen(true)
+            .setWhen(latestReading.timestamp)
+            .build()
+
+        nm.notify(NOTIFICATION_ID_LOCKSCREEN, notification)
+    }
+
+    fun dismissLockscreenNotification(context: Context) {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        nm?.cancel(NOTIFICATION_ID_LOCKSCREEN)
     }
 }

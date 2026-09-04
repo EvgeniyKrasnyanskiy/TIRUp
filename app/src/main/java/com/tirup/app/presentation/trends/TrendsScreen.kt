@@ -83,11 +83,13 @@ fun TrendsScreen(
     val isRu = state.userSettings.language.equals("RU", ignoreCase = true)
     val isMmol = state.userSettings.unit == GlucoseUnit.MMOL_L
 
-    val detectedPatterns = remember(state.percentileBins, state.statistics, isMmol) {
+    val detectedPatterns = remember(state.percentileBins, state.statistics, isMmol, state.userSettings.nightStartHour, state.userSettings.nightEndHour) {
         PatternRecognitionEngine.analyze(
             bins = state.percentileBins,
             stats = state.statistics,
-            isMmol = isMmol
+            isMmol = isMmol,
+            nightStartHour = state.userSettings.nightStartHour,
+            nightEndHour = state.userSettings.nightEndHour
         )
     }
 
@@ -312,18 +314,18 @@ fun TrendsScreen(
                         Text(
                             text = "TBR: ${String.format(Locale.US, "%.1f%%", tbrTotal)}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (tbrTotal <= 4.0) onSurfaceVariant else ColorVeryHigh
+                            color = if (tbrTotal <= 4.0) PrimaryEmerald else ColorVeryHigh
                         )
                         Text(
                             text = "TING: ${String.format(Locale.US, "%.1f%%", stats.tingPercent)}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = onSurfaceVariant,
+                            color = if (stats.tingPercent >= 50.0) PrimaryEmerald else ColorHigh,
                             fontWeight = FontWeight.Medium
                         )
                         Text(
                             text = "TAR: ${String.format(Locale.US, "%.1f%%", tarTotal)}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (tarTotal <= 25.0) onSurfaceVariant else ColorHigh
+                            color = if (tarTotal <= 25.0) PrimaryEmerald else ColorHigh
                         )
                     }
                 }
@@ -730,9 +732,10 @@ private fun AgpMetricsGrid(
     val tarValStr = if (tarVal > 0.0) "${tarVal.toInt()}%" else "0%"
     val isTarGood = tarVal <= 25.0
 
-    val griValStr = if (stats.gri > 0.0) "${stats.gri.toInt()}" else "--"
+    val hasData = stats.totalCount > 0 || stats.meanMmol > 0.0
+    val griValStr = if (hasData) "${stats.gri.toInt()}" else "--"
     val griColor = when {
-        stats.gri <= 0.0 -> onSurfaceVariant
+        !hasData -> onSurfaceVariant
         stats.gri <= 20.0 -> PrimaryEmerald
         stats.gri <= 40.0 -> ColorTargetSoft
         else -> ColorHigh
@@ -741,7 +744,7 @@ private fun AgpMetricsGrid(
     val gviValStr = if (stats.gvi > 0.0) String.format(Locale.US, "%.2f", stats.gvi) else "--"
     val isGviGood = stats.gvi <= 1.2
 
-    val pgsValStr = if (stats.pgs > 0.0) String.format(Locale.US, "%.1f", stats.pgs) else "--"
+    val pgsValStr = if (hasData) String.format(Locale.US, "%.1f", stats.pgs) else "--"
     val isPgsGood = stats.pgs <= 35.0
 
     val minMaxValStr = if (minVal > 0.0) {

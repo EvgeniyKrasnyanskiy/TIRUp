@@ -29,6 +29,7 @@ data class AlertSettings(
     val isSignalLossEnabled: Boolean = true,
     val signalLossMinutes: Int = 20,
     val isSignalLossVibrate: Boolean = true,
+    val isSignalLossFlash: Boolean = false,
 
     // Snooze / Anti-spam intervals in minutes
     val snoozeHypoMinutes: Int = 15,

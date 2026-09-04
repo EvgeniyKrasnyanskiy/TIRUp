@@ -689,8 +689,28 @@ object TirupWidgetUpdater {
         views.setTextViewText(R.id.widget_tir_score, "$targetName: $currentPercent%")
         views.setProgressBar(R.id.widget_tir_progress, 100, currentPercent.coerceIn(0, 100), false)
 
-        val recText = if (isRu) compensator.recommendationRu else compensator.recommendationEn
+        val recText = formatCompactCompensator(compensator, isRu)
         views.setTextViewText(R.id.widget_compensator_text, recText)
+    }
+
+    private fun formatCompactCompensator(compensator: com.tirup.app.domain.model.CompensatorGoal, isRu: Boolean): String {
+        return when {
+            compensator.neededMinutesToday <= 0 -> if (isRu) "В норме!" else "In target!"
+            compensator.neededMinutesToday > compensator.remainingMinutesToday -> if (isRu) "< цели" else "< goal"
+            else -> {
+                val hours = compensator.neededMinutesToday / 60
+                val mins = compensator.neededMinutesToday % 60
+                if (hours > 0) {
+                    if (mins > 0) {
+                        if (isRu) "+${hours}ч ${mins}м" else "+${hours}h ${mins}m"
+                    } else {
+                        if (isRu) "+${hours}ч" else "+${hours}h"
+                    }
+                } else {
+                    if (isRu) "+${mins}м" else "+${mins}m"
+                }
+            }
+        }
     }
 
     private fun bindIobCob(views: RemoteViews, latest: GlucoseReading) {

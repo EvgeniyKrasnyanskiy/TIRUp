@@ -14,6 +14,7 @@ import com.tirup.app.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -61,6 +62,36 @@ class SettingsViewModel(
         viewModelScope.launch {
             val updated = _uiState.value.userSettings.copy(themeMode = mode)
             settingsRepository.updateSettings(updated)
+        }
+    }
+
+    fun setLockscreenNotificationEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val updated = _uiState.value.userSettings.copy(isLockscreenNotificationEnabled = enabled)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+            if (enabled) {
+                val latest = glucoseRepository.getLatestReading().firstOrNull()
+                val calendar = java.util.Calendar.getInstance().apply {
+                    set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    set(java.util.Calendar.MINUTE, 0)
+                    set(java.util.Calendar.SECOND, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                }
+                val todayEntities = database.glucoseReadingDao().getReadingsBetweenSync(
+                    calendar.timeInMillis,
+                    System.currentTimeMillis() + 60_000L
+                )
+                val todayDomain = todayEntities.map { it.toDomain() }
+                com.tirup.app.data.alert.GlucoseAlertManager.updateLockscreenNotification(
+                    context = context,
+                    latestReading = latest,
+                    todayReadings = todayDomain,
+                    settings = updated
+                )
+            } else {
+                com.tirup.app.data.alert.GlucoseAlertManager.dismissLockscreenNotification(context)
+            }
         }
     }
 

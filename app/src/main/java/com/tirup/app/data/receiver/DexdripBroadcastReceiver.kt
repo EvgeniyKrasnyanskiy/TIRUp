@@ -68,19 +68,46 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 if (iob == null || cob == null) {
                     val pebbleData = fetchIobCobFromLocalPebbleService()
                     if (pebbleData != null) {
-                        if (iob == null && pebbleData.first != null) {
-                            iob = pebbleData.first
-                            cachedIob = iob
-                            cachedIobTimestamp = System.currentTimeMillis()
-                            Log.i(TAG, "Fetched active IoB from local 17580 web service: $iob U")
+                        if (pebbleData.first != null) {
+                            val pIob = pebbleData.first!!
+                            if (pIob <= 0.05) {
+                                iob = null
+                                cachedIob = null
+                                cachedIobTimestamp = 0L
+                            } else if (iob == null) {
+                                iob = pIob
+                                cachedIob = iob
+                                cachedIobTimestamp = System.currentTimeMillis()
+                                Log.i(TAG, "Fetched active IoB from local 17580 web service: $iob U")
+                            }
                         }
-                        if (cob == null && pebbleData.second != null) {
-                            cob = pebbleData.second
-                            cachedCob = cob
-                            cachedCobTimestamp = System.currentTimeMillis()
-                            Log.i(TAG, "Fetched active CoB from local 17580 web service: $cob g")
+                        if (pebbleData.second != null) {
+                            val pCob = pebbleData.second!!
+                            if (pCob <= 0.5) {
+                                cob = null
+                                cachedCob = null
+                                cachedCobTimestamp = 0L
+                            } else if (cob == null) {
+                                cob = pCob
+                                cachedCob = cob
+                                cachedCobTimestamp = System.currentTimeMillis()
+                                Log.i(TAG, "Fetched active CoB from local 17580 web service: $cob g")
+                            }
                         }
                     }
+                }
+
+                val curIob = iob
+                if (curIob != null && curIob <= 0.05) {
+                    iob = null
+                    cachedIob = null
+                    cachedIobTimestamp = 0L
+                }
+                val curCob = cob
+                if (curCob != null && curCob <= 0.5) {
+                    cob = null
+                    cachedCob = null
+                    cachedCobTimestamp = 0L
                 }
 
                 Log.i(TAG, "Saving glucose: $valueMmol mmol/L at $timestamp (trend: $trendArrow, iob: $iob, cob: $cob)")
@@ -106,27 +133,34 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         recentReadings = recentDomain,
                         settings = userSettings
                     )
-                    if (userSettings.alertSettings.isLastChanceAlertEnabled) {
-                        val calendar = java.util.Calendar.getInstance().apply {
-                            set(java.util.Calendar.HOUR_OF_DAY, 0)
-                            set(java.util.Calendar.MINUTE, 0)
-                            set(java.util.Calendar.SECOND, 0)
-                            set(java.util.Calendar.MILLISECOND, 0)
-                        }
-                        val todayEntities = app.database.glucoseReadingDao().getReadingsBetweenSync(
-                            calendar.timeInMillis,
-                            System.currentTimeMillis() + 60_000L
-                        )
-                        val todayDomain = todayEntities.map { it.toDomain() }
-                        if (todayDomain.isNotEmpty()) {
-                            com.tirup.app.data.alert.GlucoseAlertManager.checkLastChanceAlert(
-                                context = context.applicationContext,
-                                todayReadings = todayDomain,
-                                latestReading = todayDomain.last(),
-                                settings = userSettings
-                            )
-                        }
+                    val calendar = java.util.Calendar.getInstance().apply {
+                        set(java.util.Calendar.HOUR_OF_DAY, 0)
+                        set(java.util.Calendar.MINUTE, 0)
+                        set(java.util.Calendar.SECOND, 0)
+                        set(java.util.Calendar.MILLISECOND, 0)
                     }
+                    val todayEntities = app.database.glucoseReadingDao().getReadingsBetweenSync(
+                        calendar.timeInMillis,
+                        System.currentTimeMillis() + 60_000L
+                    )
+                    val todayDomain = todayEntities.map { it.toDomain() }
+
+                    if (userSettings.alertSettings.isLastChanceAlertEnabled && todayDomain.isNotEmpty()) {
+                        com.tirup.app.data.alert.GlucoseAlertManager.checkLastChanceAlert(
+                            context = context.applicationContext,
+                            todayReadings = todayDomain,
+                            latestReading = todayDomain.last(),
+                            settings = userSettings
+                        )
+                    }
+
+                    // Update Lockscreen status notification if enabled
+                    com.tirup.app.data.alert.GlucoseAlertManager.updateLockscreenNotification(
+                        context = context.applicationContext,
+                        latestReading = todayDomain.lastOrNull() ?: recentDomain.lastOrNull(),
+                        todayReadings = todayDomain,
+                        settings = userSettings
+                    )
                     com.tirup.app.data.backup.AutoBackupManager.maybeTriggerAutoBackup(
                         context = context.applicationContext,
                         database = app.database,
@@ -250,6 +284,11 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             if (extras.containsKey(key)) {
                 val num = getDoubleFromBundle(extras, key)
                 if (num != null && num >= 0.0) {
+                    if (num <= 0.05) {
+                        cachedIob = null
+                        cachedIobTimestamp = 0L
+                        return null
+                    }
                     cachedIob = num
                     cachedIobTimestamp = System.currentTimeMillis()
                     return num
@@ -263,6 +302,11 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             val iobMatch = Regex("""(\d+[.,]\d+)\s*(?:IE|U|ЕД)""", RegexOption.IGNORE_CASE).find(statusLine)
             val parsedIob = iobMatch?.groupValues?.get(1)?.replace(',', '.')?.toDoubleOrNull()
             if (parsedIob != null && parsedIob >= 0.0) {
+                if (parsedIob <= 0.05) {
+                    cachedIob = null
+                    cachedIobTimestamp = 0L
+                    return null
+                }
                 cachedIob = parsedIob
                 cachedIobTimestamp = System.currentTimeMillis()
                 return parsedIob
@@ -297,6 +341,11 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 if (obj is String && obj.contains("Carbs:", ignoreCase = true)) {
                     val extracted = Regex("""\d+([.,]\d+)?""").find(obj)?.value?.replace(',', '.')?.toDoubleOrNull()
                     if (extracted != null && extracted >= 0.0) {
+                        if (extracted <= 0.5) {
+                            cachedCob = null
+                            cachedCobTimestamp = 0L
+                            return null
+                        }
                         cachedCob = extracted
                         cachedCobTimestamp = System.currentTimeMillis()
                         return extracted
@@ -304,6 +353,11 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 }
                 val num = getDoubleFromBundle(extras, key)
                 if (num != null && num >= 0.0) {
+                    if (num <= 0.5) {
+                        cachedCob = null
+                        cachedCobTimestamp = 0L
+                        return null
+                    }
                     cachedCob = num
                     cachedCobTimestamp = System.currentTimeMillis()
                     return num
@@ -317,6 +371,11 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             val cobMatch = Regex("""(?:IE|U|ЕД|\||\s|^)(\d+)\s*(?:g|г)\b""", RegexOption.IGNORE_CASE).find(statusLine)
             val parsedCob = cobMatch?.groupValues?.get(1)?.toDoubleOrNull()
             if (parsedCob != null && parsedCob >= 0.0) {
+                if (parsedCob <= 0.5) {
+                    cachedCob = null
+                    cachedCobTimestamp = 0L
+                    return null
+                }
                 cachedCob = parsedCob
                 cachedCobTimestamp = System.currentTimeMillis()
                 return parsedCob

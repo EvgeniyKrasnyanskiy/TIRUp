@@ -142,6 +142,7 @@ data class UserSettings(
     val lastStreakCelebratedDays: Int = 0,
     val metricsOrder: List<String> = DEFAULT_METRICS_ORDER,
     val hiddenMetrics: List<String> = emptyList(),
+    val isLockscreenNotificationEnabled: Boolean = false,
     val alertSettings: AlertSettings = AlertSettings()
 )
 

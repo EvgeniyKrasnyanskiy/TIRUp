@@ -70,14 +70,14 @@ class FocusViewModel(
                     targetMode = settings.targetMode,
                     targetPercent = targetPercent,
                     latestReading = latest,
-                    recentReadings = recent,
+                    recentReadings = effectiveReadings,
                     targetRanges = settings.targetRanges,
                     language = settings.language
                 )
 
                 FocusUiState(
                     latestReading = latest,
-                    recentReadings = recent,
+                    recentReadings = effectiveReadings,
                     statistics = stats,
                     compensatorGoal = compensator,
                     streakDays = streak,

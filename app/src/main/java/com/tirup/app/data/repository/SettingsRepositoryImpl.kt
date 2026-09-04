@@ -54,6 +54,7 @@ class SettingsRepositoryImpl(
             .putInt(KEY_LAST_STREAK_CELEBRATED_DAYS, settings.lastStreakCelebratedDays)
             .putString(KEY_METRICS_ORDER, settings.metricsOrder.joinToString(","))
             .putString(KEY_HIDDEN_METRICS, settings.hiddenMetrics.joinToString(","))
+            .putBoolean(KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED, settings.isLockscreenNotificationEnabled)
             // Alert Settings
             .putBoolean(KEY_ALERT_MASTER_ENABLED, settings.alertSettings.isAlertsMasterEnabled)
             .putBoolean(KEY_ALERT_PREDICTIVE_ENABLED, settings.alertSettings.isPredictiveEnabled)
@@ -74,6 +75,7 @@ class SettingsRepositoryImpl(
             .putInt(KEY_ALERT_SNOOZE_HYPO, settings.alertSettings.snoozeHypoMinutes)
             .putInt(KEY_ALERT_SNOOZE_HYPER, settings.alertSettings.snoozeHyperMinutes)
             .putBoolean(KEY_ALERT_SIGNAL_LOSS_ENABLED, settings.alertSettings.isSignalLossEnabled)
+            .putBoolean(KEY_ALERT_SIGNAL_LOSS_FLASH, settings.alertSettings.isSignalLossFlash)
             .putBoolean(KEY_ALERT_LAST_CHANCE_ENABLED, settings.alertSettings.isLastChanceAlertEnabled)
             .putInt(KEY_ALERT_LAST_CHANCE_BUFFER, settings.alertSettings.lastChanceBufferMinutes)
             .apply()
@@ -152,6 +154,7 @@ class SettingsRepositoryImpl(
                 ?: com.tirup.app.domain.model.DEFAULT_METRICS_ORDER,
             hiddenMetrics = prefs.getString(KEY_HIDDEN_METRICS, null)?.split(",")?.filter { it.isNotBlank() }
                 ?: emptyList(),
+            isLockscreenNotificationEnabled = prefs.getBoolean(KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED, false),
             alertSettings = AlertSettings(
                 isAlertsMasterEnabled = prefs.getBoolean(KEY_ALERT_MASTER_ENABLED, true),
                 isPredictiveEnabled = prefs.getBoolean(KEY_ALERT_PREDICTIVE_ENABLED, true),
@@ -172,6 +175,7 @@ class SettingsRepositoryImpl(
                 snoozeHypoMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPO, 15),
                 snoozeHyperMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPER, 45),
                 isSignalLossEnabled = prefs.getBoolean(KEY_ALERT_SIGNAL_LOSS_ENABLED, true),
+                isSignalLossFlash = prefs.getBoolean(KEY_ALERT_SIGNAL_LOSS_FLASH, false),
                 isLastChanceAlertEnabled = prefs.getBoolean(KEY_ALERT_LAST_CHANCE_ENABLED, true),
                 lastChanceBufferMinutes = prefs.getInt(KEY_ALERT_LAST_CHANCE_BUFFER, 90)
             )
@@ -206,6 +210,7 @@ class SettingsRepositoryImpl(
         private const val KEY_LAST_STREAK_CELEBRATED_DAYS = "key_last_streak_celebrated_days"
         private const val KEY_METRICS_ORDER = "key_metrics_order"
         private const val KEY_HIDDEN_METRICS = "key_hidden_metrics"
+        private const val KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED = "key_is_lockscreen_notification_enabled"
 
         private const val KEY_ALERT_MASTER_ENABLED = "key_alert_master_enabled"
         private const val KEY_ALERT_PREDICTIVE_ENABLED = "key_alert_predictive_enabled"
@@ -226,6 +231,7 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_SNOOZE_HYPO = "key_alert_snooze_hypo"
         private const val KEY_ALERT_SNOOZE_HYPER = "key_alert_snooze_hyper"
         private const val KEY_ALERT_SIGNAL_LOSS_ENABLED = "key_alert_signal_loss_enabled"
+        private const val KEY_ALERT_SIGNAL_LOSS_FLASH = "key_alert_signal_loss_flash"
         private const val KEY_ALERT_LAST_CHANCE_ENABLED = "key_alert_last_chance_enabled"
         private const val KEY_ALERT_LAST_CHANCE_BUFFER = "key_alert_last_chance_buffer"
     }
