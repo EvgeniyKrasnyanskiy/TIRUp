@@ -54,6 +54,7 @@ class FloatingBubbleService : Service() {
     private var tvDelta: TextView? = null
 
     private var rippleAnimatorSet: AnimatorSet? = null
+    private var edgeAnimator: ValueAnimator? = null
     private var snoozeJob: Job? = null
     @Volatile
     private var snoozeUntilTimestamp: Long = 0L
@@ -182,6 +183,7 @@ class FloatingBubbleService : Service() {
         }
 
         val startX = params.x
+        edgeAnimator?.cancel()
         val animator = ValueAnimator.ofInt(startX, targetX).apply {
             duration = 200
             interpolator = DecelerateInterpolator()
@@ -194,6 +196,7 @@ class FloatingBubbleService : Service() {
                 }
             }
         }
+        edgeAnimator = animator
         animator.start()
     }
 
@@ -360,6 +363,8 @@ class FloatingBubbleService : Service() {
         super.onDestroy()
         serviceScope.cancel()
         snoozeJob?.cancel()
+        edgeAnimator?.cancel()
+        edgeAnimator = null
         rippleAnimatorSet?.cancel()
         rippleAnimatorSet = null
         try {
@@ -371,6 +376,12 @@ class FloatingBubbleService : Service() {
         } catch (e: Exception) {
             Log.w(TAG, "Error removing bubble view: ${e.message}")
         }
+        bubbleView = null
+        bubbleRipple = null
+        bubbleContainer = null
+        tvGlucose = null
+        tvArrow = null
+        tvDelta = null
     }
 
     private fun dpToPx(dp: Int): Int {

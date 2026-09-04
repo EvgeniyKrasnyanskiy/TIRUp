@@ -109,7 +109,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         try {
-            registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
+            androidx.core.content.ContextCompat.registerReceiver(
+                this,
+                screenOffReceiver,
+                IntentFilter(Intent.ACTION_SCREEN_OFF),
+                androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+            )
         } catch (e: Exception) {}
 
         val app = application as TirupApplication
@@ -120,8 +125,8 @@ class MainActivity : ComponentActivity() {
 
         val focusViewModel = FocusViewModel(glucoseRepo, settingsRepo, this.applicationContext)
         val trendsViewModel = TrendsViewModel(glucoseRepo, settingsRepo, this.applicationContext)
-        val reportsViewModel = ReportsViewModel(this, glucoseRepo, settingsRepo, importer, database)
-        val settingsViewModel = SettingsViewModel(this, settingsRepo, glucoseRepo, database)
+        val reportsViewModel = ReportsViewModel(this.applicationContext, glucoseRepo, settingsRepo, importer, database)
+        val settingsViewModel = SettingsViewModel(this.applicationContext, settingsRepo, glucoseRepo, database)
 
         setContent {
             val settingsState by settingsViewModel.uiState.collectAsState()

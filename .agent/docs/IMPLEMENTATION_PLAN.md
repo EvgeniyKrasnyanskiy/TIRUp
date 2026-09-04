@@ -950,10 +950,28 @@
 - [x] В `UserSettings.kt` и `SettingsRepositoryImpl.kt` значение по умолчанию для `isLockscreenNotificationEnabled` установлено в `true`.
 - [x] В `FocusViewModel.kt` добавлен автоматический вызов `GlucoseAlertManager.updateLockscreenNotification()` при получении новых замеров и обновлении экрана Focus.
 
-### 42.4. Возврат стандартного стиля обычных уведомлений (алертов) и удаление дубликата кнопки «ОК»:
-- [x] Из `sendNotification` полностью удалена кастомная разметка `alertViews` и фиолетовый акцент `#A855F7`.
-- [x] Использован нативный `NotificationCompat.Builder` со стандартным системным заголовком и подсветкой только значения уровня сахара через HTML-разметку по диапазонам (`<font color='...'>`).
-- [x] Удалена дублирующаяся кнопка «ОК» внутри плашки — оставлена одна стандартная нативная кнопка действия через `builder.addAction(0, "ОК", dismissPendingIntent)`.
+### 42.5. Ревизия виджета 3х1 и сокрытие старых данных при потере связи [Completed]:
+- [x] Виджет 3х1: удалены лишние дельта и время замера, двухстрочный компактный чип TIR / IoB+CoB, уменьшена кнопка ночника «Дианайт».
+- [x] Постоянное уведомление на экране блокировки: при потере сигнала $\ge 20$ мин отображаются прочерки `"--"` серого цвета (`#94A3B8`) и статус «Потеря связи», исключая введение пользователя в заблуждение устаревшим сахаром.
+
+---
+
+## 43. Углублённое код-ревью и оптимизация жизненного цикла [Completed]
+
+### 43.1. Устранение утечки Activity Context в ViewModels:
+- [x] В `MainActivity.kt` для `ReportsViewModel` и `SettingsViewModel` заменена передача `this` на `this.applicationContext` (аналогично `FocusViewModel` и `TrendsViewModel`), что исключает утечку памяти Activity при пересоздании (поворот, смена темы).
+
+### 43.2. Безопасность аниматоров и освобождение ресурсов плавающего оверлея:
+- [x] В `FloatingBubbleService.kt` аниматор доводки `snapToEdge` (`ValueAnimator`) теперь отслеживается переменной `edgeAnimator`.
+- [x] В методе `onDestroy()` обеспечена гарантированная отмена `edgeAnimator?.cancel()` и обнуление ссылок на иерархию View (`bubbleView`, `tvGlucose`, `tvArrow` и др.).
+
+### 43.3. Регистрация системного BroadcastReceiver по стандартам Android 14+:
+- [x] Регистрация `screenOffReceiver` переведена на `ContextCompat.registerReceiver` с явным флагом `ContextCompat.RECEIVER_NOT_EXPORTED`.
+
+### 43.4. Верификация тестов и сборки:
+- [x] Все 38 модульных тестов (`testDebugUnitTest`) успешно пройдены (100% success rate, 0 failures).
+- [x] Полная компиляция Kotlin (`compileDebugKotlin`) завершена без ошибок.
+
 
 
 
