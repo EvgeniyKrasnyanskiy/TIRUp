@@ -12,8 +12,8 @@ android {
         applicationId = "com.tirup.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "2.0.2"
+        versionCode = 5
+        versionName = "2.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

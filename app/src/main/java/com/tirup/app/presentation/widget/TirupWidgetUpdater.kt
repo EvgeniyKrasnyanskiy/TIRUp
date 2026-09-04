@@ -44,8 +44,10 @@ object TirupWidgetUpdater {
             val dashboardIds = appWidgetManager.getAppWidgetIds(ComponentName(context, TirupDashboardWidgetProvider::class.java))
             val compactIds = appWidgetManager.getAppWidgetIds(ComponentName(context, TirupCompactWidgetProvider::class.java))
             val minimalIds = appWidgetManager.getAppWidgetIds(ComponentName(context, TirupMiniWidgetProvider::class.java))
+            val verticalIds = appWidgetManager.getAppWidgetIds(ComponentName(context, TirupVerticalWidgetProvider::class.java))
+            val mediumIds = appWidgetManager.getAppWidgetIds(ComponentName(context, TirupMediumWidgetProvider::class.java))
 
-            if (stripIds.isEmpty() && dashboardIds.isEmpty() && compactIds.isEmpty() && minimalIds.isEmpty()) {
+            if (stripIds.isEmpty() && dashboardIds.isEmpty() && compactIds.isEmpty() && minimalIds.isEmpty() && verticalIds.isEmpty() && mediumIds.isEmpty()) {
                 return@withContext
             }
 
@@ -131,6 +133,34 @@ object TirupWidgetUpdater {
                 appWidgetManager.updateAppWidget(minimalIds, views)
             }
 
+            // 5. Update 1x2 Vertical Widgets
+            if (verticalIds.isNotEmpty()) {
+                val views = buildVerticalViews(
+                    context = context,
+                    latest = latest,
+                    recent = recent,
+                    todayReadings = todayReadings,
+                    settings = settings,
+                    mainIntent = mainPendingIntent
+                )
+                appWidgetManager.updateAppWidget(verticalIds, views)
+            }
+
+            // 6. Update 3x2 Medium Dashboard Widgets
+            if (mediumIds.isNotEmpty()) {
+                val views = buildMediumDashboardViews(
+                    context = context,
+                    latest = latest,
+                    recent = recent,
+                    todayReadings = todayReadings,
+                    settings = settings,
+                    streakDays = streakDays,
+                    mainIntent = mainPendingIntent,
+                    nightstandIntent = nightstandPendingIntent
+                )
+                appWidgetManager.updateAppWidget(mediumIds, views)
+            }
+
         } catch (e: Exception) {
             Log.e(TAG, "Error updating TIRUp homescreen widgets", e)
         }
@@ -173,15 +203,23 @@ object TirupWidgetUpdater {
 
             // Dynamic layout selection based on current bounding box
             val views = when {
-                minHeight >= 100 && minWidth >= 180 -> {
-                    // Expanded height: Bento Dashboard with 4h sparkline chart
+                minHeight >= 100 && minWidth >= 240 -> {
+                    // Expanded 4x2 or 5x2 Bento Dashboard with 4h sparkline chart
                     buildDashboardViews(context, latest, recent, todayReadings, settings, streakDays, mainPendingIntent, nightstandPendingIntent)
                 }
-                minWidth < 120 && minHeight < 100 -> {
+                minHeight >= 90 && minWidth in 140..239 -> {
+                    // 3x2 Compact Dashboard
+                    buildMediumDashboardViews(context, latest, recent, todayReadings, settings, streakDays, mainPendingIntent, nightstandPendingIntent)
+                }
+                minWidth < 100 && minHeight >= 90 -> {
+                    // 1x2 Vertical Glance
+                    buildVerticalViews(context, latest, recent, todayReadings, settings, mainPendingIntent)
+                }
+                minWidth < 100 && minHeight < 90 -> {
                     // 1x1 micro cell
                     buildMinimalViews(context, latest, todayReadings, settings, mainPendingIntent)
                 }
-                minWidth < 180 && minHeight >= 100 -> {
+                minWidth in 100..179 && minHeight >= 90 -> {
                     // 2x2 square focus
                     buildCompactViews(context, latest, recent, todayReadings, settings, mainPendingIntent, nightstandPendingIntent)
                 }
@@ -409,7 +447,121 @@ object TirupWidgetUpdater {
         } else 0
 
         val targetName = settings.targetMode.name
-        views.setTextViewText(R.id.widget_tir_score, "$targetName $currentPercent%")
+        if (diffMin <= 1) {
+            views.setTextViewText(R.id.widget_tir_score, "$targetName $currentPercent%")
+        } else {
+            val timeAgoStr = if (diffMin < 60) "${diffMin}м" else "${diffMin / 60}ч"
+            views.setTextViewText(R.id.widget_tir_score, "$currentPercent% • $timeAgoStr")
+        }
+
+        return views
+    }
+
+    private fun buildVerticalViews(
+        context: Context,
+        latest: GlucoseReading?,
+        recent: List<GlucoseReading>,
+        todayReadings: List<GlucoseReading>,
+        settings: UserSettings,
+        mainIntent: PendingIntent
+    ): RemoteViews {
+        val views = RemoteViews(context.packageName, R.layout.widget_vertical)
+        views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
+
+        if (latest == null) {
+            views.setTextViewText(R.id.widget_glucose_value, "--")
+            views.setTextColor(R.id.widget_glucose_value, Color.parseColor("#94A3B8"))
+            views.setTextViewText(R.id.widget_trend_arrow, "")
+            views.setTextViewText(R.id.widget_delta_value, "--")
+            views.setViewVisibility(R.id.widget_time_ago, View.GONE)
+            views.setTextViewText(R.id.widget_tir_score, "TIR: --")
+            return views
+        }
+
+        bindCommonMetrics(views, latest, recent, settings)
+
+        // TIR Score
+        val inRangeCount = todayReadings.count {
+            if (settings.targetMode == TargetMode.TIR) {
+                it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tirHighMmol
+            } else {
+                it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tingHighMmol
+            }
+        }
+        val currentPercent = if (todayReadings.isNotEmpty()) {
+            (inRangeCount * 100.0 / todayReadings.size).roundToInt()
+        } else 0
+
+        val targetName = settings.targetMode.name
+        views.setTextViewText(R.id.widget_tir_score, "$targetName: $currentPercent%")
+
+        return views
+    }
+
+    private fun buildMediumDashboardViews(
+        context: Context,
+        latest: GlucoseReading?,
+        recent: List<GlucoseReading>,
+        todayReadings: List<GlucoseReading>,
+        settings: UserSettings,
+        streakDays: Int,
+        mainIntent: PendingIntent,
+        nightstandIntent: PendingIntent
+    ): RemoteViews {
+        val views = RemoteViews(context.packageName, R.layout.widget_dashboard_medium)
+        views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
+        views.setOnClickPendingIntent(R.id.widget_btn_nightstand, nightstandIntent)
+
+        if (latest == null) {
+            views.setTextViewText(R.id.widget_glucose_value, "--")
+            views.setTextColor(R.id.widget_glucose_value, Color.parseColor("#94A3B8"))
+            views.setTextViewText(R.id.widget_trend_arrow, "")
+            views.setTextViewText(R.id.widget_delta_value, "--")
+            views.setViewVisibility(R.id.widget_time_ago, View.GONE)
+            views.setTextViewText(R.id.widget_tir_score, "TIR: --")
+            views.setTextViewText(R.id.widget_compensator_text, "Ожидание данных CGM")
+            views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
+            views.setViewVisibility(R.id.widget_streak_text, View.GONE)
+            views.setViewVisibility(R.id.widget_iob_text, View.GONE)
+            return views
+        }
+
+        bindCommonMetrics(views, latest, recent, settings)
+        bindCompensator(views, latest, todayReadings, settings)
+
+        // Streak badge
+        val isRu = settings.language.equals("RU", ignoreCase = true)
+        if (streakDays > 0) {
+            views.setViewVisibility(R.id.widget_streak_text, View.VISIBLE)
+            views.setTextViewText(R.id.widget_streak_text, if (isRu) "🔥 $streakDays дн" else "🔥 $streakDays d")
+        } else {
+            views.setViewVisibility(R.id.widget_streak_text, View.GONE)
+        }
+
+        // IoB badge
+        val iob = latest.iob ?: 0.0
+        if (iob > 0.05) {
+            views.setViewVisibility(R.id.widget_iob_text, View.VISIBLE)
+            views.setTextViewText(R.id.widget_iob_text, String.format(Locale.US, "💉 %.1f U", iob))
+        } else {
+            views.setViewVisibility(R.id.widget_iob_text, View.GONE)
+        }
+
+        // Render 4-hour HD Canvas Sparkline with corridor and time scale
+        val sparklineBitmap = drawSparklineBitmap(
+            readings = recent,
+            latest = latest,
+            widthPx = 540,
+            heightPx = 160,
+            ranges = settings.targetRanges,
+            isRu = isRu
+        )
+        if (sparklineBitmap != null) {
+            views.setImageViewBitmap(R.id.widget_chart_image, sparklineBitmap)
+            views.setViewVisibility(R.id.widget_chart_image, View.VISIBLE)
+        } else {
+            views.setViewVisibility(R.id.widget_chart_image, View.GONE)
+        }
 
         return views
     }

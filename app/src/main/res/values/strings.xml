@@ -97,4 +97,8 @@
     <string name="widget_compact_description">Compact square widget with current glucose, delta, daily TIR, and Nightstand launcher</string>
     <string name="widget_minimal_label">TIRUp: Micro (1x1)</string>
     <string name="widget_minimal_description">Micro glance widget with current glucose, trend arrow, and daily TIR focus</string>
+    <string name="widget_vertical_label">TIRUp: Vertical Glance (1x2)</string>
+    <string name="widget_vertical_description">Vertical glance widget with glucose, trend, velocity delta, and daily TIR focus</string>
+    <string name="widget_medium_label">TIRUp: Compact Dashboard (3x2)</string>
+    <string name="widget_medium_description">Compact dashboard featuring glucose, 4-hour sparkline chart, compensator goal, and nightstand mode</string>
 </resources>

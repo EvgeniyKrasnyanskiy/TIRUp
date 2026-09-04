@@ -647,6 +647,43 @@
 ### 32.4. Дорожная карта (Roadmap):
 - [ ] Генерация и подключение графических превью виджетов (`android:previewImage`) для отображения в системном меню выбора виджетов лаунчера Android.
 
+---
+
+## 33. Интеграция IoB/CoB через «API службы трансляции» xDrip+ и расширение линейки виджетов (1х1, 1х2, 3х2) [Completed]
+
+### 33.1. Интеграция IoB & CoB (Broadcast Service API):
+- [x] `DexdripBroadcastReceiver.kt`:
+  - Реализация рукопожатия `registerWithXdripBroadcastService(context)` (`update_bg_force` на `com.eveningoutpost.dexdrip.watch.wearintegration.BROADCAST_SERVICE_RECEIVER`).
+  - Авто-ответ рукопожатием при получении `FUNCTION == "start"` от xDrip+.
+  - Разбор строки `external.statusLine` регулярными выражениями: IoB `(\d+[.|,]\d+)\s*(?:IE|U|ед)`, CoB `(\d+)\s*(?:g|г)\b`.
+  - Добавление ключей `"glucodata.Minute.IOB"`, `"glucodata.Minute.COB"`, `"treatment.carbs"`.
+  - Кэширование активных значений IoB и CoB на 30 минут с предотвращением мерцания при замерах без инфо о дозах.
+- [x] `TirupApplication.kt` & `MainActivity.kt`:
+  - Добавление экшенов `BROADCAST_SERVICE_SENDER` и `info.nightscout.androidaps.status` в `registerDynamicReceivers()`.
+  - Вызов `registerWithXdripBroadcastService()` при запуске и в `onResume()`.
+- [x] `AndroidManifest.xml`:
+  - Регистрация фильтра `info.nightscout.androidaps.status`.
+
+### 33.2. Исправление виджета 1х1 (Micro Glance):
+- [x] `widget_minimal.xml`:
+  - Перевод разметки на 2 строки (паддинг 3 dp вместо 6 dp).
+  - Устранение отдельной верхней строки времени, вывод времени лаконично рядом с TIR (`100% • 4м`).
+  - Устранение обрезания бейджа `TIR`.
+- [x] `widget_minimal_info.xml`:
+  - Добавление `android:resizeMode="vertical"` для поддержки масштабирования до 1х2.
+
+### 33.3. Добавление вертикального виджета 1х2 (Vertical Glance):
+- [x] Создание разметки `widget_vertical.xml` и метаданных `widget_vertical_info.xml` ($1 \times 2$).
+- [x] Вертикальная компоновка: таймлапс `4м` сверху, крупный сахар со стрелкой, дельта `-0.4`, нижний бейдж `TIR: 100%`.
+- [x] Класс провайдера `TirupVerticalWidgetProvider` и регистрация в `AndroidManifest.xml`.
+
+### 33.4. Добавление виджета 3х2 (Compact Dashboard):
+- [x] Создание разметки `widget_dashboard_medium.xml` и метаданных `widget_dashboard_medium_info.xml` ($3 \times 2$).
+- [x] Компактный 4-часовой график, крупный сахар, дельта, компенсатор и прогресс-бар нормы.
+- [x] Класс провайдера `TirupMediumWidgetProvider` и регистрация в `AndroidManifest.xml`.
+- [x] Методы обновления в `TirupWidgetUpdater.kt`.
+
+
 
 
 

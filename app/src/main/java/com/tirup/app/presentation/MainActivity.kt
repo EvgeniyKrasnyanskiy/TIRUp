@@ -30,6 +30,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import com.tirup.app.data.alert.GlucoseAlertManager
+import com.tirup.app.data.receiver.DexdripBroadcastReceiver
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Adjust
@@ -155,6 +156,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         GlucoseAlertManager.dismissCriticalAlarm(this, fromUser = true)
+        DexdripBroadcastReceiver.registerWithXdripBroadcastService(this)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

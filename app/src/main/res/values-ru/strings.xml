@@ -97,4 +97,8 @@
     <string name="widget_compact_description">Компактный квадратный виджет с текущим сахаром, дельтой, TIR и кнопкой ночника</string>
     <string name="widget_minimal_label">TIRUp: Микро (1x1)</string>
     <string name="widget_minimal_description">Ультракомпактный микро-виджет с текущим сахаром, трендом и суточным TIR</string>
+    <string name="widget_vertical_label">TIRUp: Вертикальный (1x2)</string>
+    <string name="widget_vertical_description">Вертикальный виджет: текущий сахар, стрелка тренда, дельта и показатель TIR</string>
+    <string name="widget_medium_label">TIRUp: Компактный дашборд (3x2)</string>
+    <string name="widget_medium_description">Компактный дашборд: сахар, 4-часовой график, цель компенсатора и ночник</string>
 </resources>

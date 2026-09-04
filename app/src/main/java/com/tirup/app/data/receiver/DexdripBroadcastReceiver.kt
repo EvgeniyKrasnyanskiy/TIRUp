@@ -29,6 +29,13 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             return
         }
 
+        // Handle xDrip BroadcastService lifecycle handshake
+        val function = extras.getString("FUNCTION")
+        if (function.equals("start", ignoreCase = true)) {
+            Log.i(TAG, "Received CMD_START from xDrip. Re-sending registration handshake.")
+            registerWithXdripBroadcastService(context)
+        }
+
         // 1. Extract glucose value
         val glucoseVal = extractGlucoseValue(extras)
         if (glucoseVal == null || glucoseVal <= 0.0) {
@@ -50,7 +57,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         val slopeName = extractSlopeName(extras)
         val trendArrow = slopeToArrow(slopeName)
 
-        // 4. Extract IoB (Insulin on Board) & CoB (Carbs on Board)
+        // 4. Extract IoB (Insulin on Board) & CoB (Carbs on Board) with 30-min cache
         val iob = extractIob(extras)
         val cob = extractCob(extras)
 
@@ -122,6 +129,9 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         val candidateKeys = listOf(
             "bg.valueMgdl",
             "bg.value",
+            "glucoseMgdl",
+            "glucodata.Minute.mgdl",
+            "glucodata.Minute.glucose",
             "com.eveningoutpost.dexdrip.Extras.BgEstimate",
             "com.eveningoutpost.dexdrip.Extras.Bg",
             "com.eveningoutpost.dexdrip.Extras.Value",
@@ -146,7 +156,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         // Fallback: check all bundle keys for anything containing 'bg' or 'glucose' or 'estimate'
         for (key in extras.keySet()) {
             val kLower = key.lowercase()
-            if (kLower.contains("estimate") || kLower.contains("glucose") || kLower.contains("sgv") || kLower == "bg") {
+            if (kLower.contains("estimate") || kLower.contains("glucose") || kLower.contains("sgv") || kLower == "bg" || kLower.contains("mgdl")) {
                 val num = getDoubleFromBundle(extras, key)
                 if (num != null && num > 0.0) return num
             }
@@ -158,6 +168,8 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
     private fun extractTimestamp(extras: Bundle): Long? {
         val candidateKeys = listOf(
             "bg.timeStamp",
+            "glucoseTimeStamp",
+            "glucodata.Minute.Time",
             "treatment.timeStamp",
             "com.eveningoutpost.dexdrip.Extras.RawTimestamp",
             "com.eveningoutpost.dexdrip.Extras.Time",
@@ -183,6 +195,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
     private fun extractSlopeName(extras: Bundle): String? {
         val candidateKeys = listOf(
             "bg.deltaName",
+            "slopeArrow",
             "com.eveningoutpost.dexdrip.Extras.BgSlopeName",
             "slope_name",
             "slopename",
@@ -211,14 +224,37 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             "IOB",
             "current_iob",
             "active_insulin",
+            "glucodata.Minute.IOB",
             "de.michelinside.glucodatahandler.iob"
         )
         for (key in candidateKeys) {
             if (extras.containsKey(key)) {
                 val num = getDoubleFromBundle(extras, key)
-                if (num != null && num >= 0.0) return num
+                if (num != null && num >= 0.0) {
+                    cachedIob = num
+                    cachedIobTimestamp = System.currentTimeMillis()
+                    return num
+                }
             }
         }
+
+        // Parse external.statusLine from xDrip+ / AndroidAPS (e.g., "2,07IE 19g", "1.50 U")
+        val statusLine = extras.getString("external.statusLine")
+        if (!statusLine.isNullOrBlank()) {
+            val iobMatch = Regex("""(\d+[.,]\d+)\s*(?:IE|U|ЕД)""", RegexOption.IGNORE_CASE).find(statusLine)
+            val parsedIob = iobMatch?.groupValues?.get(1)?.replace(',', '.')?.toDoubleOrNull()
+            if (parsedIob != null && parsedIob >= 0.0) {
+                cachedIob = parsedIob
+                cachedIobTimestamp = System.currentTimeMillis()
+                return parsedIob
+            }
+        }
+
+        // Cache fallback: return last valid IoB if within 30 minutes
+        if (cachedIob != null && (System.currentTimeMillis() - cachedIobTimestamp) <= IOB_COB_EXPIRY_MS) {
+            return cachedIob
+        }
+
         return null
     }
 
@@ -227,11 +263,13 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             "predict.COB",
             "predict.cob",
             "predict.BWP",
+            "treatment.carbs",
             "com.eveningoutpost.dexdrip.Extras.Cob",
             "cob",
             "COB",
             "current_cob",
             "carbs_on_board",
+            "glucodata.Minute.COB",
             "de.michelinside.glucodatahandler.cob"
         )
         for (key in candidateKeys) {
@@ -239,12 +277,38 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 val obj = extras.get(key)
                 if (obj is String && obj.contains("Carbs:", ignoreCase = true)) {
                     val extracted = Regex("""\d+([.,]\d+)?""").find(obj)?.value?.replace(',', '.')?.toDoubleOrNull()
-                    if (extracted != null && extracted >= 0.0) return extracted
+                    if (extracted != null && extracted >= 0.0) {
+                        cachedCob = extracted
+                        cachedCobTimestamp = System.currentTimeMillis()
+                        return extracted
+                    }
                 }
                 val num = getDoubleFromBundle(extras, key)
-                if (num != null && num >= 0.0) return num
+                if (num != null && num >= 0.0) {
+                    cachedCob = num
+                    cachedCobTimestamp = System.currentTimeMillis()
+                    return num
+                }
             }
         }
+
+        // Parse external.statusLine from xDrip+ / AndroidAPS (e.g., "2,07IE 19g", "Loop aktiv 15g")
+        val statusLine = extras.getString("external.statusLine")
+        if (!statusLine.isNullOrBlank()) {
+            val cobMatch = Regex("""(?:IE|U|ЕД|\||\s|^)(\d+)\s*(?:g|г)\b""", RegexOption.IGNORE_CASE).find(statusLine)
+            val parsedCob = cobMatch?.groupValues?.get(1)?.toDoubleOrNull()
+            if (parsedCob != null && parsedCob >= 0.0) {
+                cachedCob = parsedCob
+                cachedCobTimestamp = System.currentTimeMillis()
+                return parsedCob
+            }
+        }
+
+        // Cache fallback: return last valid CoB if within 30 minutes
+        if (cachedCob != null && (System.currentTimeMillis() - cachedCobTimestamp) <= IOB_COB_EXPIRY_MS) {
+            return cachedCob
+        }
+
         return null
     }
 
@@ -273,7 +337,11 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
     }
 
     private fun slopeToArrow(slopeName: String?): String {
-        return when (slopeName?.lowercase()?.trim()) {
+        val trimmed = slopeName?.trim() ?: return "→"
+        if (trimmed in listOf("↑", "↗", "→", "↘", "↓", "↑↑", "↓↓")) {
+            return trimmed
+        }
+        return when (trimmed.lowercase()) {
             "doubleup", "double_up", "tripleup", "triple_up" -> "↑↑"
             "singleup", "single_up", "up", "rapidly increasing" -> "↑"
             "fortyfiveup", "forty_five_up", "up45", "increasing" -> "↗"
@@ -287,5 +355,34 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "DexdripReceiver"
+        private const val IOB_COB_EXPIRY_MS = 30 * 60 * 1000L // 30 min cache like GDH
+
+        @Volatile
+        private var cachedIob: Double? = null
+        @Volatile
+        private var cachedIobTimestamp: Long = 0L
+
+        @Volatile
+        private var cachedCob: Double? = null
+        @Volatile
+        private var cachedCobTimestamp: Long = 0L
+
+        /**
+         * Send registration handshake to xDrip+ BroadcastService.
+         * Calling this prompts xDrip+ to register TIRUp and stream full BG, graph, IoB and CoB data.
+         */
+        fun registerWithXdripBroadcastService(context: Context) {
+            try {
+                val intent = Intent("com.eveningoutpost.dexdrip.watch.wearintegration.BROADCAST_SERVICE_RECEIVER").apply {
+                    putExtra("FUNCTION", "update_bg_force")
+                    putExtra("PACKAGE", context.packageName)
+                    addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+                }
+                context.sendBroadcast(intent)
+                Log.i(TAG, "Dispatched registration handshake to xDrip BroadcastService (PACKAGE=${context.packageName})")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send registration handshake to xDrip BroadcastService", e)
+            }
+        }
     }
 }

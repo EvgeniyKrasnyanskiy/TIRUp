@@ -143,3 +143,72 @@ class TirupMiniWidgetProvider : AppWidgetProvider() {
         }
     }
 }
+
+/**
+ * 1x2 Vertical Glance Widget Provider
+ */
+class TirupVerticalWidgetProvider : AppWidgetProvider() {
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                TirupWidgetUpdater.updateAllWidgets(context)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                TirupWidgetUpdater.updateAppWidgetForOptions(context, appWidgetManager, appWidgetId, newOptions)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+}
+
+/**
+ * 3x2 Compact Dashboard Widget Provider
+ */
+class TirupMediumWidgetProvider : AppWidgetProvider() {
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                TirupWidgetUpdater.updateAllWidgets(context)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                TirupWidgetUpdater.updateAppWidgetForOptions(context, appWidgetManager, appWidgetId, newOptions)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+}
+

@@ -61,6 +61,7 @@
                 <action android:name="com.dexcom.g6.ACTION_NEW_BG" />
                 <action android:name="com.dexcom.cgm.ACTION_NEW_BG" />
                 <action android:name="com.eveningoutpost.dexdrip.watch.wearintegration.BROADCAST_SERVICE_SENDER" />
+                <action android:name="info.nightscout.androidaps.status" />
             </intent-filter>
         </receiver>
 
@@ -143,6 +144,32 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_minimal_info" />
+        </receiver>
+
+        <!-- AppWidget Provider: 1x2 Vertical Glance -->
+        <receiver
+            android:name=".presentation.widget.TirupVerticalWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_vertical_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_vertical_info" />
+        </receiver>
+
+        <!-- AppWidget Provider: 3x2 Compact Dashboard -->
+        <receiver
+            android:name=".presentation.widget.TirupMediumWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_medium_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_dashboard_medium_info" />
         </receiver>
     </application>
 

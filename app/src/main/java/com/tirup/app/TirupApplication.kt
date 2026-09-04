@@ -39,6 +39,7 @@ class TirupApplication : Application() {
         streamingImporter = StreamingGlucoseImporter(this, database)
 
         registerDynamicReceivers()
+        DexdripBroadcastReceiver.registerWithXdripBroadcastService(this)
 
         com.tirup.app.data.alert.GlucoseAlertManager.initChannels(this)
         com.tirup.app.data.backup.AutoBackupManager.scheduleNextDailyBackup(this)
@@ -54,6 +55,8 @@ class TirupApplication : Application() {
             addAction("com.eveningoutpost.dexdrip.BgEstimate.NEW_DATA")
             addAction("com.eveningoutpost.dexdrip.ACTION_NEW_BG_ESTIMATE")
             addAction("com.eveningoutpost.dexdrip.ACTION_NEW_BG")
+            addAction("com.eveningoutpost.dexdrip.watch.wearintegration.BROADCAST_SERVICE_SENDER")
+            addAction("info.nightscout.androidaps.status")
             addAction("glucodata.Minute")
             addAction("de.michelinside.glucodatahandler.GLUCODATA")
             addAction("de.michelinside.glucodatahandler.MINUTE")
