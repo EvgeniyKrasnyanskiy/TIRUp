@@ -13,6 +13,7 @@ import com.tirup.app.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.Locale
 
 class SettingsRepositoryImpl(
     context: Context
@@ -96,7 +97,8 @@ class SettingsRepositoryImpl(
     }
 
     private fun loadSettings(): UserSettings {
-        val lang = prefs.getString(KEY_LANG, "RU") ?: "RU"
+        val defaultLang = if (Locale.getDefault().language.lowercase() in listOf("ru", "be", "kk", "uk")) "RU" else "EN"
+        val lang = prefs.getString(KEY_LANG, defaultLang) ?: defaultLang
         val unitName = prefs.getString(KEY_UNIT, GlucoseUnit.MMOL_L.name) ?: GlucoseUnit.MMOL_L.name
         val unit = try {
             GlucoseUnit.valueOf(unitName)

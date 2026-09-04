@@ -127,7 +127,7 @@ val DEFAULT_METRICS_ORDER: List<String> = listOf(
 )
 
 data class UserSettings(
-    val language: String = "RU", // "RU" or "EN"
+    val language: String = if (java.util.Locale.getDefault().language.lowercase() in listOf("ru", "be", "kk", "uk")) "RU" else "EN",
     val unit: GlucoseUnit = GlucoseUnit.MMOL_L,
     val targetMode: TargetMode = TargetMode.TIR,
     val targetRanges: TargetRanges = TargetRanges(),
