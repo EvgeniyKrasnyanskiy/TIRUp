@@ -845,8 +845,8 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = if (isRu) "Компактный кружок поверх всех приложений. Можно перетаскивать, тап открывает TIRUp, пульсирует при гипо"
-                                else "Compact bubble over apps. Draggable, tap opens app, pulses on low glucose",
+                                text = if (isRu) "Появляется только вне нормы (<3.9 или >10.0). При гипо (<3.9) пульсирует волнами. Тап скрывает пузырёк на 5 минут (снуз). Свободно перемещается по экрану"
+                                else "Shown only out of range (<3.9 or >10.0). Ripple pulse waves on hypo (<3.9). Tap snoozes for 5 minutes. Draggable over apps.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

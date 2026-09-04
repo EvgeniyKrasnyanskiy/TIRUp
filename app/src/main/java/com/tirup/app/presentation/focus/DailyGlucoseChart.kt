@@ -64,6 +64,15 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.roundToInt
+
+data class DataGap(
+    val startTimestamp: Long,
+    val endTimestamp: Long,
+    val durationMinutes: Int,
+    val startMinute: Float,
+    val endMinute: Float
+)
 
 /**
  * Interactive 24-hour daily glucose chart for the Focus screen.
@@ -112,6 +121,36 @@ fun DailyGlucoseChart(
     }
 
     var selectedReading by remember { mutableStateOf<GlucoseReading?>(null) }
+    var selectedGap by remember { mutableStateOf<DataGap?>(null) }
+
+    val dataGaps = remember(todayReadings, startOfDay) {
+        val gaps = mutableListOf<DataGap>()
+        for (i in 1 until todayReadings.size) {
+            val prev = todayReadings[i - 1]
+            val curr = todayReadings[i]
+            val dtMs = curr.timestamp - prev.timestamp
+            if (dtMs > 20 * 60_000L) {
+                val durMin = (dtMs / 60_000L).toInt()
+                val mStart = (prev.timestamp - startOfDay) / 60000f
+                val mEnd = (curr.timestamp - startOfDay) / 60000f
+                gaps.add(DataGap(prev.timestamp, curr.timestamp, durMin, mStart, mEnd))
+            }
+        }
+        gaps
+    }
+
+    val totalGapMinutes = remember(dataGaps) { dataGaps.sumOf { it.durationMinutes } }
+    val monitoredMinutes = remember(todayReadings, now) {
+        if (todayReadings.isEmpty()) 0
+        else ((now - todayReadings.first().timestamp) / 60000L).toInt().coerceIn(1, 1440)
+    }
+    val sensorActivePercent = remember(monitoredMinutes, totalGapMinutes) {
+        if (monitoredMinutes <= 0) 100
+        else {
+            val activeMin = (monitoredMinutes - totalGapMinutes).coerceAtLeast(0)
+            ((activeMin.toDouble() / monitoredMinutes) * 100.0).roundToInt().coerceIn(0, 100)
+        }
+    }
 
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
@@ -221,8 +260,48 @@ fun DailyGlucoseChart(
             if (selectedMode == 1) {
                 metricsContent?.invoke()
             } else {
-                // Selected Reading Inspector Banner
-                if (selectedReading != null) {
+                // Selected Gap or Reading Inspector Banner
+                if (selectedGap != null) {
+                    val gap = selectedGap!!
+                    val startTime = timeFormatter.format(Date(gap.startTimestamp))
+                    val endTime = timeFormatter.format(Date(gap.endTimestamp))
+                    val durText = if (gap.durationMinutes >= 60) {
+                        val h = gap.durationMinutes / 60
+                        val m = gap.durationMinutes % 60
+                        if (m > 0) "${h}ч ${m}м" else "${h}ч"
+                    } else "${gap.durationMinutes}м"
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFFF59E0B).copy(alpha = 0.12f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "⏱ $startTime — $endTime",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = onSurface
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isRu) "⚠️ Разрыв связи: $durText" else "⚠️ Signal Gap: $durText",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFF59E0B)
+                                )
+                            }
+                        }
+                    }
+                } else if (selectedReading != null) {
                     val sel = selectedReading!!
                     val selVal = if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", sel.valueMmol)
                     else "${(sel.valueMmol * 18.0182).toInt()}"
@@ -287,17 +366,28 @@ fun DailyGlucoseChart(
                     .height(200.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .background(surfaceBg.copy(alpha = 0.5f))
-                    .pointerInput(todayReadings) {
+                    .pointerInput(todayReadings, dataGaps) {
                         detectTapGestures { tapOffset ->
-                            // Find reading closest to tap
+                            // Find reading or gap closest to tap
                             val chartWidth = size.width - 70f // right margin for labels
                             if (chartWidth > 0 && todayReadings.isNotEmpty()) {
                                 val tapMinute = windowStartMinute + (tapOffset.x / chartWidth) * visibleMinutes
-                                val closest = todayReadings.minByOrNull { r ->
-                                    val rMinute = (r.timestamp - startOfDay) / 60000f
-                                    abs(rMinute - tapMinute)
+
+                                val tappedGap = dataGaps.firstOrNull { gap ->
+                                    tapMinute in (gap.startMinute - 4f)..(gap.endMinute + 4f)
                                 }
-                                selectedReading = if (closest != null && selectedReading == closest) null else closest
+
+                                if (tappedGap != null) {
+                                    selectedGap = if (selectedGap == tappedGap) null else tappedGap
+                                    selectedReading = null
+                                } else {
+                                    val closest = todayReadings.minByOrNull { r ->
+                                        val rMinute = (r.timestamp - startOfDay) / 60000f
+                                        abs(rMinute - tapMinute)
+                                    }
+                                    selectedReading = if (closest != null && selectedReading == closest) null else closest
+                                    selectedGap = null
+                                }
                             }
                         }
                     }
@@ -447,29 +537,84 @@ fun DailyGlucoseChart(
                     }
 
                     if (visibleReadings.isNotEmpty()) {
-                        // Smooth polyline connecting points
-                        val curvePath = Path()
-                        var firstPoint = true
+                        // Draw continuous segments and dashed gap connections (>20 min)
+                        val solidPath = Path()
+                        var solidStarted = false
+                        var prevReading: GlucoseReading? = null
 
                         visibleReadings.forEach { r ->
                             val m = (r.timestamp - startOfDay) / 60000f
                             val x = xForMinute(m)
                             val y = yForMmol(r.valueMmol)
 
-                            if (firstPoint) {
-                                curvePath.moveTo(x, y)
-                                firstPoint = false
-                            } else {
-                                curvePath.lineTo(x, y)
+                            if (prevReading != null) {
+                                val prevM = (prevReading!!.timestamp - startOfDay) / 60000f
+                                val prevX = xForMinute(prevM)
+                                val prevY = yForMmol(prevReading!!.valueMmol)
+                                val dtMs = r.timestamp - prevReading!!.timestamp
+
+                                if (dtMs > 20 * 60_000L) {
+                                    // Gap > 20 min: flush existing solid path
+                                    if (solidStarted) {
+                                        drawPath(
+                                            path = solidPath,
+                                            color = PrimaryEmerald.copy(alpha = 0.65f),
+                                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5f)
+                                        )
+                                        solidPath.reset()
+                                        solidStarted = false
+                                    }
+
+                                    // Draw dashed line for the gap
+                                    drawLine(
+                                        color = onSurfaceVariant.copy(alpha = 0.45f),
+                                        start = Offset(prevX, prevY),
+                                        end = Offset(x, y),
+                                        strokeWidth = 2.0f,
+                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f)
+                                    )
+
+                                    // If gap is wide enough on screen, draw subtle badge in middle
+                                    val midX = (prevX + x) / 2f
+                                    val midY = (prevY + y) / 2f
+                                    if (abs(x - prevX) >= 42f && midX in 0f..chartRight) {
+                                        val durMin = (dtMs / 60_000L).toInt()
+                                        val gapLabel = if (durMin >= 60) {
+                                            val h = durMin / 60
+                                            val minPart = durMin % 60
+                                            if (minPart > 0) "${h}ч ${minPart}м" else "${h}ч"
+                                        } else "${durMin}м"
+                                        val gapPaint = Paint().apply {
+                                            color = onSurfaceVariant.copy(alpha = 0.7f).toArgb()
+                                            textSize = 20f
+                                            isAntiAlias = true
+                                            textAlign = Paint.Align.CENTER
+                                        }
+                                        drawContext.canvas.nativeCanvas.drawText(
+                                            "❓ $gapLabel",
+                                            midX,
+                                            midY - 8f,
+                                            gapPaint
+                                        )
+                                    }
+                                } else {
+                                    if (!solidStarted) {
+                                        solidPath.moveTo(prevX, prevY)
+                                        solidStarted = true
+                                    }
+                                    solidPath.lineTo(x, y)
+                                }
                             }
+                            prevReading = r
                         }
 
-                        // Draw path line
-                        drawPath(
-                            path = curvePath,
-                            color = PrimaryEmerald.copy(alpha = 0.65f),
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5f)
-                        )
+                        if (solidStarted) {
+                            drawPath(
+                                path = solidPath,
+                                color = PrimaryEmerald.copy(alpha = 0.65f),
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5f)
+                            )
+                        }
 
                         // Draw individual dots
                         val isDataStale = (now - visibleReadings.last().timestamp) > 5 * 60000L
@@ -540,6 +685,47 @@ fun DailyGlucoseChart(
                             chartRight + 8f,
                             y + 8f,
                             yLabelPaint
+                        )
+                    }
+                }
+            }
+
+            // Sensor Activity and Gap Status Banner
+            if (todayReadings.isNotEmpty() && totalGapMinutes > 0) {
+                val gapDurationStr = if (totalGapMinutes >= 60) {
+                    val h = totalGapMinutes / 60
+                    val m = totalGapMinutes % 60
+                    if (m > 0) "${h}ч ${m}м" else "${h}ч"
+                } else "${totalGapMinutes} мин"
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = if (isRu) "📡 Активность сенсора: $sensorActivePercent%" else "📡 Sensor Active: $sensorActivePercent%",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (sensorActivePercent >= 70) PrimaryEmerald else Color(0xFFF59E0B)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isRu) "(разрывы: $gapDurationStr)" else "(gaps: $gapDurationStr)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = onSurfaceVariant.copy(alpha = 0.75f)
+                        )
+                    }
+
+                    if (sensorActivePercent < 70) {
+                        Text(
+                            text = if (isRu) "⚠️ <70% (TIR приблиз.)" else "⚠️ <70% (TIR approx.)",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFF59E0B)
                         )
                     }
                 }

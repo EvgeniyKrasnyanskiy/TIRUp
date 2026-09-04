@@ -402,7 +402,18 @@ object TirupWidgetUpdater {
         } else 0
 
         val targetName = settings.targetMode.name
+        val targetPercent = if (settings.targetMode == TargetMode.TIR) {
+            settings.targetRanges.tirGoalPercent.toDouble()
+        } else {
+            settings.targetRanges.tingGoalPercent.toDouble()
+        }
+        val tirColor = when {
+            currentPercent >= targetPercent -> Color.parseColor("#10B981")
+            currentPercent >= (targetPercent - 15.0) -> Color.parseColor("#F59E0B")
+            else -> Color.parseColor("#EF4444")
+        }
         views.setTextViewText(R.id.widget_tir_score, "$targetName: $currentPercent%")
+        views.setTextColor(R.id.widget_tir_score, tirColor)
 
         return views
     }
@@ -476,12 +487,23 @@ object TirupWidgetUpdater {
         } else 0
 
         val targetName = settings.targetMode.name
+        val targetPercent = if (settings.targetMode == TargetMode.TIR) {
+            settings.targetRanges.tirGoalPercent.toDouble()
+        } else {
+            settings.targetRanges.tingGoalPercent.toDouble()
+        }
+        val tirColor = when {
+            currentPercent >= targetPercent -> Color.parseColor("#10B981")
+            currentPercent >= (targetPercent - 15.0) -> Color.parseColor("#F59E0B")
+            else -> Color.parseColor("#EF4444")
+        }
         if (diffMin <= 1) {
             views.setTextViewText(R.id.widget_tir_score, "$targetName $currentPercent%")
         } else {
             val timeAgoStr = if (diffMin < 60) "${diffMin}м" else "${diffMin / 60}ч"
             views.setTextViewText(R.id.widget_tir_score, "$currentPercent% • $timeAgoStr")
         }
+        views.setTextColor(R.id.widget_tir_score, tirColor)
 
         return views
     }
@@ -536,7 +558,18 @@ object TirupWidgetUpdater {
         } else 0
 
         val targetName = settings.targetMode.name
+        val targetPercent = if (settings.targetMode == TargetMode.TIR) {
+            settings.targetRanges.tirGoalPercent.toDouble()
+        } else {
+            settings.targetRanges.tingGoalPercent.toDouble()
+        }
+        val tirColor = when {
+            currentPercent >= targetPercent -> Color.parseColor("#10B981")
+            currentPercent >= (targetPercent - 15.0) -> Color.parseColor("#F59E0B")
+            else -> Color.parseColor("#EF4444")
+        }
         views.setTextViewText(R.id.widget_tir_score, "$targetName: $currentPercent%")
+        views.setTextColor(R.id.widget_tir_score, tirColor)
         views.setProgressBar(R.id.widget_tir_progress, 100, currentPercent.coerceIn(0, 100), false)
 
         // IoB badge
@@ -728,7 +761,13 @@ object TirupWidgetUpdater {
             (inRangeCount * 100.0 / todayReadings.size).roundToInt()
         } else 0
 
+        val tirColor = when {
+            currentPercent >= targetPercent -> Color.parseColor("#10B981")
+            currentPercent >= (targetPercent - 15.0) -> Color.parseColor("#F59E0B")
+            else -> Color.parseColor("#EF4444")
+        }
         views.setTextViewText(R.id.widget_tir_score, "$targetName: $currentPercent%")
+        views.setTextColor(R.id.widget_tir_score, tirColor)
         views.setProgressBar(R.id.widget_tir_progress, 100, currentPercent.coerceIn(0, 100), false)
 
         val recText = if (isStrip) {
@@ -927,18 +966,17 @@ object TirupWidgetUpdater {
         timeLabelPaint.textAlign = Paint.Align.RIGHT
         canvas.drawText(if (isRu) "сейчас" else "now", nowX, heightPx - 4f, timeLabelPaint)
 
-        // 4. Draw Trajectory Line (color matching FocusScreen: 7.9-10.0 is Good Blue!)
+        // 4. Draw Trajectory Line (colors: Pale Green 3.9..7.8, Emerald 7.9..10.0)
         val curveColor = when {
             latest.valueMmol < 3.0 -> Color.parseColor("#EF4444")
             latest.valueMmol < low -> Color.parseColor("#F59E0B")
-            latest.valueMmol <= 7.0 -> Color.parseColor("#10B981")
-            latest.valueMmol <= 7.8 -> Color.parseColor("#84CC16")
-            latest.valueMmol <= high -> Color.parseColor("#3B82F6") // Blue!
+            latest.valueMmol <= 7.8 -> Color.parseColor("#4ADE80") // Pale Green 3.9..7.8
+            latest.valueMmol <= high -> Color.parseColor("#10B981") // Emerald 7.9..10.0
             latest.valueMmol <= 13.9 -> Color.parseColor("#F59E0B")
             else -> Color.parseColor("#EF4444")
         }
 
-        val linePaint = Paint().apply {
+        val solidPaint = Paint().apply {
             color = curveColor
             style = Paint.Style.STROKE
             strokeWidth = 4.5f
@@ -947,19 +985,31 @@ object TirupWidgetUpdater {
             isAntiAlias = true
         }
 
-        val path = Path()
-        var first = true
+        val gapPaint = Paint().apply {
+            color = Color.parseColor("#64748B")
+            style = Paint.Style.STROKE
+            strokeWidth = 2.5f
+            pathEffect = DashPathEffect(floatArrayOf(6f, 6f), 0f)
+            isAntiAlias = true
+        }
+
+        var prevReading: GlucoseReading? = null
         for (reading in windowReadings) {
             val x = getX(reading.timestamp)
             val y = getY(reading.valueMmol)
-            if (first) {
-                path.moveTo(x, y)
-                first = false
-            } else {
-                path.lineTo(x, y)
+            if (prevReading != null) {
+                val prevX = getX(prevReading.timestamp)
+                val prevY = getY(prevReading.valueMmol)
+                val dt = reading.timestamp - prevReading.timestamp
+                if (dt > 20 * 60_000L) {
+                    // Gap > 20 min: draw dashed connection
+                    canvas.drawLine(prevX, prevY, x, y, gapPaint)
+                } else {
+                    canvas.drawLine(prevX, prevY, x, y, solidPaint)
+                }
             }
+            prevReading = reading
         }
-        canvas.drawPath(path, linePaint)
 
         // 5. Draw Current Glucose Glowing Head Dot
         val lastX = getX(latest.timestamp)

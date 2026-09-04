@@ -135,15 +135,10 @@ class FloatingBubbleService : Service() {
                     val dx = kotlin.math.abs(event.rawX - initialTouchX)
                     val dy = kotlin.math.abs(event.rawY - initialTouchY)
                     if (duration < 250 && dx < 20 && dy < 20) {
-                        // Tap on bubble: snooze for 5 minutes and open main screen
+                        // Tap on bubble: snooze for 5 minutes only (without opening app)
                         snoozeUntilTimestamp = System.currentTimeMillis() + 5 * 60 * 1000L
                         bubbleView?.visibility = View.GONE
                         setHypoRipple(false)
-
-                        val intent = Intent(this@FloatingBubbleService, MainActivity::class.java).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                        }
-                        startActivity(intent)
 
                         snoozeJob?.cancel()
                         snoozeJob = serviceScope.launch {
