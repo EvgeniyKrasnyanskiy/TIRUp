@@ -73,6 +73,9 @@ fun TrendsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val selectedPeriod by viewModel.selectedPeriod.collectAsState()
+    val weeklyDigest by viewModel.weeklyDigest.collectAsState()
+    val isDigestBannerDismissed by viewModel.isDigestBannerDismissed.collectAsState()
+    val isDigestSheetOpen by viewModel.isDigestSheetOpen.collectAsState()
     var detailDialogInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
     val dismissedPatternIds by viewModel.dismissedPatternIds.collectAsState()
     val dismissedInsightIds by viewModel.dismissedInsightIds.collectAsState()
@@ -137,8 +140,33 @@ fun TrendsScreen(
                     Text(
                         text = stringResource(R.string.trends_title),
                         style = MaterialTheme.typography.headlineMedium,
-                        color = onSurface
+                        color = onSurface,
+                        modifier = Modifier.weight(1f)
                     )
+                    if (weeklyDigest != null && state.userSettings.isWeeklyDigestEnabled) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = ActionBlue.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { viewModel.openWeeklyDigest() }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = "📊", fontSize = 13.sp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isRu) "Дайджест" else "Digest",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ActionBlue
+                                )
+                            }
+                        }
+                    }
                 }
 
                 // Pinned Compact Period Selector
@@ -194,6 +222,18 @@ fun TrendsScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item { Spacer(modifier = Modifier.height(2.dp)) }
+
+            // 0. Weekly Sunday Digest Banner (Can be dismissed by user with ✕)
+            if (weeklyDigest != null && !isDigestBannerDismissed && state.userSettings.isWeeklyDigestEnabled) {
+                item {
+                    WeeklyDigestBanner(
+                        digest = weeklyDigest!!,
+                        isRu = isRu,
+                        onClick = { viewModel.openWeeklyDigest() },
+                        onDismiss = { viewModel.dismissWeeklyDigestBanner() }
+                    )
+                }
+            }
 
 
 
@@ -585,6 +625,76 @@ fun TrendsScreen(
                 }
             }
         )
+    }
+
+    if (isDigestSheetOpen && weeklyDigest != null) {
+        WeeklyDigestSheet(
+            digest = weeklyDigest!!,
+            isRu = isRu,
+            unit = state.userSettings.unit,
+            onDismiss = { viewModel.closeWeeklyDigest() }
+        )
+    }
+}
+
+@Composable
+private fun WeeklyDigestBanner(
+    digest: com.tirup.app.domain.model.WeeklyDigest,
+    isRu: Boolean,
+    onClick: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = ActionBlue.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.35f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "📊",
+                fontSize = 22.sp,
+                modifier = Modifier.padding(end = 10.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = digest.headline,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                val subText = digest.keyInsights.firstOrNull() ?: if (isRu) "Нажмите для подробного разбора недели" else "Tap for weekly breakdown"
+                Text(
+                    text = subText,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+            }
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = if (isRu) "Закрыть баннер" else "Dismiss banner",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
     }
 }
 

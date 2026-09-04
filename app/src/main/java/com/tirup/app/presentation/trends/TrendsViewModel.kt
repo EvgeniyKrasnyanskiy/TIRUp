@@ -7,8 +7,10 @@ import androidx.lifecycle.viewModelScope
 import com.tirup.app.domain.calculator.AGPPercentilesCalculator
 import com.tirup.app.domain.calculator.GlucoseMetricsCalculator
 import com.tirup.app.domain.calculator.TargetCompensatorCalculator
+import com.tirup.app.domain.calculator.WeeklyDigestCalculator
 import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.domain.model.UserSettings
+import com.tirup.app.domain.model.WeeklyDigest
 import com.tirup.app.domain.repository.GlucoseRepository
 import com.tirup.app.domain.repository.SettingsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
+import java.util.Calendar
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TrendsViewModel(
@@ -43,6 +46,15 @@ class TrendsViewModel(
 
     private val _selectedPeriod = MutableStateFlow(TrendPeriod.PERIOD_14D)
     val selectedPeriod: StateFlow<TrendPeriod> = _selectedPeriod.asStateFlow()
+
+    private val _weeklyDigest = MutableStateFlow<WeeklyDigest?>(null)
+    val weeklyDigest: StateFlow<WeeklyDigest?> = _weeklyDigest.asStateFlow()
+
+    private val _isDigestBannerDismissed = MutableStateFlow(false)
+    val isDigestBannerDismissed: StateFlow<Boolean> = _isDigestBannerDismissed.asStateFlow()
+
+    private val _isDigestSheetOpen = MutableStateFlow(false)
+    val isDigestSheetOpen: StateFlow<Boolean> = _isDigestSheetOpen.asStateFlow()
 
     private val _uiState = MutableStateFlow(TrendsUiState(isLoading = true))
     val uiState: StateFlow<TrendsUiState> = _uiState.asStateFlow()
@@ -71,6 +83,13 @@ class TrendsViewModel(
         }
         _dismissedPatternIds.value = activePatterns
         _dismissedInsightIds.value = activeInsights
+
+        val cal = Calendar.getInstance()
+        val currentWeek = cal.get(Calendar.WEEK_OF_YEAR)
+        val currentYear = cal.get(Calendar.YEAR)
+        val dismissedWeek = sp.getInt("dismissed_digest_week", -1)
+        val dismissedYear = sp.getInt("dismissed_digest_year", -1)
+        _isDigestBannerDismissed.value = (currentWeek == dismissedWeek && currentYear == dismissedYear)
     }
 
     fun dismissPattern(id: String) {
@@ -83,6 +102,25 @@ class TrendsViewModel(
         val now = System.currentTimeMillis()
         prefs?.edit()?.putLong("$PREFIX_INSIGHT$id", now)?.apply()
         _dismissedInsightIds.value = _dismissedInsightIds.value + id
+    }
+
+    fun openWeeklyDigest() {
+        _isDigestSheetOpen.value = true
+    }
+
+    fun closeWeeklyDigest() {
+        _isDigestSheetOpen.value = false
+    }
+
+    fun dismissWeeklyDigestBanner() {
+        _isDigestBannerDismissed.value = true
+        val cal = Calendar.getInstance()
+        val currentWeek = cal.get(Calendar.WEEK_OF_YEAR)
+        val currentYear = cal.get(Calendar.YEAR)
+        prefs?.edit()
+            ?.putInt("dismissed_digest_week", currentWeek)
+            ?.putInt("dismissed_digest_year", currentYear)
+            ?.apply()
     }
 
     private fun observeData() {
@@ -110,20 +148,36 @@ class TrendsViewModel(
                     Long.MAX_VALUE
                 }
 
-                glucoseRepository.getReadingsBetween(startTime, endTime).combine(
+                // Query at least 14 days for weekly digest comparison
+                val digestStartTime = referenceTime - (14L * 86400000L)
+                val queryStartTime = if (period.days > 0) minOf(startTime, digestStartTime) else 0L
+
+                glucoseRepository.getReadingsBetween(queryStartTime, endTime).combine(
                     settingsRepository.getSettings()
-                ) { readings, latestSettings ->
+                ) { allReadings, latestSettings ->
+                    val periodReadings = if (period.days > 0) {
+                        allReadings.filter { it.timestamp in startTime..endTime }
+                    } else {
+                        allReadings
+                    }
+
+                    _weeklyDigest.value = WeeklyDigestCalculator.calculateForReferenceTimestamp(
+                        allReadings = allReadings,
+                        referenceTime = referenceTime,
+                        settings = latestSettings
+                    )
+
                     val stats = GlucoseMetricsCalculator.calculateStatistics(
-                        readings = readings,
+                        readings = periodReadings,
                         targetRanges = latestSettings.targetRanges,
                         nightStartHour = latestSettings.nightStartHour,
                         nightEndHour = latestSettings.nightEndHour,
                         language = latestSettings.language,
                         unit = latestSettings.unit
                     )
-                    val agpBins = AGPPercentilesCalculator.calculatePercentiles(readings, binsCount = 48)
+                    val agpBins = AGPPercentilesCalculator.calculatePercentiles(periodReadings, binsCount = 48)
                     val heatmap = AGPPercentilesCalculator.calculateHeatmap(
-                        readings = readings,
+                        readings = periodReadings,
                         targetRanges = latestSettings.targetRanges,
                         maxDays = if (period.days > 0) period.days.coerceAtMost(30) else 30
                     )
@@ -131,15 +185,15 @@ class TrendsViewModel(
                     val compensator = TargetCompensatorCalculator.calculateStrategicCompensator(
                         targetMode = TargetMode.TIR,
                         targetGoalPercent = latestSettings.targetRanges.tirGoalPercent.toDouble(),
-                        readings = readings,
+                        readings = periodReadings,
                         periodDays = period.days,
                         targetRanges = latestSettings.targetRanges,
                         language = latestSettings.language
                     )
 
-                    val actualDaysCount = if (readings.isNotEmpty()) {
+                    val actualDaysCount = if (periodReadings.isNotEmpty()) {
                         val cal = java.util.Calendar.getInstance()
-                        readings.map { r ->
+                        periodReadings.map { r ->
                             cal.timeInMillis = r.timestamp
                             cal.get(java.util.Calendar.YEAR) * 1000 + cal.get(java.util.Calendar.DAY_OF_YEAR)
                         }.distinct().size
