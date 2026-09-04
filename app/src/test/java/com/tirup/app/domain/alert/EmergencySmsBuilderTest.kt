@@ -70,4 +70,54 @@ class EmergencySmsBuilderTest {
         assertTrue(msgEn.contains("Test SMS"))
         assertTrue("Test SMS length (${msgEn.length}) must fit in single SMS (<= 70 chars)", msgEn.length <= 70)
     }
+
+    @Test
+    fun testBuildQueryReplyMessage() {
+        // Mock 14:35 timestamp
+        val calendar = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 14)
+            set(java.util.Calendar.MINUTE, 35)
+        }
+        val msg = EmergencySmsBuilder.buildQueryReplyMessage(
+            patientName = "Иван",
+            glucoseValueMmol = 6.4,
+            trendArrow = "→",
+            deltaMmol = 0.2,
+            readingTimestamp = calendar.timeInMillis,
+            todayTirPercent = 82,
+            iob = 1.2,
+            isRu = true,
+            unit = GlucoseUnit.MMOL_L
+        )
+
+        assertTrue(msg.contains("TIRUp: Иван 6.4 ммоль (→) в 14:35 (+0.2). TIR: 82%. IoB: 1.2U"))
+        assertTrue("Query reply SMS length (${msg.length}) must be <= 70 chars", msg.length <= 70)
+    }
+
+    @Test
+    fun testBuildNoDataReplyMessage() {
+        val msg = EmergencySmsBuilder.buildNoDataReplyMessage("Иван", isRu = true)
+        assertTrue(msg.contains("Иван"))
+        assertTrue(msg.contains("нет свежих данных"))
+        assertTrue("No data SMS length (${msg.length}) must be <= 70 chars", msg.length <= 70)
+    }
+
+    @Test
+    fun testMatchingPhone() {
+        assertTrue(com.tirup.app.data.receiver.SmsQueryReceiver.isMatchingPhone("+7 (999) 123-45-67", "89991234567"))
+        assertTrue(com.tirup.app.data.receiver.SmsQueryReceiver.isMatchingPhone("+79991234567", "8 (999) 123-45-67"))
+        assertTrue(!com.tirup.app.data.receiver.SmsQueryReceiver.isMatchingPhone("+79991112233", "+79998889900"))
+    }
+
+    @Test
+    fun testQueryTrigger() {
+        assertTrue(com.tirup.app.data.receiver.SmsQueryReceiver.isQueryTrigger("?"))
+        assertTrue(com.tirup.app.data.receiver.SmsQueryReceiver.isQueryTrigger("сахар"))
+        assertTrue(com.tirup.app.data.receiver.SmsQueryReceiver.isQueryTrigger("Сахар?"))
+        assertTrue(com.tirup.app.data.receiver.SmsQueryReceiver.isQueryTrigger("какой сахар?"))
+        assertTrue(com.tirup.app.data.receiver.SmsQueryReceiver.isQueryTrigger("sugar"))
+        assertTrue(com.tirup.app.data.receiver.SmsQueryReceiver.isQueryTrigger("bg"))
+        assertTrue(!com.tirup.app.data.receiver.SmsQueryReceiver.isQueryTrigger("Привет, как дела?"))
+        assertTrue(!com.tirup.app.data.receiver.SmsQueryReceiver.isQueryTrigger("Купи хлеба"))
+    }
 }
