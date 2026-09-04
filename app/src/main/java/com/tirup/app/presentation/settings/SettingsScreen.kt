@@ -77,6 +77,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.widget.Toast
 import kotlinx.coroutines.delay
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -127,6 +128,7 @@ fun SettingsScreen(
     var showCriticalHypoSafetyDialog by rememberSaveable { mutableStateOf(false) }
     var showMainThresholdDialog by rememberSaveable { mutableStateOf(false) }
     var masterOffHintVisible by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
 
     LaunchedEffect(masterOffHintVisible) {
         if (masterOffHintVisible) {
@@ -643,6 +645,71 @@ fun SettingsScreen(
             }
         }
 
+        // Section: Weekly Sunday Digest
+        item {
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(horizontal = 2.dp, vertical = 2.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isRu) "📊 Воскресный дайджест компенсации" else "📊 Weekly Sunday Digest",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isRu) "Аналитическая сводка недели каждое воскресенье в 20:00 (динамика TIR/TING, вариабельность CV, гипо, сравнение с прошлой неделей)"
+                                else "Weekly clinical summary every Sunday at 8:00 PM (TIR/TING dynamics, CV, hypos, and week-over-week comparison)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 16.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Switch(
+                            checked = settings.isWeeklyDigestEnabled,
+                            onCheckedChange = { isChecked ->
+                                viewModel.setWeeklyDigestEnabled(isChecked)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = PrimaryEmerald
+                            )
+                        )
+                    }
+
+                    if (settings.isWeeklyDigestEnabled) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = {
+                                com.tirup.app.data.worker.WeeklyDigestWorker.triggerImmediately(context)
+                                Toast.makeText(
+                                    context,
+                                    if (isRu) "Дайджест недели формируется... Проверьте шторку уведомлений"
+                                    else "Generating weekly digest... Check notifications shade",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ActionBlue)
+                        ) {
+                            Text(
+                                text = if (isRu) "Сформировать дайджест сейчас" else "Generate digest now",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // Section 3: Expandable Additional Settings Header
         item {
             BentoCard(
@@ -831,7 +898,6 @@ fun SettingsScreen(
 
         // Section: Floating Glucose Bubble (Плавающий пузырёк поверх всех окон)
         item {
-            val context = LocalContext.current
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
@@ -1142,7 +1208,6 @@ fun SettingsScreen(
 
         // Section 5: Community Telegram Text Link
         item {
-            val context = LocalContext.current
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

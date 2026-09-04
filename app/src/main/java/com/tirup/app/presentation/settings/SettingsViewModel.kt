@@ -65,6 +65,17 @@ class SettingsViewModel(
         }
     }
 
+    fun setWeeklyDigestEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val updated = _uiState.value.userSettings.copy(isWeeklyDigestEnabled = enabled)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+            if (enabled) {
+                com.tirup.app.data.worker.WeeklyDigestWorker.schedule(context)
+            }
+        }
+    }
+
     fun setLockscreenNotificationEnabled(enabled: Boolean) {
         viewModelScope.launch {
             val updated = _uiState.value.userSettings.copy(isLockscreenNotificationEnabled = enabled)
