@@ -28,11 +28,13 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
@@ -88,6 +90,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tirup.app.R
 import com.tirup.app.data.backup.AutoBackupManager
+import com.tirup.app.domain.calculator.CarbRecommendationCalculator
 import com.tirup.app.domain.model.BmiCategory
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.PatientProfile
@@ -1567,8 +1570,14 @@ private fun PatientProfileSummaryCard(
         val cat = BmiCategory.fromBmi(bmi, profile.calculatedAge, profile.gender)
         String.format(Locale.US, "ИМТ %.1f (%s)", bmi, if (isRu) cat.labelRu else cat.labelEn)
     } else ""
+    val carbStr = if (bmi != null) {
+        val cat = BmiCategory.fromBmi(bmi, profile.calculatedAge, profile.gender)
+        val carbRec = CarbRecommendationCalculator.calculate(profile.calculatedAge, profile.gender, cat)
+        val xeUnit = if (isRu) "ХЕ" else "BU"
+        String.format(Locale.US, "%.0f–%.0f %s/сут", carbRec.dailyXeRange.start, carbRec.dailyXeRange.endInclusive, xeUnit)
+    } else ""
 
-    val subtitleParts = listOf(ageStr, diagStr, durStr, bmiStr).filter { it.isNotBlank() }
+    val subtitleParts = listOf(ageStr, diagStr, durStr, bmiStr, carbStr).filter { it.isNotBlank() }
     val subtitle = if (subtitleParts.isNotEmpty()) {
         subtitleParts.joinToString(" • ")
     } else {
@@ -1664,6 +1673,9 @@ private fun PatientProfileEditDialog(
     val hM = profile.heightCm.toDoubleOrNull()?.let { it / 100.0 }
     val wKg = profile.weightKg.toDoubleOrNull()
     val bmi = if (hM != null && wKg != null && hM > 0.5) wKg / (hM * hM) else null
+
+    var showBmiGuide by remember { mutableStateOf(false) }
+    var showCarbGuide by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1812,7 +1824,10 @@ private fun PatientProfileEditDialog(
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier.fillMaxWidth()
+                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.35f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showBmiGuide = true }
                         ) {
                             Column(
                                 modifier = Modifier
@@ -1825,7 +1840,33 @@ private fun PatientProfileEditDialog(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(if (isRu) "ИМТ (индекс массы тела):" else "BMI:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(if (isRu) "ИМТ (индекс массы тела):" else "BMI:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = ActionBlue.copy(alpha = 0.15f)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Info,
+                                                    contentDescription = null,
+                                                    tint = ActionBlue,
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(3.dp))
+                                                Text(
+                                                    text = if (isRu) "Справка" else "Guide",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = ActionBlue
+                                                )
+                                            }
+                                        }
+                                    }
                                     Text(
                                         text = String.format(Locale.US, "%.1f кг/м²", bmi),
                                         style = MaterialTheme.typography.bodyMedium,
@@ -1851,6 +1892,143 @@ private fun PatientProfileEditDialog(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                            }
+                        }
+                    }
+
+                    val carbRec = CarbRecommendationCalculator.calculate(
+                        age = age,
+                        gender = profile.gender,
+                        bmiCategory = category
+                    )
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.35f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showCarbGuide = true }
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Restaurant,
+                                            contentDescription = null,
+                                            tint = PrimaryEmerald,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isRu) "Рекомендуемые углеводы:" else "Recommended Carbs:",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = PrimaryEmerald.copy(alpha = 0.15f)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Info,
+                                                contentDescription = null,
+                                                tint = PrimaryEmerald,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(3.dp))
+                                            Text(
+                                                text = if (isRu) "Справка" else "Guide",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = PrimaryEmerald
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Text(
+                                    text = carbRec.formatDailySummary(isRu),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PrimaryEmerald
+                                )
+
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isRu) "Ориентир по приёмам пищи:" else "Mealtime Distribution:",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(if (isRu) "• Завтрак (20–25%):" else "• Breakfast:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                                            Text(carbRec.distribution.formatBreakfast(isRu), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                        }
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(if (isRu) "• Обед (30–35%):" else "• Lunch:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                                            Text(carbRec.distribution.formatLunch(isRu), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                        }
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(if (isRu) "• Ужин (25–30%):" else "• Dinner:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                                            Text(carbRec.distribution.formatDinner(isRu), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                        }
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(if (isRu) "• Перекусы (10–15%):" else "• Snacks:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                                            Text(carbRec.distribution.formatSnacks(isRu), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                        }
+                                    }
+                                }
+
+                                if (carbRec.clinicalWarningRu != null) {
+                                    Text(
+                                        text = if (isRu) carbRec.clinicalWarningRu else (carbRec.clinicalWarningEn ?: ""),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = ColorVeryHigh,
+                                        lineHeight = 14.sp
+                                    )
+                                } else {
+                                    Text(
+                                        text = if (isRu) carbRec.clinicalRationaleRu else carbRec.clinicalRationaleEn,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        lineHeight = 14.sp
+                                    )
+                                }
                             }
                         }
                     }
@@ -1918,6 +2096,20 @@ private fun PatientProfileEditDialog(
             }
         }
     )
+
+    if (showBmiGuide) {
+        BmiDetailInfoDialog(
+            isRu = isRu,
+            onDismiss = { showBmiGuide = false }
+        )
+    }
+
+    if (showCarbGuide) {
+        CarbRecommendationDetailDialog(
+            isRu = isRu,
+            onDismiss = { showCarbGuide = false }
+        )
+    }
 }
 
 @Composable
