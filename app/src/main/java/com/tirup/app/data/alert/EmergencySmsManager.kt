@@ -49,9 +49,11 @@ object EmergencySmsManager {
             return false
         }
 
-        val phone = settings.emergencyContactPhone.trim()
-        if (phone.isBlank()) {
-            Log.w(TAG, "Emergency contact phone is empty, cannot send SMS.")
+        val phone1 = settings.emergencyContactPhone.trim()
+        val phone2 = settings.secondaryEmergencyContactPhone.trim()
+        val phonesToSend = listOf(phone1, phone2).filter { it.isNotBlank() }
+        if (phonesToSend.isEmpty()) {
+            Log.w(TAG, "Emergency contact phones are empty, cannot send SMS.")
             return false
         }
 
@@ -84,15 +86,21 @@ object EmergencySmsManager {
             unit = unit
         )
 
-        return try {
-            sendSmsInternal(context, phone, message)
-            Log.i(TAG, "Emergency SMS successfully dispatched to $phone")
-            updateLastSentTimestamp(context, now)
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to send emergency SMS: ${e.message}", e)
-            false
+        var atLeastOneSuccess = false
+        for (phone in phonesToSend) {
+            try {
+                sendSmsInternal(context, phone, message)
+                Log.i(TAG, "Emergency SMS successfully dispatched to $phone")
+                atLeastOneSuccess = true
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send emergency SMS to $phone: ${e.message}", e)
+            }
         }
+
+        if (atLeastOneSuccess) {
+            updateLastSentTimestamp(context, now)
+        }
+        return atLeastOneSuccess
     }
 
     /**

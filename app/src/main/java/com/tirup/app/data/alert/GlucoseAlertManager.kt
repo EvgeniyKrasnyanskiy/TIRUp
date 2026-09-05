@@ -340,7 +340,7 @@ object GlucoseAlertManager {
         isRu: Boolean,
         unit: GlucoseUnit
     ) {
-        if (!alerts.isEmergencySmsEnabled || alerts.emergencyContactPhone.isBlank()) {
+        if (!alerts.isEmergencySmsEnabled || (alerts.emergencyContactPhone.isBlank() && alerts.secondaryEmergencyContactPhone.isBlank())) {
             return
         }
 
@@ -351,7 +351,8 @@ object GlucoseAlertManager {
 
         val delayMinutes = alerts.emergencySmsDelayMinutes.coerceAtLeast(1)
         val delayMillis = delayMinutes * 60_000L
-        Log.i(TAG, "Starting Emergency SMS countdown: $delayMinutes min until alert is sent to ${alerts.emergencyContactPhone}")
+        val contactPhones = listOf(alerts.emergencyContactPhone, alerts.secondaryEmergencyContactPhone).filter { it.isNotBlank() }.joinToString()
+        Log.i(TAG, "Starting Emergency SMS countdown: $delayMinutes min until alert is sent to $contactPhones")
 
         val appContext = context.applicationContext
         emergencySmsJob = CoroutineScope(Dispatchers.IO).launch {

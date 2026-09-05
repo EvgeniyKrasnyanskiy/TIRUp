@@ -87,6 +87,8 @@ class SettingsRepositoryImpl(
             .putBoolean(KEY_ALERT_EMERGENCY_SMS_ENABLED, settings.alertSettings.isEmergencySmsEnabled)
             .putString(KEY_ALERT_EMERGENCY_PHONE, settings.alertSettings.emergencyContactPhone)
             .putString(KEY_ALERT_EMERGENCY_NAME, settings.alertSettings.emergencyContactName)
+            .putString(KEY_ALERT_EMERGENCY_PHONE_2, settings.alertSettings.secondaryEmergencyContactPhone)
+            .putString(KEY_ALERT_EMERGENCY_NAME_2, settings.alertSettings.secondaryEmergencyContactName)
             .putInt(KEY_ALERT_EMERGENCY_DELAY, settings.alertSettings.emergencySmsDelayMinutes)
             .putBoolean(KEY_ALERT_EMERGENCY_LOCATION, settings.alertSettings.includeLocationInEmergencySms)
             .putLong(KEY_ALERT_LAST_EMERGENCY_TIMESTAMP, settings.alertSettings.lastEmergencySmsTimestamp)
@@ -201,6 +203,8 @@ class SettingsRepositoryImpl(
                 isEmergencySmsEnabled = prefs.getBoolean(KEY_ALERT_EMERGENCY_SMS_ENABLED, false),
                 emergencyContactPhone = prefs.getString(KEY_ALERT_EMERGENCY_PHONE, "") ?: "",
                 emergencyContactName = prefs.getString(KEY_ALERT_EMERGENCY_NAME, "") ?: "",
+                secondaryEmergencyContactPhone = prefs.getString(KEY_ALERT_EMERGENCY_PHONE_2, "") ?: "",
+                secondaryEmergencyContactName = prefs.getString(KEY_ALERT_EMERGENCY_NAME_2, "") ?: "",
                 emergencySmsDelayMinutes = prefs.getInt(KEY_ALERT_EMERGENCY_DELAY, 5),
                 includeLocationInEmergencySms = prefs.getBoolean(KEY_ALERT_EMERGENCY_LOCATION, true),
                 lastEmergencySmsTimestamp = prefs.getLong(KEY_ALERT_LAST_EMERGENCY_TIMESTAMP, 0L),
@@ -270,6 +274,8 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_EMERGENCY_SMS_ENABLED = "key_alert_emergency_sms_enabled"
         private const val KEY_ALERT_EMERGENCY_PHONE = "key_alert_emergency_phone"
         private const val KEY_ALERT_EMERGENCY_NAME = "key_alert_emergency_name"
+        private const val KEY_ALERT_EMERGENCY_PHONE_2 = "key_alert_emergency_phone_2"
+        private const val KEY_ALERT_EMERGENCY_NAME_2 = "key_alert_emergency_name_2"
         private const val KEY_ALERT_EMERGENCY_DELAY = "key_alert_emergency_delay"
         private const val KEY_ALERT_EMERGENCY_LOCATION = "key_alert_emergency_location"
         private const val KEY_ALERT_LAST_EMERGENCY_TIMESTAMP = "key_alert_last_emergency_timestamp"

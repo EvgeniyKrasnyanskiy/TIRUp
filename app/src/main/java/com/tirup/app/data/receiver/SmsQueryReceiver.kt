@@ -51,15 +51,18 @@ class SmsQueryReceiver : BroadcastReceiver() {
             return
         }
 
-        val trustedPhone = alerts.emergencyContactPhone.trim()
-        if (trustedPhone.isBlank()) {
+        val trustedPhone1 = alerts.emergencyContactPhone.trim()
+        val trustedPhone2 = alerts.secondaryEmergencyContactPhone.trim()
+        val trustedPhones = listOf(trustedPhone1, trustedPhone2).filter { it.isNotBlank() }
+        if (trustedPhones.isEmpty()) {
             Log.d(TAG, "No emergency contact phone configured, ignoring incoming SMS.")
             return
         }
 
-        // 2. Strict Whitelist Check: Sender MUST match trusted emergency contact
-        if (!isMatchingPhone(senderPhone, trustedPhone)) {
-            Log.d(TAG, "Incoming SMS sender does not match trusted contact. Ignoring for security.")
+        // 2. Strict Whitelist Check: Sender MUST match one of trusted emergency contacts
+        val isSenderTrusted = trustedPhones.any { isMatchingPhone(senderPhone, it) }
+        if (!isSenderTrusted) {
+            Log.d(TAG, "Incoming SMS sender does not match any trusted contact. Ignoring for security.")
             return
         }
 

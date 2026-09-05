@@ -222,7 +222,6 @@ class MainActivity : ComponentActivity() {
             intent.removeExtra(EXTRA_GOTO_WEEKLY_DIGEST)
         }
         GlucoseAlertManager.dismissCriticalAlarm(this, fromUser = true)
-        DexdripBroadcastReceiver.registerWithXdripBroadcastService(this)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

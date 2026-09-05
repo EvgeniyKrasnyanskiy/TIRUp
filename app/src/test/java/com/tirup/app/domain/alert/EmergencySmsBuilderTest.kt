@@ -110,6 +110,40 @@ class EmergencySmsBuilderTest {
     }
 
     @Test
+    fun testExtractShortName() {
+        org.junit.Assert.assertEquals("Иван", EmergencySmsBuilder.extractShortName("Иванов Иван Иванович"))
+        org.junit.Assert.assertEquals("Алексей", EmergencySmsBuilder.extractShortName("Петров Алексей"))
+        org.junit.Assert.assertEquals("Елена", EmergencySmsBuilder.extractShortName("Елена"))
+        org.junit.Assert.assertEquals("пациент", EmergencySmsBuilder.extractShortName(""))
+        org.junit.Assert.assertEquals("пациент", EmergencySmsBuilder.extractShortName("   "))
+        org.junit.Assert.assertEquals("John", EmergencySmsBuilder.extractShortName("Smith John", isRu = false))
+        org.junit.Assert.assertEquals("patient", EmergencySmsBuilder.extractShortName("", isRu = false))
+    }
+
+    @Test
+    fun testStrictLengthLimit70CharsWithFullFio() {
+        val calendar = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 23)
+            set(java.util.Calendar.MINUTE, 59)
+        }
+        val msg = EmergencySmsBuilder.buildQueryReplyMessage(
+            patientName = "Краснянский Евгений Юрьевич",
+            glucoseValueMmol = 15.8,
+            trendArrow = "⇈",
+            deltaMmol = 2.4,
+            readingTimestamp = calendar.timeInMillis,
+            todayTirPercent = 74,
+            iob = 4.5,
+            isRu = true,
+            unit = GlucoseUnit.MMOL_L
+        )
+
+        assertTrue("Should extract 2nd word 'Евгений'", msg.contains("Евгений"))
+        assertTrue("Should not include surname", !msg.contains("Краснянский"))
+        assertTrue("Message length (${msg.length}) must strictly be <= 70 chars: '$msg'", msg.length <= 70)
+    }
+
+    @Test
     fun testQueryTrigger() {
         assertTrue(com.tirup.app.data.receiver.SmsQueryReceiver.isQueryTrigger("?"))
         assertTrue(com.tirup.app.data.receiver.SmsQueryReceiver.isQueryTrigger("сахар"))

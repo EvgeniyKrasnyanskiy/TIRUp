@@ -785,13 +785,13 @@ fun SettingsScreen(
                     if (alerts.isEmergencySmsEnabled) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
-                        // Trusted contact phone input
+                        // Primary trusted contact phone input
                         OutlinedTextField(
                             value = alerts.emergencyContactPhone,
                             onValueChange = { phone ->
                                 viewModel.updateAlertSettings(alerts.copy(emergencyContactPhone = phone))
                             },
-                            label = { Text(if (isRu) "Телефон близкого человека (+7...)" else "Trusted contact phone (+...)") },
+                            label = { Text(if (isRu) "Основной телефон близкого (+7...)" else "Primary trusted phone (+...)") },
                             placeholder = { Text("+7 900 123-45-67") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
@@ -806,14 +806,55 @@ fun SettingsScreen(
                             shape = RoundedCornerShape(12.dp)
                         )
 
-                        // Trusted contact name (optional)
+                        // Primary contact name (optional)
                         OutlinedTextField(
                             value = alerts.emergencyContactName,
                             onValueChange = { name ->
                                 viewModel.updateAlertSettings(alerts.copy(emergencyContactName = name))
                             },
-                            label = { Text(if (isRu) "Имя доверенного лица (необязательно)" else "Contact name (optional)") },
+                            label = { Text(if (isRu) "Имя основного контакта (необязательно)" else "Primary contact name (optional)") },
                             placeholder = { Text(if (isRu) "Мама, Муж, Доктор..." else "Mom, Spouse, Doctor...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        // Secondary trusted contact phone input (reserve: mom/dad)
+                        OutlinedTextField(
+                            value = alerts.secondaryEmergencyContactPhone,
+                            onValueChange = { phone ->
+                                viewModel.updateAlertSettings(alerts.copy(secondaryEmergencyContactPhone = phone))
+                            },
+                            label = { Text(if (isRu) "Резервный телефон (+7...)" else "Secondary trusted phone (+...)") },
+                            placeholder = { Text(if (isRu) "+7 900 765-43-21 (резерв)" else "+... (reserve)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Phone,
+                                    contentDescription = null,
+                                    tint = ActionBlue
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        // Secondary contact name (optional)
+                        OutlinedTextField(
+                            value = alerts.secondaryEmergencyContactName,
+                            onValueChange = { name ->
+                                viewModel.updateAlertSettings(alerts.copy(secondaryEmergencyContactName = name))
+                            },
+                            label = { Text(if (isRu) "Имя резервного контакта (необязательно)" else "Secondary contact name (optional)") },
+                            placeholder = { Text(if (isRu) "Папа, Бабушка..." else "Dad, Grandma...") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             leadingIcon = {
@@ -2044,6 +2085,14 @@ private fun PatientProfileEditDialog(
                             onProfileChange(profile.copy(fullName = newName))
                         },
                         label = { Text(if (isRu) "ФИО пациента" else "Full Name") },
+                        placeholder = { Text(if (isRu) "Фамилия Имя Отчество" else "Last First Middle") },
+                        supportingText = {
+                            Text(
+                                if (isRu) "Для экстренных SMS берётся имя (2-е слово: Фамилия Имя Отчество)"
+                                else "For short SMS, first name (2nd word) is used",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )

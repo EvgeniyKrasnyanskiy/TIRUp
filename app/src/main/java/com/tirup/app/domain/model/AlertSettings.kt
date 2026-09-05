@@ -45,6 +45,8 @@ data class AlertSettings(
     val isEmergencySmsEnabled: Boolean = false,
     val emergencyContactPhone: String = "",
     val emergencyContactName: String = "",
+    val secondaryEmergencyContactPhone: String = "",
+    val secondaryEmergencyContactName: String = "",
     val emergencySmsDelayMinutes: Int = 5,
     val includeLocationInEmergencySms: Boolean = true,
     val lastEmergencySmsTimestamp: Long = 0L,

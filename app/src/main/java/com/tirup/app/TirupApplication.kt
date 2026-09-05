@@ -39,7 +39,6 @@ class TirupApplication : Application() {
         streamingImporter = StreamingGlucoseImporter(this, database)
 
         registerDynamicReceivers()
-        DexdripBroadcastReceiver.registerWithXdripBroadcastService(this)
 
         com.tirup.app.data.alert.GlucoseAlertManager.initChannels(this)
         com.tirup.app.data.backup.AutoBackupManager.scheduleNextDailyBackup(this)

@@ -32,13 +32,6 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             return
         }
 
-        // Handle xDrip BroadcastService lifecycle handshake
-        val function = extras.getString("FUNCTION")
-        if (function.equals("start", ignoreCase = true)) {
-            Log.i(TAG, "Received CMD_START from xDrip. Re-sending registration handshake.")
-            registerWithXdripBroadcastService(context)
-        }
-
         // 0. Extract potential treatment event (bolus insulin or carbs)
         val treatment = extractTreatment(extras, System.currentTimeMillis())
 
@@ -619,24 +612,5 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         private var cachedCob: Double? = null
         @Volatile
         private var cachedCobTimestamp: Long = 0L
-
-        /**
-         * Send registration handshake to xDrip+ BroadcastService with required Settings Parcelable.
-         * Calling this prompts xDrip+ to register TIRUp in its subscriber table and stream full BG, graph, IoB and CoB data.
-         */
-        fun registerWithXdripBroadcastService(context: Context) {
-            try {
-                val intent = Intent("com.eveningoutpost.dexdrip.watch.wearintegration.BROADCAST_SERVICE_RECEIVER").apply {
-                    putExtra("FUNCTION", "update_bg_force")
-                    putExtra("PACKAGE", context.packageName)
-                    putExtra("SETTINGS", com.eveningoutpost.dexdrip.services.broadcastservice.models.Settings(context.packageName, 4 * 60 * 60 * 1000L))
-                    addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
-                }
-                context.sendBroadcast(intent)
-                Log.i(TAG, "Dispatched registration handshake to xDrip BroadcastService with Settings (PACKAGE=${context.packageName})")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to send registration handshake to xDrip BroadcastService", e)
-            }
-        }
     }
 }
