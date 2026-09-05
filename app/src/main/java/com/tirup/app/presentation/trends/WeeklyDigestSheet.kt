@@ -1,6 +1,7 @@
 package com.tirup.app.presentation.trends
 
 import android.content.Intent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -432,7 +433,7 @@ fun WeeklyDigestSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Button(
+                OutlinedButton(
                     onClick = {
                         val shareText = buildString {
                             append("📊 TIRUp — ").append(if (isRu) "Воскресный дайджест" else "Weekly Sunday Digest").append("\n")
@@ -455,13 +456,17 @@ fun WeeklyDigestSheet(
                         context.startActivity(Intent.createChooser(sendIntent, if (isRu) "Поделиться дайджестом" else "Share Digest"))
                     },
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = ActionBlue),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, ActionBlue),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = ActionBlue
+                    )
                 ) {
                     Icon(
                         imageVector = Icons.Default.Share,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(18.dp),
+                        tint = ActionBlue
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -474,11 +479,16 @@ fun WeeklyDigestSheet(
                 OutlinedButton(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, ActionBlue),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = ActionBlue
+                    )
                 ) {
                     Text(
                         text = if (isRu) "Закрыть" else "Close",
-                        fontSize = 14.sp
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }

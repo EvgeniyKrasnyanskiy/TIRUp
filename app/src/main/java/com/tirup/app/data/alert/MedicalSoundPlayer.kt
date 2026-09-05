@@ -50,17 +50,17 @@ object MedicalSoundPlayer {
     }
 
     /**
-     * Plays a short gentle ascending "beep" (pop-in) when the floating bubble appears during hypoglycemia.
+     * Plays a pleasant harmonic ascending "pop-chime" when the floating bubble appears.
      */
     fun playBubblePopIn() {
         audioScope.launch {
             try {
-                val p1 = generateSineWave(freq = 880.0, durationMs = 45, volume = 0.55f)
-                val p2 = generateSineWave(freq = 1174.66, durationMs = 65, volume = 0.65f)
-                val audioData = ShortArray(p1.size + p2.size)
-                System.arraycopy(p1, 0, audioData, 0, p1.size)
-                System.arraycopy(p2, 0, audioData, p1.size, p2.size)
-                playRawPcm(audioData, AudioAttributes.USAGE_NOTIFICATION)
+                val pop = generateBubbleSweep(startFreq = 587.33, endFreq = 1046.5, durationMs = 50, volume = 0.65f)
+                val chime = generateSineWave(freq = 1174.66, durationMs = 55, volume = 0.55f)
+                val audioData = ShortArray(pop.size + chime.size)
+                System.arraycopy(pop, 0, audioData, 0, pop.size)
+                System.arraycopy(chime, 0, audioData, pop.size, chime.size)
+                playShortTone(audioData)
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to play bubble pop-in: ${e.message}")
             }
@@ -68,17 +68,13 @@ object MedicalSoundPlayer {
     }
 
     /**
-     * Plays a short soft descending "bob" (reverse pop-out) when tapping the floating bubble to dismiss/snooze.
+     * Plays a soft, organic descending "bubble burst" when tapping the floating bubble to dismiss/snooze.
      */
     fun playBubblePopOut() {
         audioScope.launch {
             try {
-                val p1 = generateSineWave(freq = 659.25, durationMs = 45, volume = 0.55f)
-                val p2 = generateSineWave(freq = 369.99, durationMs = 65, volume = 0.50f)
-                val audioData = ShortArray(p1.size + p2.size)
-                System.arraycopy(p1, 0, audioData, 0, p1.size)
-                System.arraycopy(p2, 0, audioData, p1.size, p2.size)
-                playRawPcm(audioData, AudioAttributes.USAGE_NOTIFICATION)
+                val pop = generateBubbleSweep(startFreq = 540.0, endFreq = 175.0, durationMs = 55, volume = 0.60f)
+                playShortTone(pop)
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to play bubble pop-out: ${e.message}")
             }
@@ -299,6 +295,73 @@ object MedicalSoundPlayer {
                 track?.stop()
                 track?.release()
                 if (currentAudioTrack == track) currentAudioTrack = null
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun generateBubbleSweep(
+        startFreq: Double,
+        endFreq: Double,
+        durationMs: Int,
+        volume: Float
+    ): ShortArray {
+        val numSamples = (SAMPLE_RATE * (durationMs / 1000.0)).toInt()
+        val samples = ShortArray(numSamples)
+        var phase = 0.0
+        val fadeSamples = (SAMPLE_RATE * 0.005).toInt().coerceAtMost(numSamples / 4)
+
+        for (i in 0 until numSamples) {
+            val progress = i.toDouble() / numSamples
+            val currentFreq = startFreq * Math.pow(endFreq / startFreq, progress)
+            phase += 2.0 * PI * currentFreq / SAMPLE_RATE
+
+            val attack = if (i < fadeSamples) (i.toDouble() / fadeSamples) else 1.0
+            val decay = Math.exp(-3.5 * progress)
+            val envelope = attack * decay
+
+            val sampleVal = ((sin(phase) + sin(phase * 2.0) * 0.2) / 1.2 * envelope * volume * Short.MAX_VALUE).toInt()
+            samples[i] = sampleVal.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+        }
+        return samples
+    }
+
+    private fun playShortTone(data: ShortArray) {
+        var track: AudioTrack? = null
+        try {
+            val bufferSize = AudioTrack.getMinBufferSize(
+                SAMPLE_RATE,
+                AudioFormat.CHANNEL_OUT_MONO,
+                AudioFormat.ENCODING_PCM_16BIT
+            ).coerceAtLeast(data.size * 2)
+
+            val audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+
+            val audioFormat = AudioFormat.Builder()
+                .setSampleRate(SAMPLE_RATE)
+                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                .build()
+
+            track = AudioTrack(
+                audioAttributes,
+                audioFormat,
+                bufferSize,
+                AudioTrack.MODE_STATIC,
+                android.media.AudioManager.AUDIO_SESSION_ID_GENERATE
+            )
+            track.write(data, 0, data.size)
+            track.play()
+            val durationMs = (data.size.toDouble() / SAMPLE_RATE * 1000.0).toLong() + 35L
+            Thread.sleep(durationMs)
+        } catch (e: Exception) {
+            Log.w(TAG, "Short tone playback error: ${e.message}")
+        } finally {
+            try {
+                track?.stop()
+                track?.release()
             } catch (_: Exception) {}
         }
     }

@@ -143,12 +143,12 @@ class FloatingBubbleService : Service() {
                     val dx = kotlin.math.abs(event.rawX - initialTouchX)
                     val dy = kotlin.math.abs(event.rawY - initialTouchY)
                     if (duration < 250 && dx < 20 && dy < 20) {
-                        // Play reverse "bob" pop-out sound feedback
-                        MedicalSoundPlayer.playBubblePopOut()
-
                         // Instantly silence actively playing sound and dismiss alarm
                         GlucoseAlertManager.silenceCurrentSoundOnly()
                         GlucoseAlertManager.dismissCriticalAlarm(this@FloatingBubbleService, fromUser = true)
+
+                        // Play soft bubble pop-out sound feedback
+                        MedicalSoundPlayer.playBubblePopOut()
 
                         // Tap on bubble: snooze for 5 minutes only (without opening app)
                         snoozeUntilTimestamp = System.currentTimeMillis() + 5 * 60 * 1000L
@@ -267,14 +267,10 @@ class FloatingBubbleService : Service() {
             val wasGone = bubbleView?.visibility != View.VISIBLE
             bubbleView?.visibility = View.VISIBLE
 
-            if (isHypo) {
-                if (!wasHypoActive || wasGone) {
-                    MedicalSoundPlayer.playBubblePopIn()
-                    wasHypoActive = true
-                }
-            } else {
-                wasHypoActive = false
+            if (wasGone) {
+                MedicalSoundPlayer.playBubblePopIn()
             }
+            wasHypoActive = isHypo
         }
 
         val isMmol = settings.unit == GlucoseUnit.MMOL_L

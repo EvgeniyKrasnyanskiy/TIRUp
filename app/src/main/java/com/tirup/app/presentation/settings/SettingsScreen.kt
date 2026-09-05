@@ -682,6 +682,54 @@ fun SettingsScreen(
             }
         }
 
+        // Section 3: Expandable Additional Settings Header
+        item {
+            BentoCard(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { showAdvancedSettings = !showAdvancedSettings }
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = null,
+                            tint = ActionBlue,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = if (isRu) "Дополнительные настройки" else "Advanced Settings",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (isRu) "Экстренное SMS, дайджест недели, время сна, автобэкап"
+                                       else "Emergency SMS, weekly digest, sleep window, auto-backup",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Icon(
+                        imageVector = if (showAdvancedSettings) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        if (showAdvancedSettings) {
         // Section: Emergency SMS on Severe Hypo
         item {
             val alerts = settings.alertSettings
@@ -978,54 +1026,6 @@ fun SettingsScreen(
             }
         }
 
-        // Section 3: Expandable Additional Settings Header
-        item {
-            BentoCard(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { showAdvancedSettings = !showAdvancedSettings }
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = null,
-                            tint = ActionBlue,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = if (isRu) "Дополнительные настройки" else "Advanced Settings",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (isRu) "Время сна, стандарты ATTD/ADA, очистка данных"
-                                       else "Sleep window, ATTD/ADA standards, clear data",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    Icon(
-                        imageVector = if (showAdvancedSettings) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        if (showAdvancedSettings) {
         // Section 3: Clinical Targets & Sleep Window
         item {
             BentoCard(modifier = Modifier.fillMaxWidth()) {
