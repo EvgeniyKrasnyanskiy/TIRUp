@@ -79,7 +79,6 @@ object TirupWidgetUpdater {
             }
 
             val mainPendingIntent = getMainPendingIntent(context)
-            val nightstandPendingIntent = getNightstandPendingIntent(context)
 
             // 1. Update 4x1 / 5x1 Strip Widgets
             if (stripIds.isNotEmpty()) {
@@ -90,8 +89,7 @@ object TirupWidgetUpdater {
                     todayReadings = todayReadings,
                     settings = settings,
                     streakDays = streakDays,
-                    mainIntent = mainPendingIntent,
-                    nightstandIntent = nightstandPendingIntent
+                    mainIntent = mainPendingIntent
                 )
                 appWidgetManager.updateAppWidget(stripIds, views)
             }
@@ -105,8 +103,7 @@ object TirupWidgetUpdater {
                     todayReadings = todayReadings,
                     settings = settings,
                     streakDays = streakDays,
-                    mainIntent = mainPendingIntent,
-                    nightstandIntent = nightstandPendingIntent
+                    mainIntent = mainPendingIntent
                 )
                 appWidgetManager.updateAppWidget(dashboardIds, views)
             }
@@ -120,8 +117,7 @@ object TirupWidgetUpdater {
                     todayReadings = todayReadings,
                     settings = settings,
                     streakDays = streakDays,
-                    mainIntent = mainPendingIntent,
-                    nightstandIntent = nightstandPendingIntent
+                    mainIntent = mainPendingIntent
                 )
                 appWidgetManager.updateAppWidget(compactIds, views)
             }
@@ -161,8 +157,7 @@ object TirupWidgetUpdater {
                     todayReadings = todayReadings,
                     settings = settings,
                     streakDays = streakDays,
-                    mainIntent = mainPendingIntent,
-                    nightstandIntent = nightstandPendingIntent
+                    mainIntent = mainPendingIntent
                 )
                 appWidgetManager.updateAppWidget(mediumIds, views)
             }
@@ -188,8 +183,7 @@ object TirupWidgetUpdater {
                     recent = recent,
                     todayReadings = todayReadings,
                     settings = settings,
-                    mainIntent = mainPendingIntent,
-                    nightstandIntent = nightstandPendingIntent
+                    mainIntent = mainPendingIntent
                 )
                 appWidgetManager.updateAppWidget(widget3x1Ids, views)
             }
@@ -232,7 +226,6 @@ object TirupWidgetUpdater {
             val minWidth = newOptions?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH) ?: 0
 
             val mainPendingIntent = getMainPendingIntent(context)
-            val nightstandPendingIntent = getNightstandPendingIntent(context)
 
             val appWidgetInfo = appWidgetManager.getAppWidgetInfo(appWidgetId)
             val providerName = appWidgetInfo?.provider?.className ?: ""
@@ -243,15 +236,15 @@ object TirupWidgetUpdater {
                     build2x1Views(context, latest, recent, todayReadings, settings, mainPendingIntent)
                 }
                 providerName.endsWith("Tirup3x1WidgetProvider") -> {
-                    build3x1Views(context, latest, recent, todayReadings, settings, mainPendingIntent, nightstandPendingIntent)
+                    build3x1Views(context, latest, recent, todayReadings, settings, mainPendingIntent)
                 }
                 minHeight >= 100 && minWidth >= 240 -> {
                     // Expanded 4x2 or 5x2 Bento Dashboard with 4h sparkline chart
-                    buildDashboardViews(context, latest, recent, todayReadings, settings, streakDays, mainPendingIntent, nightstandPendingIntent)
+                    buildDashboardViews(context, latest, recent, todayReadings, settings, streakDays, mainPendingIntent)
                 }
                 minHeight >= 90 && minWidth in 140..239 -> {
                     // 3x2 Compact Dashboard
-                    buildMediumDashboardViews(context, latest, recent, todayReadings, settings, streakDays, mainPendingIntent, nightstandPendingIntent)
+                    buildMediumDashboardViews(context, latest, recent, todayReadings, settings, streakDays, mainPendingIntent)
                 }
                 minWidth < 100 && minHeight >= 90 -> {
                     // 1x2 Vertical Glance
@@ -263,11 +256,11 @@ object TirupWidgetUpdater {
                 }
                 minWidth in 100..179 && minHeight >= 90 -> {
                     // 2x2 square focus
-                    buildCompactViews(context, latest, recent, todayReadings, settings, streakDays, mainPendingIntent, nightstandPendingIntent)
+                    buildCompactViews(context, latest, recent, todayReadings, settings, streakDays, mainPendingIntent)
                 }
                 else -> {
                     // 1-row tall strip (4x1 or 5x1)
-                    buildStripViews(context, latest, recent, todayReadings, settings, streakDays, mainPendingIntent, nightstandPendingIntent)
+                    buildStripViews(context, latest, recent, todayReadings, settings, streakDays, mainPendingIntent)
                 }
             }
 
@@ -284,13 +277,11 @@ object TirupWidgetUpdater {
         todayReadings: List<GlucoseReading>,
         settings: UserSettings,
         streakDays: Int,
-        mainIntent: PendingIntent,
-        nightstandIntent: PendingIntent
+        mainIntent: PendingIntent
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_strip)
         applyWidgetBackground(views, settings)
         views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
-        views.setOnClickPendingIntent(R.id.widget_btn_nightstand, nightstandIntent)
 
         if (latest == null) {
             views.setTextViewText(R.id.widget_glucose_value, "--")
@@ -299,7 +290,8 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_delta_value, "--")
             views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
-            views.setTextViewText(R.id.widget_compensator_text, "Ожидание данных CGM")
+            views.setTextViewText(R.id.widget_compensator_text, "--")
+            views.setTextColor(R.id.widget_compensator_text, Color.parseColor("#94A3B8"))
             views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
             views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
             views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
@@ -329,13 +321,11 @@ object TirupWidgetUpdater {
         todayReadings: List<GlucoseReading>,
         settings: UserSettings,
         streakDays: Int,
-        mainIntent: PendingIntent,
-        nightstandIntent: PendingIntent
+        mainIntent: PendingIntent
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_dashboard)
         applyWidgetBackground(views, settings)
         views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
-        views.setOnClickPendingIntent(R.id.widget_btn_nightstand, nightstandIntent)
 
         if (latest == null) {
             views.setTextViewText(R.id.widget_glucose_value, "--")
@@ -398,13 +388,11 @@ object TirupWidgetUpdater {
         todayReadings: List<GlucoseReading>,
         settings: UserSettings,
         streakDays: Int,
-        mainIntent: PendingIntent,
-        nightstandIntent: PendingIntent
+        mainIntent: PendingIntent
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_compact)
         applyWidgetBackground(views, settings)
         views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
-        views.setOnClickPendingIntent(R.id.widget_btn_nightstand, nightstandIntent)
 
         if (latest == null) {
             views.setTextViewText(R.id.widget_glucose_value, "--")
@@ -502,7 +490,7 @@ object TirupWidgetUpdater {
         }
         views.setTextColor(R.id.widget_glucose_value, glucoseColor)
         views.setTextColor(R.id.widget_trend_arrow, glucoseColor)
-        views.setTextViewText(R.id.widget_trend_arrow, latest.trendArrow)
+        views.setTextViewText(R.id.widget_trend_arrow, formatCompactTrendArrow(latest.trendArrow))
 
         // Time ago (hidden if fresh <= 1m)
         if (diffMin <= 1) {
@@ -640,13 +628,11 @@ object TirupWidgetUpdater {
         todayReadings: List<GlucoseReading>,
         settings: UserSettings,
         streakDays: Int,
-        mainIntent: PendingIntent,
-        nightstandIntent: PendingIntent
+        mainIntent: PendingIntent
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_dashboard_medium)
         applyWidgetBackground(views, settings)
         views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
-        views.setOnClickPendingIntent(R.id.widget_btn_nightstand, nightstandIntent)
 
         if (latest == null) {
             views.setTextViewText(R.id.widget_glucose_value, "--")
@@ -759,13 +745,11 @@ object TirupWidgetUpdater {
         recent: List<GlucoseReading>,
         todayReadings: List<GlucoseReading>,
         settings: UserSettings,
-        mainIntent: PendingIntent,
-        nightstandIntent: PendingIntent
+        mainIntent: PendingIntent
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_3x1)
         applyWidgetBackground(views, settings)
         views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
-        views.setOnClickPendingIntent(R.id.widget_btn_nightstand, nightstandIntent)
 
         if (latest == null) {
             views.setTextViewText(R.id.widget_glucose_value, "--")
@@ -774,6 +758,8 @@ object TirupWidgetUpdater {
             views.setViewVisibility(R.id.widget_delta_value, View.GONE)
             views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
+            views.setTextViewText(R.id.widget_compensator_text, "--")
+            views.setTextColor(R.id.widget_compensator_text, Color.parseColor("#94A3B8"))
             views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
             return views
         }
@@ -808,6 +794,18 @@ object TirupWidgetUpdater {
         }
         views.setTextViewText(R.id.widget_tir_score, "$targetName: $currentPercent%")
         views.setTextColor(R.id.widget_tir_score, tirColor)
+
+        val compensator = TargetCompensatorCalculator.calculateDailyCompensator(
+            targetMode = settings.targetMode,
+            targetPercent = targetPercent,
+            latestReading = latest,
+            recentReadings = todayReadings,
+            targetRanges = settings.targetRanges,
+            language = settings.language
+        )
+        val (balanceText, balanceColor) = calculateDailyTimeBalance(compensator, targetPercent)
+        views.setTextViewText(R.id.widget_compensator_text, balanceText)
+        views.setTextColor(R.id.widget_compensator_text, balanceColor)
 
         return views
     }
@@ -846,8 +844,8 @@ object TirupWidgetUpdater {
         views.setTextColor(R.id.widget_glucose_value, glucoseColor)
         views.setTextColor(R.id.widget_trend_arrow, glucoseColor)
 
-        // 2. Trend Arrow
-        views.setTextViewText(R.id.widget_trend_arrow, latest.trendArrow)
+        // 2. Trend Arrow (normalized for compact single-glyph display)
+        views.setTextViewText(R.id.widget_trend_arrow, formatCompactTrendArrow(latest.trendArrow))
 
         // 3. Clinical 5-minute velocity delta (stable across 1m and 5m sensors)
         val deltaMmol = calculate5MinDelta(latest, recent)
@@ -918,32 +916,46 @@ object TirupWidgetUpdater {
         views.setTextColor(R.id.widget_tir_score, tirColor)
         views.setProgressBar(R.id.widget_tir_progress, 100, currentPercent.coerceIn(0, 100), false)
 
-        val recText = if (isStrip) {
-            formatStripCompensator(compensator, isRu)
+        if (isStrip) {
+            val (balanceText, balanceColor) = calculateDailyTimeBalance(compensator, targetPercent)
+            views.setTextViewText(R.id.widget_compensator_text, balanceText)
+            views.setTextColor(R.id.widget_compensator_text, balanceColor)
         } else {
-            if (isRu) compensator.recommendationRu else compensator.recommendationEn
+            val recText = if (isRu) compensator.recommendationRu else compensator.recommendationEn
+            views.setTextViewText(R.id.widget_compensator_text, recText)
+            views.setTextColor(R.id.widget_compensator_text, Color.parseColor("#38BDF8"))
         }
-        views.setTextViewText(R.id.widget_compensator_text, recText)
     }
 
-    private fun formatStripCompensator(compensator: com.tirup.app.domain.model.CompensatorGoal, isRu: Boolean): String {
-        return when {
-            compensator.neededMinutesToday <= 0 -> if (isRu) "Цель достигнута! (100%)" else "Goal reached! (100%)"
-            compensator.neededMinutesToday > compensator.remainingMinutesToday -> if (isRu) "Недостижимо (< цели)" else "Off target (< goal)"
-            else -> {
-                val hours = compensator.neededMinutesToday / 60
-                val mins = compensator.neededMinutesToday % 60
-                if (hours > 0) {
-                    if (mins > 0) {
-                        if (isRu) "В норме ещё ${hours}ч ${mins}м" else "In range ${hours}h ${mins}m"
-                    } else {
-                        if (isRu) "В норме ещё ${hours}ч" else "In range ${hours}h"
-                    }
-                } else {
-                    if (isRu) "В норме ещё ${mins}м" else "In range ${mins}m"
-                }
-            }
+    fun calculateDailyTimeBalance(
+        compensator: com.tirup.app.domain.model.CompensatorGoal,
+        targetPercent: Double
+    ): Pair<String, Int> {
+        if (compensator.observedPointsCount < 2) {
+            return Pair("0м", 0xFF10B981.toInt())
         }
+        val expectedMinutes = (compensator.activeMonitoringMinutes * (targetPercent / 100.0)).roundToInt()
+        val balanceMinutes = compensator.inRangeMinutes - expectedMinutes
+
+        val text = if (balanceMinutes >= 0) {
+            val h = balanceMinutes / 60
+            val m = balanceMinutes % 60
+            if (h > 0) "+${h}ч ${m}м" else "+${m}м"
+        } else {
+            val absMin = abs(balanceMinutes)
+            val h = absMin / 60
+            val m = absMin % 60
+            if (h > 0) "-${h}ч ${m}м" else "-${m}м"
+        }
+
+        val color = when {
+            balanceMinutes < -60 -> 0xFFEF4444.toInt() // Dark red (deficit > 1h)
+            balanceMinutes < 0 -> 0xFFF59E0B.toInt()   // Amber (mild deficit)
+            balanceMinutes <= 60 -> 0xFF10B981.toInt() // Green (mild surplus)
+            else -> 0xFF059669.toInt()                 // Dark green (solid surplus > 1h)
+        }
+
+        return Pair(text, color)
     }
 
     fun getBackgroundResourceForOpacity(opacityPercent: Int): Int {
@@ -965,25 +977,17 @@ object TirupWidgetUpdater {
 
     private fun bindIobCob(views: RemoteViews, latest: GlucoseReading) {
         val iob = latest.iob ?: 0.0
-        val cob = latest.cob ?: 0.0
 
-        if (iob > 0.05 || cob > 0.5) {
+        // Carbs (CoB) are completely hidden from all widgets per user design
+        views.setViewVisibility(R.id.widget_cob_text, View.GONE)
+
+        if (iob > 0.05) {
             views.setViewVisibility(R.id.widget_iob_cob_layout, View.VISIBLE)
-            if (iob > 0.05) {
-                views.setViewVisibility(R.id.widget_iob_text, View.VISIBLE)
-                views.setTextViewText(R.id.widget_iob_text, String.format(Locale.US, "💉 %.1f U", iob))
-            } else {
-                views.setViewVisibility(R.id.widget_iob_text, View.GONE)
-            }
-
-            if (cob > 0.5) {
-                views.setViewVisibility(R.id.widget_cob_text, View.VISIBLE)
-                views.setTextViewText(R.id.widget_cob_text, String.format(Locale.US, "🍞 %.0f g", cob))
-            } else {
-                views.setViewVisibility(R.id.widget_cob_text, View.GONE)
-            }
+            views.setViewVisibility(R.id.widget_iob_text, View.VISIBLE)
+            views.setTextViewText(R.id.widget_iob_text, String.format(Locale.US, "💉 %.1f U", iob))
         } else {
             views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
+            views.setViewVisibility(R.id.widget_iob_text, View.GONE)
         }
     }
 
@@ -1201,15 +1205,12 @@ object TirupWidgetUpdater {
         )
     }
 
-    private fun getNightstandPendingIntent(context: Context): PendingIntent {
-        val intent = Intent(context, com.tirup.app.data.receiver.AlertActionReceiver::class.java).apply {
-            action = com.tirup.app.data.receiver.AlertActionReceiver.ACTION_LAUNCH_DIANIGHT
+
+    fun formatCompactTrendArrow(rawArrow: String?): String {
+        return when (rawArrow) {
+            "↑↑", "⇈" -> "⇈"
+            "↓↓", "⇊" -> "⇊"
+            else -> rawArrow ?: ""
         }
-        return PendingIntent.getBroadcast(
-            context,
-            202,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
     }
 }

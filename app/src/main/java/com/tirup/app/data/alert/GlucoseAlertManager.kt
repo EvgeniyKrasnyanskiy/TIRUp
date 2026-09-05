@@ -832,7 +832,7 @@ object GlucoseAlertManager {
 
                 // Derive trend arrow strictly from rate of change to prevent conflicting arrows
                 val arrow = when {
-                    prediction.rateOfChangeMmolPerMin <= -0.15 -> "↓↓"
+                    prediction.rateOfChangeMmolPerMin <= -0.15 -> "⇊"
                     prediction.rateOfChangeMmolPerMin <= -0.06 -> "↓"
                     else -> "↘"
                 }
@@ -858,7 +858,7 @@ object GlucoseAlertManager {
                 val title = if (isRu) "📈 Скоро гипергликемия (в $timeStr)" else "📈 Predicted High (at $timeStr)"
 
                 val arrow = when {
-                    prediction.rateOfChangeMmolPerMin >= 0.15 -> "↑↑"
+                    prediction.rateOfChangeMmolPerMin >= 0.15 -> "⇈"
                     prediction.rateOfChangeMmolPerMin >= 0.06 -> "↑"
                     else -> "↗"
                 }

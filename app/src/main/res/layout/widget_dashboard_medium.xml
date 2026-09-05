@@ -118,7 +118,7 @@
             android:id="@+id/widget_iob_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="4dp"
+            android:layout_marginStart="4dp"
             android:background="@drawable/widget_badge_bg"
             android:includeFontPadding="false"
             android:paddingStart="5dp"
@@ -131,15 +131,6 @@
             android:textStyle="bold"
             android:visibility="gone" />
 
-        <!-- Nightstand Action Button -->
-        <TextView
-            android:id="@+id/widget_btn_nightstand"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:background="@drawable/widget_button_bg"
-            android:gravity="center"
-            android:text="🌙"
-            android:textSize="14sp" />
     </LinearLayout>
 
     <!-- Middle: Sparkline Chart (4-hour window) -->

@@ -64,14 +64,13 @@
         android:gravity="end|center_vertical"
         android:orientation="horizontal">
 
-        <!-- Two rows: Line 1 = TIR, Line 2 = IoB + CoB -->
+        <!-- Row 1: TIR score badge + Compact balance badge -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:gravity="end|center_vertical"
-            android:orientation="vertical">
+            android:orientation="horizontal">
 
-            <!-- TIR score badge: higher & larger (13sp) -->
             <TextView
                 android:id="@+id/widget_tir_score"
                 android:layout_width="wrap_content"
@@ -83,64 +82,58 @@
                 android:paddingBottom="2dp"
                 android:text="TIR: 97%"
                 android:textColor="#10B981"
-                android:textSize="13sp"
+                android:textSize="12sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
 
-            <!-- Second row: IoB & CoB horizontal chips -->
-            <LinearLayout
-                android:id="@+id/widget_iob_cob_layout"
+            <TextView
+                android:id="@+id/widget_compensator_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:gravity="end|center_vertical"
-                android:orientation="horizontal"
-                android:visibility="gone">
-
-                <TextView
-                    android:id="@+id/widget_iob_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/widget_badge_bg"
-                    android:paddingStart="4dp"
-                    android:paddingTop="1dp"
-                    android:paddingEnd="4dp"
-                    android:paddingBottom="1dp"
-                    android:text="💉 1.2 U"
-                    android:textColor="#38BDF8"
-                    android:textSize="9sp"
-                    android:textStyle="bold"
-                    android:includeFontPadding="false" />
-
-                <TextView
-                    android:id="@+id/widget_cob_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:background="@drawable/widget_badge_bg"
-                    android:paddingStart="4dp"
-                    android:paddingTop="1dp"
-                    android:paddingEnd="4dp"
-                    android:paddingBottom="1dp"
-                    android:text="🍞 25 g"
-                    android:textColor="#10B981"
-                    android:textSize="9sp"
-                    android:textStyle="bold"
-                    android:visibility="gone"
-                    android:includeFontPadding="false" />
-            </LinearLayout>
+                android:layout_marginStart="4dp"
+                android:background="@drawable/widget_badge_bg"
+                android:paddingStart="6dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="2dp"
+                android:text="+1ч 10м"
+                android:textColor="#10B981"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false" />
         </LinearLayout>
 
-        <!-- Nightstand Action Button (24dp x 24dp, 12sp) -->
-        <TextView
-            android:id="@+id/widget_btn_nightstand"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/widget_button_bg"
-            android:gravity="center"
-            android:text="🌙"
-            android:textSize="12sp" />
+        <!-- Second row: IoB badge (CoB hidden) -->
+        <LinearLayout
+            android:id="@+id/widget_iob_cob_layout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:gravity="end|center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/widget_iob_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/widget_badge_bg"
+                android:paddingStart="5dp"
+                android:paddingTop="1dp"
+                android:paddingEnd="5dp"
+                android:paddingBottom="1dp"
+                android:text="💉 1.2 U"
+                android:textColor="#38BDF8"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false" />
+
+            <TextView
+                android:id="@+id/widget_cob_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone" />
+        </LinearLayout>
     </LinearLayout>
 
 </RelativeLayout>

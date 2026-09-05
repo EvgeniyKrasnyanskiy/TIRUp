@@ -40,16 +40,6 @@
             android:textColor="#94A3B8"
             android:textSize="11sp"
             android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/widget_btn_nightstand"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:layout_alignParentEnd="true"
-            android:background="@drawable/widget_button_bg"
-            android:gravity="center"
-            android:text="🌙"
-            android:textSize="14sp" />
     </RelativeLayout>
 
     <LinearLayout

@@ -471,17 +471,19 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
     private fun slopeToArrow(slopeName: String?): String {
         val trimmed = slopeName?.trim() ?: return "→"
-        if (trimmed in listOf("↑", "↗", "→", "↘", "↓", "↑↑", "↓↓")) {
+        if (trimmed == "↑↑" || trimmed == "⇈") return "⇈"
+        if (trimmed == "↓↓" || trimmed == "⇊") return "⇊"
+        if (trimmed in listOf("↑", "↗", "→", "↘", "↓")) {
             return trimmed
         }
         return when (trimmed.lowercase()) {
-            "doubleup", "double_up", "tripleup", "triple_up" -> "↑↑"
+            "doubleup", "double_up", "tripleup", "triple_up" -> "⇈"
             "singleup", "single_up", "up", "rapidly increasing" -> "↑"
             "fortyfiveup", "forty_five_up", "up45", "increasing" -> "↗"
             "flat", "constant", "not changing" -> "→"
             "fortyfivedown", "forty_five_down", "down45", "decreasing" -> "↘"
             "singledown", "single_down", "down", "rapidly decreasing" -> "↓"
-            "doubledown", "double_down", "tripledown", "triple_down" -> "↓↓"
+            "doubledown", "double_down", "tripledown", "triple_down" -> "⇊"
             else -> "→"
         }
     }
