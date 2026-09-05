@@ -850,7 +850,7 @@ object GlucoseAlertManager {
                     iobNotice,
                     kotlin.math.abs(prediction.rateOfChangeMmolPerMin)
                 )
-                sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash)
+                sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash, isLastChanceHypo = true)
             } else if (prediction.event == PredictedEvent.PREDICTED_HIGH && now - lastPredictiveAlertTimestamp >= 30 * 60000L) {
                 lastPredictiveAlertTimestamp = now
                 val eventTime = now + (prediction.minutesUntilCrossing ?: 15) * 60000L
@@ -926,7 +926,8 @@ object GlucoseAlertManager {
         text: String,
         tier: AlertTier,
         vibrate: Boolean,
-        flash: Boolean
+        flash: Boolean,
+        isLastChanceHypo: Boolean = false
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
@@ -1008,7 +1009,11 @@ object GlucoseAlertManager {
             triggerFlashlight(context, tier)
         }
 
-        MedicalSoundPlayer.playSound(tier)
+        if (isLastChanceHypo) {
+            MedicalSoundPlayer.playLastChanceAlertTone()
+        } else {
+            MedicalSoundPlayer.playSound(tier)
+        }
 
         _activeAlertBanner.value = ActiveAlertBanner(
             tier = tier,

@@ -138,6 +138,7 @@ fun SettingsScreen(
     var showProfileDialog by rememberSaveable { mutableStateOf(false) }
     var showCriticalHypoSafetyDialog by rememberSaveable { mutableStateOf(false) }
     var showMainThresholdDialog by rememberSaveable { mutableStateOf(false) }
+    var showPredictiveHorizonDialog by rememberSaveable { mutableStateOf(false) }
     var masterOffHintVisible by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -448,7 +449,7 @@ fun SettingsScreen(
 
                         // Tier 1: Predictive (Soft)
                         AlertTierConfigRow(
-                            title = if (isRu) "1. Предиктивные (умные за 15 мин)" else "1. Predictive (Smart ~15 min)",
+                            title = if (isRu) "1. Предиктивные (умные за ${alerts.predictiveMinutesAhead} мин)" else "1. Predictive (Smart ~${alerts.predictiveMinutesAhead} min)",
                             subtitle = if (!isMaster) (if (isRu) "Выключено (общий тумблер выключен)" else "Disabled (master switch off)")
                                        else if (isRu) "Мягкий сигнал прогноза до выхода за диапазон" else "Soft early warning before crossing limits",
                             enabled = isMaster && alerts.isPredictiveEnabled,
@@ -465,7 +466,9 @@ fun SettingsScreen(
                             onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isPredictiveFlash = it)) },
                             accentColor = ActionBlue,
                             onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.PREDICTIVE) },
-                            isRu = isRu
+                            isRu = isRu,
+                            thresholdBadge = if (isRu) "⏱️ Горизонт: ${alerts.predictiveMinutesAhead} мин" else "⏱️ Horizon: ${alerts.predictiveMinutesAhead} min",
+                            onThresholdClick = { showPredictiveHorizonDialog = true }
                         )
 
                         Spacer(modifier = Modifier.height(6.dp))
@@ -1688,6 +1691,115 @@ fun SettingsScreen(
                     }
                 ) {
                     Text(if (isRu) "Сброс к норме (3.9 - 10.0)" else "Default (3.9 - 10.0)")
+                }
+            }
+        )
+    }
+
+    if (showPredictiveHorizonDialog) {
+        val alerts = settings.alertSettings
+        val options = listOf(10, 15, 20, 25, 30, 35, 40)
+        var selectedMinutes by remember { mutableStateOf(alerts.predictiveMinutesAhead) }
+
+        AlertDialog(
+            onDismissRequest = { showPredictiveHorizonDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = null,
+                        tint = ActionBlue,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isRu) "Горизонт предиктивной тревоги" else "Predictive Alert Horizon",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = if (isRu) "За сколько минут алгоритм предупреждает о прогнозируемом выходе за границы диапазона:"
+                               else "How many minutes in advance the algorithm alerts before predicted limit crossing:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        options.forEach { min ->
+                            val isSelected = selectedMinutes == min
+                            val isDefault = min == 15
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) ActionBlue.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isSelected) ActionBlue else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedMinutes = min }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isRu) "$min минут" else "$min minutes",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) ActionBlue else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        if (isDefault) {
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = PrimaryEmerald.copy(alpha = 0.15f)
+                                            ) {
+                                                Text(
+                                                    text = if (isRu) "стандарт" else "default",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = PrimaryEmerald,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            tint = ActionBlue,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.updateAlertSettings(alerts.copy(predictiveMinutesAhead = selectedMinutes))
+                        showPredictiveHorizonDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
+                ) {
+                    Text(if (isRu) "Применить" else "Apply")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPredictiveHorizonDialog = false }) {
+                    Text(if (isRu) "Отмена" else "Cancel")
                 }
             }
         )

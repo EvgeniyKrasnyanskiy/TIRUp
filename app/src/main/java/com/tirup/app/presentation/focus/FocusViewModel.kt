@@ -10,7 +10,10 @@ import com.tirup.app.domain.calculator.GlucoseMetricsCalculator
 import com.tirup.app.domain.calculator.GlucoseTrendPredictor
 import com.tirup.app.domain.calculator.PredictedEvent
 import com.tirup.app.domain.calculator.TargetCompensatorCalculator
+import com.tirup.app.domain.model.DailySummary
+import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.TargetMode
+import com.tirup.app.domain.model.Treatment
 import com.tirup.app.domain.repository.GlucoseRepository
 import com.tirup.app.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +26,13 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
+
+private data class GlucoseDataTuple(
+    val latest: GlucoseReading?,
+    val recent: List<GlucoseReading>,
+    val treatments: List<Treatment>,
+    val summaries: List<DailySummary>
+)
 
 class FocusViewModel(
     private val glucoseRepository: GlucoseRepository,
@@ -51,9 +61,10 @@ class FocusViewModel(
             val glucoseDataFlow = combine(
                 glucoseRepository.getLatestReading(),
                 glucoseRepository.getRecentReadings(1440), // up to 24h of 1-min readings
-                glucoseRepository.getTreatmentsBetween(startOfDay, endOfDay + 60_000L)
-            ) { latest, recent, treatments ->
-                Triple(latest, recent, treatments)
+                glucoseRepository.getTreatmentsBetween(startOfDay, endOfDay + 60_000L),
+                glucoseRepository.getDailySummariesBetween(startOfDay - 30 * 86400000L, endOfDay)
+            ) { latest, recent, treatments, summaries ->
+                GlucoseDataTuple(latest, recent, treatments, summaries)
             }
 
             combine(
@@ -61,7 +72,11 @@ class FocusViewModel(
                 glucoseRepository.getStreakDays(),
                 settingsRepository.getSettings(),
                 GlucoseAlertManager.activeAlertBanner
-            ) { (latest, recent, treatments), streak, settings, alertBanner ->
+            ) { tuple, streak, settings, alertBanner ->
+                val latest = tuple.latest
+                val recent = tuple.recent
+                val treatments = tuple.treatments
+                val summaries = tuple.summaries
                 val todayReadings = recent.filter { it.timestamp >= startOfDay }
                 val effectiveReadings = if (todayReadings.isNotEmpty()) todayReadings else recent
 
@@ -147,6 +162,7 @@ class FocusViewModel(
                     streakDays = streak,
                     userSettings = settings,
                     activeAlertBanner = effectiveAlertBanner,
+                    recentDailySummaries = summaries,
                     isLoading = false
                 )
             }.collect { newState ->

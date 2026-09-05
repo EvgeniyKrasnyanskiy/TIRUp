@@ -81,6 +81,38 @@ object MedicalSoundPlayer {
         }
     }
 
+    /**
+     * Plays a distinct urgent ascending harmonic dual-chime for predictive hypo "Last Chance" window.
+     * Uses USAGE_ALARM stream to guarantee audibility before entering acute hypoglycemia.
+     */
+    fun playLastChanceAlertTone() {
+        isPlayingActive = true
+        audioScope.launch {
+            try {
+                boostAlarmVolumeIfNeeded()
+                // A5 (880 Hz) -> D6 (1174.66 Hz), repeated twice with short pause
+                val ping1 = generateSineWave(freq = 880.0, durationMs = 120, volume = 0.95f)
+                val ping2 = generateSineWave(freq = 1174.66, durationMs = 240, volume = 1.0f)
+                val shortPause = ShortArray((SAMPLE_RATE * 0.10).toInt())
+                val burst = ShortArray(ping1.size + ping2.size)
+                System.arraycopy(ping1, 0, burst, 0, ping1.size)
+                System.arraycopy(ping2, 0, burst, ping1.size, ping2.size)
+
+                val fullTone = ShortArray((burst.size * 2) + shortPause.size)
+                var off = 0
+                System.arraycopy(burst, 0, fullTone, off, burst.size); off += burst.size
+                System.arraycopy(shortPause, 0, fullTone, off, shortPause.size); off += shortPause.size
+                System.arraycopy(burst, 0, fullTone, off, burst.size)
+
+                playRawPcm(fullTone, usage = AudioAttributes.USAGE_ALARM)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to play last chance alert tone: ${e.message}")
+            } finally {
+                restoreAlarmVolumeIfNeeded()
+            }
+        }
+    }
+
     private fun boostAlarmVolumeIfNeeded() {
         try {
             val context = try { com.tirup.app.TirupApplication.instance } catch (_: Exception) { null } ?: return

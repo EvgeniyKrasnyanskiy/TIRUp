@@ -17,5 +17,6 @@ data class FocusUiState(
     val streakDays: Int = 0,
     val userSettings: UserSettings = UserSettings(),
     val activeAlertBanner: com.tirup.app.data.alert.ActiveAlertBanner? = null,
+    val recentDailySummaries: List<com.tirup.app.domain.model.DailySummary> = emptyList(),
     val isLoading: Boolean = false
 )
