@@ -1248,6 +1248,39 @@
 - [x] **3.4. Контроль качества**:
   - Прогон всех unit-тестов, проверка размера APK (R8: ~2.00 МБ) и git commit.
 
+---
+
+## 50. Фаза 50: Локальный BLE-мост (Broadcaster / Observer) [Completed]
+
+### 50.1. Этап 1: Доменная модель, бинарный кодек пакета и тесты [Completed]
+- [x] **1.1. Модели данных (`BleBridgeSettings.kt`)**:
+  - `enum class BleBridgeRole { DISABLED, BROADCASTER, OBSERVER }`
+  - `data class BleBridgeSettings(role, familyPin, transmitBattery, lastPacketTimestamp, lastRssi, lastMasterBattery)`
+  - `data class BleGlucosePacket(timestamp, valueMmol, trendArrow, rateOfChange, iob, batteryPercent)`
+- [x] **1.2. Бинарный кодек пакета (`BlePacketCodec.kt`)**:
+  - Сериализация и десериализация 16-байтового пакета в `ManufacturerSpecificData` (ID `0x5455`): Magic ("TU"), PIN, timestamp, glucose, trend/delta, IoB, battery, CRC-8.
+- [x] **1.3. Модульные тесты (`BlePacketCodecTest.kt`)**:
+  - Проверка корректности кодирования, декодирования, CRC-8, фильтрации по PIN и граничных значений.
+- [x] **1.4. Хранилище настроек (`SettingsRepositoryImpl.kt`)**:
+  - Интеграция параметров BLE-моста в `UserSettings` и `SharedPreferences`.
+
+### 50.2. Этап 2: Сервисы вещателя (Broadcaster) и сканера (Observer) [Completed]
+- [x] **2.1. Разрешения (`AndroidManifest.xml`)**:
+  - Добавить `BLUETOOTH_ADVERTISE`, `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`, `FEATURE_BLUETOOTH_LE`.
+- [x] **2.2. Вещатель (`BleBroadcaster.kt`)**:
+  - Импульсное вещание пакета при поступлении замера в `DexdripBroadcastReceiver` (10–12 сек вещания, затем сон).
+- [x] **2.3. Приёмник (`BleObserverManager.kt`)**:
+  - Сканирование BLE в фоновом режиме с фильтром по Manufacturer ID, дедупликация точек в Room по `timestamp`, обновление UI и виджетов.
+
+### 50.3. Этап 3: Интерфейс настроек в «Дополнительных настройках» [Completed]
+- [x] **3.1. UI карточки в `SettingsScreen.kt`**:
+  - Размещение в блоке «Дополнительные настройки» (`if (showAdvancedSettings)`).
+  - Выбор роли (Выключено / Вещатель / Приёмник).
+  - Ввод 4-значного PIN-кода семьи.
+  - Отображение статуса связи (RSSI, заряд батареи мастера, время последнего пакета).
+- [x] **3.2. Комплексная верификация**:
+  - Запуск unit-тестов, сборка release APK.
+
 
 
 

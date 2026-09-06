@@ -183,6 +183,15 @@ class SettingsViewModel(
         }
     }
 
+    fun updateBleBridgeSettings(ble: com.tirup.app.domain.model.BleBridgeSettings) {
+        viewModelScope.launch {
+            val updated = _uiState.value.userSettings.copy(bleBridgeSettings = ble)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+            com.tirup.app.data.ble.BleObserverManager.syncWithSettings(context, settingsRepository, glucoseRepository)
+        }
+    }
+
     fun updateWidgetBackgroundOpacity(opacity: Int) {
         viewModelScope.launch {
             val updated = _uiState.value.userSettings.copy(widgetBackgroundOpacity = opacity)

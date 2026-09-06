@@ -147,7 +147,8 @@ data class UserSettings(
     val isFloatingBubbleEnabled: Boolean = false,
     val isWeeklyDigestEnabled: Boolean = true,
     val dismissedWeeklyDigestTimestamp: Long = 0L,
-    val alertSettings: AlertSettings = AlertSettings()
+    val alertSettings: AlertSettings = AlertSettings(),
+    val bleBridgeSettings: BleBridgeSettings = BleBridgeSettings()
 )
 
 fun localizeTherapyType(therapy: String, isRu: Boolean): String {

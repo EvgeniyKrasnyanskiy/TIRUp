@@ -216,6 +216,25 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         com.tirup.app.presentation.overlay.FloatingBubbleService.start(context.applicationContext)
                     }
 
+                    // BLE Bridge Broadcaster: pulse advertising if role is BROADCASTER
+                    if (userSettings.bleBridgeSettings.role == com.tirup.app.domain.model.BleBridgeRole.BROADCASTER) {
+                        val latest = todayDomain.lastOrNull() ?: recentDomain.lastOrNull()
+                        if (latest != null) {
+                            val prev = recentDomain.getOrNull(recentDomain.size - 2)
+                            val rate = if (prev != null && latest.timestamp > prev.timestamp) {
+                                val dtMin = (latest.timestamp - prev.timestamp) / 60000.0
+                                if (dtMin in 1.0..15.0) (latest.valueMmol - prev.valueMmol) / dtMin else 0.0
+                            } else 0.0
+                            com.tirup.app.data.ble.BleBroadcaster.broadcastReading(
+                                context = context.applicationContext,
+                                reading = latest,
+                                rateOfChange = rate,
+                                iob = latest.iob ?: 0.0,
+                                settings = userSettings.bleBridgeSettings
+                            )
+                        }
+                    }
+
                     com.tirup.app.data.backup.AutoBackupManager.maybeTriggerAutoBackup(
                         context = context.applicationContext,
                         database = app.database,

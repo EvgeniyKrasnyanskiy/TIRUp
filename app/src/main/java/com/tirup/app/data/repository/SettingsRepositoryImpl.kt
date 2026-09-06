@@ -3,6 +3,8 @@ package com.tirup.app.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 import com.tirup.app.domain.model.AlertSettings
+import com.tirup.app.domain.model.BleBridgeRole
+import com.tirup.app.domain.model.BleBridgeSettings
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.domain.model.TargetMode
@@ -93,6 +95,12 @@ class SettingsRepositoryImpl(
             .putBoolean(KEY_ALERT_EMERGENCY_LOCATION, settings.alertSettings.includeLocationInEmergencySms)
             .putLong(KEY_ALERT_LAST_EMERGENCY_TIMESTAMP, settings.alertSettings.lastEmergencySmsTimestamp)
             .putBoolean(KEY_ALERT_SMS_QUERY_REPLY_ENABLED, settings.alertSettings.isSmsQueryReplyEnabled)
+            .putString(KEY_BLE_BRIDGE_ROLE, settings.bleBridgeSettings.role.name)
+            .putString(KEY_BLE_BRIDGE_PIN, settings.bleBridgeSettings.familyPin)
+            .putBoolean(KEY_BLE_BRIDGE_TRANSMIT_BATTERY, settings.bleBridgeSettings.transmitBattery)
+            .putLong(KEY_BLE_BRIDGE_LAST_TIMESTAMP, settings.bleBridgeSettings.lastPacketTimestamp)
+            .putInt(KEY_BLE_BRIDGE_LAST_RSSI, settings.bleBridgeSettings.lastRssi)
+            .putInt(KEY_BLE_BRIDGE_LAST_MASTER_BATTERY, settings.bleBridgeSettings.lastMasterBattery)
             .apply()
 
         _settingsFlow.value = settings
@@ -209,6 +217,18 @@ class SettingsRepositoryImpl(
                 includeLocationInEmergencySms = prefs.getBoolean(KEY_ALERT_EMERGENCY_LOCATION, true),
                 lastEmergencySmsTimestamp = prefs.getLong(KEY_ALERT_LAST_EMERGENCY_TIMESTAMP, 0L),
                 isSmsQueryReplyEnabled = prefs.getBoolean(KEY_ALERT_SMS_QUERY_REPLY_ENABLED, true)
+            ),
+            bleBridgeSettings = BleBridgeSettings(
+                role = try {
+                    BleBridgeRole.valueOf(prefs.getString(KEY_BLE_BRIDGE_ROLE, BleBridgeRole.DISABLED.name) ?: BleBridgeRole.DISABLED.name)
+                } catch (_: Exception) {
+                    BleBridgeRole.DISABLED
+                },
+                familyPin = prefs.getString(KEY_BLE_BRIDGE_PIN, "0000") ?: "0000",
+                transmitBattery = prefs.getBoolean(KEY_BLE_BRIDGE_TRANSMIT_BATTERY, true),
+                lastPacketTimestamp = prefs.getLong(KEY_BLE_BRIDGE_LAST_TIMESTAMP, 0L),
+                lastRssi = prefs.getInt(KEY_BLE_BRIDGE_LAST_RSSI, 0),
+                lastMasterBattery = prefs.getInt(KEY_BLE_BRIDGE_LAST_MASTER_BATTERY, -1)
             )
         )
     }
@@ -280,5 +300,12 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_EMERGENCY_LOCATION = "key_alert_emergency_location"
         private const val KEY_ALERT_LAST_EMERGENCY_TIMESTAMP = "key_alert_last_emergency_timestamp"
         private const val KEY_ALERT_SMS_QUERY_REPLY_ENABLED = "key_alert_sms_query_reply_enabled"
+
+        private const val KEY_BLE_BRIDGE_ROLE = "key_ble_bridge_role"
+        private const val KEY_BLE_BRIDGE_PIN = "key_ble_bridge_pin"
+        private const val KEY_BLE_BRIDGE_TRANSMIT_BATTERY = "key_ble_bridge_transmit_battery"
+        private const val KEY_BLE_BRIDGE_LAST_TIMESTAMP = "key_ble_bridge_last_timestamp"
+        private const val KEY_BLE_BRIDGE_LAST_RSSI = "key_ble_bridge_last_rssi"
+        private const val KEY_BLE_BRIDGE_LAST_MASTER_BATTERY = "key_ble_bridge_last_master_battery"
     }
 }

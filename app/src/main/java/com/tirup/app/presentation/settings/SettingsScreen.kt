@@ -102,6 +102,7 @@ import androidx.compose.ui.unit.sp
 import com.tirup.app.R
 import com.tirup.app.data.backup.AutoBackupManager
 import com.tirup.app.domain.calculator.CarbRecommendationCalculator
+import com.tirup.app.domain.model.BleBridgeRole
 import com.tirup.app.domain.model.BmiCategory
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.PatientProfile
@@ -167,6 +168,45 @@ fun SettingsScreen(
             Toast.makeText(context, if (isRu) "Разрешение на приём SMS-запросов предоставлено" else "RECEIVE_SMS permission granted", Toast.LENGTH_SHORT).show()
         } else {
             Toast.makeText(context, if (isRu) "Разрешение на приём SMS отклонено" else "RECEIVE_SMS permission denied", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val blePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.values.all { it }
+        if (allGranted) {
+            Toast.makeText(context, if (isRu) "Bluetooth-разрешения предоставлены" else "Bluetooth permissions granted", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, if (isRu) "Для работы BLE-моста требуется доступ к Bluetooth" else "Bluetooth permissions required for BLE Bridge", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun checkAndRequestBlePermissions(role: BleBridgeRole) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val needed = mutableListOf<String>()
+            if (role == BleBridgeRole.BROADCASTER) {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED) {
+                    needed.add(Manifest.permission.BLUETOOTH_ADVERTISE)
+                }
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    needed.add(Manifest.permission.BLUETOOTH_CONNECT)
+                }
+            } else if (role == BleBridgeRole.OBSERVER) {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                    needed.add(Manifest.permission.BLUETOOTH_SCAN)
+                }
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    needed.add(Manifest.permission.BLUETOOTH_CONNECT)
+                }
+            }
+            if (needed.isNotEmpty()) {
+                blePermissionLauncher.launch(needed.toTypedArray())
+            }
+        } else if (role == BleBridgeRole.OBSERVER) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
         }
     }
 
@@ -715,8 +755,8 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (isRu) "Экстренное SMS, дайджест недели, время сна, автобэкап"
-                                       else "Emergency SMS, weekly digest, sleep window, auto-backup",
+                                text = if (isRu) "BLE-мост, экстренное SMS, дайджест недели, время сна, автобэкап"
+                                       else "BLE Bridge, emergency SMS, weekly digest, sleep window, auto-backup",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -733,6 +773,227 @@ fun SettingsScreen(
         }
 
         if (showAdvancedSettings) {
+        // Section: Local BLE Bridge (Broadcaster / Observer)
+        item {
+            val ble = settings.bleBridgeSettings
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "📡",
+                                fontSize = 22.sp
+                            )
+                            Column {
+                                Text(
+                                    text = if (isRu) "Локальный BLE-мост" else "Local BLE Bridge",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (isRu) "Прямая связь между смартфонами без интернета (10–25 м)"
+                                    else "Direct phone-to-phone telemetry without internet (10–25 m)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                        }
+                    }
+
+                    // Role Selector: 3 options (Off, Broadcaster, Observer)
+                    val roles = listOf(
+                        Triple(BleBridgeRole.DISABLED, if (isRu) "Выкл" else "Off", "gray"),
+                        Triple(BleBridgeRole.BROADCASTER, if (isRu) "📡 Вещатель" else "📡 Broadcaster", "blue"),
+                        Triple(BleBridgeRole.OBSERVER, if (isRu) "👂 Приёмник" else "👂 Observer", "emerald")
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        roles.forEach { (role, label, colorType) ->
+                            val isSelected = ble.role == role
+                            val (bg, textColor, borderColor) = when (colorType) {
+                                "blue" -> if (isSelected) {
+                                    Triple(ActionBlue.copy(alpha = 0.2f), ActionBlue, ActionBlue)
+                                } else {
+                                    Triple(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                                }
+                                "emerald" -> if (isSelected) {
+                                    Triple(PrimaryEmerald.copy(alpha = 0.2f), PrimaryEmerald, PrimaryEmerald)
+                                } else {
+                                    Triple(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                                }
+                                else -> if (isSelected) {
+                                    Triple(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurface, MaterialTheme.colorScheme.outline)
+                                } else {
+                                    Triple(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                                }
+                            }
+
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        if (role != BleBridgeRole.DISABLED) {
+                                            checkAndRequestBlePermissions(role)
+                                        }
+                                        viewModel.updateBleBridgeSettings(ble.copy(role = role))
+                                    },
+                                shape = RoundedCornerShape(8.dp),
+                                color = bg,
+                                border = BorderStroke(1.dp, borderColor)
+                            ) {
+                                Text(
+                                    text = label,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = textColor,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+
+                    if (ble.role != BleBridgeRole.DISABLED) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                        // Family PIN code
+                        OutlinedTextField(
+                            value = ble.familyPin,
+                            onValueChange = { pin ->
+                                val filtered = pin.filter { it.isDigit() }.take(4)
+                                viewModel.updateBleBridgeSettings(ble.copy(familyPin = filtered))
+                            },
+                            label = { Text(if (isRu) "PIN-код семьи (4 цифры)" else "Family PIN (4 digits)") },
+                            placeholder = { Text("0000") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            supportingText = {
+                                Text(
+                                    if (isRu) "Одинаковый PIN на обоих устройствах для фильтрации чужих данных"
+                                    else "Matching PIN on both devices to filter outside data",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        )
+
+                        if (ble.role == BleBridgeRole.BROADCASTER) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isRu) "Передавать заряд батареи" else "Transmit Battery Level",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = if (isRu) "Фолловер увидит процент заряда смартфона ребёнка" else "Follower will see phone battery percentage",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = ble.transmitBattery,
+                                    onCheckedChange = { isChecked ->
+                                        viewModel.updateBleBridgeSettings(ble.copy(transmitBattery = isChecked))
+                                    }
+                                )
+                            }
+
+                            // Broadcaster Status Banner
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = ActionBlue.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.3f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("📡", fontSize = 16.sp)
+                                    Text(
+                                        text = if (isRu) "Режим вещателя активен. При поступлении замера от xDrip/Juggluco телефон передаёт 12-секундный радиоимпульс в эфир."
+                                               else "Broadcaster active. Transmits 12-second BLE pulse upon receiving each glucose reading.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+
+                        if (ble.role == BleBridgeRole.OBSERVER) {
+                            // Observer Status & Diagnostics
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = PrimaryEmerald.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.3f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text("👂", fontSize = 16.sp)
+                                        Text(
+                                            text = if (isRu) "Приёмник активен (фоновое сканирование)" else "Observer active (low-power scan)",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+
+                                    if (ble.lastPacketTimestamp > 0L) {
+                                        val ageMinutes = ((System.currentTimeMillis() - ble.lastPacketTimestamp) / 60000L).coerceAtLeast(0)
+                                        val ageStr = if (ageMinutes == 0L) (if (isRu) "только что" else "just now") else (if (isRu) "$ageMinutes мин назад" else "${ageMinutes}m ago")
+                                        val signalQuality = when {
+                                            ble.lastRssi >= -70 -> if (isRu) "отличный" else "excellent"
+                                            ble.lastRssi >= -85 -> if (isRu) "хороший" else "good"
+                                            else -> if (isRu) "слабый" else "weak"
+                                        }
+
+                                        Text(
+                                            text = if (isRu) "• Последний пакет: $ageStr\n• Сигнал: ${ble.lastRssi} dBm ($signalQuality)" + (if (ble.lastMasterBattery >= 0) "\n• Батарея мастера: ${ble.lastMasterBattery}%" else "")
+                                                   else "• Last packet: $ageStr\n• Signal: ${ble.lastRssi} dBm ($signalQuality)" + (if (ble.lastMasterBattery >= 0) "\n• Master battery: ${ble.lastMasterBattery}%" else ""),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    } else {
+                                        Text(
+                                            text = if (isRu) "Ожидание первого радиосигнала от мастера..." else "Waiting for first beacon from master...",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Section: Emergency SMS on Severe Hypo
         item {
             val alerts = settings.alertSettings
