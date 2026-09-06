@@ -30,9 +30,9 @@ object BlePacketCodec {
         buffer.put(MAGIC_BYTE_1)
         buffer.put(MAGIC_BYTE_2)
 
-        // 2..3: Family PIN (0..9999 as UInt16)
-        val numericPin = pin.filter { it.isDigit() }.take(4).toIntOrNull() ?: 0
-        buffer.putShort(numericPin.toShort())
+        // 2..3: Family PIN (3 uppercase letters encoded as UInt16, 0..17575)
+        val pinCode = encodePinToShort(pin)
+        buffer.putShort(pinCode)
 
         // 4..7: Timestamp in seconds (UInt32)
         val epochSeconds = (timestampMs / 1000L).toInt()
@@ -88,8 +88,8 @@ object BlePacketCodec {
         if (b0 != MAGIC_BYTE_1 || b1 != MAGIC_BYTE_2) return null
 
         // 3. Verify Family PIN
-        val packetPin = buffer.short.toInt() and 0xFFFF
-        val myPin = expectedPin.filter { it.isDigit() }.take(4).toIntOrNull() ?: 0
+        val packetPin = buffer.short
+        val myPin = encodePinToShort(expectedPin)
         if (packetPin != myPin) return null
 
         // 4. Timestamp (seconds -> ms)
@@ -149,6 +149,34 @@ object BlePacketCodec {
             7 -> "⇊"
             else -> "→"
         }
+    }
+
+    /**
+     * Bijective encoding of 3 uppercase letters ('A'..'Z') into a 16-bit Short (0..17575).
+     * 26 * 26 * 26 = 17,576 combinations.
+     */
+    fun encodePinToShort(pin: String): Short {
+        val clean = pin.uppercase().filter { it in 'A'..'Z' }.padEnd(3, 'A').take(3)
+        val code = (clean[0] - 'A') * 676 + (clean[1] - 'A') * 26 + (clean[2] - 'A')
+        return code.toShort()
+    }
+
+    /**
+     * Bijective decoding of 16-bit Short back to 3 uppercase letters ('A'..'Z').
+     */
+    fun decodeShortToPin(codeShort: Short): String {
+        val code = codeShort.toInt() and 0xFFFF
+        val c0 = 'A' + (code / 676).coerceIn(0, 25)
+        val c1 = 'A' + ((code / 26) % 26).coerceIn(0, 25)
+        val c2 = 'A' + (code % 26).coerceIn(0, 25)
+        return "$c0$c1$c2"
+    }
+
+    /**
+     * Generates a completely random 3-letter uppercase PIN (e.g. "WKV", "TRP").
+     */
+    fun generateRandomPin(): String {
+        return (1..3).map { ('A'..'Z').random() }.joinToString("")
     }
 
     /**

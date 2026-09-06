@@ -1,5 +1,6 @@
 package com.tirup.app.presentation.reports
 
+import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -506,7 +507,7 @@ private fun HistoricalReportCard(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     if (state.isGeneratingHistorical || state.isImporting) {
                         CircularProgressIndicator(
@@ -514,29 +515,65 @@ private fun HistoricalReportCard(
                             modifier = Modifier.size(22.dp),
                             strokeWidth = 2.5.dp
                         )
-                    } else if (hist.hasData) {
-                        IconButton(
-                            onClick = { viewModel.clearHistoricalReport() },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.DeleteOutline,
-                                contentDescription = "Clear",
-                                tint = ColorHigh,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
                     } else {
-                        IconButton(
-                            onClick = onHelpClick,
-                            modifier = Modifier.size(36.dp)
+                        val context = LocalContext.current
+                        Surface(
+                            onClick = {
+                                val intent = context.packageManager.getLaunchIntentForPackage("com.eveningoutpost.dexdrip")
+                                if (intent != null) {
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    context.startActivity(intent)
+                                } else {
+                                    Toast.makeText(
+                                        context,
+                                        if (isRu) "xDrip+ не найден на устройстве" else "xDrip+ is not installed",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                            modifier = Modifier.height(30.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.HelpOutline,
-                                contentDescription = "Help",
-                                tint = ActionBlue,
-                                modifier = Modifier.size(24.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Text("🩸", fontSize = 11.sp)
+                                Text(
+                                    text = "xDrip",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = Color(0xFF38BDF8)
+                                )
+                            }
+                        }
+
+                        if (hist.hasData) {
+                            IconButton(
+                                onClick = { viewModel.clearHistoricalReport() },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.DeleteOutline,
+                                    contentDescription = "Clear",
+                                    tint = ColorHigh,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        } else {
+                            IconButton(
+                                onClick = onHelpClick,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.HelpOutline,
+                                    contentDescription = "Help",
+                                    tint = ActionBlue,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -1088,6 +1125,12 @@ private fun ParametersGuidebookModal(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            GuidebookItemCard(
+                                title = if (isRu) "Активное время сенсора (Sensor Active Time)" else "Sensor Active Time (Wear Time)",
+                                target = if (isRu) "Норма: ≥70.0% времени (≥10 из 14 дней)" else "Target: ≥70.0% (≥10 of 14 days)",
+                                desc = if (isRu) "Международный стандарт ATTD/ADA: если активное время работы сенсора составляет менее 70%, накопленных данных статистически недостаточно. Отчёт считается нерепрезентативным, и на его основе нельзя принимать клинические решения по коррекции доз инсулина или терапии (риск пропущенных скрытых гипогликемий в слепых окнах)."
+                                       else "International clinical consensus (ATTD/ADA): if active sensor wear time is <70%, data is statistically insufficient and non-representative. Clinical decisions and therapy adjustments should not be made based on such reports (risk of missed occult hypoglycemia)."
+                            )
                             GuidebookItemCard(
                                 title = if (isRu) "Mean BG (Средняя гликемия)" else "Mean BG (Average Glucose)",
                                 target = if (isRu) "Цель: ≤7.8 ммоль/л (≤140 мг/дл)" else "Target: ≤7.8 mmol/L (≤140 mg/dL)",

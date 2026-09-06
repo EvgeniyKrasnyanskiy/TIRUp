@@ -224,7 +224,10 @@ class SettingsRepositoryImpl(
                 } catch (_: Exception) {
                     BleBridgeRole.DISABLED
                 },
-                familyPin = prefs.getString(KEY_BLE_BRIDGE_PIN, "0000") ?: "0000",
+                familyPin = prefs.getString(KEY_BLE_BRIDGE_PIN, "")?.let { pin ->
+                    val clean = pin.uppercase().filter { it in 'A'..'Z' }
+                    if (clean.length == 3) clean else ""
+                } ?: "",
                 transmitBattery = prefs.getBoolean(KEY_BLE_BRIDGE_TRANSMIT_BATTERY, true),
                 lastPacketTimestamp = prefs.getLong(KEY_BLE_BRIDGE_LAST_TIMESTAMP, 0L),
                 lastRssi = prefs.getInt(KEY_BLE_BRIDGE_LAST_RSSI, 0),

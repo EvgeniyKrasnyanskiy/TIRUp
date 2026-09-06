@@ -247,7 +247,7 @@ class GuidebookPdfGenerator(private val context: Context) {
             )
 
             // Footer Disclaimer Banner (Pinned gracefully at the bottom)
-            val warnRect = RectF(30f, 742f, 565f, 810f)
+            val warnRect = RectF(30f, 726f, 565f, 812f)
             canvas.drawRoundRect(warnRect, 7f, 7f, warningBgPaint)
             canvas.drawRoundRect(warnRect, 7f, 7f, warningBorderPaint)
 
@@ -255,27 +255,33 @@ class GuidebookPdfGenerator(private val context: Context) {
                 if (isRu) "⚠️ Важные клинические примечания к системам CGM:"
                 else "⚠️ Important Clinical Notes Regarding Continuous Glucose Monitoring (CGM):",
                 38f,
-                755f,
+                739f,
                 itemTitlePaint.apply { color = Color.rgb(180, 83, 9) }
             )
             val discText1 = if (isRu) {
+                "• Достаточность данных (<70%): если активное время работы сенсора <70% (<10 из 14 дней), отчёт нерепрезентативен; менять терапию нельзя."
+            } else {
+                "• Data Sufficiency (<70%): if active wear time is <70% (<10 of 14 days), data is non-representative; clinical decisions cannot be made."
+            }
+            val discText2 = if (isRu) {
                 "• Физиологическое запаздывание: сенсоры CGM измеряют глюкозу в межтканевой жидкости; запаздывание от крови составляет 5–15 минут."
             } else {
                 "• Physiological Lag: CGM sensors measure interstitial fluid; physiological lag relative to blood glucose is typically 5–15 minutes."
             }
-            val discText2 = if (isRu) {
+            val discText3 = if (isRu) {
                 "• Погрешность MARD: стандартная клиническая погрешность систем CGM составляет 8–10%. Возможны ночные компрессионные ложные спады."
             } else {
                 "• MARD Accuracy: standard mean absolute relative difference is 8–10%. Sleep compression lows may occasionally occur."
             }
-            val discText3 = if (isRu) {
+            val discText4 = if (isRu) {
                 "• Принятие решений: при выраженном расхождении самочувствия с показаниями CGM выполните контрольный замер по капле крови."
             } else {
                 "• Medical Decisions: verify unexpected sensor readings with a capillary blood glucose fingerstick before corrective action."
             }
-            canvas.drawText(discText1, 38f, 769f, warningTextPaint)
-            canvas.drawText(discText2, 38f, 781f, warningTextPaint)
-            canvas.drawText(discText3, 38f, 793f, warningTextPaint)
+            canvas.drawText(discText1, 38f, 752f, warningTextPaint)
+            canvas.drawText(discText2, 38f, 764f, warningTextPaint)
+            canvas.drawText(discText3, 38f, 776f, warningTextPaint)
+            canvas.drawText(discText4, 38f, 788f, warningTextPaint)
 
             document.finishPage(page)
 

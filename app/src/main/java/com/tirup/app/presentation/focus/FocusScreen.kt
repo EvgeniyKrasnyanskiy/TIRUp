@@ -88,7 +88,6 @@ fun FocusScreen(
 
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
-    val context = LocalContext.current
     val userSettings = state.userSettings
     val isRu = userSettings.language.equals("RU", ignoreCase = true)
     val targetMode = userSettings.targetMode
@@ -135,31 +134,6 @@ fun FocusScreen(
                         streakDays = state.streakDays,
                         onClick = {
                             showStreakDialog = true
-                        }
-                    )
-
-                    // Vertical subtle divider
-                    Box(
-                        modifier = Modifier
-                            .width(1.dp)
-                            .height(20.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
-                    )
-
-                    // Quick xDrip+ Launch button
-                    XDripQuickLaunchButton(
-                        onClick = {
-                            val intent = context.packageManager.getLaunchIntentForPackage("com.eveningoutpost.dexdrip")
-                            if (intent != null) {
-                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                context.startActivity(intent)
-                            } else {
-                                Toast.makeText(
-                                    context,
-                                    if (isRu) "xDrip+ не найден на устройстве" else "xDrip+ is not installed",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
                         }
                     )
                 }
@@ -1326,36 +1300,6 @@ private fun TargetCompensatorCard(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
                 color = onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun XDripQuickLaunchButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-        modifier = modifier.height(32.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = "🩸",
-                fontSize = 12.sp
-            )
-            Text(
-                text = "xDrip",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = Color(0xFF38BDF8)
             )
         }
     }

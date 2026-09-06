@@ -3,15 +3,15 @@ package com.tirup.app.data.ble
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.abs
 
 class BlePacketCodecTest {
 
     @Test
     fun testEncodeAndDecodeRoundtripSuccess() {
         val now = 1725580800000L // rounded to seconds
-        val pin = "4829"
+        val pin = "TRP"
 
         val encoded = BlePacketCodec.encodePacket(
             timestampMs = now,
@@ -25,7 +25,7 @@ class BlePacketCodecTest {
 
         assertEquals(16, encoded.size)
 
-        val packet = BlePacketCodec.decodePacket(encoded, expectedPin = "4829")
+        val packet = BlePacketCodec.decodePacket(encoded, expectedPin = "TRP")
         assertNotNull(packet)
         assertEquals(now, packet!!.timestamp)
         assertEquals(6.42, packet.valueMmol, 0.01)
@@ -44,10 +44,10 @@ class BlePacketCodecTest {
             rateOfChangeMmolPerMin = 0.0,
             iob = 0.0,
             batteryPercent = 50,
-            pin = "1234"
+            pin = "TRP"
         )
 
-        val packet = BlePacketCodec.decodePacket(encoded, expectedPin = "9999")
+        val packet = BlePacketCodec.decodePacket(encoded, expectedPin = "SKY")
         assertNull(packet)
     }
 
@@ -60,13 +60,13 @@ class BlePacketCodecTest {
             rateOfChangeMmolPerMin = -0.05,
             iob = 1.2,
             batteryPercent = 75,
-            pin = "0000"
+            pin = "ABC"
         )
 
         // Corrupt a byte
         encoded[8] = (encoded[8].toInt() xor 0xFF).toByte()
 
-        val packet = BlePacketCodec.decodePacket(encoded, expectedPin = "0000")
+        val packet = BlePacketCodec.decodePacket(encoded, expectedPin = "ABC")
         assertNull(packet)
     }
 
@@ -80,10 +80,10 @@ class BlePacketCodecTest {
             rateOfChangeMmolPerMin = -0.25,
             iob = 4.5,
             batteryPercent = 100,
-            pin = "7777"
+            pin = "XYZ"
         )
 
-        val packet = BlePacketCodec.decodePacket(encoded, expectedPin = "7777")
+        val packet = BlePacketCodec.decodePacket(encoded, expectedPin = "XYZ")
         assertNotNull(packet)
         assertEquals("⇊", packet!!.trendArrow)
         assertEquals(3.9, packet.valueMmol, 0.01)
@@ -101,11 +101,30 @@ class BlePacketCodecTest {
             rateOfChangeMmolPerMin = 0.0,
             iob = 0.0,
             batteryPercent = -1,
-            pin = "0000"
+            pin = "TRP"
         )
 
-        val packet = BlePacketCodec.decodePacket(encoded, expectedPin = "0000")
+        val packet = BlePacketCodec.decodePacket(encoded, expectedPin = "TRP")
         assertNotNull(packet)
         assertEquals(-1, packet!!.batteryPercent)
+    }
+
+    @Test
+    fun testPinEncodingBijection() {
+        val testPins = listOf("AAA", "ZZZ", "TRP", "SKY", "ABC", "WKV", "GLU")
+        for (p in testPins) {
+            val encoded = BlePacketCodec.encodePinToShort(p)
+            val decoded = BlePacketCodec.decodeShortToPin(encoded)
+            assertEquals("Mismatch for pin $p", p, decoded)
+        }
+    }
+
+    @Test
+    fun testGenerateRandomPin() {
+        repeat(20) {
+            val pin = BlePacketCodec.generateRandomPin()
+            assertEquals(3, pin.length)
+            assertTrue("PIN $pin must contain only A-Z", pin.all { it in 'A'..'Z' })
+        }
     }
 }

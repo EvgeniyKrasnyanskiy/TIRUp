@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
@@ -101,6 +102,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tirup.app.R
 import com.tirup.app.data.backup.AutoBackupManager
+import com.tirup.app.data.ble.BlePacketCodec
 import com.tirup.app.domain.calculator.CarbRecommendationCalculator
 import com.tirup.app.domain.model.BleBridgeRole
 import com.tirup.app.domain.model.BmiCategory
@@ -141,6 +143,7 @@ fun SettingsScreen(
     var showMainThresholdDialog by rememberSaveable { mutableStateOf(false) }
     var showPredictiveHorizonDialog by rememberSaveable { mutableStateOf(false) }
     var masterOffHintVisible by rememberSaveable { mutableStateOf(false) }
+    var showBleHelpModal by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
     val smsPermissionLauncher = rememberLauncherForActivityResult(
@@ -809,6 +812,18 @@ fun SettingsScreen(
                                 )
                             }
                         }
+
+                        IconButton(
+                            onClick = { showBleHelpModal = true },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Help,
+                                contentDescription = "BLE Help",
+                                tint = ActionBlue,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
 
                     // Role Selector: 3 options (Off, Broadcaster, Observer)
@@ -849,7 +864,12 @@ fun SettingsScreen(
                                         if (role != BleBridgeRole.DISABLED) {
                                             checkAndRequestBlePermissions(role)
                                         }
-                                        viewModel.updateBleBridgeSettings(ble.copy(role = role))
+                                        val newPin = if (role != BleBridgeRole.DISABLED && (ble.familyPin.length != 3 || !ble.familyPin.all { it in 'A'..'Z' })) {
+                                            BlePacketCodec.generateRandomPin()
+                                        } else {
+                                            ble.familyPin
+                                        }
+                                        viewModel.updateBleBridgeSettings(ble.copy(role = role, familyPin = newPin))
                                     },
                                 shape = RoundedCornerShape(8.dp),
                                 color = bg,
@@ -871,26 +891,45 @@ fun SettingsScreen(
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
                         // Family PIN code
-                        OutlinedTextField(
-                            value = ble.familyPin,
-                            onValueChange = { pin ->
-                                val filtered = pin.filter { it.isDigit() }.take(4)
-                                viewModel.updateBleBridgeSettings(ble.copy(familyPin = filtered))
-                            },
-                            label = { Text(if (isRu) "PIN-код семьи (4 цифры)" else "Family PIN (4 digits)") },
-                            placeholder = { Text("0000") },
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            supportingText = {
-                                Text(
-                                    if (isRu) "Одинаковый PIN на обоих устройствах для фильтрации чужих данных"
-                                    else "Matching PIN on both devices to filter outside data",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = ble.familyPin,
+                                onValueChange = { pin ->
+                                    val filtered = pin.uppercase().filter { it in 'A'..'Z' }.take(3)
+                                    viewModel.updateBleBridgeSettings(ble.copy(familyPin = filtered))
+                                },
+                                label = { Text(if (isRu) "PIN-код семьи (3 буквы)" else "Family PIN (3 letters)") },
+                                placeholder = { Text("ABC") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                                supportingText = {
+                                    Text(
+                                        if (isRu) "Одинаковый 3-буквенный PIN на обоих устройствах для фильтрации чужих данных"
+                                        else "Matching 3-letter PIN on both devices to filter outside data",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            )
+
+                            IconButton(
+                                onClick = {
+                                    viewModel.updateBleBridgeSettings(ble.copy(familyPin = BlePacketCodec.generateRandomPin()))
+                                },
+                                modifier = Modifier.padding(top = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Generate Random PIN",
+                                    tint = ActionBlue
                                 )
                             }
-                        )
+                        }
 
                         if (ble.role == BleBridgeRole.BROADCASTER) {
                             Row(
@@ -2258,6 +2297,13 @@ fun SettingsScreen(
         )
     }
 
+    if (showBleHelpModal) {
+        BleBridgeHelpDialog(
+            isRu = isRu,
+            onDismiss = { showBleHelpModal = false }
+        )
+    }
+
     // Centered 3-second floating HUD banner on turning Master alerts off
     AnimatedVisibility(
         visible = masterOffHintVisible,
@@ -3245,4 +3291,146 @@ private fun AlertTierConfigRow(
         }
     }
 }
+
+@Composable
+private fun BleBridgeHelpDialog(
+    isRu: Boolean,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("📡", fontSize = 22.sp)
+                Text(
+                    text = if (isRu) "Локальный BLE-мост" else "Local BLE Bridge",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        },
+        text = {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                item {
+                    Text(
+                        text = if (isRu)
+                            "Прямая трансляция сахара, тренда, скорости изменения, активного инсулина (IOB) и уровня батареи напрямую со смартфона ребёнка на смартфоны родителей."
+                        else
+                            "Direct streaming of glucose, trend, rate of change, active insulin (IOB), and phone battery directly between smartphones.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = if (isRu) "⚡ Ключевые преимущества:" else "⚡ Key Advantages:",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = if (isRu)
+                                "• Без интернета: работает через Bluetooth Low Energy на расстоянии 10–25 метров. Идеально в школе, самолёте, за городом или при сбоях сотовой связи.\n\n" +
+                                "• Один-ко-многим: один смартфон ребёнка вещает данные сразу на неограниченное число приёмников (мама, папа, бабушка, учитель) одновременно.\n\n" +
+                                "• Безопасно для батареи: импульсное вещание длится всего 12 секунд раз в 5 минут (только в момент прихода новой точки). В остальное время радиомодуль полностью спит (<0.3% батареи в сутки).\n\n" +
+                                "• Аппаратный фильтр: приёмник сканирует эфир с аппаратной фильтрацией BLE, просыпаясь только при наличии пакета TIRUp."
+                            else
+                                "• No Internet Needed: operates via Bluetooth Low Energy over 10–25 meters. Ideal for school, travel, flights, or cellular outages.\n\n" +
+                                "• One-to-Many Architecture: a single broadcaster transmits simultaneously to mother, father, and caregivers.\n\n" +
+                                "• Battery Safe: pulsed broadcast lasts only 12 seconds every 5 minutes when a new reading arrives. The radio module sleeps the rest of the time (<0.3% battery/day).\n\n" +
+                                "• Hardware Filtered: follower uses low-power hardware scanning, waking only when a valid TIRUp packet is received.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
+
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(PrimaryEmerald.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = if (isRu) "🔒 Защита и PIN-код семьи:" else "🔒 Privacy & Family PIN:",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = PrimaryEmerald
+                        )
+                        Text(
+                            text = if (isRu)
+                                "Каждый пакет шифруется и защищён 3-буквенным случайным PIN-кодом семьи (например, «WKV»). " +
+                                "Чужие пакеты или пакеты с повреждённой контрольной суммой (CRC-8) моментально отбрасываются."
+                            else
+                                "Each packet is protected with a 3-letter uppercase family PIN (e.g. 'WKV'). " +
+                                "Foreign packets or corrupted checksums (CRC-8) are discarded immediately.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
+
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(ActionBlue.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = if (isRu) "📱 Как настроить связку:" else "📱 How to Pair Devices:",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = ActionBlue
+                        )
+                        Text(
+                            text = if (isRu)
+                                "1. На телефоне ребёнка (с сенсором/xDrip) включите роль «📡 Вещатель».\n" +
+                                "2. Запомните сгенерированный 3-буквенный PIN-код (или смените кнопкой случайного выбора).\n" +
+                                "3. На телефоне родителя включите роль «👂 Приёмник» и укажите точно такой же PIN-код.\n" +
+                                "4. Готово! При каждом замере данные мгновенно отобразятся на экране и в виджетах родителя."
+                            else
+                                "1. On the patient's phone (with CGM/xDrip), enable '📡 Broadcaster'.\n" +
+                                "2. Note the generated 3-letter PIN (or regenerate with the shuffle button).\n" +
+                                "3. On the follower's phone, enable '👂 Observer' and type the exact same PIN.\n" +
+                                "4. Done! Every reading will seamlessly appear on the follower's screen and widgets.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = if (isRu) "Понятно" else "Got it",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    )
+}
+
 
