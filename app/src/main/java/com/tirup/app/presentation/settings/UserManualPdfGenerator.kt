@@ -312,14 +312,14 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Уровень 2: Основная тревога (кастомный диапазон, 5 точек)" else "Tier 2: Confirmed Departure (Custom Range, 5 pts)",
                         if (isRu) "Тройной тон" else "Triple Tone",
-                        if (isRu) "Подтверждённый выход 5 замеров подряд за пороги. Тройной сигнал. Повтор: каждые 15 мин при гипо (<3.9) и каждые 45 мин при гипер (>10.0), пока сахар вне нормы."
-                        else "Confirmed departure of 5 consecutive points. Triple tone. Repeats every 15 min for hypo (<3.9) and 45 min for hyper (>10.0) until in range."
+                        if (isRu) "Подтверждённый выход 5 точек за пороги. Тройной сигнал. Повтор: 15м (гипо) и 45м (гипер, 60м при IoB ≥0.2 / ≥0.5 при >13.9), пока сахар вне нормы."
+                        else "Confirmed departure of 5 points. Triple tone. Repeats 15m (hypo) and 45m (hyper, 60m with IoB ≥0.2 / ≥0.5 if >13.9) until in range."
                     ),
                     Triple(
                         if (isRu) "Уровень 3: Критическая сирена («кричащая»)" else "Tier 3: Critical Siren (Extremes & Prolonged)",
                         if (isRu) "Сирена + Вспышка" else "Alarm + Strobe",
-                        if (isRu) "DND-обход, громкость ≥80%, вспышка при <3.0 / >13.9. Без реакции: гипо каждые 5 мин, гипер каждые 15 мин. Мгновенное глушение кнопками или тапом по пузырьку."
-                        else "DND bypass, volume ≥80%, camera strobe for <3.0 / >13.9. Unanswered: hypo every 5m, hyper every 15m. Instant mute via buttons or bubble tap."
+                        if (isRu) "DND-обход, громкость ≥80%, вспышка при <3.0 / >13.9. Без реакции: гипо каждые 5м, гипер каждые 15м. Снуз: 15м (гипо) / 45–60м (гипер с IoB). Глушение тапом/кнопками."
+                        else "DND bypass, volume ≥80%, camera strobe for <3.0 / >13.9. Unanswered: hypo every 5m, hyper every 15m. Snooze: 15m (hypo) / 45-60m (hyper with IoB). Mute via tap/buttons."
                     ),
                     Triple(
                         if (isRu) "Уровень 4: Потеря сигнала (>20 мин, будильник + расписание дня/ночи)" else "Tier 4: Sleep-Aware Signal Loss Alarm (>20 min)",
@@ -359,8 +359,8 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Клинический протокол снуза тревог" else "Clinical Snooze Safety Protocol",
                         if (isRu) "Безопасность" else "Safety Guard",
-                        if (isRu) "При гипо — 15м снуза с защитой от комы (сброс при <2.8 или падении ≤-0.3). При гипер — пауза 45м, а при активном инсулине (IoB ≥0.5) — авто-продление до 60м."
-                        else "Hypo: 15m snooze with coma guard (resets if <2.8 or drop rate ≤-0.3). Hyper: 45m pause, extended to 60m with active bolus (IoB ≥0.5)."
+                        if (isRu) "При гипо — 15м снуза с защитой от комы (сброс при <2.8 или падении ≤-0.3). При гипер — пауза 45м, а при активном инсулине (IoB ≥0.2 / ≥0.5 при >13.9) — авто-продление до 60м."
+                        else "Hypo: 15m snooze with coma guard (resets if <2.8 or drop rate ≤-0.3). Hyper: 45m pause, extended to 60m with active bolus (IoB ≥0.2 / ≥0.5 if >13.9)."
                     )
                 ),
                 cardHeight = 41f

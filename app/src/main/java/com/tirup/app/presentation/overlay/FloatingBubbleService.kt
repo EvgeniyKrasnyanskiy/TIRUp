@@ -159,12 +159,14 @@ class FloatingBubbleService : Service() {
                         val alertSettings = lastKnownSettings?.alertSettings
                         val isHypo = currentMmol < 3.9
                         val iob = lastKnownReading?.iob ?: 0.0
+                        val isExtremeHigh = currentMmol > 13.9
+                        val requiredIob = if (isExtremeHigh) 0.5 else 0.2
 
                         val snoozeMinutes = if (isHypo) {
                             alertSettings?.snoozeHypoMinutes ?: 15
                         } else {
                             val baseHyper = alertSettings?.snoozeHyperMinutes ?: 45
-                            if (iob >= 0.5) maxOf(baseHyper, 60) else baseHyper
+                            if (iob >= requiredIob) maxOf(baseHyper, 60) else baseHyper
                         }
 
                         val snoozeDuration = snoozeMinutes * 60 * 1000L

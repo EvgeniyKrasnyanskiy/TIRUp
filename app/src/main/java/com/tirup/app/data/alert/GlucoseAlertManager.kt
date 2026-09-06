@@ -724,8 +724,11 @@ object GlucoseAlertManager {
                 val isUnderInitialSnooze = userAcknowledgedHyperTimestamp > 0 && timeSinceAck < 30 * 60000L
                 val isBetween30And45 = userAcknowledgedHyperTimestamp > 0 && timeSinceAck in (30 * 60000L)..(45 * 60000L)
 
-                // Check trend & active bolus: is glucose falling or is there active bolus IoB >= 0.5?
-                val hasActiveBolus = latest.iob != null && latest.iob >= 0.5
+                // Check trend & active bolus: is glucose falling or is there active bolus IoB >= threshold?
+                // For BG <= 13.9: IoB >= 0.2 U (pediatric & small dose safety)
+                // For BG > 13.9: IoB >= 0.5 U (significant corrective bolus required)
+                val requiredIob = if (isExtremeHigh) 0.5 else 0.2
+                val hasActiveBolus = latest.iob != null && latest.iob >= requiredIob
                 val isFalling = sorted.size >= 3 && (latest.valueMmol - sorted[sorted.size - 3].valueMmol) <= -0.5
 
                 val shouldTriggerHyper = when {
@@ -797,18 +800,25 @@ object GlucoseAlertManager {
                 )
                 sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash)
                 return
-            } else if (isHighConfirmed && now - lastHyperAlertTimestamp >= alerts.snoozeHyperMinutes * 60000L) {
-                lastHyperAlertTimestamp = now
-                val title = if (isRu) "🔺 Высокий сахар (подтверждено)" else "🔺 High Glucose (Confirmed)"
-                val text = String.format(
-                    Locale.US,
-                    if (isRu) "Глюкоза: %.1f ммоль/л выше нормы %.1f."
-                    else "Glucose: %.1f mmol/L above threshold %.1f.",
-                    latest.valueMmol,
-                    mainHigh
-                )
-                sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash)
-                return
+            } else if (isHighConfirmed) {
+                val isExtremeHigh = latest.valueMmol > targetRanges.veryHighThresholdMmol
+                val requiredIob = if (isExtremeHigh) 0.5 else 0.2
+                val hasActiveBolus = latest.iob != null && latest.iob >= requiredIob
+                val hyperRepeatInterval = if (hasActiveBolus) 60 * 60000L else alerts.snoozeHyperMinutes * 60000L
+
+                if (now - lastHyperAlertTimestamp >= hyperRepeatInterval) {
+                    lastHyperAlertTimestamp = now
+                    val title = if (isRu) "🔺 Высокий сахар (подтверждено)" else "🔺 High Glucose (Confirmed)"
+                    val text = String.format(
+                        Locale.US,
+                        if (isRu) "Глюкоза: %.1f ммоль/л выше нормы %.1f."
+                        else "Glucose: %.1f mmol/L above threshold %.1f.",
+                        latest.valueMmol,
+                        mainHigh
+                    )
+                    sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash)
+                    return
+                }
             }
         }
 
