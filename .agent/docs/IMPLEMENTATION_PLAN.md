@@ -1636,3 +1636,29 @@
 ### 61.3. Контроль качества (Quality Gate) [Completed]
 - [x] Прогон модульных тестов `gradlew testDebugUnitTest`.
 
+---
+
+## 62. Фаза 62: Исправление алгоритма стрика (защита от сброса в начале суток и учёт только завершённых дней) [Completed]
+
+### 62.1. Исправление алгоритма стрика (`GlucoseRepositoryImpl.kt`) [Completed]
+- [x] **Изоляция текущих незавершённых суток (In-progress day)**:
+  - Текущий день отделяется от завершённых дней (`completedSummaries = summaries.filter { it.dateTimestamp < todayStart }`).
+  - Временный подъем сахара ночью (в 02:00) или утром не обнуляет серию вчерашних дней до завершения суток.
+- [x] **Строгая последовательность календарных дней (Consecutive Days Check)**:
+  - Проверка завершённых дней строго со вчерашнего дня назад (`expectedDay = yesterdayStart`). Любой пропущенный день (отсутствие замеров) корректно прерывает серию.
+- [x] **Бонус текущего дня (Today Bonus)**:
+  - Если сегодня сахар уже идёт в норме (TIR $\ge 70\%$ и $\ge 10$ точек), к серии завершённых дней прибавляется `+1`.
+  - В первые 50 минут после полуночи (пока $<10$ точек) стрик не падает в 0, а сохраняет вчерашнее значение.
+
+### 62.2. Модульное тестирование (`StreakCalculatorTest.kt`) [Completed]
+- [x] Создан тестовый класс `StreakCalculatorTest.kt` с 5 сценариями:
+  - `testTodayNightDropDoesNotBreakYesterdayStreak` (ночной подъем сахара в 02:00 сохраняет вчерашнюю серию).
+  - `testYesterdayFailedResetsCompletedStreak` (провал вчерашних полных суток обнуляет стрик).
+  - `testTodayGoodAddsBonusOnTopOfCompletedStreak` (успешный текущий день добавляет +1 к серии).
+  - `testEarlyMorningUnder10PointsPreservesStreak` (первые минуты после полуночи не сбрасывают стрик).
+  - `testMissingDayBreaksStreak` (пропущенный день прерывает серию).
+
+### 62.3. Контроль качества (Quality Gate) [Completed]
+- [x] Прогон модульных тестов `gradlew testDebugUnitTest` (BUILD SUCCESSFUL, все 27 тестов пройдены).
+
+

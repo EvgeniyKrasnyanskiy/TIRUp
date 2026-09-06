@@ -55,17 +55,7 @@ class GlucoseRepositoryImpl(
 
     override fun getStreakDays(): Flow<Int> {
         return summaryDao.getAllSummaries().map { summaries ->
-            var streak = 0
-            // Traverse from newest to oldest
-            for (summary in summaries) {
-                // If TIR >= 70%, streak increments
-                if (summary.tir >= 70.0 && summary.count >= 10) {
-                    streak++
-                } else {
-                    break
-                }
-            }
-            streak
+            calculateStreakDays(summaries)
         }
     }
 
@@ -139,13 +129,51 @@ class GlucoseRepositoryImpl(
         treatmentDao.clearAll()
     }
 
-    private fun getStartOfDay(timestamp: Long): Long {
-        val calendar = Calendar.getInstance(TimeZone.getDefault())
-        calendar.timeInMillis = timestamp
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        return calendar.timeInMillis
+    companion object {
+        fun calculateStreakDays(
+            summaries: List<DailySummaryEntity>,
+            nowTimestamp: Long = System.currentTimeMillis()
+        ): Int {
+            val todayStart = getStartOfDay(nowTimestamp)
+            val cal = Calendar.getInstance(TimeZone.getDefault())
+            cal.timeInMillis = todayStart
+            cal.add(Calendar.DAY_OF_YEAR, -1)
+            val yesterdayStart = cal.timeInMillis
+
+            // Separate current in-progress day from completed past days
+            val todaySummary = summaries.firstOrNull { it.dateTimestamp == todayStart }
+            val completedSummaries = summaries.filter { it.dateTimestamp < todayStart }
+
+            var completedStreak = 0
+            var expectedDay = yesterdayStart
+
+            for (summary in completedSummaries) {
+                // Must strictly match expected consecutive calendar day (no missing days)
+                if (summary.dateTimestamp == expectedDay && summary.tir >= 70.0 && summary.count >= 10) {
+                    completedStreak++
+                    cal.timeInMillis = expectedDay
+                    cal.add(Calendar.DAY_OF_YEAR, -1)
+                    expectedDay = cal.timeInMillis
+                } else {
+                    break
+                }
+            }
+
+            // If today is currently meeting the target (TIR >= 70% with at least 10 readings),
+            // award today's bonus (+1) on top of completed streak
+            val todayBonus = if (todaySummary != null && todaySummary.tir >= 70.0 && todaySummary.count >= 10) 1 else 0
+
+            return completedStreak + todayBonus
+        }
+
+        fun getStartOfDay(timestamp: Long): Long {
+            val calendar = Calendar.getInstance(TimeZone.getDefault())
+            calendar.timeInMillis = timestamp
+            calendar.set(Calendar.HOUR_OF_DAY, 0)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            return calendar.timeInMillis
+        }
     }
 }
