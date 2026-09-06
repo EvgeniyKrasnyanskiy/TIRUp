@@ -15,6 +15,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -49,6 +51,8 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -144,6 +148,7 @@ fun SettingsScreen(
     var showPredictiveHorizonDialog by rememberSaveable { mutableStateOf(false) }
     var masterOffHintVisible by rememberSaveable { mutableStateOf(false) }
     var showBleHelpModal by rememberSaveable { mutableStateOf(false) }
+    var showBlePinDialog by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
     val smsPermissionLauncher = rememberLauncherForActivityResult(
@@ -813,15 +818,52 @@ fun SettingsScreen(
                             }
                         }
 
-                        IconButton(
-                            onClick = { showBleHelpModal = true },
-                            modifier = Modifier.size(36.dp)
+                        Surface(
+                            shape = CircleShape,
+                            color = ActionBlue.copy(alpha = 0.15f),
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clickable { showBleHelpModal = true }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = "BLE Info",
+                                    tint = ActionBlue,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Informational banner plate (as in patient profile)
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.25f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Help,
-                                contentDescription = "BLE Help",
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
                                 tint = ActionBlue,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = if (isRu)
+                                    "Прямая передача замера импульсом 12 сек (раз в 5 мин) без интернета"
+                                else
+                                    "Direct telemetry via 12s BLE burst (every 5 min) without internet",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 15.sp
                             )
                         }
                     }
@@ -890,44 +932,57 @@ fun SettingsScreen(
                     if (ble.role != BleBridgeRole.DISABLED) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
-                        // Family PIN code
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        // Family PIN code (Compact row with masked PIN & modal trigger)
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showBlePinDialog = true }
                         ) {
-                            OutlinedTextField(
-                                value = ble.familyPin,
-                                onValueChange = { pin ->
-                                    val filtered = pin.uppercase().filter { it in 'A'..'Z' }.take(3)
-                                    viewModel.updateBleBridgeSettings(ble.copy(familyPin = filtered))
-                                },
-                                label = { Text(if (isRu) "PIN-код семьи (3 буквы)" else "Family PIN (3 letters)") },
-                                placeholder = { Text("ABC") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-                                supportingText = {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("🔑", fontSize = 18.sp)
+                                    Column {
+                                        Text(
+                                            text = if (isRu) "PIN-код семьи" else "Family PIN",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        val maskedPin = if (ble.familyPin.length == 3) "• • •" else (if (isRu) "Не задан" else "Not set")
+                                        Text(
+                                            text = if (isRu) "Код: $maskedPin (нажмите для изменения)" else "Code: $maskedPin (tap to edit)",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = ActionBlue.copy(alpha = 0.15f),
+                                    border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.35f))
+                                ) {
                                     Text(
-                                        if (isRu) "Одинаковый 3-буквенный PIN на обоих устройствах для фильтрации чужих данных"
-                                        else "Matching 3-letter PIN on both devices to filter outside data",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        text = if (isRu) "Настроить" else "Setup",
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ActionBlue
                                     )
                                 }
-                            )
-
-                            IconButton(
-                                onClick = {
-                                    viewModel.updateBleBridgeSettings(ble.copy(familyPin = BlePacketCodec.generateRandomPin()))
-                                },
-                                modifier = Modifier.padding(top = 4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = "Generate Random PIN",
-                                    tint = ActionBlue
-                                )
                             }
                         }
 
@@ -2304,6 +2359,18 @@ fun SettingsScreen(
         )
     }
 
+    if (showBlePinDialog) {
+        val ble = settings.bleBridgeSettings
+        BleFamilyPinDialog(
+            currentPin = ble.familyPin,
+            isRu = isRu,
+            onSavePin = { newPin ->
+                viewModel.updateBleBridgeSettings(ble.copy(familyPin = newPin))
+            },
+            onDismiss = { showBlePinDialog = false }
+        )
+    }
+
     // Centered 3-second floating HUD banner on turning Master alerts off
     AnimatedVisibility(
         visible = masterOffHintVisible,
@@ -3432,5 +3499,129 @@ private fun BleBridgeHelpDialog(
         }
     )
 }
+
+@Composable
+private fun BleFamilyPinDialog(
+    currentPin: String,
+    isRu: Boolean,
+    onSavePin: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var pinText by remember(currentPin) {
+        mutableStateOf(if (currentPin.length == 3 && currentPin.all { it in 'A'..'Z' }) currentPin else BlePacketCodec.generateRandomPin())
+    }
+    var isVisible by rememberSaveable { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("🔑", fontSize = 22.sp)
+                Text(
+                    text = if (isRu) "PIN-код семьи" else "Family PIN Code",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    text = if (isRu)
+                        "3 заглавные латинские буквы (A–Z). Должен быть одинаковым на смартфоне ребёнка и смартфонах родителей для безопасной фильтрации данных семьи."
+                    else
+                        "3 uppercase letters (A–Z). Must match on both child and parent smartphones to securely filter your family telemetry.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 16.sp
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = pinText,
+                        onValueChange = { newPin ->
+                            pinText = newPin.uppercase().filter { it in 'A'..'Z' }.take(3)
+                        },
+                        label = { Text(if (isRu) "PIN (3 буквы)" else "PIN (3 letters)") },
+                        placeholder = { Text("ABC") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            letterSpacing = 6.sp
+                        ),
+                        visualTransformation = if (isVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+                    )
+
+                    // Eye visibility toggle
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clickable { isVisible = !isVisible }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = if (isVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = "Toggle Visibility",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    // Centered Random Dice / Refresh button
+                    Surface(
+                        shape = CircleShape,
+                        color = ActionBlue.copy(alpha = 0.15f),
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clickable { pinText = BlePacketCodec.generateRandomPin() }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Generate Random PIN",
+                                tint = ActionBlue,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val validPin = if (pinText.length == 3 && pinText.all { it in 'A'..'Z' }) pinText else BlePacketCodec.generateRandomPin()
+                    onSavePin(validPin)
+                    onDismiss()
+                }
+            ) {
+                Text(if (isRu) "Сохранить" else "Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(if (isRu) "Отмена" else "Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    )
+}
+
 
 

@@ -14,6 +14,9 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.graphics.Color
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.StrikethroughSpan
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.text.HtmlCompat
@@ -1178,16 +1181,20 @@ object GlucoseAlertManager {
         val timeStr: String
         var deltaStr = ""
 
+        val isExpired = isStale || isSignalLost
+        val grayHex = "#94A3B8"
+        val grayColor = Color.parseColor(grayHex)
+
         if (isSignalLost) {
-            glucoseStr = "--"
+            glucoseStr = if (lastKnownGlucose.isNotEmpty()) lastKnownGlucose else "--"
             arrow = ""
-            hexColor = "#94A3B8"
+            hexColor = grayHex
             val lastTimeFormatted = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(latestReading.timestamp))
             timeStr = if (isRu) "посл: $lastTimeFormatted" else "last: $lastTimeFormatted"
         } else if (isStale) {
             glucoseStr = lastKnownGlucose
             arrow = latestReading.trendArrow ?: ""
-            hexColor = "#94A3B8"
+            hexColor = grayHex
             timeStr = if (isRu) "${elapsedMin}м назад" else "${elapsedMin}m ago"
         } else {
             glucoseStr = lastKnownGlucose
@@ -1223,9 +1230,20 @@ object GlucoseAlertManager {
             }
         }
 
+        val displayGlucose: CharSequence = if (isExpired) {
+            SpannableString(glucoseStr).apply {
+                setSpan(StrikethroughSpan(), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+        } else {
+            glucoseStr
+        }
+
         val titleHtml = if (isSignalLost) {
             val signalLostLabel = if (isRu) "📡 Потеря связи ($elapsedMin мин)" else "📡 Signal Lost ($elapsedMin min)"
-            "<font color='#94A3B8'><b>-- $signalLostLabel</b></font> &nbsp;&nbsp; <font color='#64748B'>$timeStr</font>"
+            "<font color='$grayHex'><b><s>$glucoseStr</s> $signalLostLabel</b></font> &nbsp;&nbsp; <font color='#64748B'>$timeStr</font>"
+        } else if (isStale) {
+            val deltaHtml = if (deltaStr.isNotEmpty()) " <font color='$grayHex'>($deltaStr)</font>" else ""
+            "<font color='$grayHex'><b><s>$glucoseStr</s> $arrow</b>$deltaHtml &nbsp;&nbsp; $timeStr</font>"
         } else {
             val deltaHtml = if (deltaStr.isNotEmpty()) " <font color='$hexColor'>($deltaStr)</font>" else ""
             "<font color='$hexColor'><b>$glucoseStr $arrow</b></font>$deltaHtml &nbsp;&nbsp; <font color='#94A3B8'>$timeStr</font>"
@@ -1247,20 +1265,23 @@ object GlucoseAlertManager {
         val extrasList = mutableListOf<String>()
         if (isSignalLost) {
             val lastLabel = if (isRu) "Посл: $lastKnownGlucose" else "Last: $lastKnownGlucose"
-            extrasList.add("<font color='#94A3B8'><b>$lastLabel</b></font>")
+            extrasList.add("<font color='$grayHex'><b><s>$lastLabel</s></b></font>")
         }
-        extrasList.add("<font color='$tirColor'><b>$targetName: $tirPercent%</b></font>")
+        val tirBadgeColor = if (isExpired) grayHex else tirColor
+        extrasList.add("<font color='$tirBadgeColor'><b>$targetName: $tirPercent%</b></font>")
 
         val hasIob = !isSignalLost && latestReading.iob != null && latestReading.iob > 0.05
         val iobFormatted = if (hasIob) String.format(Locale.US, if (isRu) "💉 %.2f Ед" else "💉 %.2f U", latestReading.iob) else ""
         if (hasIob) {
-            extrasList.add("<font color='#38BDF8'><b>$iobFormatted</b></font>")
+            val iobColor = if (isExpired) grayHex else "#38BDF8"
+            extrasList.add("<font color='$iobColor'><b>$iobFormatted</b></font>")
         }
 
         val hasCob = !isSignalLost && latestReading.cob != null && latestReading.cob > 0.5
         val cobFormatted = if (hasCob) String.format(Locale.US, if (isRu) "🍞 %.0f г" else "🍞 %.0f g", latestReading.cob) else ""
         if (hasCob) {
-            extrasList.add("<font color='#FBBF24'><b>$cobFormatted</b></font>")
+            val cobColor = if (isExpired) grayHex else "#FBBF24"
+            extrasList.add("<font color='$cobColor'><b>$cobFormatted</b></font>")
         }
 
         val bodyHtml = extrasList.joinToString(" &nbsp;<font color='#64748B'>•</font>&nbsp; ")
@@ -1278,36 +1299,39 @@ object GlucoseAlertManager {
         )
 
         val lockViews = android.widget.RemoteViews(context.packageName, R.layout.notification_glucose_lockscreen).apply {
-            setTextViewText(R.id.notif_glucose, glucoseStr)
-            setTextColor(R.id.notif_glucose, Color.parseColor(hexColor))
+            setTextViewText(R.id.notif_glucose, displayGlucose)
+            setTextColor(R.id.notif_glucose, if (isExpired) grayColor else Color.parseColor(hexColor))
             setTextViewText(R.id.notif_arrow, arrow)
-            setTextColor(R.id.notif_arrow, Color.parseColor(hexColor))
+            setTextColor(R.id.notif_arrow, if (isExpired) grayColor else Color.parseColor(hexColor))
 
             if (deltaStr.isNotEmpty() && !isSignalLost) {
                 setViewVisibility(R.id.notif_delta, android.view.View.VISIBLE)
                 setTextViewText(R.id.notif_delta, "Δ $deltaStr")
+                setTextColor(R.id.notif_delta, if (isExpired) grayColor else Color.parseColor(hexColor))
             } else {
                 setViewVisibility(R.id.notif_delta, android.view.View.GONE)
             }
 
             setTextViewText(R.id.notif_time, timeStr)
+            setTextColor(R.id.notif_time, grayColor)
 
             if (isSignalLost) {
                 val signalLostText = if (isRu) "📡 Потеря связи ($elapsedMin мин)" else "📡 Signal Lost ($elapsedMin min)"
                 setTextViewText(R.id.notif_tir, signalLostText)
-                setTextColor(R.id.notif_tir, Color.parseColor("#94A3B8"))
+                setTextColor(R.id.notif_tir, grayColor)
                 setViewVisibility(R.id.notif_dot1, android.view.View.GONE)
                 setViewVisibility(R.id.notif_iob, android.view.View.GONE)
                 setViewVisibility(R.id.notif_dot2, android.view.View.GONE)
                 setViewVisibility(R.id.notif_cob, android.view.View.GONE)
             } else {
                 setTextViewText(R.id.notif_tir, "$targetName: $tirPercent%")
-                setTextColor(R.id.notif_tir, Color.parseColor(tirColor))
+                setTextColor(R.id.notif_tir, if (isExpired) grayColor else Color.parseColor(tirColor))
 
                 if (hasIob) {
                     setViewVisibility(R.id.notif_dot1, android.view.View.VISIBLE)
                     setViewVisibility(R.id.notif_iob, android.view.View.VISIBLE)
                     setTextViewText(R.id.notif_iob, iobFormatted)
+                    setTextColor(R.id.notif_iob, if (isExpired) grayColor else Color.parseColor("#38BDF8"))
                 } else {
                     setViewVisibility(R.id.notif_iob, android.view.View.GONE)
                 }
@@ -1315,6 +1339,7 @@ object GlucoseAlertManager {
                 if (hasCob) {
                     setViewVisibility(R.id.notif_cob, android.view.View.VISIBLE)
                     setTextViewText(R.id.notif_cob, cobFormatted)
+                    setTextColor(R.id.notif_cob, if (isExpired) grayColor else Color.parseColor("#FBBF24"))
                     if (hasIob) {
                         setViewVisibility(R.id.notif_dot2, android.view.View.VISIBLE)
                     } else {
@@ -1333,7 +1358,7 @@ object GlucoseAlertManager {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_LOCKSCREEN)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setColor(Color.parseColor(hexColor))
+            .setColor(if (isExpired) grayColor else Color.parseColor(hexColor))
             .setCustomContentView(lockViews)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setContentTitle(titleSpanned)
