@@ -1182,10 +1182,13 @@ fun SettingsScreen(
                                         viewModel.boostBleObserverScan()
                                     }
                                 },
+                                enabled = boostRemaining <= 0,
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (boostRemaining > 0) PrimaryEmerald else PrimaryEmerald.copy(alpha = 0.85f),
-                                    contentColor = Color.White
+                                    containerColor = PrimaryEmerald.copy(alpha = 0.85f),
+                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = Color.White,
+                                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                                 ),
                                 shape = RoundedCornerShape(10.dp)
                             ) {

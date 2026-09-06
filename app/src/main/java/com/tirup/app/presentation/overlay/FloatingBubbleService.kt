@@ -291,7 +291,7 @@ class FloatingBubbleService : Service() {
             valueMmol <= 7.8 -> Color.parseColor("#4ADE80")
             valueMmol <= 10.0 -> Color.parseColor("#10B981")
             valueMmol <= 13.9 -> Color.parseColor("#F59E0B")
-            else -> Color.parseColor("#A855F7")
+            else -> Color.parseColor("#EF4444")
         }
 
         val bg = GradientDrawable().apply {

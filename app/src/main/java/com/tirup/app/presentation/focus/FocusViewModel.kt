@@ -173,7 +173,8 @@ class FocusViewModel(
                         context = context,
                         latestReading = latest,
                         todayReadings = newState.recentReadings,
-                        settings = newState.userSettings
+                        settings = newState.userSettings,
+                        streakDays = newState.streakDays
                     )
                 }
             }

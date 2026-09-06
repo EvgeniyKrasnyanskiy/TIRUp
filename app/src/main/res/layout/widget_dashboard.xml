@@ -87,9 +87,9 @@
             android:textSize="11sp"
             android:textStyle="bold" />
 
-        <!-- Streak Badge -->
+        <!-- IoB Badge -->
         <TextView
-            android:id="@+id/widget_streak_text"
+            android:id="@+id/widget_iob_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="6dp"
@@ -98,14 +98,14 @@
             android:paddingTop="2dp"
             android:paddingEnd="6dp"
             android:paddingBottom="2dp"
-            android:text="🔥 2 дн"
-            android:textColor="#F59E0B"
+            android:text="💉 1.2 U"
+            android:textColor="#38BDF8"
             android:textSize="11sp"
             android:textStyle="bold" />
 
-        <!-- IoB Badge -->
+        <!-- Streak Badge -->
         <TextView
-            android:id="@+id/widget_iob_text"
+            android:id="@+id/widget_streak_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/widget_badge_bg"
@@ -113,8 +113,8 @@
             android:paddingTop="2dp"
             android:paddingEnd="6dp"
             android:paddingBottom="2dp"
-            android:text="💉 1.2 U"
-            android:textColor="#38BDF8"
+            android:text="🔥 2 дн"
+            android:textColor="#F59E0B"
             android:textSize="11sp"
             android:textStyle="bold" />
 

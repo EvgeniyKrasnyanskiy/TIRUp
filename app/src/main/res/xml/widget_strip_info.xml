@@ -5,7 +5,7 @@
     android:initialLayout="@layout/widget_strip"
     android:minWidth="250dp"
     android:minHeight="54dp"
-    android:targetCellWidth="4"
+    android:targetCellWidth="5"
     android:targetCellHeight="1"
     android:maxResizeWidth="600dp"
     android:maxResizeHeight="120dp"

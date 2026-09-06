@@ -6,32 +6,10 @@
     android:background="@drawable/widget_background"
     android:gravity="center_horizontal"
     android:orientation="vertical"
-    android:padding="6dp">
-
-    <!-- Top: Daily Compensator Balance Badge (+1ч 34м) -->
-    <TextView
-        android:id="@+id/widget_compensator_text"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="1dp"
-        android:background="@drawable/widget_badge_bg"
-        android:includeFontPadding="false"
-        android:paddingStart="6dp"
-        android:paddingTop="2dp"
-        android:paddingEnd="6dp"
-        android:paddingBottom="2dp"
-        android:text="+1ч 34м"
-        android:textColor="#10B981"
-        android:textSize="10sp"
-        android:textStyle="bold"
-        android:visibility="gone" />
-
-    <!-- Dummy hidden time_ago for safety -->
-    <TextView
-        android:id="@+id/widget_time_ago"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone" />
+    android:paddingStart="4dp"
+    android:paddingTop="6dp"
+    android:paddingEnd="4dp"
+    android:paddingBottom="6dp">
 
     <!-- Flexible Top Spacer -->
     <FrameLayout
@@ -39,7 +17,7 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <!-- Center: Large Glucose Value + Stacked [ Arrow / Delta ] -->
+    <!-- 1. Glucose Value + Trend Arrow centered in one row -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -51,43 +29,26 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:includeFontPadding="false"
-            android:text="9.1"
+            android:text="4.7"
             android:textColor="#10B981"
-            android:textSize="30sp"
+            android:textSize="24sp"
             android:textStyle="bold" />
 
-        <LinearLayout
+        <TextView
+            android:id="@+id/widget_trend_arrow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="3dp"
-            android:gravity="center_horizontal"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/widget_trend_arrow"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:includeFontPadding="false"
-                android:text="→"
-                android:textColor="#10B981"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/widget_delta_value"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:includeFontPadding="false"
-                android:text="+0.2"
-                android:textColor="#94A3B8"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-        </LinearLayout>
+            android:includeFontPadding="false"
+            android:paddingStart="2dp"
+            android:text="↑"
+            android:textColor="#10B981"
+            android:textSize="18sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Streak Badge -->
+    <!-- 2. TIR: 93% -->
     <TextView
-        android:id="@+id/widget_streak_badge"
+        android:id="@+id/widget_tir_score"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="3dp"
@@ -97,26 +58,84 @@
         android:paddingTop="1dp"
         android:paddingEnd="5dp"
         android:paddingBottom="1dp"
-        android:text="🔥 5 д."
+        android:singleLine="true"
+        android:text="TIR: 93%"
+        android:textColor="#10B981"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+
+    <!-- 3. +3ч 45м (Compensator) -->
+    <TextView
+        android:id="@+id/widget_compensator_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/widget_badge_bg"
+        android:includeFontPadding="false"
+        android:paddingStart="5dp"
+        android:paddingTop="1dp"
+        android:paddingEnd="5dp"
+        android:paddingBottom="1dp"
+        android:singleLine="true"
+        android:text="+3ч 45м"
+        android:textColor="#10B981"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- 4. IoB (💉 0.7 U) -->
+    <TextView
+        android:id="@+id/widget_iob_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/widget_badge_bg"
+        android:includeFontPadding="false"
+        android:paddingStart="5dp"
+        android:paddingTop="1dp"
+        android:paddingEnd="5dp"
+        android:paddingBottom="1dp"
+        android:singleLine="true"
+        android:text="💉 0.7 U"
+        android:textColor="#38BDF8"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- 5. Streak (🔥 4 д.) -->
+    <TextView
+        android:id="@+id/widget_streak_badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/widget_badge_bg"
+        android:includeFontPadding="false"
+        android:paddingStart="5dp"
+        android:paddingTop="1dp"
+        android:paddingEnd="5dp"
+        android:paddingBottom="1dp"
+        android:singleLine="true"
+        android:text="🔥 4 д."
         android:textColor="#F59E0B"
         android:textSize="10sp"
         android:textStyle="bold"
         android:visibility="gone" />
 
-    <!-- Active Insulin (IoB) Badge -->
+    <!-- 6. Master Battery (🔋 19%) -->
     <TextView
-        android:id="@+id/widget_iob_text"
+        android:id="@+id/widget_master_battery"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
+        android:layout_marginTop="2dp"
         android:background="@drawable/widget_badge_bg"
         android:includeFontPadding="false"
-        android:paddingStart="6dp"
+        android:paddingStart="5dp"
         android:paddingTop="1dp"
-        android:paddingEnd="6dp"
+        android:paddingEnd="5dp"
         android:paddingBottom="1dp"
-        android:text="💉 1.2 U"
-        android:textColor="#38BDF8"
+        android:singleLine="true"
+        android:text="🔋 19%"
+        android:textColor="#10B981"
         android:textSize="10sp"
         android:textStyle="bold"
         android:visibility="gone" />
@@ -127,35 +146,32 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <!-- Bottom: TIR Focus Badge -->
-    <TextView
-        android:id="@+id/widget_tir_score"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="@drawable/widget_badge_bg"
-        android:includeFontPadding="false"
-        android:paddingStart="7dp"
-        android:paddingTop="2dp"
-        android:paddingEnd="7dp"
-        android:paddingBottom="2dp"
-        android:text="TIR: 100%"
-        android:textColor="#10B981"
-        android:textSize="11sp"
-        android:textStyle="bold" />
-
-    <!-- Mini Horizontal TIR Progress Bar -->
+    <!-- 7. Mini Horizontal TIR Progress Bar -->
     <ProgressBar
         android:id="@+id/widget_tir_progress"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="4dp"
+        android:layout_height="3dp"
         android:layout_marginStart="4dp"
-        android:layout_marginTop="3dp"
+        android:layout_marginTop="2dp"
         android:layout_marginEnd="4dp"
-        android:layout_marginBottom="2dp"
+        android:layout_marginBottom="1dp"
         android:max="100"
         android:progress="85"
         android:progressBackgroundTint="#2E3A4B"
         android:progressTint="#10B981" />
+
+    <!-- Dummy hidden views -->
+    <TextView
+        android:id="@+id/widget_delta_value"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_time_ago"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
 
 </LinearLayout>

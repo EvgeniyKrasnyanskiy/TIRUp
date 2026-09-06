@@ -908,8 +908,8 @@ object GlucoseAlertManager {
         val value = numStr.toDoubleOrNull() ?: return text
 
         val colorHex = when {
-            value < 3.0 -> "#EF4444"
-            value < 3.9 -> "#F59E0B"
+            value < 3.9 -> "#EF4444"
+            value <= 7.8 -> "#4ADE80"
             value <= 10.0 -> "#10B981"
             value <= 13.9 -> "#F59E0B"
             else -> "#EF4444"
@@ -1148,7 +1148,8 @@ object GlucoseAlertManager {
         context: Context,
         latestReading: GlucoseReading?,
         todayReadings: List<GlucoseReading>,
-        settings: UserSettings
+        settings: UserSettings,
+        streakDays: Int = 0
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
         if (!settings.isLockscreenNotificationEnabled || latestReading == null) {
@@ -1207,7 +1208,7 @@ object GlucoseAlertManager {
                 v <= 7.8 -> "#4ADE80"
                 v <= 10.0 -> "#10B981"
                 v <= 13.9 -> "#F59E0B"
-                else -> "#A855F7"
+                else -> "#EF4444"
             }
 
             // Delta
@@ -1269,6 +1270,13 @@ object GlucoseAlertManager {
         }
         val tirBadgeColor = if (isExpired) grayHex else tirColor
         extrasList.add("<font color='$tirBadgeColor'><b>$targetName: $tirPercent%</b></font>")
+
+        val hasStreak = !isSignalLost && streakDays > 0
+        val streakFormatted = if (hasStreak) (if (isRu) "🔥 $streakDays д." else "🔥 ${streakDays}d") else ""
+        if (hasStreak) {
+            val streakColor = if (isExpired) grayHex else "#F59E0B"
+            extrasList.add("<font color='$streakColor'><b>$streakFormatted</b></font>")
+        }
 
         val hasIob = !isSignalLost && latestReading.iob != null && latestReading.iob > 0.05
         val iobFormatted = if (hasIob) String.format(Locale.US, if (isRu) "💉 %.2f Ед" else "💉 %.2f U", latestReading.iob) else ""
@@ -1338,6 +1346,8 @@ object GlucoseAlertManager {
                 val signalLostText = if (isRu) "📡 Потеря связи ($elapsedMin мин)" else "📡 Signal Lost ($elapsedMin min)"
                 setTextViewText(R.id.notif_tir, signalLostText)
                 setTextColor(R.id.notif_tir, grayColor)
+                setViewVisibility(R.id.notif_dot_streak, android.view.View.GONE)
+                setViewVisibility(R.id.notif_streak, android.view.View.GONE)
                 setViewVisibility(R.id.notif_dot1, android.view.View.GONE)
                 setViewVisibility(R.id.notif_iob, android.view.View.GONE)
                 setViewVisibility(R.id.notif_dot2, android.view.View.GONE)
@@ -1346,12 +1356,23 @@ object GlucoseAlertManager {
                 setTextViewText(R.id.notif_tir, "$targetName: $tirPercent%")
                 setTextColor(R.id.notif_tir, if (isExpired) grayColor else Color.parseColor(tirColor))
 
+                if (hasStreak) {
+                    setViewVisibility(R.id.notif_dot_streak, android.view.View.VISIBLE)
+                    setViewVisibility(R.id.notif_streak, android.view.View.VISIBLE)
+                    setTextViewText(R.id.notif_streak, streakFormatted)
+                    setTextColor(R.id.notif_streak, if (isExpired) grayColor else Color.parseColor("#F59E0B"))
+                } else {
+                    setViewVisibility(R.id.notif_dot_streak, android.view.View.GONE)
+                    setViewVisibility(R.id.notif_streak, android.view.View.GONE)
+                }
+
                 if (hasIob) {
                     setViewVisibility(R.id.notif_dot1, android.view.View.VISIBLE)
                     setViewVisibility(R.id.notif_iob, android.view.View.VISIBLE)
                     setTextViewText(R.id.notif_iob, iobFormatted)
                     setTextColor(R.id.notif_iob, if (isExpired) grayColor else Color.parseColor("#38BDF8"))
                 } else {
+                    setViewVisibility(R.id.notif_dot1, android.view.View.GONE)
                     setViewVisibility(R.id.notif_iob, android.view.View.GONE)
                 }
 
@@ -1359,7 +1380,7 @@ object GlucoseAlertManager {
                     setViewVisibility(R.id.notif_cob, android.view.View.VISIBLE)
                     setTextViewText(R.id.notif_cob, cobFormatted)
                     setTextColor(R.id.notif_cob, if (isExpired) grayColor else Color.parseColor("#FBBF24"))
-                    if (hasIob) {
+                    if (hasIob || hasStreak) {
                         setViewVisibility(R.id.notif_dot2, android.view.View.VISIBLE)
                     } else {
                         setViewVisibility(R.id.notif_dot1, android.view.View.VISIBLE)
@@ -1368,7 +1389,7 @@ object GlucoseAlertManager {
                 } else {
                     setViewVisibility(R.id.notif_dot2, android.view.View.GONE)
                     setViewVisibility(R.id.notif_cob, android.view.View.GONE)
-                    if (!hasIob) {
+                    if (!hasIob && !hasStreak) {
                         setViewVisibility(R.id.notif_dot1, android.view.View.GONE)
                     }
                 }

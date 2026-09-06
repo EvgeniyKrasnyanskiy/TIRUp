@@ -216,8 +216,8 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Цветовое кодирование гликемии" else "Glycemic Range Color Standards",
                         if (isRu) "Цвета" else "Colors",
-                        if (isRu) "<3.9 ммоль/л — красный; 3.9..7.8 — бледно-зелёный (#4ADE80); 7.9..10.0 — насыщенный изумрудный (#10B981); 10.1..13.9 — оранжевый; >13.9 — фиолетовый."
-                        else "<3.9 mmol/L Red; 3.9..7.8 Pale Green (#4ADE80); 7.9..10.0 Saturated Emerald (#10B981); 10.1..13.9 Orange; >13.9 Purple. Syncs across all widgets."
+                        if (isRu) "<3.9 ммоль/л — красный; 3.9..7.8 — бледно-зелёный (#4ADE80); 7.9..10.0 — насыщенный изумрудный (#10B981); 10.1..13.9 — оранжевый; >13.9 — красный (#EF4444)."
+                        else "<3.9 mmol/L Red; 3.9..7.8 Pale Green (#4ADE80); 7.9..10.0 Saturated Emerald (#10B981); 10.1..13.9 Orange; >13.9 Red (#EF4444). Syncs across all widgets."
                     ),
                     Triple(
                         if (isRu) "Бейджи IoB/CoB, Стрик (🔥 X д.) и кнопка DiaNight (🌙)" else "IoB/CoB Badges, Streak (🔥) & DiaNight (🌙)",

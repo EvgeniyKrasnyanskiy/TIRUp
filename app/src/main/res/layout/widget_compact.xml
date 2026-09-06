@@ -8,35 +8,19 @@
     android:orientation="vertical"
     android:padding="8dp">
 
-    <!-- Top Row: Streak (Left), IoB (Center), Master Battery (Right) -->
+    <!-- Top Row: IoB (Left), Streak (Center), Master Battery (Right) -->
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <TextView
-            android:id="@+id/widget_streak_badge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentStart="true"
-            android:layout_centerVertical="true"
-            android:background="@drawable/widget_badge_bg"
-            android:paddingStart="5dp"
-            android:paddingTop="1dp"
-            android:paddingEnd="5dp"
-            android:paddingBottom="1dp"
-            android:text="🔥 5 д."
-            android:textColor="#F59E0B"
-            android:textSize="10sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
-
-        <!-- IoB in Center of Top Bar -->
+        <!-- IoB on Left of Top Bar -->
         <LinearLayout
             android:id="@+id/widget_iob_cob_layout"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
-            android:gravity="center"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:gravity="center_vertical"
             android:orientation="horizontal"
             android:visibility="gone">
 
@@ -45,6 +29,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/widget_badge_bg"
+                android:includeFontPadding="false"
                 android:paddingStart="5dp"
                 android:paddingTop="1dp"
                 android:paddingEnd="5dp"
@@ -61,6 +46,25 @@
                 android:visibility="gone" />
         </LinearLayout>
 
+        <!-- Streak in Center of Top Bar -->
+        <TextView
+            android:id="@+id/widget_streak_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:background="@drawable/widget_badge_bg"
+            android:includeFontPadding="false"
+            android:paddingStart="5dp"
+            android:paddingTop="1dp"
+            android:paddingEnd="5dp"
+            android:paddingBottom="1dp"
+            android:text="🔥 5 д."
+            android:textColor="#F59E0B"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <!-- Master Battery on Right -->
         <TextView
             android:id="@+id/widget_master_battery"
             android:layout_width="wrap_content"
@@ -68,6 +72,7 @@
             android:layout_alignParentEnd="true"
             android:layout_centerVertical="true"
             android:background="@drawable/widget_badge_bg"
+            android:includeFontPadding="false"
             android:paddingStart="5dp"
             android:paddingTop="1dp"
             android:paddingEnd="5dp"

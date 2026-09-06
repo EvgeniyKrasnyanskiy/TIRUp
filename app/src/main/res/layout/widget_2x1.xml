@@ -1,110 +1,131 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:paddingStart="10dp"
-    android:paddingTop="6dp"
-    android:paddingEnd="10dp"
-    android:paddingBottom="6dp">
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="8dp"
+    android:paddingTop="4dp"
+    android:paddingEnd="8dp"
+    android:paddingBottom="4dp">
 
-    <!-- Left: Glucose Value + Stacked [ Arrow / Delta ] -->
+    <!-- Left Column: Elements of 1x1 (Sugar + Trend Arrow in Row 1, TIR score in Row 2) -->
     <LinearLayout
-        android:id="@+id/widget_glucose_section"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_alignParentStart="true"
-        android:layout_centerVertical="true"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:layout_weight="1"
+        android:gravity="center_vertical|start"
+        android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/widget_glucose_value"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:includeFontPadding="false"
-            android:text="5.4"
-            android:textColor="#10B981"
-            android:textSize="26sp"
-            android:textStyle="bold" />
-
+        <!-- Row 1: Glucose Value + Trend Arrow -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="3dp"
-            android:gravity="center_horizontal"
-            android:orientation="vertical">
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_glucose_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="5.4"
+                android:textColor="#10B981"
+                android:textSize="22sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_trend_arrow"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
+                android:paddingStart="2dp"
                 android:text="↗"
                 android:textColor="#10B981"
-                android:textSize="14sp"
+                android:textSize="15sp"
                 android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/widget_delta_value"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:includeFontPadding="false"
-                android:text="+0.2"
-                android:textColor="#94A3B8"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/widget_time_ago"
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:visibility="gone" />
         </LinearLayout>
-    </LinearLayout>
 
-    <!-- Right: TIR Badge & Battery -->
-    <LinearLayout
-        android:id="@+id/widget_info_section"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentEnd="true"
-        android:layout_centerVertical="true"
-        android:gravity="end|center_vertical"
-        android:orientation="vertical">
-
+        <!-- Row 2: TIR score badge -->
         <TextView
             android:id="@+id/widget_tir_score"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
             android:background="@drawable/widget_badge_bg"
-            android:paddingStart="6dp"
-            android:paddingTop="2dp"
-            android:paddingEnd="6dp"
-            android:paddingBottom="2dp"
-            android:text="TIR: 97%"
-            android:textColor="#10B981"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:includeFontPadding="false" />
-
-        <TextView
-            android:id="@+id/widget_master_battery"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
-            android:background="@drawable/widget_badge_bg"
+            android:includeFontPadding="false"
             android:paddingStart="5dp"
             android:paddingTop="1dp"
             android:paddingEnd="5dp"
             android:paddingBottom="1dp"
-            android:text="🔋 85%"
+            android:text="TIR: 97%"
             android:textColor="#10B981"
-            android:textSize="9sp"
-            android:textStyle="bold"
-            android:visibility="gone"
-            android:includeFontPadding="false" />
+            android:textSize="10sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
-</RelativeLayout>
+    <!-- Right Column: IoB (Top) and Streak (Bottom) -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="end|center_vertical"
+        android:orientation="vertical">
+
+        <!-- IoB badge -->
+        <TextView
+            android:id="@+id/widget_iob_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/widget_badge_bg"
+            android:includeFontPadding="false"
+            android:paddingStart="5dp"
+            android:paddingTop="1dp"
+            android:paddingEnd="5dp"
+            android:paddingBottom="1dp"
+            android:text="💉 1.2 U"
+            android:textColor="#38BDF8"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <!-- Streak badge -->
+        <TextView
+            android:id="@+id/widget_streak_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:background="@drawable/widget_badge_bg"
+            android:includeFontPadding="false"
+            android:paddingStart="5dp"
+            android:paddingTop="1dp"
+            android:paddingEnd="5dp"
+            android:paddingBottom="1dp"
+            android:text="🔥 5 д."
+            android:textColor="#F59E0B"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Hidden dummy views so updater doesn't crash if referenced -->
+    <TextView
+        android:id="@+id/widget_delta_value"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_time_ago"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_master_battery"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+</LinearLayout>
