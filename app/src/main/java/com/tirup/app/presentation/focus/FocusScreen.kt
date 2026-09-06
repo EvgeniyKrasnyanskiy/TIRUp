@@ -150,12 +150,18 @@ fun FocusScreen(
 
         // 1. Hero Card: Current Glucose
         item {
+            val bleSettings = userSettings.bleBridgeSettings
+            val masterBattery = if (bleSettings.role == com.tirup.app.domain.model.BleBridgeRole.OBSERVER && bleSettings.lastMasterBattery in 0..100) {
+                bleSettings.lastMasterBattery
+            } else null
+
             HeroGlucoseCard(
                 latestReading = state.latestReading,
                 recentReadings = state.recentReadings,
                 unit = unit,
                 isRu = isRu,
                 activeAlertBanner = state.activeAlertBanner,
+                masterBatteryPct = masterBattery,
                 onClick = {
                     val r = state.latestReading
                     if (r != null) {
@@ -822,6 +828,7 @@ private fun HeroGlucoseCard(
     unit: GlucoseUnit,
     isRu: Boolean,
     activeAlertBanner: ActiveAlertBanner? = null,
+    masterBatteryPct: Int? = null,
     onClick: () -> Unit
 ) {
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
@@ -951,14 +958,37 @@ private fun HeroGlucoseCard(
         ) {
             val hasIob = (latestReading?.iob != null && latestReading.iob > 0.0)
             val hasCob = (latestReading?.cob != null && latestReading.cob > 0.0)
+            val hasBattery = masterBatteryPct != null
 
-            if (hasIob || hasCob) {
+            if (hasIob || hasCob || hasBattery) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    if (hasBattery) {
+                        val batColor = when {
+                            masterBatteryPct!! <= 15 -> ColorVeryLow
+                            masterBatteryPct <= 25 -> ColorHigh
+                            else -> PrimaryEmerald
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = batColor.copy(alpha = 0.12f),
+                            border = BorderStroke(0.8.dp, batColor.copy(alpha = 0.35f))
+                        ) {
+                            Text(
+                                text = "📱 🔋 $masterBatteryPct%",
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = batColor
+                            )
+                        }
+                    }
+
                     if (hasIob) {
+                        if (hasBattery) Spacer(modifier = Modifier.width(6.dp))
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = ActionBlue.copy(alpha = 0.12f),
@@ -975,7 +1005,7 @@ private fun HeroGlucoseCard(
                     }
 
                     if (hasCob) {
-                        if (hasIob) Spacer(modifier = Modifier.width(8.dp))
+                        if (hasIob || hasBattery) Spacer(modifier = Modifier.width(6.dp))
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = PrimaryEmerald.copy(alpha = 0.12f),

@@ -120,6 +120,23 @@
             android:textColor="#38BDF8"
             android:textSize="11sp"
             android:textStyle="bold" />
+
+        <!-- Master Battery Badge -->
+        <TextView
+            android:id="@+id/widget_master_battery"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/widget_badge_bg"
+            android:paddingStart="6dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="2dp"
+            android:text="🔋 85%"
+            android:textColor="#10B981"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- Middle: Sparkline Chart (4-hour window with TIR band & time scale) -->

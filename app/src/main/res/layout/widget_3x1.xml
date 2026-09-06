@@ -4,9 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:paddingStart="10dp"
+    android:paddingStart="12dp"
     android:paddingTop="6dp"
-    android:paddingEnd="10dp"
+    android:paddingEnd="12dp"
     android:paddingBottom="6dp">
 
     <!-- 1. Left: Large Glucose + Arrow -->
@@ -39,36 +39,34 @@
             android:textSize="22sp"
             android:textStyle="bold"
             android:includeFontPadding="false" />
-
-        <!-- Hidden delta & time ago elements kept for safe binding -->
-        <TextView
-            android:id="@+id/widget_delta_value"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/widget_time_ago"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:visibility="gone" />
     </LinearLayout>
 
-    <!-- 2. Right: Vertical block with TIR on top, IoB + CoB below, and Nightstand button -->
+    <!-- Divider Line separating glucose from right section -->
+    <FrameLayout
+        android:id="@+id/widget_divider"
+        android:layout_width="1dp"
+        android:layout_height="28dp"
+        android:layout_toEndOf="@id/widget_glucose_section"
+        android:layout_centerVertical="true"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:background="#26FFFFFF" />
+
+    <!-- 2. Right: 2 clean rows taking the rest of space without overlapping -->
     <LinearLayout
         android:id="@+id/widget_right_section"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_toEndOf="@id/widget_divider"
         android:layout_alignParentEnd="true"
         android:layout_centerVertical="true"
-        android:gravity="end|center_vertical"
-        android:orientation="horizontal">
+        android:orientation="vertical">
 
-        <!-- Row 1: TIR score badge + Compact balance badge -->
+        <!-- Row 1: TIR score badge + Compact balance badge + Master battery badge -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:gravity="end|center_vertical"
+            android:gravity="center_vertical"
             android:orientation="horizontal">
 
             <TextView
@@ -76,13 +74,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/widget_badge_bg"
-                android:paddingStart="7dp"
+                android:paddingStart="6dp"
                 android:paddingTop="2dp"
-                android:paddingEnd="7dp"
+                android:paddingEnd="6dp"
                 android:paddingBottom="2dp"
                 android:text="TIR: 97%"
                 android:textColor="#10B981"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
 
@@ -92,47 +90,94 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
                 android:background="@drawable/widget_badge_bg"
-                android:paddingStart="6dp"
+                android:paddingStart="5dp"
                 android:paddingTop="2dp"
-                android:paddingEnd="6dp"
+                android:paddingEnd="5dp"
                 android:paddingBottom="2dp"
                 android:text="+1ч 10м"
                 android:textColor="#10B981"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:includeFontPadding="false" />
-        </LinearLayout>
-
-        <!-- Second row: IoB badge (CoB hidden) -->
-        <LinearLayout
-            android:id="@+id/widget_iob_cob_layout"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
-            android:gravity="end|center_vertical"
-            android:orientation="horizontal"
-            android:visibility="gone">
-
-            <TextView
-                android:id="@+id/widget_iob_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/widget_badge_bg"
-                android:paddingStart="5dp"
-                android:paddingTop="1dp"
-                android:paddingEnd="5dp"
-                android:paddingBottom="1dp"
-                android:text="💉 1.2 U"
-                android:textColor="#38BDF8"
                 android:textSize="10sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
 
             <TextView
-                android:id="@+id/widget_cob_text"
+                android:id="@+id/widget_master_battery"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:visibility="gone" />
+                android:layout_marginStart="4dp"
+                android:background="@drawable/widget_badge_bg"
+                android:paddingStart="5dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="5dp"
+                android:paddingBottom="2dp"
+                android:text="🔋 85%"
+                android:textColor="#10B981"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                android:includeFontPadding="false" />
+        </LinearLayout>
+
+        <!-- Row 2: Delta + Time Ago + IoB badge -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_delta_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+0.3"
+                android:textColor="#94A3B8"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false" />
+
+            <TextView
+                android:id="@+id/widget_time_ago"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="2м"
+                android:textColor="#64748B"
+                android:textSize="10sp"
+                android:visibility="gone"
+                android:includeFontPadding="false" />
+
+            <!-- IoB container (CoB hidden) -->
+            <LinearLayout
+                android:id="@+id/widget_iob_cob_layout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/widget_iob_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/widget_badge_bg"
+                    android:paddingStart="5dp"
+                    android:paddingTop="1dp"
+                    android:paddingEnd="5dp"
+                    android:paddingBottom="1dp"
+                    android:text="💉 1.2 U"
+                    android:textColor="#38BDF8"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:includeFontPadding="false" />
+
+                <TextView
+                    android:id="@+id/widget_cob_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 

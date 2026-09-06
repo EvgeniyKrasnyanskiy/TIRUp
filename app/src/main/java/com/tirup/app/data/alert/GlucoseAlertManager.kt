@@ -1284,6 +1284,19 @@ object GlucoseAlertManager {
             extrasList.add("<font color='$cobColor'><b>$cobFormatted</b></font>")
         }
 
+        val ble = settings.bleBridgeSettings
+        val hasMasterBattery = ble.role == com.tirup.app.domain.model.BleBridgeRole.OBSERVER && ble.lastMasterBattery in 0..100
+        if (hasMasterBattery) {
+            val bat = ble.lastMasterBattery
+            val batColor = when {
+                bat <= 15 -> "#EF4444"
+                bat <= 25 -> "#F59E0B"
+                else -> "#10B981"
+            }
+            val finalBatColor = if (isExpired) grayHex else batColor
+            extrasList.add("<font color='$finalBatColor'><b>🔋 $bat%</b></font>")
+        }
+
         val bodyHtml = extrasList.joinToString(" &nbsp;<font color='#64748B'>•</font>&nbsp; ")
         val bodySpanned = HtmlCompat.fromHtml(bodyHtml, HtmlCompat.FROM_HTML_MODE_LEGACY)
 
@@ -1353,6 +1366,21 @@ object GlucoseAlertManager {
                         setViewVisibility(R.id.notif_dot1, android.view.View.GONE)
                     }
                 }
+            }
+
+            if (hasMasterBattery) {
+                setViewVisibility(R.id.notif_dot3, android.view.View.VISIBLE)
+                setViewVisibility(R.id.notif_battery, android.view.View.VISIBLE)
+                setTextViewText(R.id.notif_battery, "🔋 ${ble.lastMasterBattery}%")
+                val batColor = when {
+                    ble.lastMasterBattery <= 15 -> Color.parseColor("#EF4444")
+                    ble.lastMasterBattery <= 25 -> Color.parseColor("#F59E0B")
+                    else -> Color.parseColor("#10B981")
+                }
+                setTextColor(R.id.notif_battery, if (isExpired) grayColor else batColor)
+            } else {
+                setViewVisibility(R.id.notif_dot3, android.view.View.GONE)
+                setViewVisibility(R.id.notif_battery, android.view.View.GONE)
             }
         }
 

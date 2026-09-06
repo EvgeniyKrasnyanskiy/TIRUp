@@ -1377,15 +1377,32 @@
   - Предупреждающая плашка при отключённом Bluetooth на смартфоне.
   - Живые индикаторы текущего режима работы сканера.
 
+---
 
+## 54. Фаза 54: Оптимизация расхода батареи BLE-моста, индикатор заряда Мастера и рефакторинг виджетов [Completed]
 
+### 54.1. Энергосбережение вещателя (`BleBroadcaster.kt`) [Completed]
+- [x] Сократить длительность регулярного импульса вещания замеров CGM с 30 до 10 секунд (`ADVERTISE_BURST_MS = 10_000L`). Это снижает скважность радиомодуля с 50% до ~16% и сокращает энергопотребление в 3 раза.
+- [x] Оставить длительность ручного диагностического импульса по кнопке «Тест связи» на 30 секундах (`TEST_PING_BURST_MS = 30_000L`).
 
+### 54.2. Индикатор заряда батареи Мастера на Фоловере [Completed]
+- [x] **Главный экран (`FocusScreen.kt`)**:
+  - В карточке сахара `HeroGlucoseCard` при роли `OBSERVER` отображать бейдж `📱 🔋 XX%`.
+  - Динамическая цветовая индикация: зеленый (PrimaryEmerald) при >25%, янтарный (ColorHigh) при 16–25%, красный (ColorVeryLow) при <=15%.
+- [x] **Постоянное уведомление (`notification_glucose_lockscreen.xml` и `GlucoseAlertManager.kt`)**:
+  - Во второй строке чипов добавить `notif_battery` (`🔋 XX%`) с разделителем `notif_dot3`.
+- [x] **Виджеты рабочего стола (`TirupWidgetUpdater.kt`)**:
+  - Реализован метод `bindMasterBattery(views, settings, latest)`.
+  - Добавлен `widget_master_battery` в разметку виджетов 4х1/5х1 (`widget_strip.xml`), 4х2/5х2 (`widget_dashboard.xml`), 3х2 (`widget_dashboard_medium.xml`), 2х2 (`widget_compact.xml`), 2х1 (`widget_2x1.xml`), 3х1 (`widget_3x1.xml`).
 
+### 54.3. Устранение наслоения текста на виджете 3х1 (`widget_3x1.xml`) [Completed]
+- [x] Полностью разделена левая часть (сахар + стрелка) и правая часть разделителем `widget_divider`.
+- [x] Правая часть переведена в 2 чёткие строки (`orientation="vertical"`):
+  - Строка 1: TIR score (`widget_tir_score`) + компенсатор (`widget_compensator_text`) + батарея (`widget_master_battery`).
+  - Строка 2: дельта (`widget_delta_value`) + время замера (`widget_time_ago`) + IoB (`widget_iob_text`).
+- [x] В `TirupWidgetUpdater.kt` в методе `build3x1Views` подключено отображение дельты, времени замера и батареи.
 
-
-
-
-
-
-
-
+### 54.4. Контроль качества (Quality Gate) [Completed]
+- [x] Прогон модульных тестов `gradlew testDebugUnitTest` (BUILD SUCCESSFUL).
+- [x] Сборка релизного APK `gradlew assembleRelease` (BUILD SUCCESSFUL).
+- [x] Локальный коммит Conventional Commits и отправка в удаленный репозиторий (`git push origin main`).

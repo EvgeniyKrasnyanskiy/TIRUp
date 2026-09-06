@@ -131,6 +131,23 @@
             android:textStyle="bold"
             android:visibility="gone" />
 
+        <!-- Optional Master Battery Badge -->
+        <TextView
+            android:id="@+id/widget_master_battery"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/widget_badge_bg"
+            android:includeFontPadding="false"
+            android:paddingStart="5dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="5dp"
+            android:paddingBottom="2dp"
+            android:text="🔋 85%"
+            android:textColor="#10B981"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- Middle: Sparkline Chart (4-hour window) -->

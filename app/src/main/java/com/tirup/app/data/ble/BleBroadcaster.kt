@@ -28,7 +28,8 @@ import kotlinx.coroutines.launch
 object BleBroadcaster {
 
     private const val TAG = "BleBroadcaster"
-    private const val ADVERTISE_BURST_MS = 30_000L // 30 seconds per reading to ensure reception
+    private const val ADVERTISE_BURST_MS = 10_000L // 10 seconds per reading to minimize battery drain while ensuring balanced reception
+    private const val TEST_PING_BURST_MS = 30_000L // 30 seconds for manual diagnostic test ping
 
     private val scope = CoroutineScope(Dispatchers.IO)
     private var currentAdvertiser: BluetoothLeAdvertiser? = null
@@ -44,7 +45,7 @@ object BleBroadcaster {
 
     /**
      * Broadcasts a telemetry packet over BLE advertising if BLE Bridge is in BROADCASTER mode.
-     * Advertising runs for a 30-second pulse burst and then shuts off to preserve battery.
+     * Advertising runs for a 10-second pulse burst (or custom burstDurationMs) and then shuts off to preserve battery.
      */
     fun broadcastReading(
         context: Context,
@@ -52,6 +53,7 @@ object BleBroadcaster {
         rateOfChange: Double,
         iob: Double,
         settings: BleBridgeSettings,
+        burstDurationMs: Long = ADVERTISE_BURST_MS,
         onStatus: ((Boolean, String) -> Unit)? = null
     ) {
         if (settings.role != BleBridgeRole.BROADCASTER) {
@@ -136,11 +138,11 @@ object BleBroadcaster {
                 currentAdvertiser = advertiser
                 advertiser.startAdvertising(advertiseSettings, advertiseData, callback)
 
-                // Run countdown and burst shutdown after ADVERTISE_BURST_MS
+                // Run countdown and burst shutdown after burstDurationMs
                 stopBurstJob?.cancel()
                 countdownJob?.cancel()
 
-                _broadcastRemainingSec.value = (ADVERTISE_BURST_MS / 1000L).toInt()
+                _broadcastRemainingSec.value = (burstDurationMs / 1000L).toInt()
 
                 countdownJob = launch {
                     while (_broadcastRemainingSec.value > 0) {
@@ -150,9 +152,9 @@ object BleBroadcaster {
                 }
 
                 stopBurstJob = launch {
-                    delay(ADVERTISE_BURST_MS)
+                    delay(burstDurationMs)
                     stopAdvertisingInternal()
-                    Log.d(TAG, "BLE broadcast pulse burst completed")
+                    Log.d(TAG, "BLE broadcast pulse burst completed ($burstDurationMs ms)")
                 }
             } catch (e: SecurityException) {
                 Log.w(TAG, "SecurityException starting BLE advertising: ${e.message}")
@@ -190,6 +192,7 @@ object BleBroadcaster {
             rateOfChange = 0.0,
             iob = targetReading.iob ?: 0.0,
             settings = settings,
+            burstDurationMs = TEST_PING_BURST_MS,
             onStatus = onStatus
         )
     }

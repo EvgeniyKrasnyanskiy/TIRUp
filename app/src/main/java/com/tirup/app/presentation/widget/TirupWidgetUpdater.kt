@@ -297,6 +297,7 @@ object TirupWidgetUpdater {
             views.setTextColor(R.id.widget_compensator_text, Color.parseColor("#94A3B8"))
             views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
             views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
+            views.setViewVisibility(R.id.widget_master_battery, View.GONE)
             views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
             return views
         }
@@ -304,6 +305,7 @@ object TirupWidgetUpdater {
         bindCommonMetrics(views, latest, recent, settings)
         bindCompensator(views, latest, todayReadings, settings, isStrip = true)
         bindIobCob(views, latest)
+        bindMasterBattery(views, settings, latest)
 
         // Streak badge
         val isRu = settings.language.equals("RU", ignoreCase = true)
@@ -340,12 +342,14 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_compensator_text, "Ожидание данных CGM")
             views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
             views.setViewVisibility(R.id.widget_streak_text, View.GONE)
+            views.setViewVisibility(R.id.widget_master_battery, View.GONE)
             views.setViewVisibility(R.id.widget_iob_text, View.GONE)
             return views
         }
 
         bindCommonMetrics(views, latest, recent, settings)
         bindCompensator(views, latest, todayReadings, settings, isStrip = false)
+        bindMasterBattery(views, settings, latest)
 
         // Streak badge
         val isRu = settings.language.equals("RU", ignoreCase = true)
@@ -405,10 +409,12 @@ object TirupWidgetUpdater {
             views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
             views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
+            views.setViewVisibility(R.id.widget_master_battery, View.GONE)
             return views
         }
 
         bindCommonMetrics(views, latest, recent, settings)
+        bindMasterBattery(views, settings, latest)
 
         // Streak badge
         val isRu = settings.language.equals("RU", ignoreCase = true)
@@ -657,12 +663,14 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_compensator_text, "Ожидание данных CGM")
             views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
             views.setViewVisibility(R.id.widget_streak_text, View.GONE)
+            views.setViewVisibility(R.id.widget_master_battery, View.GONE)
             views.setViewVisibility(R.id.widget_iob_text, View.GONE)
             return views
         }
 
         bindCommonMetrics(views, latest, recent, settings)
         bindCompensator(views, latest, todayReadings, settings, isStrip = false)
+        bindMasterBattery(views, settings, latest)
 
         // Streak badge
         val isRu = settings.language.equals("RU", ignoreCase = true)
@@ -720,10 +728,12 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_delta_value, "--")
             views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
+            views.setViewVisibility(R.id.widget_master_battery, View.GONE)
             return views
         }
 
         bindCommonMetrics(views, latest, recent, settings)
+        bindMasterBattery(views, settings, latest)
 
         val targetName = settings.targetMode.name
         val targetPercent = if (settings.targetMode == TargetMode.TIR) {
@@ -773,16 +783,14 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
             views.setTextViewText(R.id.widget_compensator_text, "--")
             views.setTextColor(R.id.widget_compensator_text, Color.parseColor("#94A3B8"))
+            views.setViewVisibility(R.id.widget_master_battery, View.GONE)
             views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
             return views
         }
 
         bindCommonMetrics(views, latest, recent, settings)
         bindIobCob(views, latest)
-
-        // For 3x1, hide delta and time ago (orientation purely by gray color when stale)
-        views.setViewVisibility(R.id.widget_delta_value, View.GONE)
-        views.setViewVisibility(R.id.widget_time_ago, View.GONE)
+        bindMasterBattery(views, settings, latest)
 
         val targetName = settings.targetMode.name
         val targetPercent = if (settings.targetMode == TargetMode.TIR) {
@@ -1021,6 +1029,26 @@ object TirupWidgetUpdater {
         } else {
             views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
             views.setViewVisibility(R.id.widget_iob_text, View.GONE)
+        }
+    }
+
+    private fun bindMasterBattery(views: RemoteViews, settings: UserSettings, latest: GlucoseReading?) {
+        val ble = settings.bleBridgeSettings
+        val isObserver = ble.role == com.tirup.app.domain.model.BleBridgeRole.OBSERVER
+        val battery = ble.lastMasterBattery
+        if (latest != null && isObserver && battery in 0..100) {
+            val isStale = ((System.currentTimeMillis() - latest.timestamp) / 60_000L) > 5
+            val grayColor = Color.parseColor("#94A3B8")
+            views.setViewVisibility(R.id.widget_master_battery, View.VISIBLE)
+            views.setTextViewText(R.id.widget_master_battery, "🔋 $battery%")
+            val batColor = when {
+                battery <= 15 -> Color.parseColor("#EF4444")
+                battery <= 25 -> Color.parseColor("#F59E0B")
+                else -> Color.parseColor("#10B981")
+            }
+            views.setTextColor(R.id.widget_master_battery, if (isStale) grayColor else batColor)
+        } else {
+            views.setViewVisibility(R.id.widget_master_battery, View.GONE)
         }
     }
 
