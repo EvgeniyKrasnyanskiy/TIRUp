@@ -6,8 +6,9 @@
     android:background="@drawable/widget_background"
     android:gravity="center"
     android:orientation="vertical"
-    android:padding="10dp">
+    android:padding="8dp">
 
+    <!-- Top Row: Streak (Left), IoB (Center), Master Battery (Right) -->
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
@@ -29,17 +30,36 @@
             android:textStyle="bold"
             android:visibility="gone" />
 
-        <TextView
-            android:id="@+id/widget_time_ago"
+        <!-- IoB in Center of Top Bar -->
+        <LinearLayout
+            android:id="@+id/widget_iob_cob_layout"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_toEndOf="@id/widget_streak_badge"
-            android:layout_marginStart="4dp"
-            android:layout_centerVertical="true"
-            android:text="2м"
-            android:textColor="#94A3B8"
-            android:textSize="11sp"
-            android:visibility="gone" />
+            android:layout_centerInParent="true"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/widget_iob_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/widget_badge_bg"
+                android:paddingStart="5dp"
+                android:paddingTop="1dp"
+                android:paddingEnd="5dp"
+                android:paddingBottom="1dp"
+                android:text="💉 0.7 U"
+                android:textColor="#38BDF8"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_cob_text"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/widget_master_battery"
@@ -57,12 +77,19 @@
             android:textSize="10sp"
             android:textStyle="bold"
             android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/widget_time_ago"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
     </RelativeLayout>
 
+    <!-- Center: Large Glucose Value + Stacked [ Arrow / Delta ] -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="2dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -70,44 +97,72 @@
             android:id="@+id/widget_glucose_value"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:includeFontPadding="false"
             android:text="9.1"
             android:textColor="#10B981"
-            android:textSize="32sp"
+            android:textSize="30sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/widget_trend_arrow"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingStart="4dp"
-            android:text="→"
-            android:textColor="#10B981"
-            android:textSize="22sp"
-            android:textStyle="bold" />
+            android:layout_marginStart="4dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_trend_arrow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="→"
+                android:textColor="#10B981"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_delta_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="+0.3"
+                android:textColor="#94A3B8"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/widget_delta_value"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="+0.3"
-        android:textColor="#94A3B8"
-        android:textSize="12sp"
-        android:textStyle="bold" />
-
+    <!-- Row 3: TIR Score Badge -->
     <TextView
         android:id="@+id/widget_tir_score"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="3dp"
         android:background="@drawable/widget_badge_bg"
-        android:paddingStart="8dp"
-        android:paddingTop="3dp"
-        android:paddingEnd="8dp"
-        android:paddingBottom="3dp"
+        android:paddingStart="7dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="7dp"
+        android:paddingBottom="2dp"
         android:text="TIR: 82%"
         android:textColor="#10B981"
-        android:textSize="12sp"
+        android:textSize="11sp"
         android:textStyle="bold" />
+
+    <!-- Row 4: Compensator Daily Balance Badge (+1ч 45м) -->
+    <TextView
+        android:id="@+id/widget_compensator_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:background="@drawable/widget_badge_bg"
+        android:paddingStart="7dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="7dp"
+        android:paddingBottom="2dp"
+        android:text="+1ч 45м"
+        android:textColor="#10B981"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
 
 </LinearLayout>

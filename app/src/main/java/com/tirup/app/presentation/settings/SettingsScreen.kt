@@ -996,19 +996,12 @@ fun SettingsScreen(
                                     }
                                 }
 
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = ActionBlue.copy(alpha = 0.15f),
-                                    border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.35f))
-                                ) {
-                                    Text(
-                                        text = if (isRu) "Настроить" else "Setup",
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = ActionBlue
-                                    )
-                                }
+                                Text(
+                                    text = "›",
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
                             }
                         }
 
@@ -3562,12 +3555,12 @@ private fun BleBridgeHelpDialog(
                             text = if (isRu)
                                 "• Без интернета: работает через Bluetooth Low Energy на расстоянии 10–25 метров. Идеально в школе, самолёте, за городом или при сбоях сотовой связи.\n\n" +
                                 "• Один-ко-многим: один смартфон ребёнка вещает данные сразу на неограниченное число приёмников (мама, папа, бабушка, учитель) одновременно.\n\n" +
-                                "• Безопасно для батареи: импульсное вещание длится всего 12 секунд раз в 5 минут (только в момент прихода новой точки). В остальное время радиомодуль полностью спит (<0.3% батареи в сутки).\n\n" +
+                                "• Безопасно для батареи: импульс длится всего 5–10 секунд при каждом новом замере (5 сек при интервале 1 мин, 10 сек — при 5 мин). В остальное время радиомодуль полностью спит (<0.3% батареи в сутки).\n\n" +
                                 "• Аппаратный фильтр: приёмник сканирует эфир с аппаратной фильтрацией BLE, просыпаясь только при наличии пакета TIRUp."
                             else
                                 "• No Internet Needed: operates via Bluetooth Low Energy over 10–25 meters. Ideal for school, travel, flights, or cellular outages.\n\n" +
                                 "• One-to-Many Architecture: a single broadcaster transmits simultaneously to mother, father, and caregivers.\n\n" +
-                                "• Battery Safe: pulsed broadcast lasts only 12 seconds every 5 minutes when a new reading arrives. The radio module sleeps the rest of the time (<0.3% battery/day).\n\n" +
+                                "• Battery Safe: pulsed broadcast lasts only 5–10 seconds per reading (5s for 1-min sensors, 10s for 5-min sensors). The radio module sleeps the rest of the time (<0.3% battery/day).\n\n" +
                                 "• Hardware Filtered: follower uses low-power hardware scanning, waking only when a valid TIRUp packet is received.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,

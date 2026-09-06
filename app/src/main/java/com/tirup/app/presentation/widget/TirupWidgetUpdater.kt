@@ -408,12 +408,16 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_delta_value, "--")
             views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
+            views.setViewVisibility(R.id.widget_compensator_text, View.GONE)
             views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
             views.setViewVisibility(R.id.widget_master_battery, View.GONE)
+            views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
             return views
         }
 
         bindCommonMetrics(views, latest, recent, settings)
+        bindCompensator(views, latest, todayReadings, settings, isStrip = true)
+        bindIobCob(views, latest)
         bindMasterBattery(views, settings, latest)
 
         // Streak badge
@@ -424,32 +428,6 @@ object TirupWidgetUpdater {
         } else {
             views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
         }
-
-        // TIR Score
-        val inRangeCount = todayReadings.count {
-            if (settings.targetMode == TargetMode.TIR) {
-                it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tirHighMmol
-            } else {
-                it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tingHighMmol
-            }
-        }
-        val currentPercent = if (todayReadings.isNotEmpty()) {
-            (inRangeCount * 100.0 / todayReadings.size).roundToInt()
-        } else 0
-
-        val targetName = settings.targetMode.name
-        val targetPercent = if (settings.targetMode == TargetMode.TIR) {
-            settings.targetRanges.tirGoalPercent.toDouble()
-        } else {
-            settings.targetRanges.tingGoalPercent.toDouble()
-        }
-        val tirColor = when {
-            currentPercent >= targetPercent -> Color.parseColor("#10B981")
-            currentPercent >= (targetPercent - 15.0) -> Color.parseColor("#F59E0B")
-            else -> Color.parseColor("#EF4444")
-        }
-        views.setTextViewText(R.id.widget_tir_score, "$targetName: $currentPercent%")
-        views.setTextColor(R.id.widget_tir_score, tirColor)
 
         return views
     }
@@ -573,6 +551,7 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_delta_value, "--")
             views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
+            views.setViewVisibility(R.id.widget_compensator_text, View.GONE)
             views.setViewVisibility(R.id.widget_iob_text, View.GONE)
             views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
             views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
@@ -580,6 +559,8 @@ object TirupWidgetUpdater {
         }
 
         bindCommonMetrics(views, latest, recent, settings)
+        bindCompensator(views, latest, todayReadings, settings, isStrip = true)
+        views.setViewVisibility(R.id.widget_time_ago, View.GONE)
 
         // Streak badge
         val isRu = settings.language.equals("RU", ignoreCase = true)
@@ -590,51 +571,16 @@ object TirupWidgetUpdater {
             views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
         }
 
-        // TIR Score & Progress
-        val inRangeCount = todayReadings.count {
-            if (settings.targetMode == TargetMode.TIR) {
-                it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tirHighMmol
-            } else {
-                it.valueMmol in settings.targetRanges.tirLowMmol..settings.targetRanges.tingHighMmol
-            }
-        }
-        val currentPercent = if (todayReadings.isNotEmpty()) {
-            (inRangeCount * 100.0 / todayReadings.size).roundToInt()
-        } else 0
-
-        val targetName = settings.targetMode.name
-        val targetPercent = if (settings.targetMode == TargetMode.TIR) {
-            settings.targetRanges.tirGoalPercent.toDouble()
-        } else {
-            settings.targetRanges.tingGoalPercent.toDouble()
-        }
-        val tirColor = when {
-            currentPercent >= targetPercent -> Color.parseColor("#10B981")
-            currentPercent >= (targetPercent - 15.0) -> Color.parseColor("#F59E0B")
-            else -> Color.parseColor("#EF4444")
-        }
-        views.setTextViewText(R.id.widget_tir_score, "$targetName: $currentPercent%")
-        views.setTextColor(R.id.widget_tir_score, tirColor)
-        views.setProgressBar(R.id.widget_tir_progress, 100, currentPercent.coerceIn(0, 100), false)
-
         // IoB badge
+        val isStale = ((System.currentTimeMillis() - latest.timestamp) / 60_000L) > 5
+        val grayColor = Color.parseColor("#94A3B8")
         val iob = latest.iob ?: 0.0
         if (iob > 0.05) {
             views.setViewVisibility(R.id.widget_iob_text, View.VISIBLE)
             views.setTextViewText(R.id.widget_iob_text, String.format(Locale.US, "💉 %.1f U", iob))
+            views.setTextColor(R.id.widget_iob_text, if (isStale) grayColor else Color.parseColor("#38BDF8"))
         } else {
             views.setViewVisibility(R.id.widget_iob_text, View.GONE)
-        }
-
-        // Time indicator for 1x2 (show compact time if fresh, e.g. 12:45)
-        val now = System.currentTimeMillis()
-        val diffMin = ((now - latest.timestamp).coerceAtLeast(0L) / 60_000L).toInt()
-        views.setViewVisibility(R.id.widget_time_ago, View.VISIBLE)
-        if (diffMin <= 1) {
-            val timeFormat = java.text.SimpleDateFormat("HH:mm", Locale.getDefault())
-            views.setTextViewText(R.id.widget_time_ago, timeFormat.format(java.util.Date(latest.timestamp)))
-        } else {
-            views.setTextViewText(R.id.widget_time_ago, if (diffMin < 60) "${diffMin}м" else "${diffMin / 60}ч")
         }
 
         return views
@@ -958,10 +904,12 @@ object TirupWidgetUpdater {
             val (balanceText, balanceColor) = calculateDailyTimeBalance(compensator, targetPercent)
             views.setTextViewText(R.id.widget_compensator_text, balanceText)
             views.setTextColor(R.id.widget_compensator_text, if (isStale) grayColor else balanceColor)
+            views.setViewVisibility(R.id.widget_compensator_text, View.VISIBLE)
         } else {
             val recText = if (isRu) compensator.recommendationRu else compensator.recommendationEn
             views.setTextViewText(R.id.widget_compensator_text, recText)
             views.setTextColor(R.id.widget_compensator_text, if (isStale) grayColor else Color.parseColor("#38BDF8"))
+            views.setViewVisibility(R.id.widget_compensator_text, View.VISIBLE)
         }
     }
 

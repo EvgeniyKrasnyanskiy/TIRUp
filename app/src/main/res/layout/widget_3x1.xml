@@ -4,12 +4,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:paddingStart="12dp"
+    android:paddingStart="10dp"
     android:paddingTop="6dp"
-    android:paddingEnd="12dp"
+    android:paddingEnd="10dp"
     android:paddingBottom="6dp">
 
-    <!-- 1. Left: Large Glucose + Arrow -->
+    <!-- 1. Left: Large Glucose Value + Stacked [ Arrow / Delta ] -->
     <LinearLayout
         android:id="@+id/widget_glucose_section"
         android:layout_width="wrap_content"
@@ -23,22 +23,45 @@
             android:id="@+id/widget_glucose_value"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:includeFontPadding="false"
             android:text="5.4"
             android:textColor="#10B981"
             android:textSize="26sp"
-            android:textStyle="bold"
-            android:includeFontPadding="false" />
+            android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/widget_trend_arrow"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingStart="2dp"
-            android:text="↗"
-            android:textColor="#10B981"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:includeFontPadding="false" />
+            android:layout_marginStart="3dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_trend_arrow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="↗"
+                android:textColor="#10B981"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_delta_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="+0.3"
+                android:textColor="#94A3B8"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_time_ago"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- Divider Line separating glucose from right section -->
@@ -101,7 +124,7 @@
                 android:includeFontPadding="false" />
         </LinearLayout>
 
-        <!-- Row 2: Delta + Time Ago + Master Battery badge + IoB badge -->
+        <!-- Row 2: Master Battery badge + IoB badge -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -109,37 +132,15 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/widget_delta_value"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="+0.3"
-                android:textColor="#94A3B8"
-                android:textSize="10sp"
-                android:textStyle="bold"
-                android:includeFontPadding="false" />
-
-            <TextView
-                android:id="@+id/widget_time_ago"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:text="2м"
-                android:textColor="#64748B"
-                android:textSize="9sp"
-                android:visibility="gone"
-                android:includeFontPadding="false" />
-
             <!-- Master battery badge in Row 2 -->
             <TextView
                 android:id="@+id/widget_master_battery"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="5dp"
                 android:background="@drawable/widget_badge_bg"
-                android:paddingStart="4dp"
+                android:paddingStart="5dp"
                 android:paddingTop="1dp"
-                android:paddingEnd="4dp"
+                android:paddingEnd="5dp"
                 android:paddingBottom="1dp"
                 android:text="🔋 85%"
                 android:textColor="#10B981"
@@ -163,9 +164,9 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:background="@drawable/widget_badge_bg"
-                    android:paddingStart="4dp"
+                    android:paddingStart="5dp"
                     android:paddingTop="1dp"
-                    android:paddingEnd="4dp"
+                    android:paddingEnd="5dp"
                     android:paddingBottom="1dp"
                     android:text="💉 1.2 U"
                     android:textColor="#38BDF8"
