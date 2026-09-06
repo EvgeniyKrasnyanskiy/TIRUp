@@ -351,10 +351,10 @@ class UserManualPdfGenerator(private val context: Context) {
                         else "Strictly circular 60x60dp overlay. Visible ONLY when glucose is out of range (<3.9 or >10.0). Automatically hidden during normal range (3.9..10.0)."
                     ),
                     Triple(
-                        if (isRu) "Быстрый снуз на 5 минут и круги на воде" else "5-Min Snooze Tap & Water Ripple Wave",
+                        if (isRu) "Умный снуз (15м гипо / 45м гипер) и круги на воде" else "Smart Snooze (15m hypo / 45m hyper) & Water Ripple Wave",
                         if (isRu) "Снуз & Волна" else "Tap Snooze",
-                        if (isRu) "Тап по пузырьку скрывает его ровно на 5 минут и открывает приложение. При гипогликемии (<3.9) пузырёк воспроизводит пульсирующий эффект «круги на воде»."
-                        else "Tapping bubble snoozes it for exactly 5 minutes and launches MainActivity. Hypoglycemia (<3.9) triggers pulsating outward water ripple waves."
+                        if (isRu) "Тап по пузырьку глушит звук и скрывает его на 15 мин (гипо) или 45 мин (гипер). Повторный показ из паузы беззвучен. При гипо (<3.9) воспроизводит пульсацию «круги на воде»."
+                        else "Tapping bubble silences sound and snoozes for 15m (hypo) or 45m (hyper). Quiet re-emergence. Hypoglycemia (<3.9) triggers pulsating outward water ripple waves."
                     ),
                     Triple(
                         if (isRu) "Клинический протокол снуза тревог" else "Clinical Snooze Safety Protocol",

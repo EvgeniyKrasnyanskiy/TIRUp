@@ -58,6 +58,11 @@ class FloatingBubbleService : Service() {
     private var snoozeJob: Job? = null
     @Volatile
     private var snoozeUntilTimestamp: Long = 0L
+    @Volatile
+    private var lastKnownReading: GlucoseReading? = null
+    @Volatile
+    private var lastKnownSettings: UserSettings? = null
+    private var wasOutOfRange: Boolean = false
     private var wasHypoActive: Boolean = false
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -150,14 +155,26 @@ class FloatingBubbleService : Service() {
                         // Play soft bubble pop-out sound feedback
                         MedicalSoundPlayer.playBubblePopOut()
 
-                        // Tap on bubble: snooze for 5 minutes only (without opening app)
-                        snoozeUntilTimestamp = System.currentTimeMillis() + 5 * 60 * 1000L
+                        val currentMmol = lastKnownReading?.valueMmol ?: 5.0
+                        val alertSettings = lastKnownSettings?.alertSettings
+                        val isHypo = currentMmol < 3.9
+                        val iob = lastKnownReading?.iob ?: 0.0
+
+                        val snoozeMinutes = if (isHypo) {
+                            alertSettings?.snoozeHypoMinutes ?: 15
+                        } else {
+                            val baseHyper = alertSettings?.snoozeHyperMinutes ?: 45
+                            if (iob >= 0.5) maxOf(baseHyper, 60) else baseHyper
+                        }
+
+                        val snoozeDuration = snoozeMinutes * 60 * 1000L
+                        snoozeUntilTimestamp = System.currentTimeMillis() + snoozeDuration
                         bubbleView?.visibility = View.GONE
                         setHypoRipple(false)
 
                         snoozeJob?.cancel()
                         snoozeJob = serviceScope.launch {
-                            delay(5 * 60 * 1000L)
+                            delay(snoozeDuration)
                             recheckCurrentBubble()
                         }
                     } else {
@@ -247,30 +264,59 @@ class FloatingBubbleService : Service() {
     }
 
     private fun updateBubble(reading: GlucoseReading, settings: UserSettings) {
+        lastKnownReading = reading
+        lastKnownSettings = settings
         val valueMmol = reading.valueMmol
-
-        // Bubble is visible ONLY when glucose is out of range (<3.9 or >10.0)
-        val isOutOfRange = valueMmol < 3.9 || valueMmol > 10.0
         val now = System.currentTimeMillis()
-        val isSnoozed = now < snoozeUntilTimestamp
+
+        // 1. Hysteresis calculation for out-of-range state
+        // When in-range: triggers out-of-range if < 3.9 or > 10.0
+        // When out-of-range: stays out-of-range until comfortably back in target:
+        //    Low -> must rise to >= 4.1
+        //    High -> must drop to <= 9.8
+        val isOutOfRange = if (wasOutOfRange) {
+            when {
+                wasHypoActive -> valueMmol < 4.1
+                else -> valueMmol > 9.8
+            }
+        } else {
+            valueMmol < 3.9 || valueMmol > 10.0
+        }
 
         val isHypo = valueMmol < 3.9
+
+        // 2. Safety override for snooze:
+        // If glucose is plummeting dangerously (<3.0) or dropping fast into hypo during hyper snooze, break snooze early!
+        if (now < snoozeUntilTimestamp) {
+            val shouldBreakSnooze = (isHypo && !wasHypoActive) || (valueMmol < 3.0)
+            if (shouldBreakSnooze) {
+                snoozeUntilTimestamp = 0L
+                snoozeJob?.cancel()
+            }
+        }
+
+        val isSnoozed = now < snoozeUntilTimestamp
 
         if (!isOutOfRange || isSnoozed) {
             bubbleView?.visibility = View.GONE
             setHypoRipple(false)
-            if (!isHypo) {
+            if (!isOutOfRange) {
+                wasOutOfRange = false
                 wasHypoActive = false
             }
             return
         } else {
-            val wasGone = bubbleView?.visibility != View.VISIBLE
+            val wasPreviouslyOutOfRange = wasOutOfRange
+            wasOutOfRange = true
+            wasHypoActive = isHypo
+
             bubbleView?.visibility = View.VISIBLE
 
-            if (wasGone) {
+            // Play PopIn sound ONLY on first transition into out-of-range!
+            // Never play sound when quietly re-appearing after snooze expiration!
+            if (!wasPreviouslyOutOfRange) {
                 MedicalSoundPlayer.playBubblePopIn()
             }
-            wasHypoActive = isHypo
         }
 
         val isMmol = settings.unit == GlucoseUnit.MMOL_L
