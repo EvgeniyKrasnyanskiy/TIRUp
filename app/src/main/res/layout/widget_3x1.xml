@@ -6,9 +6,9 @@
     android:background="@drawable/widget_background"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingStart="8dp"
+    android:paddingStart="4dp"
     android:paddingTop="4dp"
-    android:paddingEnd="8dp"
+    android:paddingEnd="4dp"
     android:paddingBottom="4dp">
 
     <!-- 1. Left: Large Glucose Value + Stacked [ Arrow / Delta ] -->
@@ -26,13 +26,13 @@
             android:includeFontPadding="false"
             android:text="5.4"
             android:textColor="#10B981"
-            android:textSize="26sp"
+            android:textSize="23sp"
             android:textStyle="bold" />
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="3dp"
+            android:layout_marginStart="2dp"
             android:gravity="center_horizontal"
             android:orientation="vertical">
 
@@ -43,7 +43,7 @@
                 android:includeFontPadding="false"
                 android:text="↗"
                 android:textColor="#10B981"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -53,19 +53,10 @@
                 android:includeFontPadding="false"
                 android:text="+0.3"
                 android:textColor="#94A3B8"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
-
-    <!-- Divider Line -->
-    <FrameLayout
-        android:id="@+id/widget_divider"
-        android:layout_width="1dp"
-        android:layout_height="26dp"
-        android:layout_marginStart="6dp"
-        android:layout_marginEnd="6dp"
-        android:background="#26FFFFFF" />
 
     <!-- 2. Middle: Stacked [ TIR / Compensator ] in 2 rows -->
     <LinearLayout
@@ -73,6 +64,8 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="4dp"
         android:gravity="center_vertical|start"
         android:orientation="vertical">
 
@@ -83,9 +76,9 @@
             android:layout_height="wrap_content"
             android:background="@drawable/widget_badge_bg"
             android:includeFontPadding="false"
-            android:paddingStart="5dp"
+            android:paddingStart="3dp"
             android:paddingTop="1dp"
-            android:paddingEnd="5dp"
+            android:paddingEnd="3dp"
             android:paddingBottom="1dp"
             android:singleLine="true"
             android:text="TIR: 97%"
@@ -101,9 +94,9 @@
             android:layout_marginTop="2dp"
             android:background="@drawable/widget_badge_bg"
             android:includeFontPadding="false"
-            android:paddingStart="5dp"
+            android:paddingStart="3dp"
             android:paddingTop="1dp"
-            android:paddingEnd="5dp"
+            android:paddingEnd="3dp"
             android:paddingBottom="1dp"
             android:singleLine="true"
             android:text="+3ч 50м"
@@ -127,9 +120,9 @@
             android:layout_height="wrap_content"
             android:background="@drawable/widget_badge_bg"
             android:includeFontPadding="false"
-            android:paddingStart="5dp"
+            android:paddingStart="3dp"
             android:paddingTop="1dp"
-            android:paddingEnd="5dp"
+            android:paddingEnd="3dp"
             android:paddingBottom="1dp"
             android:singleLine="true"
             android:text="💉 1.2 U"
@@ -146,9 +139,9 @@
             android:layout_marginTop="2dp"
             android:background="@drawable/widget_badge_bg"
             android:includeFontPadding="false"
-            android:paddingStart="5dp"
+            android:paddingStart="3dp"
             android:paddingTop="1dp"
-            android:paddingEnd="5dp"
+            android:paddingEnd="3dp"
             android:paddingBottom="1dp"
             android:singleLine="true"
             android:text="🔥 5 д."

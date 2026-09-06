@@ -17,6 +17,7 @@ import android.view.View
 import android.widget.RemoteViews
 import com.tirup.app.R
 import com.tirup.app.TirupApplication
+import com.tirup.app.domain.calculator.GlucoseMetricsCalculator
 import com.tirup.app.domain.calculator.TargetCompensatorCalculator
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseUnit
@@ -298,6 +299,10 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_compensator_text, "--")
             views.setTextColor(R.id.widget_compensator_text, Color.parseColor("#94A3B8"))
             views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
+            views.setTextViewText(R.id.widget_mean_glucose, if (settings.language.equals("RU", ignoreCase = true)) "Ср: --" else "Avg: --")
+            views.setTextColor(R.id.widget_mean_glucose, Color.parseColor("#94A3B8"))
+            views.setTextViewText(R.id.widget_cv_score, "CV: --")
+            views.setTextColor(R.id.widget_cv_score, Color.parseColor("#94A3B8"))
             views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
             views.setViewVisibility(R.id.widget_master_battery, View.GONE)
             views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
@@ -309,11 +314,55 @@ object TirupWidgetUpdater {
         bindIobCob(views, latest)
         bindMasterBattery(views, settings, latest)
 
-        // Streak badge
         val isRu = settings.language.equals("RU", ignoreCase = true)
         val diffMin = ((System.currentTimeMillis() - latest.timestamp).coerceAtLeast(0L) / 60_000L).toInt()
         val isStale = diffMin > 5
         val grayColor = Color.parseColor("#94A3B8")
+
+        // Daily Statistics (Mean BG & CV)
+        val isMmol = settings.unit == GlucoseUnit.MMOL_L
+        val meanPrefix = if (isRu) "Ср: " else "Avg: "
+        if (todayReadings.isNotEmpty()) {
+            val stats = GlucoseMetricsCalculator.calculateStatistics(
+                readings = todayReadings,
+                targetRanges = settings.targetRanges,
+                language = settings.language,
+                unit = settings.unit
+            )
+            val meanFormatted = if (isMmol) {
+                String.format(Locale.US, "%.1f", stats.meanMmol)
+            } else {
+                "${(stats.meanMmol * 18.0182).roundToInt()}"
+            }
+            views.setTextViewText(R.id.widget_mean_glucose, "$meanPrefix$meanFormatted")
+
+            val meanColor = when {
+                isStale -> grayColor
+                stats.meanMmol < 3.9 -> Color.parseColor("#EF4444")
+                stats.meanMmol <= 7.8 -> Color.parseColor("#4ADE80")
+                stats.meanMmol <= settings.targetRanges.tirHighMmol -> Color.parseColor("#10B981")
+                stats.meanMmol <= 13.9 -> Color.parseColor("#F59E0B")
+                else -> Color.parseColor("#EF4444")
+            }
+            views.setTextColor(R.id.widget_mean_glucose, meanColor)
+
+            val cvPercent = stats.cvPercent.roundToInt()
+            views.setTextViewText(R.id.widget_cv_score, "CV: $cvPercent%")
+            val cvColor = when {
+                isStale -> grayColor
+                cvPercent <= 36 -> Color.parseColor("#10B981")
+                cvPercent <= 45 -> Color.parseColor("#F59E0B")
+                else -> Color.parseColor("#EF4444")
+            }
+            views.setTextColor(R.id.widget_cv_score, cvColor)
+        } else {
+            views.setTextViewText(R.id.widget_mean_glucose, "$meanPrefix--")
+            views.setTextColor(R.id.widget_mean_glucose, grayColor)
+            views.setTextViewText(R.id.widget_cv_score, "CV: --")
+            views.setTextColor(R.id.widget_cv_score, grayColor)
+        }
+
+        // Streak badge
         if (streakDays > 0) {
             views.setViewVisibility(R.id.widget_streak_badge, View.VISIBLE)
             views.setTextViewText(R.id.widget_streak_badge, if (isRu) "🔥 $streakDays д." else "🔥 ${streakDays}d")
@@ -578,7 +627,6 @@ object TirupWidgetUpdater {
         bindCompensator(views, latest, todayReadings, settings, isStrip = true)
         bindMasterBattery(views, settings, latest)
         views.setViewVisibility(R.id.widget_time_ago, View.GONE)
-        views.setViewVisibility(R.id.widget_delta_value, View.GONE)
 
         val diffMin = ((System.currentTimeMillis() - latest.timestamp).coerceAtLeast(0L) / 60_000L).toInt()
         val isStale = diffMin > 5
