@@ -218,9 +218,9 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
                     // BLE Bridge Broadcaster: pulse advertising if role is BROADCASTER
                     if (userSettings.bleBridgeSettings.role == com.tirup.app.domain.model.BleBridgeRole.BROADCASTER) {
-                        val latest = todayDomain.lastOrNull() ?: recentDomain.lastOrNull()
+                        val latest = todayDomain.lastOrNull() ?: recentDomain.firstOrNull()
                         if (latest != null) {
-                            val prev = recentDomain.getOrNull(recentDomain.size - 2)
+                            val prev = recentDomain.getOrNull(1)
                             val rate = if (prev != null && latest.timestamp > prev.timestamp) {
                                 val dtMin = (latest.timestamp - prev.timestamp) / 60000.0
                                 if (dtMin in 1.0..15.0) (latest.valueMmol - prev.valueMmol) / dtMin else 0.0

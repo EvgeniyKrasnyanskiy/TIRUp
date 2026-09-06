@@ -185,8 +185,9 @@ fun SettingsScreen(
         val allGranted = permissions.values.all { it }
         if (allGranted) {
             Toast.makeText(context, if (isRu) "Bluetooth-разрешения предоставлены" else "Bluetooth permissions granted", Toast.LENGTH_SHORT).show()
+            viewModel.restartBleSync()
         } else {
-            Toast.makeText(context, if (isRu) "Для работы BLE-моста требуется доступ к Bluetooth" else "Bluetooth permissions required for BLE Bridge", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, if (isRu) "Для работы BLE-моста требуется доступ к Bluetooth и геолокации" else "Bluetooth and Location permissions required for BLE Bridge", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -207,14 +208,31 @@ fun SettingsScreen(
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                     needed.add(Manifest.permission.BLUETOOTH_CONNECT)
                 }
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    needed.add(Manifest.permission.ACCESS_FINE_LOCATION)
+                }
             }
             if (needed.isNotEmpty()) {
                 blePermissionLauncher.launch(needed.toTypedArray())
             }
         } else if (role == BleBridgeRole.OBSERVER) {
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                blePermissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION))
             }
+        }
+    }
+
+    val isBroadcasting by viewModel.isBleBroadcasting.collectAsState()
+    val broadcastRemaining by viewModel.bleBroadcastRemaining.collectAsState()
+    val isScanning by viewModel.isBleScanning.collectAsState()
+    val boostRemaining by viewModel.bleBoostRemaining.collectAsState()
+
+    LaunchedEffect(Unit) {
+        com.tirup.app.data.ble.BleObserverManager.packetReceivedEvent.collect { pair ->
+            val (packet, rssi) = pair
+            val msg = if (isRu) "🎉 Получен радиосигнал с Мастера! Сигнал: $rssi dBm (${String.format(java.util.Locale.US, "%.1f", packet.valueMmol)} ммоль/л)"
+                      else "🎉 Received BLE signal from Master! Signal: $rssi dBm (${String.format(java.util.Locale.US, "%.1f", packet.valueMmol)} mmol/L)"
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -986,6 +1004,32 @@ fun SettingsScreen(
                             }
                         }
 
+                        // Bluetooth Hardware Check Warning
+                        val isBtOn = com.tirup.app.data.ble.BleBroadcaster.isBluetoothEnabled(context)
+                        if (!isBtOn) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0x22EF4444),
+                                border = BorderStroke(1.dp, Color(0x66EF4444)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("⚠️", fontSize = 16.sp)
+                                    Text(
+                                        text = if (isRu) "Bluetooth выключен на смартфоне. Включите Bluetooth в шторке Android для работы радиомоста."
+                                               else "Bluetooth is disabled on device. Enable Bluetooth in Android settings for BLE bridge.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFFEF4444),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+
                         if (ble.role == BleBridgeRole.BROADCASTER) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1025,14 +1069,47 @@ fun SettingsScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text("📡", fontSize = 16.sp)
+                                    Text(if (isBroadcasting) "📡" else "💤", fontSize = 16.sp)
                                     Text(
-                                        text = if (isRu) "Режим вещателя активен. При поступлении замера от xDrip/Juggluco телефон передаёт 12-секундный радиоимпульс в эфир."
-                                               else "Broadcaster active. Transmits 12-second BLE pulse upon receiving each glucose reading.",
+                                        text = if (isBroadcasting) {
+                                            if (isRu) "Радиоимпульс в эфире! Осталось: ${broadcastRemaining}с"
+                                            else "Transmitting BLE pulse! Remaining: ${broadcastRemaining}s"
+                                        } else {
+                                            if (isRu) "Режим вещателя готов. При получении замера телефон транслирует 30-сек импульс."
+                                            else "Broadcaster active. Transmits 30-second pulse upon receiving each reading."
+                                        },
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        fontWeight = if (isBroadcasting) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isBroadcasting) ActionBlue else MaterialTheme.colorScheme.onSurface
                                     )
                                 }
+                            }
+
+                            // Master Test Ping Button
+                            Button(
+                                onClick = {
+                                    if (!isBtOn) {
+                                        Toast.makeText(context, if (isRu) "Включите Bluetooth на смартфоне" else "Enable Bluetooth first", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        checkAndRequestBlePermissions(BleBridgeRole.BROADCASTER)
+                                        viewModel.sendBleTestPing()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isBroadcasting) ActionBlue else ActionBlue.copy(alpha = 0.85f),
+                                    contentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text(
+                                    text = if (isBroadcasting) {
+                                        if (isRu) "📡 Вещание активно (${broadcastRemaining}с)" else "📡 Broadcasting (${broadcastRemaining}s)"
+                                    } else {
+                                        if (isRu) "📡 Тест связи (отправить импульс 30 сек)" else "📡 Test Link (Send 30s Pulse)"
+                                    },
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
 
@@ -1044,17 +1121,23 @@ fun SettingsScreen(
                                 border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.3f)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text("👂", fontSize = 16.sp)
+                                        Text(if (boostRemaining > 0) "⚡" else "👂", fontSize = 16.sp)
+                                        val scanStatusText = when {
+                                            !isBtOn -> if (isRu) "Bluetooth выключен" else "Bluetooth is off"
+                                            boostRemaining > 0 -> if (isRu) "Активный поиск мастера (${boostRemaining}с)" else "Boost scan active (${boostRemaining}s)"
+                                            isScanning -> if (isRu) "Приёмник активен (фоновый приём)" else "Observer active (balanced scan)"
+                                            else -> if (isRu) "Ожидание разрешений сканера" else "Waiting for scanner permissions"
+                                        }
                                         Text(
-                                            text = if (isRu) "Приёмник активен (фоновое сканирование)" else "Observer active (low-power scan)",
+                                            text = scanStatusText,
                                             style = MaterialTheme.typography.bodySmall,
                                             fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            color = if (boostRemaining > 0) PrimaryEmerald else MaterialTheme.colorScheme.onSurface
                                         )
                                     }
 
@@ -1081,6 +1164,33 @@ fun SettingsScreen(
                                         )
                                     }
                                 }
+                            }
+
+                            // Follower Boost Scan Button
+                            Button(
+                                onClick = {
+                                    if (!isBtOn) {
+                                        Toast.makeText(context, if (isRu) "Включите Bluetooth на смартфоне" else "Enable Bluetooth first", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        checkAndRequestBlePermissions(BleBridgeRole.OBSERVER)
+                                        viewModel.boostBleObserverScan()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (boostRemaining > 0) PrimaryEmerald else PrimaryEmerald.copy(alpha = 0.85f),
+                                    contentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text(
+                                    text = if (boostRemaining > 0) {
+                                        if (isRu) "⚡ Активный поиск (${boostRemaining}с)..." else "⚡ Boosting Scan (${boostRemaining}s)..."
+                                    } else {
+                                        if (isRu) "🔍 Быстрый поиск мастера (30 сек)" else "🔍 Fast Master Search (30s)"
+                                    },
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }

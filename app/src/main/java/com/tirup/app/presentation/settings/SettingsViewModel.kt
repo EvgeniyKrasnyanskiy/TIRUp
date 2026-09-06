@@ -183,6 +183,11 @@ class SettingsViewModel(
         }
     }
 
+    val isBleBroadcasting = com.tirup.app.data.ble.BleBroadcaster.isBroadcasting
+    val bleBroadcastRemaining = com.tirup.app.data.ble.BleBroadcaster.broadcastRemainingSec
+    val isBleScanning = com.tirup.app.data.ble.BleObserverManager.isScanningFlow
+    val bleBoostRemaining = com.tirup.app.data.ble.BleObserverManager.boostRemainingSec
+
     fun updateBleBridgeSettings(ble: com.tirup.app.domain.model.BleBridgeSettings) {
         viewModelScope.launch {
             val updated = _uiState.value.userSettings.copy(bleBridgeSettings = ble)
@@ -190,6 +195,39 @@ class SettingsViewModel(
             _uiState.update { it.copy(userSettings = updated) }
             com.tirup.app.data.ble.BleObserverManager.syncWithSettings(context, settingsRepository, glucoseRepository)
         }
+    }
+
+    fun sendBleTestPing() {
+        viewModelScope.launch {
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            val ble = _uiState.value.userSettings.bleBridgeSettings
+            val latest = glucoseRepository.getLatestReading().firstOrNull()
+            com.tirup.app.data.ble.BleBroadcaster.broadcastTestPing(
+                context = context,
+                reading = latest,
+                settings = ble
+            ) { success, message ->
+                val text = if (success) {
+                    if (isRu) "📡 $message" else "📡 BLE pulse started (30s)"
+                } else {
+                    if (isRu) "⚠️ $message" else "⚠️ BLE error: $message"
+                }
+                _uiState.update { it.copy(infoMessage = text) }
+            }
+        }
+    }
+
+    fun boostBleObserverScan() {
+        viewModelScope.launch {
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            com.tirup.app.data.ble.BleObserverManager.boostScanFor30Sec(context, settingsRepository, glucoseRepository)
+            val msg = if (isRu) "🔍 Активный поиск мастера запущен (30 сек)" else "🔍 Boost scan active (30s)"
+            _uiState.update { it.copy(infoMessage = msg) }
+        }
+    }
+
+    fun restartBleSync() {
+        com.tirup.app.data.ble.BleObserverManager.syncWithSettings(context, settingsRepository, glucoseRepository)
     }
 
     fun updateWidgetBackgroundOpacity(opacity: Int) {

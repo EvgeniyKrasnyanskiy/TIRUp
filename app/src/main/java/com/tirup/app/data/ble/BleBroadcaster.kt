@@ -20,46 +20,63 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 object BleBroadcaster {
 
     private const val TAG = "BleBroadcaster"
-    private const val ADVERTISE_BURST_MS = 12_000L // 12 seconds per new reading
+    private const val ADVERTISE_BURST_MS = 30_000L // 30 seconds per reading to ensure reception
 
     private val scope = CoroutineScope(Dispatchers.IO)
     private var currentAdvertiser: BluetoothLeAdvertiser? = null
     private var activeCallback: AdvertiseCallback? = null
     private var stopBurstJob: Job? = null
+    private var countdownJob: Job? = null
+
+    private val _isBroadcasting = MutableStateFlow(false)
+    val isBroadcasting: StateFlow<Boolean> = _isBroadcasting.asStateFlow()
+
+    private val _broadcastRemainingSec = MutableStateFlow(0)
+    val broadcastRemainingSec: StateFlow<Int> = _broadcastRemainingSec.asStateFlow()
 
     /**
      * Broadcasts a telemetry packet over BLE advertising if BLE Bridge is in BROADCASTER mode.
-     * Advertising runs for a 12-second pulse burst and then shuts off to preserve battery.
+     * Advertising runs for a 30-second pulse burst and then shuts off to preserve battery.
      */
     fun broadcastReading(
         context: Context,
         reading: GlucoseReading,
         rateOfChange: Double,
         iob: Double,
-        settings: BleBridgeSettings
+        settings: BleBridgeSettings,
+        onStatus: ((Boolean, String) -> Unit)? = null
     ) {
-        if (settings.role != BleBridgeRole.BROADCASTER) return
-
-        if (!hasAdvertisePermission(context)) {
-            Log.w(TAG, "Cannot advertise: BLUETOOTH_ADVERTISE permission not granted")
+        if (settings.role != BleBridgeRole.BROADCASTER) {
+            onStatus?.invoke(false, "Роль «Мастер (Вещатель)» не включена")
             return
         }
 
-        val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager ?: return
-        val adapter = bm.adapter ?: return
-        if (!adapter.isEnabled) {
+        if (!hasAdvertisePermission(context)) {
+            Log.w(TAG, "Cannot advertise: BLUETOOTH_ADVERTISE permission not granted")
+            onStatus?.invoke(false, "Нет разрешения BLUETOOTH_ADVERTISE")
+            return
+        }
+
+        val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        val adapter = bm?.adapter
+        if (adapter == null || !adapter.isEnabled) {
             Log.d(TAG, "Bluetooth adapter is disabled, skipping BLE broadcast")
+            onStatus?.invoke(false, "Bluetooth выключен на смартфоне")
             return
         }
 
         val advertiser = adapter.bluetoothLeAdvertiser
         if (advertiser == null) {
             Log.w(TAG, "Device does not support BLE Peripheral advertising")
+            onStatus?.invoke(false, "Смартфон не поддерживает BLE-вещание (Peripheral mode)")
             return
         }
 
@@ -95,10 +112,23 @@ object BleBroadcaster {
                 val callback = object : AdvertiseCallback() {
                     override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
                         Log.i(TAG, "BLE broadcast started successfully for reading ts=${reading.timestamp}")
+                        _isBroadcasting.value = true
+                        onStatus?.invoke(true, "Радиоимпульс запущен (30 сек)")
                     }
 
                     override fun onStartFailure(errorCode: Int) {
                         Log.w(TAG, "BLE broadcast start failed with code: $errorCode")
+                        _isBroadcasting.value = false
+                        _broadcastRemainingSec.value = 0
+                        val errDesc = when (errorCode) {
+                            ADVERTISE_FAILED_DATA_TOO_LARGE -> "Пакет слишком велик"
+                            ADVERTISE_FAILED_TOO_MANY_ADVERTISERS -> "Слишком много вещателей BLE"
+                            ADVERTISE_FAILED_ALREADY_STARTED -> "Вещание уже запущено"
+                            ADVERTISE_FAILED_INTERNAL_ERROR -> "Внутренняя ошибка Bluetooth стека"
+                            ADVERTISE_FAILED_FEATURE_UNSUPPORTED -> "BLE-вещание не поддерживается чипом"
+                            else -> "Код ошибки $errorCode"
+                        }
+                        onStatus?.invoke(false, "Ошибка BLE: $errDesc")
                     }
                 }
 
@@ -106,8 +136,19 @@ object BleBroadcaster {
                 currentAdvertiser = advertiser
                 advertiser.startAdvertising(advertiseSettings, advertiseData, callback)
 
-                // Schedule burst shutdown after ADVERTISE_BURST_MS
+                // Run countdown and burst shutdown after ADVERTISE_BURST_MS
                 stopBurstJob?.cancel()
+                countdownJob?.cancel()
+
+                _broadcastRemainingSec.value = (ADVERTISE_BURST_MS / 1000L).toInt()
+
+                countdownJob = launch {
+                    while (_broadcastRemainingSec.value > 0) {
+                        delay(1000L)
+                        _broadcastRemainingSec.value = (_broadcastRemainingSec.value - 1).coerceAtLeast(0)
+                    }
+                }
+
                 stopBurstJob = launch {
                     delay(ADVERTISE_BURST_MS)
                     stopAdvertisingInternal()
@@ -115,9 +156,47 @@ object BleBroadcaster {
                 }
             } catch (e: SecurityException) {
                 Log.w(TAG, "SecurityException starting BLE advertising: ${e.message}")
+                _isBroadcasting.value = false
+                _broadcastRemainingSec.value = 0
+                onStatus?.invoke(false, "Ошибка безопасности: нет Bluetooth-доступа")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start BLE advertising: ${e.message}")
+                _isBroadcasting.value = false
+                _broadcastRemainingSec.value = 0
+                onStatus?.invoke(false, "Сбой запуска: ${e.message}")
             }
+        }
+    }
+
+    /**
+     * Sends a manual test ping burst (30 seconds) for link diagnostics.
+     */
+    fun broadcastTestPing(
+        context: Context,
+        reading: GlucoseReading?,
+        settings: BleBridgeSettings,
+        onStatus: (Boolean, String) -> Unit
+    ) {
+        val targetReading = reading ?: GlucoseReading(
+            timestamp = System.currentTimeMillis(),
+            valueMmol = 6.0,
+            trendArrow = "→",
+            iob = null,
+            cob = null
+        )
+        broadcastReading(
+            context = context,
+            reading = targetReading,
+            rateOfChange = 0.0,
+            iob = targetReading.iob ?: 0.0,
+            settings = settings,
+            onStatus = onStatus
+        )
+    }
+
+    fun stopAdvertising() {
+        scope.launch {
+            stopAdvertisingInternal()
         }
     }
 
@@ -129,6 +208,15 @@ object BleBroadcaster {
         } catch (_: Exception) {}
         activeCallback = null
         currentAdvertiser = null
+        _isBroadcasting.value = false
+        _broadcastRemainingSec.value = 0
+        countdownJob?.cancel()
+        stopBurstJob?.cancel()
+    }
+
+    fun isBluetoothEnabled(context: Context): Boolean {
+        val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager ?: return false
+        return bm.adapter?.isEnabled == true
     }
 
     fun hasAdvertisePermission(context: Context): Boolean {

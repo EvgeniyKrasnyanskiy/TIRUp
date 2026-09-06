@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import com.tirup.app.TirupApplication
 import com.tirup.app.data.alert.GlucoseAlertManager
 import com.tirup.app.domain.model.BleBridgeRole
+import com.tirup.app.domain.model.BleGlucosePacket
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.repository.GlucoseRepository
 import com.tirup.app.domain.repository.SettingsRepository
@@ -23,6 +24,13 @@ import com.tirup.app.presentation.widget.TirupWidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -37,6 +45,17 @@ object BleObserverManager {
     private var scanner: BluetoothLeScanner? = null
     private var activeCallback: ScanCallback? = null
     private var isScanning = false
+    private var isBoostActive = false
+    private var boostJob: Job? = null
+
+    private val _isScanningFlow = MutableStateFlow(false)
+    val isScanningFlow: StateFlow<Boolean> = _isScanningFlow.asStateFlow()
+
+    private val _boostRemainingSec = MutableStateFlow(0)
+    val boostRemainingSec: StateFlow<Int> = _boostRemainingSec.asStateFlow()
+
+    private val _packetReceivedEvent = MutableSharedFlow<Pair<BleGlucosePacket, Int>>(extraBufferCapacity = 5)
+    val packetReceivedEvent: SharedFlow<Pair<BleGlucosePacket, Int>> = _packetReceivedEvent.asSharedFlow()
 
     @Volatile
     private var lastHandledTimestamp: Long = 0L
@@ -55,49 +74,82 @@ object BleObserverManager {
             val ble = userSettings.bleBridgeSettings
 
             if (ble.role == BleBridgeRole.OBSERVER) {
-                startScanning(context, ble.familyPin, settingsRepository, glucoseRepository)
+                startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = isBoostActive)
             } else {
-                stopScanning()
+                stopScanningInternal()
             }
         }
     }
 
-    private suspend fun startScanning(
+    /**
+     * Boosts scanning to SCAN_MODE_LOW_LATENCY for 30 seconds to quickly detect the master.
+     */
+    fun boostScanFor30Sec(
+        context: Context,
+        settingsRepository: SettingsRepository,
+        glucoseRepository: GlucoseRepository
+    ) {
+        scope.launch {
+            val userSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
+            val ble = userSettings.bleBridgeSettings
+            if (ble.role != BleBridgeRole.OBSERVER) return@launch
+
+            boostJob?.cancel()
+            isBoostActive = true
+            _boostRemainingSec.value = 30
+
+            // Restart scanner in low latency mode
+            stopScanningInternal()
+            startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = true)
+
+            boostJob = launch {
+                while (_boostRemainingSec.value > 0) {
+                    delay(1000L)
+                    _boostRemainingSec.value = (_boostRemainingSec.value - 1).coerceAtLeast(0)
+                }
+                isBoostActive = false
+                // Revert to BALANCED scan mode
+                stopScanningInternal()
+                startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = false)
+            }
+        }
+    }
+
+    private suspend fun startScanningInternal(
         context: Context,
         familyPin: String,
         settingsRepository: SettingsRepository,
-        glucoseRepository: GlucoseRepository
+        glucoseRepository: GlucoseRepository,
+        boost: Boolean
     ) = mutex.withLock {
         if (isScanning) return@withLock
 
         if (!hasScanPermission(context)) {
             Log.w(TAG, "Cannot start BLE scanner: scan permission not granted")
+            _isScanningFlow.value = false
             return@withLock
         }
 
         val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager ?: return@withLock
-        val adapter = bm.adapter ?: return@withLock
-        if (!adapter.isEnabled) {
+        val adapter = bm.adapter
+        if (adapter == null || !adapter.isEnabled) {
             Log.d(TAG, "Bluetooth disabled, cannot start BLE Observer")
+            _isScanningFlow.value = false
             return@withLock
         }
 
         val leScanner = adapter.bluetoothLeScanner
         if (leScanner == null) {
             Log.w(TAG, "BluetoothLeScanner not available")
+            _isScanningFlow.value = false
             return@withLock
         }
 
-        val scanFilter = ScanFilter.Builder()
-            .setManufacturerData(
-                BlePacketCodec.MANUFACTURER_ID,
-                byteArrayOf(0x54, 0x55), // Match 'TU' prefix
-                byteArrayOf(0xFF.toByte(), 0xFF.toByte())
-            )
-            .build()
+        // Generic ScanFilter without manufacturer byte mask ensures compatibility across all hardware chipsets
+        val scanFilter = ScanFilter.Builder().build()
 
         val scanSettings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER) // Energy-conserving hardware filter
+            .setScanMode(if (boost) ScanSettings.SCAN_MODE_LOW_LATENCY else ScanSettings.SCAN_MODE_BALANCED)
             .build()
 
         val callback = object : ScanCallback() {
@@ -114,6 +166,7 @@ object BleObserverManager {
 
             override fun onScanFailed(errorCode: Int) {
                 Log.w(TAG, "BLE Scan failed with errorCode: $errorCode")
+                _isScanningFlow.value = false
             }
         }
 
@@ -122,11 +175,14 @@ object BleObserverManager {
             scanner = leScanner
             activeCallback = callback
             isScanning = true
-            Log.i(TAG, "BLE Observer started scanning in low power mode")
+            _isScanningFlow.value = true
+            Log.i(TAG, "BLE Observer started scanning (boost=$boost)")
         } catch (e: SecurityException) {
             Log.w(TAG, "SecurityException starting scan: ${e.message}")
+            _isScanningFlow.value = false
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start scan: ${e.message}")
+            _isScanningFlow.value = false
         }
     }
 
@@ -148,6 +204,7 @@ object BleObserverManager {
 
         val rssi = result.rssi
         Log.i(TAG, "Received valid BLE glucose packet: ts=${packet.timestamp}, bg=${packet.valueMmol}, rssi=$rssi, bat=${packet.batteryPercent}%")
+        _packetReceivedEvent.tryEmit(Pair(packet, rssi))
 
         scope.launch {
             try {
@@ -185,7 +242,9 @@ object BleObserverManager {
         }
     }
 
-    suspend fun stopScanning() = mutex.withLock {
+    suspend fun stopScanning() = stopScanningInternal()
+
+    private suspend fun stopScanningInternal() = mutex.withLock {
         if (!isScanning) return@withLock
         try {
             activeCallback?.let { cb ->
@@ -195,14 +254,22 @@ object BleObserverManager {
         activeCallback = null
         scanner = null
         isScanning = false
+        _isScanningFlow.value = false
         Log.i(TAG, "BLE Observer stopped scanning")
     }
 
+    fun isBluetoothEnabled(context: Context): Boolean {
+        val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager ?: return false
+        return bm.adapter?.isEnabled == true
+    }
+
     fun hasScanPermission(context: Context): Boolean {
+        val hasLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+            val hasScan = ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+            hasScan && hasLocation
         } else {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            hasLocation
         }
     }
 }

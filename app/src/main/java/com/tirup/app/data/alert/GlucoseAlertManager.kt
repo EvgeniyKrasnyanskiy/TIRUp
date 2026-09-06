@@ -1419,6 +1419,13 @@ object GlucoseAlertManager {
         }
     }
 
+    fun scheduleNextStalenessCheck(context: Context, readingTimestamp: Long) {
+        val now = System.currentTimeMillis()
+        val stalenessExpiryMs = readingTimestamp + 5 * 60 * 1000L + 2000L
+        val triggerAtMs = if (now < stalenessExpiryMs) stalenessExpiryMs else now + 60_000L
+        scheduleNextSignalLossCheck(context, triggerAtMs)
+    }
+
     fun scheduleNextSignalLossCheck(context: Context, triggerAtMs: Long) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val intent = Intent(context, AlertActionReceiver::class.java).apply {
@@ -1553,9 +1560,9 @@ object GlucoseAlertManager {
                 // Schedule next check based on day/night interval
                 val nextIntervalMs = getNextSignalLossIntervalMs(signalLossAlertCount, isNightNow(settings))
                 scheduleNextSignalLossCheck(context, now + nextIntervalMs)
-            } else if (settings.isLockscreenNotificationEnabled) {
-                // Keep periodic check alive to update elapsed minutes in lockscreen notification
-                scheduleNextSignalLossCheck(context, now + 5 * 60 * 1000L)
+            } else {
+                // Keep periodic check alive every minute to update elapsed minutes in lockscreen notification & widgets
+                scheduleNextSignalLossCheck(context, now + 60_000L)
             }
             return true
         } else {
@@ -1566,11 +1573,16 @@ object GlucoseAlertManager {
                 val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
                 nm?.cancel(NOTIFICATION_ID_SIGNAL_LOSS)
             }
-            if (alerts.isSignalLossEnabled || settings.isLockscreenNotificationEnabled) {
-                scheduleNextSignalLossCheck(context, latestTimestamp + thresholdMs + 1000L)
+            // If fresh (<5 min), next check MUST be at staleness threshold (5 min + 2 sec)
+            // so that lockscreen notification and widgets immediately turn gray/strikethrough at minute 5!
+            val stalenessExpiryMs = latestTimestamp + 5 * 60 * 1000L + 2000L
+            val signalLossExpiryMs = latestTimestamp + thresholdMs + 1000L
+            val nextCheckMs = if (now < stalenessExpiryMs) {
+                stalenessExpiryMs
             } else {
-                cancelSignalLossCheck(context)
+                minOf(now + 60_000L, signalLossExpiryMs)
             }
+            scheduleNextSignalLossCheck(context, nextCheckMs)
             return false
         }
     }

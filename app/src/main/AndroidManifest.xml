@@ -15,7 +15,7 @@
     <!-- Bluetooth Low Energy (BLE Bridge) -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" tools:targetApi="s" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" tools:targetApi="s" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" tools:targetApi="s" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:targetApi="s" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
@@ -98,6 +98,15 @@
                 <action android:name="com.tirup.app.ACTION_DISMISS_CRITICAL" />
                 <action android:name="com.tirup.app.ACTION_LAUNCH_DIANIGHT" />
                 <action android:name="com.tirup.app.ACTION_CHECK_SIGNAL_LOSS" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Receiver for 5-minute staleness alarm (refreshing lockscreen notification & widgets) -->
+        <receiver
+            android:name=".data.receiver.StalenessAlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.tirup.app.ACTION_REFRESH_STALENESS" />
             </intent-filter>
         </receiver>
 

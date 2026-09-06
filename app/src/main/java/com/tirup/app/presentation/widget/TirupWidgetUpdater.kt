@@ -27,6 +27,9 @@ import com.tirup.app.presentation.MainActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.StrikethroughSpan
 import java.util.Calendar
 import java.util.Locale
 import kotlin.math.abs
@@ -470,17 +473,25 @@ object TirupWidgetUpdater {
         val diffMin = ((now - latest.timestamp).coerceAtLeast(0L) / 60_000L).toInt()
         val isStale = diffMin > 5
 
-        // Glucose Value
+        // Glucose Value with strikethrough if stale
         val glucoseStr = if (isMmol) {
             String.format(Locale.US, "%.1f", latest.valueMmol)
         } else {
             "${(latest.valueMmol * 18.0182).roundToInt()}"
         }
-        views.setTextViewText(R.id.widget_glucose_value, glucoseStr)
+        val grayColor = Color.parseColor("#94A3B8")
+        val displayGlucose: CharSequence = if (isStale) {
+            SpannableString(glucoseStr).apply {
+                setSpan(StrikethroughSpan(), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+        } else {
+            glucoseStr
+        }
+        views.setTextViewText(R.id.widget_glucose_value, displayGlucose)
 
         // Range color (Pale Green for 3.9..7.8, Emerald for 7.9..10.0)
         val glucoseColor = when {
-            isStale -> Color.parseColor("#94A3B8") // Gray when stale!
+            isStale -> grayColor // Gray when stale!
             latest.valueMmol < 3.0 -> Color.parseColor("#EF4444")
             latest.valueMmol < settings.targetRanges.tirLowMmol -> Color.parseColor("#F59E0B")
             latest.valueMmol <= 7.8 -> Color.parseColor("#4ADE80") // Pale Green 3.9 - 7.8
@@ -498,6 +509,7 @@ object TirupWidgetUpdater {
         } else {
             views.setViewVisibility(R.id.widget_time_ago, View.VISIBLE)
             views.setTextViewText(R.id.widget_time_ago, if (diffMin < 60) "${diffMin}м" else "${diffMin / 60}ч")
+            views.setTextColor(R.id.widget_time_ago, grayColor)
         }
 
         // TIR Score
@@ -519,6 +531,7 @@ object TirupWidgetUpdater {
             settings.targetRanges.tingGoalPercent.toDouble()
         }
         val tirColor = when {
+            isStale -> grayColor
             currentPercent >= targetPercent -> Color.parseColor("#10B981")
             currentPercent >= (targetPercent - 15.0) -> Color.parseColor("#F59E0B")
             else -> Color.parseColor("#EF4444")
@@ -831,9 +844,20 @@ object TirupWidgetUpdater {
         val diffMs = (now - latest.timestamp).coerceAtLeast(0L)
         val diffMin = (diffMs / 60_000L).toInt()
         val isStale = diffMin > 5
+        val grayColor = Color.parseColor("#94A3B8")
+
+        // 1. Glucose Value with strikethrough if stale
+        val displayGlucose: CharSequence = if (isStale) {
+            SpannableString(glucoseStr).apply {
+                setSpan(StrikethroughSpan(), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+        } else {
+            glucoseStr
+        }
+        views.setTextViewText(R.id.widget_glucose_value, displayGlucose)
 
         val glucoseColor = when {
-            isStale -> Color.parseColor("#94A3B8") // Gray when stale!
+            isStale -> grayColor // Gray when stale!
             latest.valueMmol < 3.0 -> Color.parseColor("#EF4444")
             latest.valueMmol < settings.targetRanges.tirLowMmol -> Color.parseColor("#F59E0B")
             latest.valueMmol <= 7.8 -> Color.parseColor("#4ADE80") // Pale Green 3.9 - 7.8
@@ -857,8 +881,10 @@ object TirupWidgetUpdater {
                 "${if (deltaMg > 0) "+" else ""}$deltaMg"
             }
             views.setTextViewText(R.id.widget_delta_value, deltaStr)
+            views.setTextColor(R.id.widget_delta_value, if (isStale) grayColor else Color.parseColor("#E2E8F0"))
         } else {
             views.setTextViewText(R.id.widget_delta_value, "--")
+            views.setTextColor(R.id.widget_delta_value, grayColor)
         }
 
         // 4. Time Ago (hidden if <= 1m, compact "2м", "5м", "1ч" without "назад")
@@ -869,6 +895,7 @@ object TirupWidgetUpdater {
             views.setViewVisibility(R.id.widget_time_ago, View.VISIBLE)
             val timeAgoStr = if (diffMin < 60) "${diffMin}м" else "${diffMin / 60}ч"
             views.setTextViewText(R.id.widget_time_ago, timeAgoStr)
+            views.setTextColor(R.id.widget_time_ago, grayColor)
         }
     }
 
@@ -907,7 +934,10 @@ object TirupWidgetUpdater {
             (inRangeCount * 100.0 / todayReadings.size).roundToInt()
         } else 0
 
+        val isStale = ((System.currentTimeMillis() - latest.timestamp) / 60_000L) > 5
+        val grayColor = Color.parseColor("#94A3B8")
         val tirColor = when {
+            isStale -> grayColor
             currentPercent >= targetPercent -> Color.parseColor("#10B981")
             currentPercent >= (targetPercent - 15.0) -> Color.parseColor("#F59E0B")
             else -> Color.parseColor("#EF4444")
@@ -919,11 +949,11 @@ object TirupWidgetUpdater {
         if (isStrip) {
             val (balanceText, balanceColor) = calculateDailyTimeBalance(compensator, targetPercent)
             views.setTextViewText(R.id.widget_compensator_text, balanceText)
-            views.setTextColor(R.id.widget_compensator_text, balanceColor)
+            views.setTextColor(R.id.widget_compensator_text, if (isStale) grayColor else balanceColor)
         } else {
             val recText = if (isRu) compensator.recommendationRu else compensator.recommendationEn
             views.setTextViewText(R.id.widget_compensator_text, recText)
-            views.setTextColor(R.id.widget_compensator_text, Color.parseColor("#38BDF8"))
+            views.setTextColor(R.id.widget_compensator_text, if (isStale) grayColor else Color.parseColor("#38BDF8"))
         }
     }
 
@@ -981,10 +1011,13 @@ object TirupWidgetUpdater {
         // Carbs (CoB) are completely hidden from all widgets per user design
         views.setViewVisibility(R.id.widget_cob_text, View.GONE)
 
+        val isStale = ((System.currentTimeMillis() - latest.timestamp) / 60_000L) > 5
+        val grayColor = Color.parseColor("#94A3B8")
         if (iob > 0.05) {
             views.setViewVisibility(R.id.widget_iob_cob_layout, View.VISIBLE)
             views.setViewVisibility(R.id.widget_iob_text, View.VISIBLE)
             views.setTextViewText(R.id.widget_iob_text, String.format(Locale.US, "💉 %.1f U", iob))
+            views.setTextColor(R.id.widget_iob_text, if (isStale) grayColor else Color.parseColor("#38BDF8"))
         } else {
             views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
             views.setViewVisibility(R.id.widget_iob_text, View.GONE)
