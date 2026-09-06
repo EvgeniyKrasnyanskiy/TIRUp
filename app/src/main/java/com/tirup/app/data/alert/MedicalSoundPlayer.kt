@@ -82,8 +82,9 @@ object MedicalSoundPlayer {
     }
 
     /**
-     * Plays a distinct urgent ascending harmonic dual-chime for predictive hypo "Last Chance" window.
-     * Uses USAGE_ALARM stream to guarantee audibility before entering acute hypoglycemia.
+     * Plays a distinct urgent ascending harmonic dual-chime for the Daily Compensator "Last Chance to reach daily TIR" alert.
+     * Triggered when remaining time in day is barely enough to achieve daily TIR target.
+     * Uses USAGE_ALARM stream to guarantee audibility.
      */
     fun playLastChanceAlertTone() {
         isPlayingActive = true
