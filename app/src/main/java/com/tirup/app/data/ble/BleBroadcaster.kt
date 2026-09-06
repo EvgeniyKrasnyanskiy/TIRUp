@@ -11,6 +11,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.BatteryManager
 import android.os.Build
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.tirup.app.domain.model.BleBridgeRole
@@ -28,14 +29,16 @@ import kotlinx.coroutines.launch
 object BleBroadcaster {
 
     private const val TAG = "BleBroadcaster"
-    private const val ADVERTISE_BURST_MS = 10_000L // 10 seconds per reading to minimize battery drain while ensuring balanced reception
-    private const val TEST_PING_BURST_MS = 30_000L // 30 seconds for manual diagnostic test ping
+    const val BURST_1MIN_MS = 5_000L   // 5 seconds for 1-minute CGM sensors (Libre 3, Dexcom G7)
+    const val BURST_5MIN_MS = 10_000L  // 10 seconds for 5-minute CGM sensors (Libre 1/2, Dexcom G6)
+    const val TEST_PING_BURST_MS = 30_000L // 30 seconds for manual diagnostic test ping
 
     private val scope = CoroutineScope(Dispatchers.IO)
     private var currentAdvertiser: BluetoothLeAdvertiser? = null
     private var activeCallback: AdvertiseCallback? = null
     private var stopBurstJob: Job? = null
     private var countdownJob: Job? = null
+    private var wakeLock: PowerManager.WakeLock? = null
 
     private val _isBroadcasting = MutableStateFlow(false)
     val isBroadcasting: StateFlow<Boolean> = _isBroadcasting.asStateFlow()
@@ -45,7 +48,7 @@ object BleBroadcaster {
 
     /**
      * Broadcasts a telemetry packet over BLE advertising if BLE Bridge is in BROADCASTER mode.
-     * Advertising runs for a 10-second pulse burst (or custom burstDurationMs) and then shuts off to preserve battery.
+     * Advertising runs for an adaptive pulse burst (5s or 10s) and then shuts off to preserve battery.
      */
     fun broadcastReading(
         context: Context,
@@ -53,7 +56,7 @@ object BleBroadcaster {
         rateOfChange: Double,
         iob: Double,
         settings: BleBridgeSettings,
-        burstDurationMs: Long = ADVERTISE_BURST_MS,
+        burstDurationMs: Long = BURST_5MIN_MS,
         onStatus: ((Boolean, String) -> Unit)? = null
     ) {
         if (settings.role != BleBridgeRole.BROADCASTER) {
@@ -111,17 +114,28 @@ object BleBroadcaster {
                 // Stop any previous active burst
                 stopAdvertisingInternal()
 
+                // Acquire partial WakeLock to prevent CPU sleep during burst
+                val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+                try {
+                    wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TIRUp:BleBroadcasterWakeLock")?.apply {
+                        setReferenceCounted(false)
+                        acquire(burstDurationMs + 5_000L)
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to acquire WakeLock: ${e.message}")
+                }
+
+                val durationSec = (burstDurationMs / 1000L).toInt()
                 val callback = object : AdvertiseCallback() {
                     override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
                         Log.i(TAG, "BLE broadcast started successfully for reading ts=${reading.timestamp}")
                         _isBroadcasting.value = true
-                        onStatus?.invoke(true, "Радиоимпульс запущен (30 сек)")
+                        onStatus?.invoke(true, "Радиоимпульс запущен ($durationSec сек)")
                     }
 
                     override fun onStartFailure(errorCode: Int) {
                         Log.w(TAG, "BLE broadcast start failed with code: $errorCode")
-                        _isBroadcasting.value = false
-                        _broadcastRemainingSec.value = 0
+                        stopAdvertisingInternal()
                         val errDesc = when (errorCode) {
                             ADVERTISE_FAILED_DATA_TOO_LARGE -> "Пакет слишком велик"
                             ADVERTISE_FAILED_TOO_MANY_ADVERTISERS -> "Слишком много вещателей BLE"
@@ -142,7 +156,7 @@ object BleBroadcaster {
                 stopBurstJob?.cancel()
                 countdownJob?.cancel()
 
-                _broadcastRemainingSec.value = (burstDurationMs / 1000L).toInt()
+                _broadcastRemainingSec.value = durationSec
 
                 countdownJob = launch {
                     while (_broadcastRemainingSec.value > 0) {
@@ -158,13 +172,11 @@ object BleBroadcaster {
                 }
             } catch (e: SecurityException) {
                 Log.w(TAG, "SecurityException starting BLE advertising: ${e.message}")
-                _isBroadcasting.value = false
-                _broadcastRemainingSec.value = 0
+                stopAdvertisingInternal()
                 onStatus?.invoke(false, "Ошибка безопасности: нет Bluetooth-доступа")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start BLE advertising: ${e.message}")
-                _isBroadcasting.value = false
-                _broadcastRemainingSec.value = 0
+                stopAdvertisingInternal()
                 onStatus?.invoke(false, "Сбой запуска: ${e.message}")
             }
         }
@@ -215,6 +227,12 @@ object BleBroadcaster {
         _broadcastRemainingSec.value = 0
         countdownJob?.cancel()
         stopBurstJob?.cancel()
+        try {
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+            }
+        } catch (_: Exception) {}
+        wakeLock = null
     }
 
     fun isBluetoothEnabled(context: Context): Boolean {

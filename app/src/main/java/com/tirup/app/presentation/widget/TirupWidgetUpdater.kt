@@ -1036,11 +1036,16 @@ object TirupWidgetUpdater {
         val ble = settings.bleBridgeSettings
         val isObserver = ble.role == com.tirup.app.domain.model.BleBridgeRole.OBSERVER
         val battery = ble.lastMasterBattery
-        if (latest != null && isObserver && battery in 0..100) {
-            val isStale = ((System.currentTimeMillis() - latest.timestamp) / 60_000L) > 5
+        val packetAgeMinutes = if (ble.lastPacketTimestamp > 0L) {
+            (System.currentTimeMillis() - ble.lastPacketTimestamp) / 60_000L
+        } else 999L
+        val isStale = (latest != null && ((System.currentTimeMillis() - latest.timestamp) / 60_000L) > 5) || packetAgeMinutes > 7
+        val hasBattery = latest != null && isObserver && (battery in 0..100 || ble.lastPacketTimestamp > 0L)
+        if (hasBattery) {
             val grayColor = Color.parseColor("#94A3B8")
             views.setViewVisibility(R.id.widget_master_battery, View.VISIBLE)
-            views.setTextViewText(R.id.widget_master_battery, "🔋 $battery%")
+            val batText = if (isStale) "🔋 ?" else "🔋 $battery%"
+            views.setTextViewText(R.id.widget_master_battery, batText)
             val batColor = when {
                 battery <= 15 -> Color.parseColor("#EF4444")
                 battery <= 25 -> Color.parseColor("#F59E0B")

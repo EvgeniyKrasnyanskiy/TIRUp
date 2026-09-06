@@ -225,12 +225,22 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                                 val dtMin = (latest.timestamp - prev.timestamp) / 60000.0
                                 if (dtMin in 1.0..15.0) (latest.valueMmol - prev.valueMmol) / dtMin else 0.0
                             } else 0.0
+
+                            // Adaptive burst duration (Variant B):
+                            // 5s for 1-minute cadence (dt <= 2.5 min), 10s for standard 5-minute cadence
+                            val burstDuration = if (prev != null && (latest.timestamp - prev.timestamp) <= 150_000L) {
+                                com.tirup.app.data.ble.BleBroadcaster.BURST_1MIN_MS
+                            } else {
+                                com.tirup.app.data.ble.BleBroadcaster.BURST_5MIN_MS
+                            }
+
                             com.tirup.app.data.ble.BleBroadcaster.broadcastReading(
                                 context = context.applicationContext,
                                 reading = latest,
                                 rateOfChange = rate,
                                 iob = latest.iob ?: 0.0,
-                                settings = userSettings.bleBridgeSettings
+                                settings = userSettings.bleBridgeSettings,
+                                burstDurationMs = burstDuration
                             )
                         }
                     }

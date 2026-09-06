@@ -236,6 +236,14 @@ fun SettingsScreen(
         }
     }
 
+    LaunchedEffect(state.infoMessage) {
+        val msg = state.infoMessage
+        if (!msg.isNullOrBlank()) {
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            viewModel.clearInfoMessage()
+        }
+    }
+
     LaunchedEffect(masterOffHintVisible) {
         if (masterOffHintVisible) {
             delay(3000L)
@@ -876,9 +884,9 @@ fun SettingsScreen(
                             )
                             Text(
                                 text = if (isRu)
-                                    "Прямая передача замера импульсом 12 сек (раз в 5 мин) без интернета"
+                                    "Прямая передача замера импульсом 5–10 сек при каждом новом замере CGM без интернета"
                                 else
-                                    "Direct telemetry via 12s BLE burst (every 5 min) without internet",
+                                    "Direct telemetry via 5-10s BLE pulse upon each CGM reading without internet",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 lineHeight = 15.sp
@@ -1075,8 +1083,8 @@ fun SettingsScreen(
                                             if (isRu) "Радиоимпульс в эфире! Осталось: ${broadcastRemaining}с"
                                             else "Transmitting BLE pulse! Remaining: ${broadcastRemaining}s"
                                         } else {
-                                            if (isRu) "Режим вещателя готов. При получении замера телефон транслирует 30-сек импульс."
-                                            else "Broadcaster active. Transmits 30-second pulse upon receiving each reading."
+                                            if (isRu) "Режим вещателя готов. При получении замера телефон транслирует импульс 5–10 сек."
+                                            else "Broadcaster active. Transmits 5-10 second pulse upon receiving each reading."
                                         },
                                         style = MaterialTheme.typography.bodySmall,
                                         fontWeight = if (isBroadcasting) FontWeight.Bold else FontWeight.Normal,
@@ -1095,19 +1103,18 @@ fun SettingsScreen(
                                         viewModel.sendBleTestPing()
                                     }
                                 },
+                                enabled = !isBroadcasting,
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isBroadcasting) ActionBlue else ActionBlue.copy(alpha = 0.85f),
-                                    contentColor = Color.White
+                                    containerColor = ActionBlue,
+                                    contentColor = Color.White,
+                                    disabledContainerColor = ActionBlue.copy(alpha = 0.35f),
+                                    disabledContentColor = Color.White.copy(alpha = 0.6f)
                                 ),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
                                 Text(
-                                    text = if (isBroadcasting) {
-                                        if (isRu) "📡 Вещание активно (${broadcastRemaining}с)" else "📡 Broadcasting (${broadcastRemaining}s)"
-                                    } else {
-                                        if (isRu) "📡 Тест связи (отправить импульс 30 сек)" else "📡 Test Link (Send 30s Pulse)"
-                                    },
+                                    text = if (isRu) "📡 Тест связи (импульс 30 сек)" else "📡 Test Link (30s Pulse)",
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -1149,10 +1156,16 @@ fun SettingsScreen(
                                             ble.lastRssi >= -85 -> if (isRu) "хороший" else "good"
                                             else -> if (isRu) "слабый" else "weak"
                                         }
+                                        val isStaleBattery = ageMinutes > 7
+                                        val batteryInfo = when {
+                                            ble.lastMasterBattery < 0 -> ""
+                                            isStaleBattery -> if (isRu) "\n• Батарея мастера: ? (нет связи > 7 мин)" else "\n• Master battery: ? (stale > 7m)"
+                                            else -> "\n• ${if (isRu) "Батарея мастера" else "Master battery"}: ${ble.lastMasterBattery}%"
+                                        }
 
                                         Text(
-                                            text = if (isRu) "• Последний пакет: $ageStr\n• Сигнал: ${ble.lastRssi} dBm ($signalQuality)" + (if (ble.lastMasterBattery >= 0) "\n• Батарея мастера: ${ble.lastMasterBattery}%" else "")
-                                                   else "• Last packet: $ageStr\n• Signal: ${ble.lastRssi} dBm ($signalQuality)" + (if (ble.lastMasterBattery >= 0) "\n• Master battery: ${ble.lastMasterBattery}%" else ""),
+                                            text = if (isRu) "• Последний пакет: $ageStr\n• Сигнал: ${ble.lastRssi} dBm ($signalQuality)$batteryInfo"
+                                                   else "• Last packet: $ageStr\n• Signal: ${ble.lastRssi} dBm ($signalQuality)$batteryInfo",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -2030,6 +2043,32 @@ fun SettingsScreen(
                     text = if (isRu) "Назад" else "Back",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // Section 7: App Version & Build Information
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp, bottom = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                val appVersion = remember(context) { getAppVersionName(context) }
+                Text(
+                    text = if (isRu) "TIRUp • Версия $appVersion"
+                           else "TIRUp • Version $appVersion",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = if (isRu) "Автономный диа-мост и аналитика CGM"
+                           else "Autonomous CGM Analytics & Telemetry Bridge",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
                 )
             }
         }
@@ -3731,6 +3770,19 @@ private fun BleFamilyPinDialog(
             }
         }
     )
+}
+
+private fun getAppVersionName(context: android.content.Context): String {
+    return try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0)).versionName ?: "2.0.4"
+        } else {
+            @Suppress("DEPRECATION")
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "2.0.4"
+        }
+    } catch (_: Exception) {
+        "2.0.4"
+    }
 }
 
 

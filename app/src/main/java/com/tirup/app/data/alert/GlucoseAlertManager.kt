@@ -1285,7 +1285,12 @@ object GlucoseAlertManager {
         }
 
         val ble = settings.bleBridgeSettings
-        val hasMasterBattery = ble.role == com.tirup.app.domain.model.BleBridgeRole.OBSERVER && ble.lastMasterBattery in 0..100
+        val isObserver = ble.role == com.tirup.app.domain.model.BleBridgeRole.OBSERVER
+        val packetAgeMinutes = if (ble.lastPacketTimestamp > 0L) {
+            (System.currentTimeMillis() - ble.lastPacketTimestamp) / 60_000L
+        } else 999L
+        val isStaleBattery = packetAgeMinutes > 7
+        val hasMasterBattery = isObserver && (ble.lastMasterBattery in 0..100 || ble.lastPacketTimestamp > 0L)
         if (hasMasterBattery) {
             val bat = ble.lastMasterBattery
             val batColor = when {
@@ -1293,8 +1298,9 @@ object GlucoseAlertManager {
                 bat <= 25 -> "#F59E0B"
                 else -> "#10B981"
             }
-            val finalBatColor = if (isExpired) grayHex else batColor
-            extrasList.add("<font color='$finalBatColor'><b>🔋 $bat%</b></font>")
+            val finalBatColor = if (isExpired || isStaleBattery) grayHex else batColor
+            val batText = if (isExpired || isStaleBattery) "🔋 ?" else "🔋 $bat%"
+            extrasList.add("<font color='$finalBatColor'><b>$batText</b></font>")
         }
 
         val bodyHtml = extrasList.joinToString(" &nbsp;<font color='#64748B'>•</font>&nbsp; ")

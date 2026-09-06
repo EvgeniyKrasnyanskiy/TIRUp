@@ -190,6 +190,10 @@ class SettingsViewModel(
 
     fun updateBleBridgeSettings(ble: com.tirup.app.domain.model.BleBridgeSettings) {
         viewModelScope.launch {
+            val prevRole = _uiState.value.userSettings.bleBridgeSettings.role
+            if (prevRole == com.tirup.app.domain.model.BleBridgeRole.BROADCASTER && ble.role != com.tirup.app.domain.model.BleBridgeRole.BROADCASTER) {
+                com.tirup.app.data.ble.BleBroadcaster.stopAdvertising()
+            }
             val updated = _uiState.value.userSettings.copy(bleBridgeSettings = ble)
             settingsRepository.updateSettings(updated)
             _uiState.update { it.copy(userSettings = updated) }
@@ -213,8 +217,13 @@ class SettingsViewModel(
                     if (isRu) "⚠️ $message" else "⚠️ BLE error: $message"
                 }
                 _uiState.update { it.copy(infoMessage = text) }
+                android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    fun clearInfoMessage() {
+        _uiState.update { it.copy(infoMessage = null) }
     }
 
     fun boostBleObserverScan() {

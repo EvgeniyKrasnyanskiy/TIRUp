@@ -151,7 +151,12 @@ fun FocusScreen(
         // 1. Hero Card: Current Glucose
         item {
             val bleSettings = userSettings.bleBridgeSettings
-            val masterBattery = if (bleSettings.role == com.tirup.app.domain.model.BleBridgeRole.OBSERVER && bleSettings.lastMasterBattery in 0..100) {
+            val isObserver = bleSettings.role == com.tirup.app.domain.model.BleBridgeRole.OBSERVER
+            val packetAgeMinutes = if (bleSettings.lastPacketTimestamp > 0L) {
+                (System.currentTimeMillis() - bleSettings.lastPacketTimestamp) / 60_000L
+            } else 999L
+            val isMasterBatteryStale = packetAgeMinutes > 7
+            val masterBattery = if (isObserver && (bleSettings.lastMasterBattery in 0..100 || bleSettings.lastPacketTimestamp > 0L)) {
                 bleSettings.lastMasterBattery
             } else null
 
@@ -162,6 +167,7 @@ fun FocusScreen(
                 isRu = isRu,
                 activeAlertBanner = state.activeAlertBanner,
                 masterBatteryPct = masterBattery,
+                isMasterBatteryStale = isMasterBatteryStale,
                 onClick = {
                     val r = state.latestReading
                     if (r != null) {
@@ -829,6 +835,7 @@ private fun HeroGlucoseCard(
     isRu: Boolean,
     activeAlertBanner: ActiveAlertBanner? = null,
     masterBatteryPct: Int? = null,
+    isMasterBatteryStale: Boolean = false,
     onClick: () -> Unit
 ) {
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
@@ -967,10 +974,16 @@ private fun HeroGlucoseCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (hasBattery) {
-                        val batColor = when {
-                            masterBatteryPct!! <= 15 -> ColorVeryLow
-                            masterBatteryPct <= 25 -> ColorHigh
-                            else -> PrimaryEmerald
+                        val grayColor = Color(0xFF94A3B8)
+                        val (batText, batColor) = if (isMasterBatteryStale) {
+                            Pair("📱 🔋 ?", grayColor)
+                        } else {
+                            val color = when {
+                                masterBatteryPct!! <= 15 -> ColorVeryLow
+                                masterBatteryPct <= 25 -> ColorHigh
+                                else -> PrimaryEmerald
+                            }
+                            Pair("📱 🔋 $masterBatteryPct%", color)
                         }
                         Surface(
                             shape = RoundedCornerShape(10.dp),
@@ -978,7 +991,7 @@ private fun HeroGlucoseCard(
                             border = BorderStroke(0.8.dp, batColor.copy(alpha = 0.35f))
                         ) {
                             Text(
-                                text = "📱 🔋 $masterBatteryPct%",
+                                text = batText,
                                 modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,

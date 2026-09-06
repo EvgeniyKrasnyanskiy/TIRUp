@@ -25,7 +25,7 @@
             android:layout_height="wrap_content"
             android:text="5.4"
             android:textColor="#10B981"
-            android:textSize="28sp"
+            android:textSize="26sp"
             android:textStyle="bold"
             android:includeFontPadding="false" />
 
@@ -33,10 +33,10 @@
             android:id="@+id/widget_trend_arrow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingStart="3dp"
+            android:paddingStart="2dp"
             android:text="↗"
             android:textColor="#10B981"
-            android:textSize="22sp"
+            android:textSize="20sp"
             android:textStyle="bold"
             android:includeFontPadding="false" />
     </LinearLayout>
@@ -45,14 +45,14 @@
     <FrameLayout
         android:id="@+id/widget_divider"
         android:layout_width="1dp"
-        android:layout_height="28dp"
+        android:layout_height="26dp"
         android:layout_toEndOf="@id/widget_glucose_section"
         android:layout_centerVertical="true"
-        android:layout_marginStart="8dp"
-        android:layout_marginEnd="8dp"
+        android:layout_marginStart="6dp"
+        android:layout_marginEnd="6dp"
         android:background="#26FFFFFF" />
 
-    <!-- 2. Right: 2 clean rows taking the rest of space without overlapping -->
+    <!-- 2. Right: 2 clean rows taking the rest of space without overflowing -->
     <LinearLayout
         android:id="@+id/widget_right_section"
         android:layout_width="match_parent"
@@ -62,7 +62,7 @@
         android:layout_centerVertical="true"
         android:orientation="vertical">
 
-        <!-- Row 1: TIR score badge + Compact balance badge + Master battery badge -->
+        <!-- Row 1: TIR score badge + Compact balance badge -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -74,13 +74,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/widget_badge_bg"
-                android:paddingStart="6dp"
+                android:paddingStart="5dp"
                 android:paddingTop="2dp"
-                android:paddingEnd="6dp"
+                android:paddingEnd="5dp"
                 android:paddingBottom="2dp"
                 android:text="TIR: 97%"
                 android:textColor="#10B981"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
 
@@ -99,26 +99,9 @@
                 android:textSize="10sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
-
-            <TextView
-                android:id="@+id/widget_master_battery"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:background="@drawable/widget_badge_bg"
-                android:paddingStart="5dp"
-                android:paddingTop="2dp"
-                android:paddingEnd="5dp"
-                android:paddingBottom="2dp"
-                android:text="🔋 85%"
-                android:textColor="#10B981"
-                android:textSize="10sp"
-                android:textStyle="bold"
-                android:visibility="gone"
-                android:includeFontPadding="false" />
         </LinearLayout>
 
-        <!-- Row 2: Delta + Time Ago + IoB badge -->
+        <!-- Row 2: Delta + Time Ago + Master Battery badge + IoB badge -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -132,7 +115,7 @@
                 android:layout_height="wrap_content"
                 android:text="+0.3"
                 android:textColor="#94A3B8"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
 
@@ -140,10 +123,28 @@
                 android:id="@+id/widget_time_ago"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
+                android:layout_marginStart="4dp"
                 android:text="2м"
                 android:textColor="#64748B"
-                android:textSize="10sp"
+                android:textSize="9sp"
+                android:visibility="gone"
+                android:includeFontPadding="false" />
+
+            <!-- Master battery badge in Row 2 -->
+            <TextView
+                android:id="@+id/widget_master_battery"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="5dp"
+                android:background="@drawable/widget_badge_bg"
+                android:paddingStart="4dp"
+                android:paddingTop="1dp"
+                android:paddingEnd="4dp"
+                android:paddingBottom="1dp"
+                android:text="🔋 85%"
+                android:textColor="#10B981"
+                android:textSize="9sp"
+                android:textStyle="bold"
                 android:visibility="gone"
                 android:includeFontPadding="false" />
 
@@ -152,7 +153,7 @@
                 android:id="@+id/widget_iob_cob_layout"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
+                android:layout_marginStart="4dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:visibility="gone">
@@ -162,13 +163,13 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:background="@drawable/widget_badge_bg"
-                    android:paddingStart="5dp"
+                    android:paddingStart="4dp"
                     android:paddingTop="1dp"
-                    android:paddingEnd="5dp"
+                    android:paddingEnd="4dp"
                     android:paddingBottom="1dp"
                     android:text="💉 1.2 U"
                     android:textColor="#38BDF8"
-                    android:textSize="10sp"
+                    android:textSize="9sp"
                     android:textStyle="bold"
                     android:includeFontPadding="false" />
 
