@@ -11,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.domain.model.PumpSetStatus
 import com.tirup.app.domain.model.SensorStatus
 import com.tirup.app.domain.model.daysRemaining
@@ -54,6 +56,8 @@ fun DeviceStatusModal(
 
     // Pump confirmation state
     var showPumpConfirm by remember { mutableStateOf(false) }
+    var showSensorInfo by remember { mutableStateOf(false) }
+    var showPumpInfo by remember { mutableStateOf(false) }
     var pendingPumpDays by remember { mutableStateOf(pumpSetStatus.lastUsedDurationDays.coerceIn(2, 7)) }
     var pumpPickerDays by remember { mutableStateOf(pumpSetStatus.lastUsedDurationDays.coerceIn(2, 7)) }
 
@@ -91,7 +95,8 @@ fun DeviceStatusModal(
                     onNewSensor = {
                         pendingSensorDays = sensorPickerDays
                         showSensorConfirm = true
-                    }
+                    },
+                    onShowInfo = { showSensorInfo = true }
                 )
 
                 // --- PUMP SET SECTION ---
@@ -105,7 +110,8 @@ fun DeviceStatusModal(
                         onNewPumpSet = {
                             pendingPumpDays = pumpPickerDays
                             showPumpConfirm = true
-                        }
+                        },
+                        onShowInfo = { showPumpInfo = true }
                     )
                 }
 
@@ -157,12 +163,13 @@ private fun SensorSection(
     pickerDays: Int,
     isRu: Boolean,
     onPickerChange: (Int) -> Unit,
-    onNewSensor: () -> Unit
+    onNewSensor: () -> Unit,
+    onShowInfo: () -> Unit
 ) {
     val sdf = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("📡", fontSize = 20.sp)
+            Text("◉", fontSize = 20.sp)
             Text(
                 text = if (isRu) "Сенсор CGM" else "CGM Sensor",
                 style = MaterialTheme.typography.titleMedium,
@@ -173,29 +180,46 @@ private fun SensorSection(
         if (status.installedAt > 0L) {
             val days = status.daysRemaining
             val color = statusColor(days)
-            val installedStr = sdf.format(Date(status.installedAt))
+            val installedStr = java.text.SimpleDateFormat("dd.MM.yyyy (HH:mm)", java.util.Locale.getDefault()).format(Date(status.installedAt))
             val expiresStr = sdf.format(Date(status.expiresAt))
-            Text(
-                text = if (isRu) "Установлен: $installedStr  ·  Истекает: $expiresStr" else "Installed: $installedStr  ·  Expires: $expiresStr",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = color.copy(alpha = 0.15f),
-                border = BorderStroke(1.dp, color.copy(alpha = 0.5f))
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = if (days < 0) {
-                        if (isRu) "Просрочен на ${-days} дн." else "Expired ${-days}d ago"
-                    } else {
-                        if (isRu) "Осталось: $days дн." else "Remaining: $days days"
-                    },
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                    color = color,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
+                    text = if (isRu) "Установлен: $installedStr" else "Installed: $installedStr",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Text(
+                    text = if (isRu) "Истекает: $expiresStr" else "Expires: $expiresStr",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = color.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, color.copy(alpha = 0.5f))
+                ) {
+                    Text(
+                        text = if (days < 0) {
+                            if (isRu) "Просрочен на ${-days} дн." else "Expired ${-days}d ago"
+                        } else {
+                            if (isRu) "Осталось: $days дн." else "Remaining: $days days"
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        color = color,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+                IconButton(onClick = onShowInfo) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Info",
+                        tint = ActionBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         } else {
             Text(
@@ -216,6 +240,7 @@ private fun SensorSection(
 
         Button(
             onClick = onNewSensor,
+            colors = ButtonDefaults.buttonColors(containerColor = ActionBlue),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp)
         ) {
@@ -232,12 +257,13 @@ private fun PumpSetSection(
     pickerDays: Int,
     isRu: Boolean,
     onPickerChange: (Int) -> Unit,
-    onNewPumpSet: () -> Unit
+    onNewPumpSet: () -> Unit,
+    onShowInfo: () -> Unit
 ) {
     val sdf = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("💉", fontSize = 20.sp)
+            Text("▣", fontSize = 20.sp)
             Text(
                 text = if (isRu) "Инфузионный набор" else "Infusion Set",
                 style = MaterialTheme.typography.titleMedium,
@@ -248,29 +274,46 @@ private fun PumpSetSection(
         if (status.installedAt > 0L) {
             val days = status.daysRemaining
             val color = statusColor(days)
-            val installedStr = sdf.format(Date(status.installedAt))
+            val installedStr = java.text.SimpleDateFormat("dd.MM.yyyy (HH:mm)", java.util.Locale.getDefault()).format(Date(status.installedAt))
             val expiresStr = sdf.format(Date(status.expiresAt))
-            Text(
-                text = if (isRu) "Установлен: $installedStr  ·  Истекает: $expiresStr" else "Installed: $installedStr  ·  Expires: $expiresStr",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = color.copy(alpha = 0.15f),
-                border = BorderStroke(1.dp, color.copy(alpha = 0.5f))
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = if (days < 0) {
-                        if (isRu) "Просрочен на ${-days} дн." else "Expired ${-days}d ago"
-                    } else {
-                        if (isRu) "Осталось: $days дн." else "Remaining: $days days"
-                    },
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                    color = color,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
+                    text = if (isRu) "Установлен: $installedStr" else "Installed: $installedStr",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Text(
+                    text = if (isRu) "Истекает: $expiresStr" else "Expires: $expiresStr",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = color.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, color.copy(alpha = 0.5f))
+                ) {
+                    Text(
+                        text = if (days < 0) {
+                            if (isRu) "Просрочен на ${-days} дн." else "Expired ${-days}d ago"
+                        } else {
+                            if (isRu) "Осталось: $days дн." else "Remaining: $days days"
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        color = color,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+                IconButton(onClick = onShowInfo) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Info",
+                        tint = ActionBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         } else {
             Text(
@@ -290,6 +333,7 @@ private fun PumpSetSection(
 
         Button(
             onClick = onNewPumpSet,
+            colors = ButtonDefaults.buttonColors(containerColor = ActionBlue),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp)
         ) {

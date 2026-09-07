@@ -48,7 +48,7 @@ fun DeviceStatusChips(
             // Pump part (if pump user)
             if (showPump) {
                 DeviceTextPart(
-                    emoji = "💉",
+                    emoji = "▣",
                     daysRemaining = pumpSetStatus.daysRemaining,
                     isSet = pumpSetStatus.installedAt > 0L,
                     isRu = isRu
@@ -66,7 +66,7 @@ fun DeviceStatusChips(
 
             // Sensor part (always shown)
             DeviceTextPart(
-                emoji = "📡",
+                emoji = "◉",
                 daysRemaining = sensorStatus.daysRemaining,
                 isSet = sensorStatus.installedAt > 0L,
                 isRu = isRu
