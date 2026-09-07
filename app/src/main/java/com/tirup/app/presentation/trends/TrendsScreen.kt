@@ -621,7 +621,7 @@ fun TrendsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { detailDialogInfo = null }) {
-                    Text(text = if (isRu) "Понятно" else "OK", color = PrimaryEmerald, fontWeight = FontWeight.Bold)
+                    Text(text = if (isRu) "Понятно" else "OK", color = ActionBlue, fontWeight = FontWeight.Bold)
                 }
             }
         )

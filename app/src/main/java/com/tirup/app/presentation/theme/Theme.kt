@@ -49,8 +49,8 @@ val TextSecondaryLight = Color(0xFF1E293B) // High-contrast deep slate
 val TextMutedLight = Color(0xFF334155)
 
 private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryEmerald,
-    onPrimary = Color.Black,
+    primary = ActionBlue,
+    onPrimary = Color.White,
     secondary = SecondaryTeal,
     onSecondary = Color.Black,
     background = DarkBg,
@@ -63,7 +63,7 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = PrimaryEmeraldDark,
+    primary = ActionBlue,
     onPrimary = Color.White,
     secondary = SecondaryTeal,
     onSecondary = Color.White,

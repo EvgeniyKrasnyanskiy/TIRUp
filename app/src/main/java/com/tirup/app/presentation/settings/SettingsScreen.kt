@@ -543,7 +543,7 @@ fun SettingsScreen(
                                 },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = Color.White,
-                                    checkedTrackColor = PrimaryEmerald
+                                    checkedTrackColor = ActionBlue
                                 )
                             )
                             Spacer(modifier = Modifier.width(4.dp))
@@ -758,7 +758,7 @@ fun SettingsScreen(
                             },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
-                                checkedTrackColor = PrimaryEmerald
+                                checkedTrackColor = ActionBlue
                             )
                         )
                     }
@@ -1759,7 +1759,7 @@ fun SettingsScreen(
                             },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
-                                checkedTrackColor = PrimaryEmerald
+                                checkedTrackColor = ActionBlue
                             )
                         )
                     }
@@ -1952,7 +1952,7 @@ fun SettingsScreen(
                             onCheckedChange = { viewModel.setLockscreenNotificationEnabled(it) },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
-                                checkedTrackColor = PrimaryEmerald
+                                checkedTrackColor = ActionBlue
                             )
                         )
                     }
@@ -2002,7 +2002,7 @@ fun SettingsScreen(
                             },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
-                                checkedTrackColor = PrimaryEmerald
+                                checkedTrackColor = ActionBlue
                             )
                         )
                     }
@@ -2196,7 +2196,7 @@ fun SettingsScreen(
                             onCheckedChange = { viewModel.toggleAutoBackup(it) },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
-                                checkedTrackColor = PrimaryEmerald
+                                checkedTrackColor = ActionBlue
                             )
                         )
                     }
