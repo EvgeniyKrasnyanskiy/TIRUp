@@ -178,6 +178,7 @@ fun FocusScreen(
                             sensorStatus = sensorStatus,
                             pumpSetStatus = pumpSetStatus,
                             showPump = isPumpUser,
+                            isRu = isRu,
                             onClick = { showDeviceModal = true }
                         )
                     }
