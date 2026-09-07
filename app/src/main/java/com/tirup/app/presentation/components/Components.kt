@@ -147,7 +147,7 @@ fun StreakBadge(
             Icon(
                 imageVector = Icons.Default.LocalFireDepartment,
                 contentDescription = null,
-                tint = PrimaryEmerald,
+                tint = Color(0xFFF97316),
                 modifier = Modifier.size(16.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))

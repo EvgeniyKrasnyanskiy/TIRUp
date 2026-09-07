@@ -72,10 +72,18 @@ import androidx.compose.ui.graphics.Brush
 import android.os.Build
 import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.ui.draw.scale
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -142,6 +150,8 @@ fun SettingsScreen(
     val currentYear = Calendar.getInstance().get(Calendar.YEAR)
     var showHelpDialog by remember { mutableStateOf(false) }
     var showAdvancedSettings by rememberSaveable { mutableStateOf(false) }
+    var isBleCardExpanded by rememberSaveable { mutableStateOf(false) }
+    var isSmsCardExpanded by rememberSaveable { mutableStateOf(false) }
     var showProfileDialog by rememberSaveable { mutableStateOf(false) }
     var showCriticalHypoSafetyDialog by rememberSaveable { mutableStateOf(false) }
     var showMainThresholdDialog by rememberSaveable { mutableStateOf(false) }
@@ -226,6 +236,15 @@ fun SettingsScreen(
     val broadcastRemaining by viewModel.bleBroadcastRemaining.collectAsState()
     val isScanning by viewModel.isBleScanning.collectAsState()
     val boostRemaining by viewModel.bleBoostRemaining.collectAsState()
+    val latestReading by viewModel.latestReading.collectAsState()
+
+    var currentTimeMs by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000L)
+            currentTimeMs = System.currentTimeMillis()
+        }
+    }
 
     LaunchedEffect(Unit) {
         com.tirup.app.data.ble.BleObserverManager.packetReceivedEvent.collect { pair ->
@@ -759,14 +778,19 @@ fun SettingsScreen(
             }
         }
 
-        // Section 3: Expandable Additional Settings Header
+        // Section 3: Grouped Additional Settings Frame
         item {
-            BentoCard(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { showAdvancedSettings = !showAdvancedSettings }
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = ActionBlue.copy(alpha = 0.10f),
+                border = BorderStroke(1.5.dp, ActionBlue.copy(alpha = 0.45f)),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showAdvancedSettings = !showAdvancedSettings }
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -775,19 +799,38 @@ fun SettingsScreen(
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Settings,
+                            imageVector = Icons.Default.Tune,
                             contentDescription = null,
                             tint = ActionBlue,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text(
-                                text = if (isRu) "Дополнительные настройки" else "Advanced Settings",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = if (isRu) "Дополнительные настройки" else "Advanced Settings",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = ActionBlue.copy(alpha = 0.2f),
+                                    border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.5f))
+                                ) {
+                                    Text(
+                                        text = if (showAdvancedSettings) (if (isRu) "Развёрнуто" else "Expanded") else (if (isRu) "Свёрнуто" else "Collapsed"),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = ActionBlue,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = if (isRu) "BLE-мост, экстренное SMS, дайджест недели, время сна, автобэкап"
                                        else "BLE Bridge, emergency SMS, weekly digest, sleep window, auto-backup",
@@ -799,8 +842,9 @@ fun SettingsScreen(
 
                     Icon(
                         imageVector = if (showAdvancedSettings) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        contentDescription = if (showAdvancedSettings) "Collapse" else "Expand",
+                        tint = ActionBlue,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
@@ -813,7 +857,9 @@ fun SettingsScreen(
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isBleCardExpanded = !isBleCardExpanded },
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -827,12 +873,35 @@ fun SettingsScreen(
                                 fontSize = 22.sp
                             )
                             Column {
-                                Text(
-                                    text = if (isRu) "Локальный BLE-мост" else "Local BLE Bridge",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = if (isRu) "Локальный BLE-мост" else "Local BLE Bridge",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    val (roleBadgeText, roleBadgeColor) = when (ble.role) {
+                                        BleBridgeRole.BROADCASTER -> Pair(if (isRu) "Вещатель" else "Broadcaster", ActionBlue)
+                                        BleBridgeRole.OBSERVER -> Pair(if (isRu) "Приёмник" else "Observer", PrimaryEmerald)
+                                        else -> Pair(if (isRu) "Выкл" else "Off", MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = roleBadgeColor.copy(alpha = 0.15f),
+                                        border = BorderStroke(0.8.dp, roleBadgeColor.copy(alpha = 0.4f))
+                                    ) {
+                                        Text(
+                                            text = roleBadgeText,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = roleBadgeColor,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = if (isRu) "Прямая связь между смартфонами без интернета (10–25 м)"
@@ -844,55 +913,62 @@ fun SettingsScreen(
                             }
                         }
 
-                        Surface(
-                            shape = CircleShape,
-                            color = ActionBlue.copy(alpha = 0.15f),
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clickable { showBleHelpModal = true }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = "BLE Info",
-                                    tint = ActionBlue,
-                                    modifier = Modifier.size(16.dp)
-                                )
+                            Surface(
+                                shape = CircleShape,
+                                color = ActionBlue.copy(alpha = 0.15f),
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clickable { showBleHelpModal = true }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = "BLE Info",
+                                        tint = ActionBlue,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
+
+                            Icon(
+                                imageVector = if (isBleCardExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (isBleCardExpanded) "Collapse" else "Expand",
+                                tint = ActionBlue,
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
                     }
 
-                    // Informational banner plate (as in patient profile)
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                        border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.25f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 10.dp, vertical = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = null,
-                                tint = ActionBlue,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = if (isRu)
-                                    "Прямая передача замера импульсом 5–10 сек при каждом новом замере CGM без интернета"
-                                else
-                                    "Direct telemetry via 5-10s BLE pulse upon each CGM reading without internet",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 15.sp
-                            )
-                        }
-                    }
+                    AnimatedVisibility(visible = isBleCardExpanded) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            // Informational banner plate (duplicate ℹ️ removed)
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.25f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (isRu)
+                                            "Прямая передача замера импульсом 5–10 сек при каждом новом замере CGM без интернета"
+                                        else
+                                            "Direct telemetry via 5-10s BLE pulse upon each CGM reading without internet",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        lineHeight = 15.sp
+                                    )
+                                }
+                            }
 
                     // Role Selector: 3 options (Off, Broadcaster, Observer)
                     val roles = listOf(
@@ -1058,31 +1134,90 @@ fun SettingsScreen(
                                 )
                             }
 
-                            // Broadcaster Status Banner
+                            // Broadcaster Status Banner with Pulse Animation & Idle Countdown
+                            val infiniteTransition = rememberInfiniteTransition(label = "BlePulse")
+                            val pulseAlpha by infiniteTransition.animateFloat(
+                                initialValue = 0.35f,
+                                targetValue = 1.0f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(700, easing = LinearEasing),
+                                    repeatMode = RepeatMode.Reverse
+                                ),
+                                label = "PulseAlpha"
+                            )
+                            val pulseScale by infiniteTransition.animateFloat(
+                                initialValue = 0.92f,
+                                targetValue = 1.08f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(700, easing = FastOutSlowInEasing),
+                                    repeatMode = RepeatMode.Reverse
+                                ),
+                                label = "PulseScale"
+                            )
+
                             Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = ActionBlue.copy(alpha = 0.12f),
-                                border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.3f)),
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isBroadcasting) ActionBlue.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                border = BorderStroke(1.2.dp, if (isBroadcasting) ActionBlue.copy(alpha = pulseAlpha) else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Row(
                                     modifier = Modifier.padding(10.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    Text(if (isBroadcasting) "📡" else "💤", fontSize = 16.sp)
-                                    Text(
-                                        text = if (isBroadcasting) {
-                                            if (isRu) "Радиоимпульс в эфире! Осталось: ${broadcastRemaining}с"
-                                            else "Transmitting BLE pulse! Remaining: ${broadcastRemaining}s"
-                                        } else {
-                                            if (isRu) "Режим вещателя готов. При получении замера телефон транслирует импульс 5–10 сек."
-                                            else "Broadcaster active. Transmits 5-10 second pulse upon receiving each reading."
-                                        },
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = if (isBroadcasting) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isBroadcasting) ActionBlue else MaterialTheme.colorScheme.onSurface
-                                    )
+                                    if (isBroadcasting) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .scale(pulseScale)
+                                                .background(ActionBlue.copy(alpha = pulseAlpha * 0.4f), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text("📡", fontSize = 16.sp)
+                                        }
+                                        Column {
+                                            Text(
+                                                text = if (isRu) "ИДЁТ ВЕЩАНИЕ В ЭФИР!" else "TRANSMITTING TELEMETRY!",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = ActionBlue
+                                            )
+                                            Text(
+                                                text = if (isRu) "Активный радиосигнал: осталось ${broadcastRemaining} сек."
+                                                       else "Active radio pulse: ${broadcastRemaining}s left",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                    } else {
+                                        Text("💤", fontSize = 20.sp)
+                                        Column {
+                                            Text(
+                                                text = if (isRu) "Вещатель в покое (радио молчит)" else "Broadcaster idle (radio silent)",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            val nextTimerStr = if (latestReading != null) {
+                                                val nextDueMs = latestReading!!.timestamp + 5 * 60 * 1000L
+                                                val diffSec = ((nextDueMs - currentTimeMs) / 1000L).coerceAtLeast(0L)
+                                                if (diffSec > 0) {
+                                                    String.format(java.util.Locale.US, "%d:%02d", diffSec / 60, diffSec % 60)
+                                                } else {
+                                                    if (isRu) "с минуты на минуту" else "any moment"
+                                                }
+                                            } else {
+                                                if (isRu) "ожидание замера" else "awaiting reading"
+                                            }
+                                            Text(
+                                                text = if (isRu) "Следующий импульс через ~$nextTimerStr (при замере)"
+                                                       else "Next pulse in ~$nextTimerStr (upon reading)",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
                                 }
                             }
 
@@ -1206,6 +1341,8 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+}
 
         // Section: Emergency SMS on Severe Hypo
         item {
@@ -1213,7 +1350,9 @@ fun SettingsScreen(
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isSmsCardExpanded = !isSmsCardExpanded },
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -1227,47 +1366,80 @@ fun SettingsScreen(
                                 fontSize = 22.sp
                             )
                             Column {
-                                Text(
-                                    text = if (isRu) "Экстренное SMS при гипогликемии" else "Emergency Hypo SMS",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = if (isRu) "Экстренное SMS" else "Emergency SMS",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    val (smsBadgeText, smsBadgeColor) = if (alerts.isEmergencySmsEnabled) {
+                                        Pair(if (isRu) "Вкл" else "On", Color(0xFFEF4444))
+                                    } else {
+                                        Pair(if (isRu) "Выкл" else "Off", MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = smsBadgeColor.copy(alpha = 0.15f),
+                                        border = BorderStroke(0.8.dp, smsBadgeColor.copy(alpha = 0.4f))
+                                    ) {
+                                        Text(
+                                            text = smsBadgeText,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = smsBadgeColor,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = if (isRu) "Авто-отправка SMS доверенному контакту, если сирена не отключена (подозрение на кому)"
-                                    else "Auto-send SMS to trusted contact if alarm is unacknowledged (coma suspicion)",
+                                    text = if (isRu) "Авто-отправка SMS доверенному контакту"
+                                    else "Auto-send SMS to trusted contact",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     lineHeight = 16.sp
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Switch(
-                            checked = alerts.isEmergencySmsEnabled,
-                            onCheckedChange = { isChecked ->
-                                if (isChecked && ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-                                    smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
-                                }
-                                viewModel.updateAlertSettings(alerts.copy(isEmergencySmsEnabled = isChecked))
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = Color(0xFFEF4444)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Switch(
+                                checked = alerts.isEmergencySmsEnabled,
+                                onCheckedChange = { isChecked ->
+                                    if (isChecked && ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                                        smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
+                                    }
+                                    viewModel.updateAlertSettings(alerts.copy(isEmergencySmsEnabled = isChecked))
+                                    if (isChecked) isSmsCardExpanded = true
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = Color(0xFFEF4444)
+                                )
                             )
-                        )
+
+                            Icon(
+                                imageVector = if (isSmsCardExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (isSmsCardExpanded) "Collapse" else "Expand",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
 
-                    if (alerts.isEmergencySmsEnabled) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                    AnimatedVisibility(visible = alerts.isEmergencySmsEnabled && isSmsCardExpanded) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
-                        // Primary trusted contact phone input
-                        OutlinedTextField(
-                            value = alerts.emergencyContactPhone,
-                            onValueChange = { phone ->
-                                viewModel.updateAlertSettings(alerts.copy(emergencyContactPhone = phone))
-                            },
+                            // Primary trusted contact phone input
+                            OutlinedTextField(
+                                value = alerts.emergencyContactPhone,
+                                onValueChange = { phone ->
+                                    viewModel.updateAlertSettings(alerts.copy(emergencyContactPhone = phone))
+                                },
                             label = { Text(if (isRu) "Основной телефон близкого (+7...)" else "Primary trusted phone (+...)") },
                             placeholder = { Text("+7 900 123-45-67") },
                             modifier = Modifier.fillMaxWidth(),
@@ -1478,6 +1650,7 @@ fun SettingsScreen(
                 }
             }
         }
+    }
 
         // Section: Weekly Sunday Digest
         item {
@@ -1987,6 +2160,40 @@ fun SettingsScreen(
                             color = PrimaryEmerald
                         )
                     }
+                }
+            }
+        }
+
+        // Section: Collapse Advanced Settings Footer
+        item {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showAdvancedSettings = false },
+                shape = RoundedCornerShape(12.dp),
+                color = ActionBlue.copy(alpha = 0.08f),
+                border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.25f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ExpandLess,
+                        contentDescription = "Collapse Advanced Settings",
+                        tint = ActionBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isRu) "Свернуть дополнительные настройки" else "Collapse Advanced Settings",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = ActionBlue,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }
