@@ -827,7 +827,7 @@ object GlucoseAlertManager {
 
             if (isLowConfirmed && now - lastHypoAlertTimestamp >= alerts.snoozeHypoMinutes * 60000L) {
                 lastHypoAlertTimestamp = now
-                val title = if (isRu) "🔻 Низкий сахар (подтверждено)" else "🔻 Low Glucose (Confirmed)"
+                val title = if (isRu) "🔻 Низкий сахар" else "🔻 Low Glucose"
                 val text = String.format(
                     Locale.US,
                     if (isRu) "Глюкоза: %.1f ммоль/л ниже порога %.1f."
@@ -845,7 +845,7 @@ object GlucoseAlertManager {
 
                 if (now - lastHyperAlertTimestamp >= hyperRepeatInterval) {
                     lastHyperAlertTimestamp = now
-                    val title = if (isRu) "🔺 Высокий сахар (подтверждено)" else "🔺 High Glucose (Confirmed)"
+                    val title = if (isRu) "🔺 Высокий сахар" else "🔺 High Glucose"
                     val text = String.format(
                         Locale.US,
                         if (isRu) "Глюкоза: %.1f ммоль/л выше нормы %.1f."
