@@ -102,6 +102,13 @@ class SettingsRepositoryImpl(
             .putLong(KEY_BLE_BRIDGE_LAST_TIMESTAMP, settings.bleBridgeSettings.lastPacketTimestamp)
             .putInt(KEY_BLE_BRIDGE_LAST_RSSI, settings.bleBridgeSettings.lastRssi)
             .putInt(KEY_BLE_BRIDGE_LAST_MASTER_BATTERY, settings.bleBridgeSettings.lastMasterBattery)
+            .putBoolean(KEY_DEVICE_REMINDERS_ENABLED, settings.isDeviceRemindersEnabled)
+            .putLong(KEY_SENSOR_INSTALLED_AT, settings.sensorStatus.installedAt)
+            .putInt(KEY_SENSOR_DURATION_DAYS, settings.sensorStatus.durationDays)
+            .putInt(KEY_SENSOR_LAST_USED_DURATION, settings.sensorStatus.lastUsedDurationDays)
+            .putLong(KEY_PUMP_SET_INSTALLED_AT, settings.pumpSetStatus.installedAt)
+            .putInt(KEY_PUMP_SET_DURATION_DAYS, settings.pumpSetStatus.durationDays)
+            .putInt(KEY_PUMP_SET_LAST_USED_DURATION, settings.pumpSetStatus.lastUsedDurationDays)
             .apply()
 
         _settingsFlow.value = settings
@@ -234,6 +241,17 @@ class SettingsRepositoryImpl(
                 lastPacketTimestamp = prefs.getLong(KEY_BLE_BRIDGE_LAST_TIMESTAMP, 0L),
                 lastRssi = prefs.getInt(KEY_BLE_BRIDGE_LAST_RSSI, 0),
                 lastMasterBattery = prefs.getInt(KEY_BLE_BRIDGE_LAST_MASTER_BATTERY, -1)
+            ),
+            isDeviceRemindersEnabled = prefs.getBoolean(KEY_DEVICE_REMINDERS_ENABLED, true),
+            sensorStatus = com.tirup.app.domain.model.SensorStatus(
+                installedAt = prefs.getLong(KEY_SENSOR_INSTALLED_AT, 0L),
+                durationDays = prefs.getInt(KEY_SENSOR_DURATION_DAYS, 14),
+                lastUsedDurationDays = prefs.getInt(KEY_SENSOR_LAST_USED_DURATION, 14)
+            ),
+            pumpSetStatus = com.tirup.app.domain.model.PumpSetStatus(
+                installedAt = prefs.getLong(KEY_PUMP_SET_INSTALLED_AT, 0L),
+                durationDays = prefs.getInt(KEY_PUMP_SET_DURATION_DAYS, 3),
+                lastUsedDurationDays = prefs.getInt(KEY_PUMP_SET_LAST_USED_DURATION, 3)
             )
         )
     }
@@ -313,5 +331,13 @@ class SettingsRepositoryImpl(
         private const val KEY_BLE_BRIDGE_LAST_TIMESTAMP = "key_ble_bridge_last_timestamp"
         private const val KEY_BLE_BRIDGE_LAST_RSSI = "key_ble_bridge_last_rssi"
         private const val KEY_BLE_BRIDGE_LAST_MASTER_BATTERY = "key_ble_bridge_last_master_battery"
+
+        private const val KEY_DEVICE_REMINDERS_ENABLED = "key_device_reminders_enabled"
+        private const val KEY_SENSOR_INSTALLED_AT = "key_sensor_installed_at"
+        private const val KEY_SENSOR_DURATION_DAYS = "key_sensor_duration_days"
+        private const val KEY_SENSOR_LAST_USED_DURATION = "key_sensor_last_used_duration"
+        private const val KEY_PUMP_SET_INSTALLED_AT = "key_pump_set_installed_at"
+        private const val KEY_PUMP_SET_DURATION_DAYS = "key_pump_set_duration_days"
+        private const val KEY_PUMP_SET_LAST_USED_DURATION = "key_pump_set_last_used_duration"
     }
 }

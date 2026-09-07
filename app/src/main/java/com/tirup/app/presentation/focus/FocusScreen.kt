@@ -73,6 +73,13 @@ import com.tirup.app.data.alert.AlertTier
 import com.tirup.app.domain.calculator.TargetCompensatorCalculator
 import com.tirup.app.domain.model.CompensatorStatus
 import com.tirup.app.domain.model.GlucoseReading
+import com.tirup.app.domain.model.SensorStatus
+import com.tirup.app.domain.model.PumpSetStatus
+import com.tirup.app.domain.model.isExpired
+import com.tirup.app.domain.model.daysRemaining
+import com.tirup.app.presentation.components.DeviceStatusChips
+import com.tirup.app.presentation.components.DeviceStatusModal
+import com.tirup.app.presentation.components.DeviceExpiredAlertDialog
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.presentation.components.BentoMetricCompact
@@ -112,6 +119,7 @@ fun FocusScreen(
     var showDailyAlertLogsDialog by rememberSaveable { mutableStateOf(false) }
     var focusCardMode by rememberSaveable { mutableStateOf(0) }
 
+
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val userSettings = state.userSettings
@@ -119,6 +127,15 @@ fun FocusScreen(
     val targetMode = userSettings.targetMode
     val unit = userSettings.unit
     val goal = state.compensatorGoal
+
+    var showDeviceModal by remember { mutableStateOf(false) }
+    val sensorStatus = state.sensorStatus
+    val pumpSetStatus = state.pumpSetStatus
+    val isPumpUser = userSettings.patientProfile.therapyType in listOf("Инсулиновая помпа", "Insulin Pump")
+    val showExpiredSensorDialog = remember(sensorStatus.installedAt) { sensorStatus.isExpired }
+    val showExpiredPumpDialog = remember(pumpSetStatus.installedAt) { isPumpUser && pumpSetStatus.isExpired }
+    var sensorExpiredDismissed by rememberSaveable { mutableStateOf(false) }
+    var pumpExpiredDismissed by rememberSaveable { mutableStateOf(false) }
 
     val shouldCelebrateStreak = state.streakDays >= 2 && state.streakDays > userSettings.lastStreakCelebratedDays
     var showStreakDialog by remember(shouldCelebrateStreak) { mutableStateOf(shouldCelebrateStreak) }
@@ -156,6 +173,14 @@ fun FocusScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    if (userSettings.isDeviceRemindersEnabled) {
+                        DeviceStatusChips(
+                            sensorStatus = sensorStatus,
+                            pumpSetStatus = pumpSetStatus,
+                            showPump = isPumpUser,
+                            onClick = { showDeviceModal = true }
+                        )
+                    }
                     StreakBadge(
                         streakDays = state.streakDays,
                         onClick = {
@@ -891,6 +916,51 @@ fun FocusScreen(
     }
 
     // Streak Motivator Dialog
+
+
+
+
+    // Device Status Modal
+    if (showDeviceModal) {
+        DeviceStatusModal(
+            sensorStatus = sensorStatus,
+            pumpSetStatus = pumpSetStatus,
+            isPumpUser = isPumpUser,
+            isRu = isRu,
+            onDismiss = { showDeviceModal = false },
+            onNewSensor = { days -> viewModel.updateSensorInstalled(days) },
+            onNewPumpSet = { days -> viewModel.updatePumpSetInstalled(days) }
+        )
+    }
+
+    // Expired sensor in-app alert
+    if (showExpiredSensorDialog && !sensorExpiredDismissed) {
+        DeviceExpiredAlertDialog(
+            isSensor = true,
+            daysExpired = -sensorStatus.daysRemaining,
+            isRu = isRu,
+            onDismiss = { sensorExpiredDismissed = true },
+            onInstallNow = {
+                sensorExpiredDismissed = true
+                showDeviceModal = true
+            }
+        )
+    }
+
+    // Expired pump set in-app alert
+    if (showExpiredPumpDialog && !pumpExpiredDismissed) {
+        DeviceExpiredAlertDialog(
+            isSensor = false,
+            daysExpired = -pumpSetStatus.daysRemaining,
+            isRu = isRu,
+            onDismiss = { pumpExpiredDismissed = true },
+            onInstallNow = {
+                pumpExpiredDismissed = true
+                showDeviceModal = true
+            }
+        )
+    }
+
     if (showStreakDialog) {
         StreakMotivatorDialog(
             streakDays = state.streakDays,
@@ -1775,4 +1845,5 @@ private fun DailyAlertLogsDialog(
             }
         }
     )
+
 }

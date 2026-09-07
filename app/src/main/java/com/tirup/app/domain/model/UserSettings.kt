@@ -149,7 +149,10 @@ data class UserSettings(
     val dismissedWeeklyDigestTimestamp: Long = 0L,
     val showTreatmentsOnChart: Boolean = true,
     val alertSettings: AlertSettings = AlertSettings(),
-    val bleBridgeSettings: BleBridgeSettings = BleBridgeSettings()
+    val bleBridgeSettings: BleBridgeSettings = BleBridgeSettings(),
+    val isDeviceRemindersEnabled: Boolean = true,
+    val sensorStatus: SensorStatus = SensorStatus(),
+    val pumpSetStatus: PumpSetStatus = PumpSetStatus()
 )
 
 fun localizeTherapyType(therapy: String, isRu: Boolean): String {

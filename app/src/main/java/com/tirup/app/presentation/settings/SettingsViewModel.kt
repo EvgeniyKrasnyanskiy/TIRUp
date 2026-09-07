@@ -71,6 +71,13 @@ class SettingsViewModel(
         }
     }
 
+        fun setDeviceRemindersEnabled(enabled: Boolean) {
+        val current = _uiState.value.userSettings
+        viewModelScope.launch {
+            settingsRepository.updateSettings(current.copy(isDeviceRemindersEnabled = enabled))
+        }
+    }
+
     fun setWeeklyDigestEnabled(enabled: Boolean) {
         viewModelScope.launch {
             val updated = _uiState.value.userSettings.copy(isWeeklyDigestEnabled = enabled)

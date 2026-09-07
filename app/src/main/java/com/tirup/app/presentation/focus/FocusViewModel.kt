@@ -13,6 +13,8 @@ import com.tirup.app.domain.calculator.TargetCompensatorCalculator
 import com.tirup.app.domain.model.DailySummary
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.TargetMode
+import com.tirup.app.domain.model.SensorStatus
+import com.tirup.app.domain.model.PumpSetStatus
 import com.tirup.app.domain.model.Treatment
 import com.tirup.app.domain.repository.GlucoseRepository
 import com.tirup.app.domain.repository.SettingsRepository
@@ -161,6 +163,8 @@ class FocusViewModel(
                     compensatorGoal = compensator,
                     streakDays = streak,
                     userSettings = settings,
+                        sensorStatus = settings.sensorStatus,
+                        pumpSetStatus = settings.pumpSetStatus,
                     activeAlertBanner = effectiveAlertBanner,
                     recentDailySummaries = summaries,
                     isLoading = false
@@ -226,6 +230,35 @@ class FocusViewModel(
     fun deleteTreatment(treatmentId: Long) {
         viewModelScope.launch {
             glucoseRepository.deleteTreatmentById(treatmentId)
+        }
+    }
+    fun updateSensorInstalled(durationDays: Int) {
+        val currentSettings = _uiState.value.userSettings
+        viewModelScope.launch {
+            settingsRepository.updateSettings(
+                currentSettings.copy(
+                    sensorStatus = SensorStatus(
+                        installedAt = System.currentTimeMillis(),
+                        durationDays = durationDays,
+                        lastUsedDurationDays = durationDays
+                    )
+                )
+            )
+        }
+    }
+
+    fun updatePumpSetInstalled(durationDays: Int) {
+        val currentSettings = _uiState.value.userSettings
+        viewModelScope.launch {
+            settingsRepository.updateSettings(
+                currentSettings.copy(
+                    pumpSetStatus = PumpSetStatus(
+                        installedAt = System.currentTimeMillis(),
+                        durationDays = durationDays,
+                        lastUsedDurationDays = durationDays
+                    )
+                )
+            )
         }
     }
 }

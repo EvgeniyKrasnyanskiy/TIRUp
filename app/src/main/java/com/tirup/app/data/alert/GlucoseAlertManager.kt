@@ -117,6 +117,7 @@ object GlucoseAlertManager {
     const val CHANNEL_COMPENSATOR = "tirup_compensator_v1"
     const val CHANNEL_LOCKSCREEN = "tirup_lockscreen_status_v1"
     const val CHANNEL_WEEKLY_DIGEST = "tirup_weekly_digest_v1"
+    const val CHANNEL_DEVICE_REMINDER = "tirup_device_reminder_v1"
 
     const val NOTIFICATION_ID_LOCKSCREEN = 1000
     const val NOTIFICATION_ID_PREDICTIVE = 1001
@@ -255,11 +256,74 @@ object GlucoseAlertManager {
         nm.createNotificationChannel(compensatorChannel)
         nm.createNotificationChannel(lockscreenChannel)
         nm.createNotificationChannel(weeklyDigestChannel)
+
+        NotificationChannel(
+            CHANNEL_DEVICE_REMINDER,
+            "Device Reminders",
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "CGM sensor and infusion set replacement reminders"
+            enableLights(true)
+            lightColor = Color.CYAN
+        }.also { nm.createNotificationChannel(it) }
     }
 
     /**
      * Posts a notification for the Sunday Weekly Digest.
      */
+    fun showDeviceReminderNotification(
+        context: Context,
+        isSensor: Boolean,
+        daysRemaining: Int,
+        isRu: Boolean
+    ) {
+        val notifId = if (isSensor) 9201 else 9202
+        val title: String
+        val text: String
+        if (isSensor) {
+            if (daysRemaining < 0) {
+                title = if (isRu) "⚠️ Сенсор CGM истёк" else "⚠️ CGM Sensor Expired"
+                text = if (isRu) "Срок службы сенсора истёк ${(-daysRemaining)} дн. назад. Установите новый сенсор." else "Sensor expired ${(-daysRemaining)}d ago. Install a new one."
+            } else {
+                title = if (isRu) "📡 Скоро замена сенсора CGM" else "📡 CGM Sensor Expiring Soon"
+                text = if (isRu) "Осталось $daysRemaining дн. Заранее подготовьте новый сенсор (1–2 дня на прогрев)." else "$daysRemaining days remaining. Prepare a new sensor early (1–2 days warm-up)."
+            }
+        } else {
+            if (daysRemaining < 0) {
+                title = if (isRu) "⚠️ Инфузионный набор истёк" else "⚠️ Infusion Set Expired"
+                text = if (isRu) "Срок службы набора истёк ${(-daysRemaining)} дн. назад. Смените набор немедленно." else "Infusion set expired ${(-daysRemaining)}d ago. Change it immediately."
+            } else {
+                title = if (isRu) "💉 Скоро замена инфузионного набора" else "💉 Infusion Set Expiring Soon"
+                text = if (isRu) "Осталось $daysRemaining дн. до замены инфузионного набора помпы." else "$daysRemaining days until infusion set change."
+            }
+        }
+
+        val intent = Intent(context, com.tirup.app.presentation.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context, notifId, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_DEVICE_REMINDER)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+
+        try {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.notify(notifId, notification)
+        } catch (e: Exception) {
+            Log.e(TAG, "showDeviceReminderNotification error", e)
+        }
+    }
+
     fun showWeeklyDigestNotification(
         context: Context,
         digest: com.tirup.app.domain.model.WeeklyDigest,

@@ -43,6 +43,7 @@ class TirupApplication : Application() {
         com.tirup.app.data.alert.GlucoseAlertManager.initChannels(this)
         com.tirup.app.data.backup.AutoBackupManager.scheduleNextDailyBackup(this)
         com.tirup.app.data.worker.WeeklyDigestWorker.schedule(this)
+        com.tirup.app.data.worker.DeviceStatusReminderWorker.schedule(this)
         com.tirup.app.data.ble.BleObserverManager.syncWithSettings(this, settingsRepository, glucoseRepository)
 
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO).launch {
