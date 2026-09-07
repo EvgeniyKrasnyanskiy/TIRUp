@@ -155,6 +155,38 @@ fun DeviceStatusModal(
             onDismiss = { showPumpConfirm = false }
         )
     }
+    if (showSensorInfo) {
+        AlertDialog(
+            onDismissRequest = { showSensorInfo = false },
+            title = { Text(if (isRu) "Срок службы сенсора" else "Sensor Lifespan") },
+            text = { 
+                Text(if (isRu) "Не рекомендуется носить сенсор дольше заявленного срока (обычно 14 дней), так как точность измерений может снизиться, а клей вызвать раздражение кожи." 
+                     else "It is not recommended to wear the sensor longer than its specified lifespan (usually 14 days), as accuracy may degrade and adhesive may cause skin irritation.")
+            },
+            confirmButton = {
+                TextButton(onClick = { showSensorInfo = false }) {
+                    Text("OK", color = ActionBlue)
+                }
+            }
+        )
+    }
+
+    if (showPumpInfo) {
+        AlertDialog(
+            onDismissRequest = { showPumpInfo = false },
+            title = { Text(if (isRu) "Срок службы набора" else "Infusion Set Lifespan") },
+            text = { 
+                Text(if (isRu) "Не рекомендуется носить инфузионную канюлю дольше 3 дней (для тефлона) или 2 дней (для стали). Это повышает риск воспаления и ухудшения всасывания инсулина." 
+                     else "It is not recommended to wear the infusion cannula longer than 3 days (for teflon) or 2 days (for steel). This increases the risk of inflammation and poor insulin absorption.")
+            },
+            confirmButton = {
+                TextButton(onClick = { showPumpInfo = false }) {
+                    Text("OK", color = ActionBlue)
+                }
+            }
+        )
+    }
+
 }
 
 @Composable
@@ -437,12 +469,12 @@ fun CountdownConfirmDialog(
             }
         },
         confirmButton = {
-            Button(onClick = onConfirm) {
+            Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)) {
                 Text(if (isRu) "Подтвердить" else "Confirm")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = ActionBlue)) {
                 Text(if (isRu) "Отмена" else "Cancel")
             }
         }
@@ -478,12 +510,12 @@ fun DeviceExpiredAlertDialog(
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = {
-            Button(onClick = onInstallNow) {
+            Button(onClick = onInstallNow, colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)) {
                 Text(if (isRu) "Установить сейчас" else "Install Now")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = ActionBlue)) {
                 Text(if (isRu) "ОК" else "OK")
             }
         }
