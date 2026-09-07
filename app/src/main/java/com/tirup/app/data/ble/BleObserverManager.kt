@@ -145,11 +145,25 @@ object BleObserverManager {
             return@withLock
         }
 
-        // Generic ScanFilter without manufacturer byte mask ensures compatibility across all hardware chipsets
-        val scanFilter = ScanFilter.Builder().build()
+        // Manufacturer ScanFilter with exact 'TU' magic header ensures hardware filtering keeps scanning alive while screen is off (Android 8+)
+        val scanFilter = ScanFilter.Builder()
+            .setManufacturerData(
+                BlePacketCodec.MANUFACTURER_ID,
+                byteArrayOf(0x54, 0x55), // magic "TU"
+                byteArrayOf(0xFF.toByte(), 0xFF.toByte()) // exact match mask
+            )
+            .build()
 
         val scanSettings = ScanSettings.Builder()
             .setScanMode(if (boost) ScanSettings.SCAN_MODE_LOW_LATENCY else ScanSettings.SCAN_MODE_BALANCED)
+            .setReportDelay(0L)
+            .apply {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
+                    setNumOfMatches(ScanSettings.MATCH_NUM_ONE_ADVERTISEMENT)
+                    setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+                }
+            }
             .build()
 
         val callback = object : ScanCallback() {

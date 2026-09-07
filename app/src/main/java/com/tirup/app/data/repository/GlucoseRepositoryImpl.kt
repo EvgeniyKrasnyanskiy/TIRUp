@@ -60,6 +60,29 @@ class GlucoseRepositoryImpl(
     }
 
     override suspend fun insertReading(reading: GlucoseReading) = withContext(Dispatchers.IO) {
+        val windowMs = 60_000L
+        val existing = readingDao.getReadingsBetweenSync(
+            reading.timestamp - windowMs,
+            reading.timestamp + windowMs
+        )
+        if (existing.isNotEmpty()) {
+            val closest = existing.minByOrNull { kotlin.math.abs(it.timestamp - reading.timestamp) }!!
+            // If already exists within 60s, enrich it if the incoming reading has extra information (e.g. IoB/trend)
+            val shouldUpdate = (reading.iob != null && closest.iob == null) ||
+                               (reading.cob != null && closest.cob == null) ||
+                               (!reading.trendArrow.isNullOrBlank() && closest.trendArrow.isNullOrBlank())
+            if (shouldUpdate) {
+                val merged = closest.copy(
+                    valueMmol = if (reading.valueMmol > 0.0) reading.valueMmol else closest.valueMmol,
+                    trendArrow = reading.trendArrow ?: closest.trendArrow,
+                    iob = reading.iob ?: closest.iob,
+                    cob = reading.cob ?: closest.cob
+                )
+                readingDao.insert(merged)
+            }
+            return@withContext
+        }
+
         readingDao.insert(GlucoseReadingEntity.fromDomain(reading))
 
         // Recalculate summary for today
@@ -69,12 +92,24 @@ class GlucoseRepositoryImpl(
     }
 
     override suspend fun insertReadingsBatch(readings: List<GlucoseReading>) = withContext(Dispatchers.IO) {
-        val entities = readings.map { GlucoseReadingEntity.fromDomain(it) }
-        readingDao.insertBatch(entities)
+        if (readings.isEmpty()) return@withContext
+        val windowMs = 60_000L
+        val filtered = mutableListOf<GlucoseReading>()
+        
+        for (r in readings) {
+            val existing = readingDao.getReadingsBetweenSync(r.timestamp - windowMs, r.timestamp + windowMs)
+            val alreadyInBatch = filtered.any { kotlin.math.abs(it.timestamp - r.timestamp) < windowMs }
+            if (existing.isEmpty() && !alreadyInBatch) {
+                filtered.add(r)
+            }
+        }
+        
+        if (filtered.isNotEmpty()) {
+            val entities = filtered.map { GlucoseReadingEntity.fromDomain(it) }
+            readingDao.insertBatch(entities)
 
-        if (readings.isNotEmpty()) {
-            val minTs = readings.minOf { it.timestamp }
-            val maxTs = readings.maxOf { it.timestamp }
+            val minTs = filtered.minOf { it.timestamp }
+            val maxTs = filtered.maxOf { it.timestamp }
             recalculateDailySummaries(minTs, maxTs)
         }
     }
@@ -121,6 +156,53 @@ class GlucoseRepositoryImpl(
 
     override suspend fun insertTreatmentsBatch(treatments: List<Treatment>) = withContext(Dispatchers.IO) {
         treatmentDao.insertBatch(treatments.map { TreatmentEntity.fromDomain(it) })
+    }
+
+    override suspend fun purgeDuplicateReadings(): Int = withContext(Dispatchers.IO) {
+        val totalCount = readingDao.getTotalCount()
+        if (totalCount <= 1) return@withContext 0
+
+        var offset = 0
+        val batchSize = 1000
+        var deletedCount = 0
+        var lastKeptEntity: GlucoseReadingEntity? = null
+        var earliestModifiedTs: Long? = null
+        var latestModifiedTs: Long? = null
+
+        while (true) {
+            val page = readingDao.getReadingsPaginated(batchSize, offset)
+            if (page.isEmpty()) break
+
+            for (current in page) {
+                val prev = lastKeptEntity
+                if (prev != null && kotlin.math.abs(current.timestamp - prev.timestamp) < 60_000L) {
+                    val prevScore = (if (prev.iob != null) 2 else 0) + (if (!prev.trendArrow.isNullOrBlank()) 1 else 0)
+                    val currScore = (if (current.iob != null) 2 else 0) + (if (!current.trendArrow.isNullOrBlank()) 1 else 0)
+
+                    val toDeleteId = if (currScore > prevScore) {
+                        lastKeptEntity = current
+                        prev.id
+                    } else {
+                        current.id
+                    }
+                    readingDao.deleteById(toDeleteId)
+                    deletedCount++
+
+                    if (earliestModifiedTs == null || current.timestamp < earliestModifiedTs) earliestModifiedTs = current.timestamp
+                    if (latestModifiedTs == null || current.timestamp > latestModifiedTs) latestModifiedTs = current.timestamp
+                } else {
+                    lastKeptEntity = current
+                }
+            }
+
+            offset += batchSize
+        }
+
+        if (deletedCount > 0 && earliestModifiedTs != null && latestModifiedTs != null) {
+            recalculateDailySummaries(earliestModifiedTs, latestModifiedTs)
+        }
+
+        deletedCount
     }
 
     override suspend fun clearAllData() = withContext(Dispatchers.IO) {

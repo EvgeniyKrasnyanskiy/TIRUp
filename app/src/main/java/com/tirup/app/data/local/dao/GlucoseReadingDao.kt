@@ -43,6 +43,9 @@ interface GlucoseReadingDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBatch(readings: List<GlucoseReadingEntity>)
 
+    @Query("DELETE FROM glucose_readings WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
     @Query("DELETE FROM glucose_readings")
     suspend fun clearAll()
 }

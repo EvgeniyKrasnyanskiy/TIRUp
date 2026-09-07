@@ -249,9 +249,19 @@ fun SettingsScreen(
     LaunchedEffect(Unit) {
         com.tirup.app.data.ble.BleObserverManager.packetReceivedEvent.collect { pair ->
             val (packet, rssi) = pair
-            val msg = if (isRu) "🎉 Получен радиосигнал с Мастера! Сигнал: $rssi dBm (${String.format(java.util.Locale.US, "%.1f", packet.valueMmol)} ммоль/л)"
-                      else "🎉 Received BLE signal from Master! Signal: $rssi dBm (${String.format(java.util.Locale.US, "%.1f", packet.valueMmol)} mmol/L)"
-            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            val signalBars = when {
+                rssi >= -65 -> "▂▄▆█"
+                rssi >= -75 -> "▂▄▆_"
+                rssi >= -85 -> "▂▄__"
+                else -> "▂___"
+            }
+            val iobStr = if (packet.iob > 0.0) ", 💉${String.format(java.util.Locale.US, "%.1f", packet.iob)}" else ""
+            val batStr = if (packet.batteryPercent in 0..100) ", 🔋${packet.batteryPercent}%" else ""
+            val msg = "📡 BLE: 🩸${String.format(java.util.Locale.US, "%.1f", packet.valueMmol)} ${packet.trendArrow}$iobStr$batStr ($rssi dBm $signalBars)"
+            
+            val toast = Toast.makeText(context, msg, Toast.LENGTH_SHORT)
+            toast.setGravity(android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL, 0, 140)
+            toast.show()
         }
     }
 

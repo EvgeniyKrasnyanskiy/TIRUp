@@ -163,6 +163,15 @@ class MainActivity : ComponentActivity() {
             }
         )[SettingsViewModel::class.java]
 
+        // Proactively clean up any historical duplicates (<60s jitter between xDrip and BLE)
+        androidx.lifecycle.lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                glucoseRepo.purgeDuplicateReadings()
+            } catch (e: Exception) {
+                android.util.Log.w("MainActivity", "Duplicate purge skipped: ${e.message}")
+            }
+        }
+
         setContent {
             val settingsState by settingsViewModel.uiState.collectAsState()
             val languageCode = settingsState.userSettings.language
