@@ -15,3 +15,5 @@ app/build/
 *.db-shm
 *.db-wal
 *.apk
+*.jks
+*.keystore

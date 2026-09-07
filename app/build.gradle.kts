@@ -1,12 +1,39 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
 }
 
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        FileInputStream(localPropertiesFile).use { load(it) }
+    }
+}
+
 android {
     namespace = "com.tirup.app"
     compileSdk = 34
+
+    signingConfigs {
+        create("release") {
+            val keystoreFile = rootProject.file("tirup.jks").takeIf { it.exists() }
+                ?: rootProject.file("../DiaNight/dianight.jks").takeIf { it.exists() }
+            val storePass = localProperties.getProperty("RELEASE_STORE_PASSWORD")
+            val keyPass = localProperties.getProperty("RELEASE_KEY_PASSWORD")
+            val alias = localProperties.getProperty("RELEASE_KEY_ALIAS") ?: "tirup"
+
+            if (keystoreFile != null && storePass != null && keyPass != null) {
+                storeFile = keystoreFile
+                storePassword = storePass
+                keyAlias = alias
+                keyPassword = keyPass
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.tirup.app"
@@ -14,6 +41,8 @@ android {
         targetSdk = 34
         versionCode = 6
         versionName = "2.0.4"
+
+        resourceConfigurations += listOf("ru", "en")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -29,7 +58,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            val releaseSigning = signingConfigs.getByName("release")
+            signingConfig = if (releaseSigning.storeFile != null) releaseSigning else signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -48,6 +78,17 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/*.version"
+            excludes += "/META-INF/*.kotlin_module"
+            excludes += "DebugProbesKt.bin"
+            excludes += "kotlin-tooling-metadata.json"
+        }
+    }
+
+    applicationVariants.all {
+        outputs.all {
+            (this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl)?.outputFileName =
+                "TIRUp-v${versionName}-release.apk"
         }
     }
 }
