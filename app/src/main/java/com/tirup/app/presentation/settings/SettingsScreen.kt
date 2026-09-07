@@ -1765,7 +1765,7 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (isRu) "📊 Воскресный дайджест компенсации" else "📊 Weekly Sunday Digest",
+                                text = if (isRu) "📊 Воскресный дайджест" else "📊 Sunday Digest",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -4121,13 +4121,13 @@ private fun BleFamilyPinDialog(
 private fun getAppVersionName(context: android.content.Context): String {
     return try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0)).versionName ?: "2.0.4"
+            context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0)).versionName ?: "2.0.5"
         } else {
             @Suppress("DEPRECATION")
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "2.0.4"
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "2.0.5"
         }
     } catch (_: Exception) {
-        "2.0.4"
+        "2.0.5"
     }
 }
 

@@ -240,7 +240,7 @@ object GlucoseAlertManager {
         // Weekly Sunday Digest
         val weeklyDigestChannel = NotificationChannel(
             CHANNEL_WEEKLY_DIGEST,
-            "Воскресный дайджест компенсации",
+            "Воскресный дайджест",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             description = "Еженедельная аналитическая сводка прогресса TIR, вариабельности и стабильности"
