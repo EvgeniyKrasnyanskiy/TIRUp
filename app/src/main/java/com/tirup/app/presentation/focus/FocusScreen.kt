@@ -1687,7 +1687,7 @@ private fun DailyAlertLogsDialog(
             ) {
                 Text(text = "🔔", fontSize = 20.sp)
                 Text(
-                    text = if (isRu) "Журнал оповещений (24ч)" else "Alert Log (24h)",
+                    text = if (isRu) "Журнал оповещений" else "Alert Log",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
