@@ -384,7 +384,7 @@ fun CarbRecommendationDetailDialog(
                 Text(
                     text = if (isRu) "Понятно" else "Got it",
                     fontWeight = FontWeight.Bold,
-                    color = PrimaryEmerald
+                    color = ActionBlue
                 )
             }
         }

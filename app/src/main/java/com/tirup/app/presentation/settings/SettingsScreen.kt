@@ -1351,7 +1351,7 @@ fun SettingsScreen(
                                 enabled = boostRemaining <= 0,
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = PrimaryEmerald.copy(alpha = 0.85f),
+                                    containerColor = ActionBlue.copy(alpha = 0.85f),
                                     disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                                     contentColor = Color.White,
                                     disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1707,19 +1707,19 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.6f))
+                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.6f))
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Send,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp),
-                                tint = PrimaryEmerald
+                                tint = ActionBlue
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = if (isRu) "Отправить проверочное SMS" else "Send test SMS verification",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = PrimaryEmerald
+                                color = ActionBlue
                             )
                         }
                     }
@@ -2708,7 +2708,7 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .height(44.dp),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald)
+                            colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
                         ) {
                             Text(
                                 text = if (isRu) "▶️ Снять паузу и включить сейчас" else "▶️ Resume and Enable Now",
@@ -2949,7 +2949,7 @@ private fun PatientProfileSummaryCard(
     }
 
     val isFemale = profile.gender.equals("F", ignoreCase = true)
-    val avatarBg = if (isFemale) Color(0xFFC026D3) else PrimaryEmerald
+    val avatarBg = if (isFemale) Color(0xFFC026D3) else ActionBlue
 
     BentoCard(
         modifier = Modifier.fillMaxWidth(),
@@ -3050,7 +3050,7 @@ private fun PatientProfileEditDialog(
                 Icon(
                     imageVector = Icons.Default.Person,
                     contentDescription = null,
-                    tint = if (profile.gender == "F") Color(0xFFC026D3) else PrimaryEmerald,
+                    tint = if (profile.gender == "F") Color(0xFFC026D3) else ActionBlue,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -3143,7 +3143,7 @@ private fun PatientProfileEditDialog(
                                 verticalArrangement = Arrangement.Center
                             ) {
                                 Text(if (isRu) "Возраст" else "Age", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("${profile.calculatedAge} ${if (isRu) "лет" else "y.o."}", style = MaterialTheme.typography.bodyMedium, color = PrimaryEmerald, fontWeight = FontWeight.Bold)
+                                Text("${profile.calculatedAge} ${if (isRu) "лет" else "y.o."}", style = MaterialTheme.typography.bodyMedium, color = ActionBlue, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -3310,7 +3310,7 @@ private fun PatientProfileEditDialog(
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant,
-                            border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.35f)),
+                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.35f)),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { isCarbExpanded = !isCarbExpanded }
@@ -3333,7 +3333,7 @@ private fun PatientProfileEditDialog(
                                         Icon(
                                             imageVector = Icons.Default.Restaurant,
                                             contentDescription = null,
-                                            tint = PrimaryEmerald,
+                                            tint = ActionBlue,
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
@@ -3341,14 +3341,14 @@ private fun PatientProfileEditDialog(
                                             text = carbRec.formatDailySummary(isRu),
                                             style = MaterialTheme.typography.bodySmall,
                                             fontWeight = FontWeight.Bold,
-                                            color = PrimaryEmerald
+                                            color = ActionBlue
                                         )
                                     }
 
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Surface(
                                             shape = CircleShape,
-                                            color = PrimaryEmerald.copy(alpha = 0.15f),
+                                            color = ActionBlue.copy(alpha = 0.15f),
                                             modifier = Modifier
                                                 .size(26.dp)
                                                 .clickable { showCarbGuide = true }
@@ -3357,7 +3357,7 @@ private fun PatientProfileEditDialog(
                                                 Icon(
                                                     imageVector = Icons.Default.Info,
                                                     contentDescription = "Carb Guide",
-                                                    tint = PrimaryEmerald,
+                                                    tint = ActionBlue,
                                                     modifier = Modifier.size(15.dp)
                                                 )
                                             }
@@ -3502,7 +3502,7 @@ private fun PatientProfileEditDialog(
                 Text(
                     text = if (isRu) "Готово" else "Done",
                     fontWeight = FontWeight.Bold,
-                    color = PrimaryEmerald
+                    color = ActionBlue
                 )
             }
         }

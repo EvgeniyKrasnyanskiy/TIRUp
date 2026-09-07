@@ -515,7 +515,18 @@ fun TrendsScreen(
                                 )
                             }
                             Text(
-                                text = "${tirInsights.size} ${if (isRu) "совета" else "tips"}",
+                                text = if (isRu) {
+                                    val n = tirInsights.size
+                                    val form = when {
+                                        n % 100 in 11..19 -> "советов"
+                                        n % 10 == 1 -> "совет"
+                                        n % 10 in 2..4 -> "совета"
+                                        else -> "советов"
+                                    }
+                                    "$n $form"
+                                } else {
+                                    "${tirInsights.size} tips"
+                                },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = onSurfaceVariant
                             )
