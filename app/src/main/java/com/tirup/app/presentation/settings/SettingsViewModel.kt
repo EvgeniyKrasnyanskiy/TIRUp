@@ -285,6 +285,23 @@ class SettingsViewModel(
         }
     }
 
+    fun setShowTreatmentsOnChart(enabled: Boolean) {
+        viewModelScope.launch {
+            val updated = _uiState.value.userSettings.copy(showTreatmentsOnChart = enabled)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+        }
+    }
+
+    fun clearTreatments() {
+        viewModelScope.launch {
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            glucoseRepository.clearTreatments()
+            val msg = if (isRu) "Метки болюсов и еды очищены." else "Insulin & meal marks cleared."
+            _uiState.update { it.copy(infoMessage = msg) }
+        }
+    }
+
     private val manualPdfGenerator = UserManualPdfGenerator(context)
 
     fun printOrShareUserManual() {

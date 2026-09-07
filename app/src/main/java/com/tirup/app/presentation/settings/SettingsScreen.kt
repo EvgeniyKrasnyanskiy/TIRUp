@@ -432,6 +432,44 @@ fun SettingsScreen(
                             )
                         }
                     }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+
+                    // Show Treatments On Chart Toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("💉🍽️", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = if (isRu) "Метки болюсов и еды на графике" else "Insulin & Meal Marks on Chart",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isRu) "Значки шприца 💉 и приёмов пищи 🍽️ на суточном графике" else "Syringe 💉 and meal 🍽️ icons on glucose curve",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = settings.showTreatmentsOnChart,
+                            onCheckedChange = { viewModel.setShowTreatmentsOnChart(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = ActionBlue
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -2161,6 +2199,20 @@ fun SettingsScreen(
                         Icon(imageVector = Icons.Default.DeleteSweep, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(text = stringResource(R.string.clear_data))
+                    }
+
+                    OutlinedButton(
+                        onClick = { viewModel.clearTreatments() },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Text("💉", fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = if (isRu) "Очистить метки болюсов и еды" else "Clear Insulin & Meal Marks")
                     }
 
                     if (state.infoMessage != null) {

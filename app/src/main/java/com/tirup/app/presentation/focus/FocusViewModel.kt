@@ -222,4 +222,10 @@ class FocusViewModel(
     fun updateMetricsOrder(newOrder: List<String>) {
         updateMetricsConfiguration(newOrder, _uiState.value.userSettings.hiddenMetrics)
     }
+
+    fun deleteTreatment(treatmentId: Long) {
+        viewModelScope.launch {
+            glucoseRepository.deleteTreatmentById(treatmentId)
+        }
+    }
 }

@@ -119,20 +119,22 @@ fun HelpAndDisclaimerDialog(
                     title = if (isRu) "Настройка связи с xDrip+" else "xDrip+ Connection Guide",
                     content = if (isRu) {
                         "Для полной интеграции выполните настройку в xDrip+ и Android:\n" +
-                        "1. Настройки ➔ Межпрограммная интеграция:\n" +
-                        "   • Включите «Широковещательный показ данных» (Broadcast locally) для приёма сахара;\n" +
-                        "   • Включите «API службы трансляции» (Broadcast Service API) для получения активного инсулина (IoB), углеводов (CoB) и меток болюсов/еды (Treatments).\n" +
-                        "2. Настройки системы Android ➔ Батарея:\n" +
-                        "   • Отключите оптимизацию батареи для TIRUp и xDrip+ (выберите «Без ограничений»).\n" +
-                        "3. TIRUp будет автоматически принимать замеры, стрелки тренда и историю Treatments в фоне без интернета."
+                        "1. Настройки xDrip+ ➔ Межпрограммная интеграция:\n" +
+                        "   • Широковещательные передачи: включите «Широковещательные передачи xDrip» и «Совместимый широковещатель»;\n" +
+                        "   • Широковещательная служба: включите «Поддержка широковещательной службы»;\n" +
+                        "   • Локальный веб-сервер: включите «Включить локальный веб-сервер» и обязательно «Включить сообщения об IoB в конечной точке Web Service API...» (для передачи активного инсулина IoB и углеводов);\n" +
+                        "2. Настройки системы Android ➔ Приложения ➔ TIRUp и xDrip+ ➔ Батарея:\n" +
+                        "   • Выберите режим «Без ограничений» (отключите оптимизацию расхода аккумулятора).\n" +
+                        "3. TIRUp будет автоматически принимать замеры, стрелки тренда, активный инсулин (IoB) и историю Treatments в фоне без интернета."
                     } else {
                         "For complete integration, configure the following in xDrip+ and Android:\n" +
-                        "1. Settings ➔ Inter-app settings:\n" +
-                        "   • Enable 'Broadcast locally' for real-time glucose readings;\n" +
-                        "   • Enable 'Broadcast Service API' to receive Insulin on Board (IoB), Carbs (CoB), and Treatments.\n" +
-                        "2. Android System Settings ➔ Battery:\n" +
-                        "   • Disable battery optimization for TIRUp and xDrip+ (select 'Unrestricted').\n" +
-                        "3. TIRUp will automatically receive readings, trend arrows, and Treatments in the background locally."
+                        "1. xDrip+ Settings ➔ Inter-app settings:\n" +
+                        "   • Broadcast service: enable 'Broadcast locally' and 'Compatible Broadcast';\n" +
+                        "   • Broadcast service support: enable 'Broadcast service support';\n" +
+                        "   • Local Web Server: enable 'Enable Local Web Server' and 'Show IOB in Web Service API endpoints' (for IoB and active carbs);\n" +
+                        "2. Android System Settings ➔ Apps ➔ TIRUp & xDrip+ ➔ Battery:\n" +
+                        "   • Choose 'Unrestricted' (disable battery optimization).\n" +
+                        "3. TIRUp will automatically receive readings, trend arrows, IoB, and Treatments in the background locally."
                     }
                 )
 

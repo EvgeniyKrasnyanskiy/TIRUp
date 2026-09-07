@@ -180,16 +180,16 @@ class UserManualPdfGenerator(private val context: Context) {
                 else "1. Linking Data Sources (xDrip+, GlucoDataHandler, Juggluco)",
                 items = listOf(
                     Triple(
-                        if (isRu) "Локальная трансляция (Broadcast locally)" else "Local Broadcast Toggle",
+                        if (isRu) "Широковещательные передачи xDrip" else "Local Broadcast Toggle",
                         if (isRu) "Шаг 1" else "Step 1",
-                        if (isRu) "xDrip+ ➔ Настройки ➔ «Межпрограммная интеграция» ➔ включите «Широковещательный показ данных». Приём работает полностью автономно без интернета и серверов при каждом замере сенсора."
-                        else "xDrip+ ➔ Settings ➔ 'Inter-app settings' ➔ enable 'Broadcast locally'. Runs 100% offline without cloud servers upon every new sensor measurement."
+                        if (isRu) "xDrip+ ➔ Настройки xDrip+ ➔ «Межпрограммная интеграция» ➔ включите «Широковещательные передачи xDrip» и «Совместимый широковещатель». Приём работает полностью автономно без интернета при каждом замере."
+                        else "xDrip+ ➔ Settings ➔ 'Inter-app settings' ➔ enable 'Broadcast locally' and 'Compatible Broadcast'. Runs 100% offline without cloud servers."
                     ),
                     Triple(
-                        if (isRu) "Служба трансляции API и Treatments" else "Broadcast Service API & Treatments",
+                        if (isRu) "Широковещательная служба и веб-сервер (IoB)" else "Broadcast Service & Web Server (IoB)",
                         if (isRu) "Шаг 2" else "Step 2",
-                        if (isRu) "xDrip+ ➔ «Межпрограммная интеграция» ➔ включите «API службы трансляции» (Broadcast Service API). Передаёт активный инсулин (IoB), углеводы (CoB) и маркеры болюсов/еды на Canvas."
-                        else "xDrip+ ➔ 'Inter-app settings' ➔ enable 'Broadcast Service API'. Enables real-time transmission of active insulin (IoB), carbs (CoB), and bolus/meal treatments to the Canvas."
+                        if (isRu) "В «Межпрограммная интеграция» включите «Поддержка широковещательной службы», а в «Локальный веб-сервер» включите «Включить сообщения об IoB в конечной точке Web Service API...» для передачи активного инсулина (IoB)."
+                        else "In 'Inter-app settings' enable 'Broadcast service support' and under 'Local Web Server' enable 'Show IOB in Web Service API endpoints' for active insulin (IoB)."
                     ),
                     Triple(
                         if (isRu) "Бесперебойная работа в фоне (Батарея)" else "Unrestricted Background Running (Battery)",

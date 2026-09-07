@@ -19,6 +19,8 @@ interface GlucoseRepository {
     suspend fun insertTreatmentsBatch(treatments: List<Treatment>)
     suspend fun recalculateDailySummaries(startDate: Long, endDate: Long)
     suspend fun purgeDuplicateReadings(): Int
+    suspend fun deleteTreatmentById(id: Long)
+    suspend fun clearTreatments()
     suspend fun clearAllData()
 }
 

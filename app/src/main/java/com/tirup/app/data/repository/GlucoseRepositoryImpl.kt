@@ -205,6 +205,14 @@ class GlucoseRepositoryImpl(
         deletedCount
     }
 
+    override suspend fun deleteTreatmentById(id: Long) = withContext(Dispatchers.IO) {
+        treatmentDao.deleteById(id)
+    }
+
+    override suspend fun clearTreatments() = withContext(Dispatchers.IO) {
+        treatmentDao.clearAll()
+    }
+
     override suspend fun clearAllData() = withContext(Dispatchers.IO) {
         readingDao.clearAll()
         summaryDao.clearAll()

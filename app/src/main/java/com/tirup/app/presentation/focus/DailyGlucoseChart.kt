@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -94,6 +95,8 @@ fun DailyGlucoseChart(
     isRu: Boolean,
     modifier: Modifier = Modifier,
     treatments: List<Treatment> = emptyList(),
+    showTreatments: Boolean = true,
+    onDeleteTreatment: ((Long) -> Unit)? = null,
     selectedMode: Int = 0,
     onModeChange: (Int) -> Unit = {},
     onConfigureMetricsClick: (() -> Unit)? = null,
@@ -118,7 +121,8 @@ fun DailyGlucoseChart(
         else readings.sortedBy { it.timestamp }
     }
 
-    val todayTreatments = remember(treatments, startOfDay) {
+    val todayTreatments = remember(treatments, startOfDay, showTreatments) {
+        if (!showTreatments) return@remember emptyList()
         val filtered = treatments.filter { it.timestamp >= startOfDay }
         if (filtered.isNotEmpty()) filtered.sortedBy { it.timestamp }
         else treatments.sortedBy { it.timestamp }
@@ -333,15 +337,34 @@ fun DailyGlucoseChart(
                                 }
                             }
 
-                            Text(
-                                text = "✕",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = onSurfaceVariant,
-                                modifier = Modifier
-                                    .clickable { selectedTreatment = null }
-                                    .padding(horizontal = 4.dp)
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (onDeleteTreatment != null) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = if (isRu) "Удалить метку" else "Delete mark",
+                                        tint = Color(0xFFEF4444),
+                                        modifier = Modifier
+                                            .size(18.dp)
+                                            .clickable {
+                                                onDeleteTreatment(tr.id)
+                                                selectedTreatment = null
+                                            }
+                                    )
+                                }
+
+                                Text(
+                                    text = "✕",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = onSurfaceVariant,
+                                    modifier = Modifier
+                                        .clickable { selectedTreatment = null }
+                                        .padding(horizontal = 4.dp)
+                                )
+                            }
                         }
                     }
                 } else if (selectedGap != null) {

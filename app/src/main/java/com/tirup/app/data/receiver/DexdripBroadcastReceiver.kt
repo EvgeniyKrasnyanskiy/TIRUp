@@ -518,9 +518,27 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
     }
 
     private fun fetchIobCobFromLocalPebbleService(): Pair<Double?, Double?>? {
+        // 1. Try /pebble endpoint
+        val pebbleResult = queryLocalEndpoint("pebble")?.let { parsePebbleJson(it) }
+        if (pebbleResult?.first != null && pebbleResult.second != null) {
+            return pebbleResult
+        }
+
+        // 2. Fallback to /status.json endpoint
+        val statusResult = queryLocalEndpoint("status.json")?.let { parseStatusJson(it) }
+        val mergedIob = pebbleResult?.first ?: statusResult?.first
+        val mergedCob = pebbleResult?.second ?: statusResult?.second
+
+        if (mergedIob != null || mergedCob != null) {
+            return Pair(mergedIob, mergedCob)
+        }
+        return null
+    }
+
+    private fun queryLocalEndpoint(endpoint: String): String? {
         var connection: java.net.HttpURLConnection? = null
         return try {
-            val url = java.net.URL("http://127.0.0.1:17580/pebble")
+            val url = java.net.URL("http://127.0.0.1:17580/$endpoint")
             connection = (url.openConnection() as java.net.HttpURLConnection).apply {
                 connectTimeout = 1500
                 readTimeout = 1500
@@ -528,17 +546,50 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 setRequestProperty("Accept", "application/json")
             }
             if (connection.responseCode == 200) {
-                val response = connection.inputStream.bufferedReader().use { it.readText() }
-                parsePebbleJson(response)
-            } else {
-                null
-            }
+                connection.inputStream.bufferedReader().use { it.readText() }
+            } else null
         } catch (_: Exception) {
-            // Local server not running or port 17580 disabled - expected when xDrip web service is off
             null
         } finally {
             connection?.disconnect()
         }
+    }
+
+    private fun parseStatusJson(jsonStr: String): Pair<Double?, Double?>? {
+        try {
+            val root = org.json.JSONObject(jsonStr)
+            var iob: Double? = null
+            var cob: Double? = null
+
+            val statusArr = root.optJSONArray("status")
+            val statusObj = if (statusArr != null && statusArr.length() > 0) statusArr.optJSONObject(0) else root
+
+            if (statusObj != null) {
+                val iobObj = statusObj.optJSONObject("iob")
+                if (iobObj != null && iobObj.has("iob")) {
+                    val v = iobObj.optDouble("iob")
+                    if (!v.isNaN() && v >= 0.0) iob = v
+                } else if (statusObj.has("iob")) {
+                    val v = statusObj.optDouble("iob")
+                    if (!v.isNaN() && v >= 0.0) iob = v
+                }
+
+                val cobObj = statusObj.optJSONObject("cob")
+                if (cobObj != null && cobObj.has("cob")) {
+                    val v = cobObj.optDouble("cob")
+                    if (!v.isNaN() && v >= 0.0) cob = v
+                } else if (statusObj.has("cob")) {
+                    val v = statusObj.optDouble("cob")
+                    if (!v.isNaN() && v >= 0.0) cob = v
+                }
+            }
+            if (iob != null || cob != null) {
+                return Pair(iob, cob)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse status.json: ${e.message}")
+        }
+        return null
     }
 
     private fun parsePebbleJson(jsonStr: String): Pair<Double?, Double?>? {
@@ -643,5 +694,25 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         private var cachedCob: Double? = null
         @Volatile
         private var cachedCobTimestamp: Long = 0L
+
+        fun sendXdripBroadcastServiceHandshake(context: Context) {
+            try {
+                val actions = listOf(
+                    "com.eveningoutpost.dexdrip.services.broadcastservice.BROADCAST_SERVICE_INIT",
+                    "com.eveningoutpost.dexdrip.services.broadcastservice.PING",
+                    "com.eveningoutpost.dexdrip.services.broadcastservice.CONNECT"
+                )
+                for (act in actions) {
+                    val intent = Intent(act).apply {
+                        setPackage("com.eveningoutpost.dexdrip")
+                        putExtra("package", context.packageName)
+                        putExtra("app_name", "TIRUp")
+                    }
+                    context.sendBroadcast(intent)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to send xDrip handshake: ${e.message}")
+            }
+        }
     }
 }

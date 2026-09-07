@@ -147,6 +147,7 @@ data class UserSettings(
     val isFloatingBubbleEnabled: Boolean = false,
     val isWeeklyDigestEnabled: Boolean = true,
     val dismissedWeeklyDigestTimestamp: Long = 0L,
+    val showTreatmentsOnChart: Boolean = true,
     val alertSettings: AlertSettings = AlertSettings(),
     val bleBridgeSettings: BleBridgeSettings = BleBridgeSettings()
 )

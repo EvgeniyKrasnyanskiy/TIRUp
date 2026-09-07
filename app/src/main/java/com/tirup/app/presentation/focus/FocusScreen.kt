@@ -283,6 +283,8 @@ fun FocusScreen(
                 unit = unit,
                 isRu = isRu,
                 treatments = state.treatments,
+                showTreatments = userSettings.showTreatmentsOnChart,
+                onDeleteTreatment = { viewModel.deleteTreatment(it) },
                 selectedMode = focusCardMode,
                 onModeChange = { focusCardMode = it },
                 onConfigureMetricsClick = { showMetricsOrderDialog = true },

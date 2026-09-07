@@ -94,6 +94,7 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import kotlinx.coroutines.launch
+import androidx.lifecycle.lifecycleScope
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
@@ -164,12 +165,15 @@ class MainActivity : ComponentActivity() {
         )[SettingsViewModel::class.java]
 
         // Proactively clean up any historical duplicates (<60s jitter between xDrip and BLE)
-        androidx.lifecycle.lifecycleScope.launch(Dispatchers.IO) {
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
             try {
                 glucoseRepo.purgeDuplicateReadings()
             } catch (e: Exception) {
                 android.util.Log.w("MainActivity", "Duplicate purge skipped: ${e.message}")
             }
+            try {
+                DexdripBroadcastReceiver.sendXdripBroadcastServiceHandshake(this@MainActivity)
+            } catch (_: Exception) {}
         }
 
         setContent {
