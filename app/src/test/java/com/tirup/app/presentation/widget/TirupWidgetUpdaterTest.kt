@@ -107,4 +107,103 @@ class TirupWidgetUpdaterTest {
         assertEquals("-14м", mildDefText)
         assertEquals(0xFFF59E0B.toInt(), mildDefColor) // mild deficit <= 60m -> amber
     }
+
+    @Test
+    fun testPrioritizedBadgesWhenAllPresent() {
+        val now = System.currentTimeMillis()
+        val latest = GlucoseReading(
+            timestamp = now - 2 * 60_000L,
+            valueMmol = 6.0,
+            iob = 1.5
+        )
+        val settings = com.tirup.app.domain.model.UserSettings(
+            bleBridgeSettings = com.tirup.app.domain.model.BleBridgeSettings(
+                role = com.tirup.app.domain.model.BleBridgeRole.OBSERVER,
+                lastMasterBattery = 85,
+                lastPacketTimestamp = now - 60_000L
+            )
+        )
+        val streakDays = 5
+        val today = listOf(
+            GlucoseReading(timestamp = now - 10 * 60_000L, valueMmol = 5.5),
+            latest
+        )
+
+        val badges = TirupWidgetUpdater.getPrioritizedBadges(
+            latest = latest,
+            recent = today,
+            todayReadings = today,
+            settings = settings,
+            streakDays = streakDays
+        )
+
+        val types = badges.map { it.type }
+        assertEquals("iob", types[0])
+        assertEquals("battery", types[1])
+        assertEquals("streak", types[2])
+        assertEquals("💉 1.5 U", badges[0].text)
+        assertEquals("🔋 85%", badges[1].text)
+        assertEquals("🔥 5 д.", badges[2].text)
+    }
+
+    @Test
+    fun testPrioritizedBadgesFallbackWhenOptionalAbsent() {
+        val now = System.currentTimeMillis()
+        // No IoB, no BLE battery, streak = 0
+        val latest = GlucoseReading(
+            timestamp = now - 3 * 60_000L,
+            valueMmol = 6.0,
+            iob = null
+        )
+        val settings = com.tirup.app.domain.model.UserSettings(
+            bleBridgeSettings = com.tirup.app.domain.model.BleBridgeSettings(
+                role = com.tirup.app.domain.model.BleBridgeRole.DISABLED
+            )
+        )
+        val streakDays = 0
+        val today = listOf(
+            GlucoseReading(timestamp = now - 5 * 60_000L, valueMmol = 5.4),
+            latest
+        )
+
+        val badges = TirupWidgetUpdater.getPrioritizedBadges(
+            latest = latest,
+            recent = today,
+            todayReadings = today,
+            settings = settings,
+            streakDays = streakDays
+        )
+
+        val types = badges.map { it.type }
+        // ioB, battery, and streak are absent, so compensator/delta/time_ago/mean populate the top
+        org.junit.Assert.assertFalse(types.contains("iob"))
+        org.junit.Assert.assertFalse(types.contains("battery"))
+        org.junit.Assert.assertFalse(types.contains("streak"))
+        org.junit.Assert.assertTrue(types.isNotEmpty())
+        assertEquals("compensator", types[0])
+    }
+
+    @Test
+    fun testPrioritizedBadgesExcludesSpecifiedTypes() {
+        val now = System.currentTimeMillis()
+        val latest = GlucoseReading(
+            timestamp = now - 2 * 60_000L,
+            valueMmol = 6.0,
+            iob = 2.0
+        )
+        val settings = com.tirup.app.domain.model.UserSettings()
+        val today = listOf(latest)
+
+        val badges = TirupWidgetUpdater.getPrioritizedBadges(
+            latest = latest,
+            recent = today,
+            todayReadings = today,
+            settings = settings,
+            streakDays = 0,
+            excludeTypes = setOf("iob")
+        )
+
+        val types = badges.map { it.type }
+        org.junit.Assert.assertFalse(types.contains("iob"))
+    }
 }

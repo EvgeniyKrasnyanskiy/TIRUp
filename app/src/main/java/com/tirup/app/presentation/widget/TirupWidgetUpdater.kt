@@ -19,6 +19,7 @@ import com.tirup.app.R
 import com.tirup.app.TirupApplication
 import com.tirup.app.domain.calculator.GlucoseMetricsCalculator
 import com.tirup.app.domain.calculator.TargetCompensatorCalculator
+import com.tirup.app.domain.model.BleBridgeRole
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.TargetMode
@@ -306,13 +307,14 @@ object TirupWidgetUpdater {
             views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
             views.setViewVisibility(R.id.widget_master_battery, View.GONE)
             views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
+            views.setViewVisibility(R.id.widget_iob_text, View.GONE)
+            views.setViewVisibility(R.id.widget_iob_streak_section, View.GONE)
+            views.setViewVisibility(R.id.widget_battery_time_section, View.GONE)
             return views
         }
 
         bindCommonMetrics(views, latest, recent, settings)
         bindCompensator(views, latest, todayReadings, settings, isStrip = true)
-        bindIobCob(views, latest)
-        bindMasterBattery(views, settings, latest)
 
         val isRu = settings.language.equals("RU", ignoreCase = true)
         val diffMin = ((System.currentTimeMillis() - latest.timestamp).coerceAtLeast(0L) / 60_000L).toInt()
@@ -362,14 +364,33 @@ object TirupWidgetUpdater {
             views.setTextColor(R.id.widget_cv_score, grayColor)
         }
 
-        // Streak badge
-        if (streakDays > 0) {
-            views.setViewVisibility(R.id.widget_streak_badge, View.VISIBLE)
-            views.setTextViewText(R.id.widget_streak_badge, if (isRu) "🔥 $streakDays д." else "🔥 ${streakDays}d")
-            views.setTextColor(R.id.widget_streak_badge, if (isStale) grayColor else Color.parseColor("#F59E0B"))
-        } else {
-            views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
-        }
+        // Dynamic badges in right section
+        val badges = getPrioritizedBadges(
+            latest = latest,
+            recent = recent,
+            todayReadings = todayReadings,
+            settings = settings,
+            streakDays = streakDays,
+            excludeTypes = setOf("delta", "compensator", "mean", "cv")
+        )
+        fillBadgeSlots(
+            views = views,
+            slotIds = listOf(
+                R.id.widget_iob_text,
+                R.id.widget_streak_badge,
+                R.id.widget_master_battery,
+                R.id.widget_time_ago
+            ),
+            badges = badges
+        )
+        views.setViewVisibility(
+            R.id.widget_iob_streak_section,
+            if (badges.isNotEmpty()) View.VISIBLE else View.GONE
+        )
+        views.setViewVisibility(
+            R.id.widget_battery_time_section,
+            if (badges.size > 2) View.VISIBLE else View.GONE
+        )
 
         return views
     }
@@ -404,32 +425,27 @@ object TirupWidgetUpdater {
 
         bindCommonMetrics(views, latest, recent, settings)
         bindCompensator(views, latest, todayReadings, settings, isStrip = false)
-        bindMasterBattery(views, settings, latest)
 
-        // Streak badge
-        val isRu = settings.language.equals("RU", ignoreCase = true)
-        val diffMin = ((System.currentTimeMillis() - latest.timestamp).coerceAtLeast(0L) / 60_000L).toInt()
-        val isStale = diffMin > 5
-        val grayColor = Color.parseColor("#94A3B8")
-        if (streakDays > 0) {
-            views.setViewVisibility(R.id.widget_streak_text, View.VISIBLE)
-            views.setTextViewText(R.id.widget_streak_text, if (isRu) "🔥 $streakDays д." else "🔥 ${streakDays}d")
-            views.setTextColor(R.id.widget_streak_text, if (isStale) grayColor else Color.parseColor("#F59E0B"))
-        } else {
-            views.setViewVisibility(R.id.widget_streak_text, View.GONE)
-        }
-
-        // IoB badge
-        val iob = latest.iob ?: 0.0
-        if (iob > 0.05) {
-            views.setViewVisibility(R.id.widget_iob_text, View.VISIBLE)
-            views.setTextViewText(R.id.widget_iob_text, String.format(Locale.US, "💉 %.1f U", iob))
-            views.setTextColor(R.id.widget_iob_text, if (isStale) grayColor else Color.parseColor("#38BDF8"))
-        } else {
-            views.setViewVisibility(R.id.widget_iob_text, View.GONE)
-        }
+        val badges = getPrioritizedBadges(
+            latest = latest,
+            recent = recent,
+            todayReadings = todayReadings,
+            settings = settings,
+            streakDays = streakDays,
+            excludeTypes = setOf("delta")
+        )
+        fillBadgeSlots(
+            views = views,
+            slotIds = listOf(
+                R.id.widget_iob_text,
+                R.id.widget_streak_text,
+                R.id.widget_master_battery
+            ),
+            badges = badges
+        )
 
         // Render 4-hour HD Canvas Sparkline with corridor and time scale
+        val isRu = settings.language.equals("RU", ignoreCase = true)
         val sparklineBitmap = drawSparklineBitmap(
             readings = recent,
             latest = latest,
@@ -477,21 +493,28 @@ object TirupWidgetUpdater {
 
         bindCommonMetrics(views, latest, recent, settings)
         bindCompensator(views, latest, todayReadings, settings, isStrip = true)
-        bindIobCob(views, latest)
-        bindMasterBattery(views, settings, latest)
 
-        // Streak badge
-        val isRu = settings.language.equals("RU", ignoreCase = true)
-        val diffMin = ((System.currentTimeMillis() - latest.timestamp).coerceAtLeast(0L) / 60_000L).toInt()
-        val isStale = diffMin > 5
-        val grayColor = Color.parseColor("#94A3B8")
-        if (streakDays > 0) {
-            views.setViewVisibility(R.id.widget_streak_badge, View.VISIBLE)
-            views.setTextViewText(R.id.widget_streak_badge, if (isRu) "🔥 $streakDays д." else "🔥 ${streakDays}d")
-            views.setTextColor(R.id.widget_streak_badge, if (isStale) grayColor else Color.parseColor("#F59E0B"))
-        } else {
-            views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
-        }
+        val badges = getPrioritizedBadges(
+            latest = latest,
+            recent = recent,
+            todayReadings = todayReadings,
+            settings = settings,
+            streakDays = streakDays,
+            excludeTypes = setOf("delta", "compensator")
+        )
+        fillBadgeSlots(
+            views = views,
+            slotIds = listOf(
+                R.id.widget_iob_text,
+                R.id.widget_master_battery,
+                R.id.widget_streak_badge
+            ),
+            badges = badges
+        )
+        views.setViewVisibility(
+            R.id.widget_iob_cob_layout,
+            if (badges.isNotEmpty()) View.VISIBLE else View.GONE
+        )
 
         return views
     }
@@ -625,32 +648,25 @@ object TirupWidgetUpdater {
 
         bindCommonMetrics(views, latest, recent, settings)
         bindCompensator(views, latest, todayReadings, settings, isStrip = true)
-        bindMasterBattery(views, settings, latest)
         views.setViewVisibility(R.id.widget_time_ago, View.GONE)
 
-        val diffMin = ((System.currentTimeMillis() - latest.timestamp).coerceAtLeast(0L) / 60_000L).toInt()
-        val isStale = diffMin > 5
-        val grayColor = Color.parseColor("#94A3B8")
-
-        // Streak badge
-        val isRu = settings.language.equals("RU", ignoreCase = true)
-        if (streakDays > 0) {
-            views.setViewVisibility(R.id.widget_streak_badge, View.VISIBLE)
-            views.setTextViewText(R.id.widget_streak_badge, if (isRu) "🔥 $streakDays д." else "🔥 ${streakDays}d")
-            views.setTextColor(R.id.widget_streak_badge, if (isStale) grayColor else Color.parseColor("#F59E0B"))
-        } else {
-            views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
-        }
-
-        // IoB badge
-        val iob = latest.iob ?: 0.0
-        if (iob > 0.05) {
-            views.setViewVisibility(R.id.widget_iob_text, View.VISIBLE)
-            views.setTextViewText(R.id.widget_iob_text, String.format(Locale.US, "💉 %.1f U", iob))
-            views.setTextColor(R.id.widget_iob_text, if (isStale) grayColor else Color.parseColor("#38BDF8"))
-        } else {
-            views.setViewVisibility(R.id.widget_iob_text, View.GONE)
-        }
+        val badges = getPrioritizedBadges(
+            latest = latest,
+            recent = recent,
+            todayReadings = todayReadings,
+            settings = settings,
+            streakDays = streakDays,
+            excludeTypes = setOf("delta", "compensator")
+        )
+        fillBadgeSlots(
+            views = views,
+            slotIds = listOf(
+                R.id.widget_iob_text,
+                R.id.widget_streak_badge,
+                R.id.widget_master_battery
+            ),
+            badges = badges
+        )
 
         return views
     }
@@ -685,32 +701,27 @@ object TirupWidgetUpdater {
 
         bindCommonMetrics(views, latest, recent, settings)
         bindCompensator(views, latest, todayReadings, settings, isStrip = false)
-        bindMasterBattery(views, settings, latest)
 
-        // Streak badge
-        val isRu = settings.language.equals("RU", ignoreCase = true)
-        val diffMin = ((System.currentTimeMillis() - latest.timestamp).coerceAtLeast(0L) / 60_000L).toInt()
-        val isStale = diffMin > 5
-        val grayColor = Color.parseColor("#94A3B8")
-        if (streakDays > 0) {
-            views.setViewVisibility(R.id.widget_streak_text, View.VISIBLE)
-            views.setTextViewText(R.id.widget_streak_text, if (isRu) "🔥 $streakDays д." else "🔥 ${streakDays}d")
-            views.setTextColor(R.id.widget_streak_text, if (isStale) grayColor else Color.parseColor("#F59E0B"))
-        } else {
-            views.setViewVisibility(R.id.widget_streak_text, View.GONE)
-        }
-
-        // IoB badge
-        val iob = latest.iob ?: 0.0
-        if (iob > 0.05) {
-            views.setViewVisibility(R.id.widget_iob_text, View.VISIBLE)
-            views.setTextViewText(R.id.widget_iob_text, String.format(Locale.US, "💉 %.1f U", iob))
-            views.setTextColor(R.id.widget_iob_text, if (isStale) grayColor else Color.parseColor("#38BDF8"))
-        } else {
-            views.setViewVisibility(R.id.widget_iob_text, View.GONE)
-        }
+        val badges = getPrioritizedBadges(
+            latest = latest,
+            recent = recent,
+            todayReadings = todayReadings,
+            settings = settings,
+            streakDays = streakDays,
+            excludeTypes = setOf("delta")
+        )
+        fillBadgeSlots(
+            views = views,
+            slotIds = listOf(
+                R.id.widget_iob_text,
+                R.id.widget_streak_text,
+                R.id.widget_master_battery
+            ),
+            badges = badges
+        )
 
         // Render 4-hour HD Canvas Sparkline with corridor and time scale
+        val isRu = settings.language.equals("RU", ignoreCase = true)
         val sparklineBitmap = drawSparklineBitmap(
             readings = recent,
             latest = latest,
@@ -788,25 +799,19 @@ object TirupWidgetUpdater {
         views.setTextViewText(R.id.widget_tir_score, "$targetName: $currentPercent%")
         views.setTextColor(R.id.widget_tir_score, tirColor)
 
-        // IoB on right top
-        val iob = latest.iob ?: 0.0
-        if (iob > 0.05) {
-            views.setViewVisibility(R.id.widget_iob_text, View.VISIBLE)
-            views.setTextViewText(R.id.widget_iob_text, String.format(Locale.US, "💉 %.1f U", iob))
-            views.setTextColor(R.id.widget_iob_text, if (isStale) grayColor else Color.parseColor("#38BDF8"))
-        } else {
-            views.setViewVisibility(R.id.widget_iob_text, View.GONE)
-        }
-
-        // Streak on right bottom
-        val isRu = settings.language.equals("RU", ignoreCase = true)
-        if (streakDays > 0) {
-            views.setViewVisibility(R.id.widget_streak_badge, View.VISIBLE)
-            views.setTextViewText(R.id.widget_streak_badge, if (isRu) "🔥 $streakDays д." else "🔥 ${streakDays}d")
-            views.setTextColor(R.id.widget_streak_badge, if (isStale) grayColor else Color.parseColor("#F59E0B"))
-        } else {
-            views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
-        }
+        // Dynamic badges for right column slots (Row 1 & Row 2)
+        val badges = getPrioritizedBadges(
+            latest = latest,
+            recent = recent,
+            todayReadings = todayReadings,
+            settings = settings,
+            streakDays = streakDays
+        )
+        fillBadgeSlots(
+            views = views,
+            slotIds = listOf(R.id.widget_iob_text, R.id.widget_streak_badge),
+            badges = badges
+        )
 
         return views
     }
@@ -885,25 +890,20 @@ object TirupWidgetUpdater {
         views.setTextViewText(R.id.widget_compensator_text, balanceText)
         views.setTextColor(R.id.widget_compensator_text, if (isStale) grayColor else balanceColor)
 
-        // IoB on right top
-        val iob = latest.iob ?: 0.0
-        if (iob > 0.05) {
-            views.setViewVisibility(R.id.widget_iob_text, View.VISIBLE)
-            views.setTextViewText(R.id.widget_iob_text, String.format(Locale.US, "💉 %.1f U", iob))
-            views.setTextColor(R.id.widget_iob_text, if (isStale) grayColor else Color.parseColor("#38BDF8"))
-        } else {
-            views.setViewVisibility(R.id.widget_iob_text, View.GONE)
-        }
-
-        // Streak on right bottom
-        val isRu = settings.language.equals("RU", ignoreCase = true)
-        if (streakDays > 0) {
-            views.setViewVisibility(R.id.widget_streak_badge, View.VISIBLE)
-            views.setTextViewText(R.id.widget_streak_badge, if (isRu) "🔥 $streakDays д." else "🔥 ${streakDays}d")
-            views.setTextColor(R.id.widget_streak_badge, if (isStale) grayColor else Color.parseColor("#F59E0B"))
-        } else {
-            views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
-        }
+        // Dynamic badges for right column slots (Row 1 & Row 2)
+        val badges = getPrioritizedBadges(
+            latest = latest,
+            recent = recent,
+            todayReadings = todayReadings,
+            settings = settings,
+            streakDays = streakDays,
+            excludeTypes = setOf("delta", "compensator")
+        )
+        fillBadgeSlots(
+            views = views,
+            slotIds = listOf(R.id.widget_iob_text, R.id.widget_streak_badge),
+            badges = badges
+        )
 
         return views
     }
@@ -1091,48 +1091,204 @@ object TirupWidgetUpdater {
         views.setInt(R.id.widget_root, "setBackgroundResource", bgRes)
     }
 
-    private fun bindIobCob(views: RemoteViews, latest: GlucoseReading) {
-        val iob = latest.iob ?: 0.0
-
-        // Carbs (CoB) are completely hidden from all widgets per user design
-        views.setViewVisibility(R.id.widget_cob_text, View.GONE)
-
-        val isStale = ((System.currentTimeMillis() - latest.timestamp) / 60_000L) > 5
-        val grayColor = Color.parseColor("#94A3B8")
-        if (iob > 0.05) {
-            views.setViewVisibility(R.id.widget_iob_cob_layout, View.VISIBLE)
-            views.setViewVisibility(R.id.widget_iob_text, View.VISIBLE)
-            views.setTextViewText(R.id.widget_iob_text, String.format(Locale.US, "💉 %.1f U", iob))
-            views.setTextColor(R.id.widget_iob_text, if (isStale) grayColor else Color.parseColor("#38BDF8"))
-        } else {
-            views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
-            views.setViewVisibility(R.id.widget_iob_text, View.GONE)
+    fun fillBadgeSlots(
+        views: RemoteViews,
+        slotIds: List<Int>,
+        badges: List<WidgetBadge>
+    ) {
+        for (i in slotIds.indices) {
+            val slotId = slotIds[i]
+            if (i < badges.size) {
+                val badge = badges[i]
+                views.setViewVisibility(slotId, View.VISIBLE)
+                views.setTextViewText(slotId, badge.text)
+                views.setTextColor(slotId, badge.color)
+            } else {
+                views.setViewVisibility(slotId, View.GONE)
+            }
         }
     }
 
-    private fun bindMasterBattery(views: RemoteViews, settings: UserSettings, latest: GlucoseReading?) {
+    fun getPrioritizedBadges(
+        latest: GlucoseReading?,
+        recent: List<GlucoseReading>,
+        todayReadings: List<GlucoseReading>,
+        settings: UserSettings,
+        streakDays: Int,
+        excludeTypes: Set<String> = emptySet()
+    ): List<WidgetBadge> {
+        if (latest == null) return emptyList()
+
+        val list = mutableListOf<WidgetBadge>()
+        val isRu = settings.language.equals("RU", ignoreCase = true)
+        val now = System.currentTimeMillis()
+        val diffMs = (now - latest.timestamp).coerceAtLeast(0L)
+        val diffMin = (diffMs / 60_000L).toInt()
+        val isStale = diffMin > 5
+        val grayColor = 0xFF94A3B8.toInt()
+
+        // 1. IoB (Priority 1)
+        val iob = latest.iob ?: 0.0
+        if (!excludeTypes.contains("iob") && iob > 0.05) {
+            list.add(
+                WidgetBadge(
+                    type = "iob",
+                    text = String.format(Locale.US, "💉 %.1f U", iob),
+                    color = if (isStale) grayColor else 0xFF38BDF8.toInt()
+                )
+            )
+        }
+
+        // 2. Master Battery (Priority 2)
         val ble = settings.bleBridgeSettings
-        val isObserver = ble.role == com.tirup.app.domain.model.BleBridgeRole.OBSERVER
+        val isObserver = ble.role == BleBridgeRole.OBSERVER
         val battery = ble.lastMasterBattery
         val packetAgeMinutes = if (ble.lastPacketTimestamp > 0L) {
-            (System.currentTimeMillis() - ble.lastPacketTimestamp) / 60_000L
+            (now - ble.lastPacketTimestamp) / 60_000L
         } else 999L
-        val isStale = (latest != null && ((System.currentTimeMillis() - latest.timestamp) / 60_000L) > 5) || packetAgeMinutes > 7
-        val hasBattery = latest != null && isObserver && (battery in 0..100 || ble.lastPacketTimestamp > 0L)
-        if (hasBattery) {
-            val grayColor = Color.parseColor("#94A3B8")
-            views.setViewVisibility(R.id.widget_master_battery, View.VISIBLE)
-            val batText = if (isStale) "🔋 ?" else "🔋 $battery%"
-            views.setTextViewText(R.id.widget_master_battery, batText)
+        val isBleStale = isStale || packetAgeMinutes > 7
+        val hasBattery = isObserver && (battery in 0..100 || ble.lastPacketTimestamp > 0L)
+        if (!excludeTypes.contains("battery") && hasBattery) {
+            val batText = if (isBleStale) "🔋 ?" else "🔋 $battery%"
             val batColor = when {
-                battery <= 15 -> Color.parseColor("#EF4444")
-                battery <= 25 -> Color.parseColor("#F59E0B")
-                else -> Color.parseColor("#10B981")
+                battery <= 15 -> 0xFFEF4444.toInt()
+                battery <= 25 -> 0xFFF59E0B.toInt()
+                else -> 0xFF10B981.toInt()
             }
-            views.setTextColor(R.id.widget_master_battery, if (isStale) grayColor else batColor)
-        } else {
-            views.setViewVisibility(R.id.widget_master_battery, View.GONE)
+            list.add(
+                WidgetBadge(
+                    type = "battery",
+                    text = batText,
+                    color = if (isBleStale) grayColor else batColor
+                )
+            )
         }
+
+        // 3. Streak (Priority 3)
+        if (!excludeTypes.contains("streak") && streakDays > 0) {
+            list.add(
+                WidgetBadge(
+                    type = "streak",
+                    text = if (isRu) "🔥 $streakDays д." else "🔥 ${streakDays}d",
+                    color = if (isStale) grayColor else 0xFFF59E0B.toInt()
+                )
+            )
+        }
+
+        // 4. Daily Compensator Balance (Priority 4)
+        if (!excludeTypes.contains("compensator") && todayReadings.size >= 2) {
+            val targetPercent = if (settings.targetMode == TargetMode.TIR) {
+                settings.targetRanges.tirGoalPercent.toDouble()
+            } else {
+                settings.targetRanges.tingGoalPercent.toDouble()
+            }
+            val compensator = TargetCompensatorCalculator.calculateDailyCompensator(
+                targetMode = settings.targetMode,
+                targetPercent = targetPercent,
+                latestReading = latest,
+                recentReadings = todayReadings,
+                targetRanges = settings.targetRanges,
+                language = settings.language
+            )
+            val (balanceText, balanceColor) = calculateDailyTimeBalance(compensator, targetPercent)
+            list.add(
+                WidgetBadge(
+                    type = "compensator",
+                    text = balanceText,
+                    color = if (isStale) grayColor else balanceColor
+                )
+            )
+        }
+
+        // 5. Delta (Priority 5)
+        if (!excludeTypes.contains("delta")) {
+            val deltaMmol = calculate5MinDelta(latest, recent)
+            if (deltaMmol != null) {
+                val isMmol = settings.unit == GlucoseUnit.MMOL_L
+                val deltaStr = if (isMmol) {
+                    String.format(Locale.US, "Δ %+.1f", deltaMmol)
+                } else {
+                    val deltaMg = (deltaMmol * 18.0182).roundToInt()
+                    "Δ ${if (deltaMg > 0) "+" else ""}$deltaMg"
+                }
+                list.add(
+                    WidgetBadge(
+                        type = "delta",
+                        text = deltaStr,
+                        color = if (isStale) grayColor else 0xFFE2E8F0.toInt()
+                    )
+                )
+            }
+        }
+
+        // 6. Time Ago (Priority 6)
+        if (!excludeTypes.contains("time_ago") && diffMin > 1) {
+            list.add(
+                WidgetBadge(
+                    type = "time_ago",
+                    text = "⏱ " + formatTimeAgoShort(diffMs),
+                    color = grayColor
+                )
+            )
+        }
+
+        // 7. Mean BG (Priority 7)
+        if (!excludeTypes.contains("mean") && todayReadings.isNotEmpty()) {
+            val stats = GlucoseMetricsCalculator.calculateStatistics(
+                readings = todayReadings,
+                targetRanges = settings.targetRanges,
+                language = settings.language,
+                unit = settings.unit
+            )
+            val isMmol = settings.unit == GlucoseUnit.MMOL_L
+            val meanPrefix = if (isRu) "Ср: " else "Avg: "
+            val meanFormatted = if (isMmol) {
+                String.format(Locale.US, "%.1f", stats.meanMmol)
+            } else {
+                "${(stats.meanMmol * 18.0182).roundToInt()}"
+            }
+            val meanColor = when {
+                isStale -> grayColor
+                stats.meanMmol < 3.9 -> 0xFFEF4444.toInt()
+                stats.meanMmol <= 7.8 -> 0xFF4ADE80.toInt()
+                stats.meanMmol <= settings.targetRanges.tirHighMmol -> 0xFF10B981.toInt()
+                stats.meanMmol <= 13.9 -> 0xFFF59E0B.toInt()
+                else -> 0xFFEF4444.toInt()
+            }
+            list.add(
+                WidgetBadge(
+                    type = "mean",
+                    text = "$meanPrefix$meanFormatted",
+                    color = meanColor
+                )
+            )
+        }
+
+        // 8. CV (Priority 8)
+        if (!excludeTypes.contains("cv") && todayReadings.size >= 10) {
+            val stats = GlucoseMetricsCalculator.calculateStatistics(
+                readings = todayReadings,
+                targetRanges = settings.targetRanges,
+                language = settings.language,
+                unit = settings.unit
+            )
+            val cvPercent = stats.cvPercent.roundToInt()
+            val cvColor = when {
+                isStale -> grayColor
+                cvPercent <= 36 -> 0xFF10B981.toInt()
+                cvPercent <= 45 -> 0xFFF59E0B.toInt()
+                else -> 0xFFEF4444.toInt()
+            }
+            list.add(
+                WidgetBadge(
+                    type = "cv",
+                    text = "CV: $cvPercent%",
+                    color = cvColor
+                )
+            )
+        }
+
+        return list
     }
 
     /**
@@ -1366,3 +1522,10 @@ object TirupWidgetUpdater {
         }
     }
 }
+
+data class WidgetBadge(
+    val type: String,
+    val text: String,
+    val color: Int
+)
+
