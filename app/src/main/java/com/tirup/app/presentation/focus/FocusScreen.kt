@@ -5,6 +5,22 @@ import android.text.format.DateUtils
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import kotlin.math.roundToInt
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.BluetoothSearching
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
+import com.tirup.app.presentation.components.BentoCard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -59,12 +75,10 @@ import com.tirup.app.domain.model.CompensatorStatus
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.TargetMode
-import com.tirup.app.presentation.components.BentoCard
 import com.tirup.app.presentation.components.BentoMetricCompact
 import com.tirup.app.presentation.components.MetricsOrderDialog
 import com.tirup.app.presentation.components.StreakBadge
 import com.tirup.app.presentation.components.StreakMotivatorDialog
-import androidx.compose.foundation.BorderStroke
 import com.tirup.app.data.alert.AlertLogEntry
 import com.tirup.app.data.alert.GlucoseAlertManager
 import com.tirup.app.data.ble.BleBroadcaster
@@ -91,6 +105,7 @@ fun FocusScreen(
     val dailyAlertLogs by GlucoseAlertManager.dailyAlertLogs.collectAsState()
     val isBleBroadcasting by BleBroadcaster.isBroadcasting.collectAsState()
     val broadcastRemainingSec by BleBroadcaster.broadcastRemainingSec.collectAsState()
+    val nextHeartbeatRemainingSec by BleBroadcaster.nextHeartbeatRemainingSec.collectAsState()
 
     var detailDialogInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
     var showMetricsOrderDialog by remember { mutableStateOf(false) }
@@ -182,6 +197,7 @@ fun FocusScreen(
                 isBroadcaster = bleSettings.role == BleBridgeRole.BROADCASTER,
                 isBleBroadcasting = isBleBroadcasting,
                 broadcastRemainingSec = broadcastRemainingSec,
+                nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
                 dailyAlertsCount = dailyAlertLogs.size,
                 onAlertHistoryClick = { showDailyAlertLogsDialog = true },
                 onClick = {
@@ -855,6 +871,131 @@ fun FocusScreen(
 }
 
 @Composable
+private fun BleTransmitterBadge(
+    isBleBroadcasting: Boolean,
+    broadcastRemainingSec: Int,
+    nextHeartbeatRemainingSec: Int,
+    modifier: Modifier = Modifier
+) {
+    if (isBleBroadcasting) {
+        val transition = rememberInfiniteTransition(label = "BleWaves")
+        val wave1Progress by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1400, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "wave1"
+        )
+        val wave2Progress by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1400, delayMillis = 450, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "wave2"
+        )
+        val wave3Progress by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1400, delayMillis = 900, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "wave3"
+        )
+
+        Surface(
+            modifier = modifier,
+            shape = RoundedCornerShape(10.dp),
+            color = ActionBlue.copy(alpha = 0.14f),
+            border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.45f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 36.dp, height = 24.dp)
+                    .padding(2.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val center = Offset(size.width / 2f, size.height / 2f)
+                    val maxRadius = size.width.coerceAtLeast(size.height) * 0.9f
+
+                    val waves = listOf(wave1Progress, wave2Progress, wave3Progress)
+                    for (prog in waves) {
+                        if (prog > 0.05f) {
+                            val r = prog * maxRadius
+                            val alpha = (1f - prog).coerceIn(0f, 1f) * 0.85f
+                            val strokeW = (2.2f * (1f - prog * 0.4f)).dp.toPx()
+
+                            // 120-degree wave arc to the right (centered at 0°)
+                            drawArc(
+                                color = ActionBlue.copy(alpha = alpha),
+                                startAngle = -60f,
+                                sweepAngle = 120f,
+                                useCenter = false,
+                                topLeft = Offset(center.x - r, center.y - r),
+                                size = Size(r * 2, r * 2),
+                                style = Stroke(width = strokeW)
+                            )
+                            // 120-degree wave arc to the left (centered at 180°)
+                            drawArc(
+                                color = ActionBlue.copy(alpha = alpha),
+                                startAngle = 120f,
+                                sweepAngle = 120f,
+                                useCenter = false,
+                                topLeft = Offset(center.x - r, center.y - r),
+                                size = Size(r * 2, r * 2),
+                                style = Stroke(width = strokeW)
+                            )
+                        }
+                    }
+                }
+                Icon(
+                    imageVector = Icons.Default.Bluetooth,
+                    contentDescription = "Broadcasting",
+                    tint = ActionBlue,
+                    modifier = Modifier.size(15.dp)
+                )
+            }
+        }
+    } else {
+        // Idle state: Bluetooth icon + countdown mm:ss to next periodic heartbeat
+        val minutes = (nextHeartbeatRemainingSec / 60).coerceAtLeast(0)
+        val seconds = (nextHeartbeatRemainingSec % 60).coerceAtLeast(0)
+        val countdownText = String.format(Locale.US, "%d:%02d", minutes, seconds)
+
+        Surface(
+            modifier = modifier,
+            shape = RoundedCornerShape(10.dp),
+            color = ActionBlue.copy(alpha = 0.08f),
+            border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.25f))
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Bluetooth,
+                    contentDescription = "Bluetooth Master",
+                    tint = ActionBlue.copy(alpha = 0.85f),
+                    modifier = Modifier.size(13.dp)
+                )
+                Text(
+                    text = countdownText,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = ActionBlue.copy(alpha = 0.85f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun HeroGlucoseCard(
     latestReading: GlucoseReading?,
     recentReadings: List<GlucoseReading>,
@@ -866,6 +1007,7 @@ private fun HeroGlucoseCard(
     isBroadcaster: Boolean = false,
     isBleBroadcasting: Boolean = false,
     broadcastRemainingSec: Int = 0,
+    nextHeartbeatRemainingSec: Int = 300,
     dailyAlertsCount: Int = 0,
     onAlertHistoryClick: () -> Unit = {},
     onClick: () -> Unit
@@ -873,6 +1015,24 @@ private fun HeroGlucoseCard(
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val now = System.currentTimeMillis()
     val diffMinutes = if (latestReading != null) ((now - latestReading.timestamp) / 60000L).toInt().coerceAtLeast(0) else 0
+
+    val isStale = diffMinutes > 5
+    val valueColor = when {
+        latestReading == null -> onSurfaceVariant
+        isStale -> onSurfaceVariant.copy(alpha = 0.55f)
+        latestReading.valueMmol < 3.0 -> ColorVeryLow
+        latestReading.valueMmol < 3.9 -> ColorLow
+        latestReading.valueMmol in 3.9..7.0 -> ColorTight
+        latestReading.valueMmol in 7.01..7.8 -> ColorTargetSoft
+        latestReading.valueMmol in 7.81..10.0 -> ColorTarget
+        latestReading.valueMmol in 10.01..13.9 -> ColorHigh
+        else -> ColorVeryHigh
+    }
+
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val heroBgColor = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0)
+    val heroBorderColor = if (isDark) valueColor.copy(alpha = 0.38f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
+    val heroBorderWidth = if (isDark) 1.2.dp else 1.dp
 
     val sorted = remember(recentReadings) { recentReadings.sortedBy { it.timestamp } }
 
@@ -989,6 +1149,9 @@ private fun HeroGlucoseCard(
 
     BentoCard(
         modifier = Modifier.fillMaxWidth(),
+        backgroundColor = heroBgColor,
+        borderColor = heroBorderColor,
+        borderWidth = heroBorderWidth,
         onClick = onClick
     ) {
         Column(
@@ -1100,24 +1263,11 @@ private fun HeroGlucoseCard(
 
                 // Right: Master BLE Pulse Status or placeholder spacer
                 if (isBroadcaster) {
-                    val (bleText, bleColor) = if (isBleBroadcasting) {
-                        Pair("📡 ${broadcastRemainingSec}с", ActionBlue)
-                    } else {
-                        Pair("📡 Мастер", PrimaryEmerald)
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = bleColor.copy(alpha = 0.12f),
-                        border = BorderStroke(0.8.dp, bleColor.copy(alpha = 0.4f))
-                    ) {
-                        Text(
-                            text = bleText,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = bleColor
-                        )
-                    }
+                    BleTransmitterBadge(
+                        isBleBroadcasting = isBleBroadcasting,
+                        broadcastRemainingSec = broadcastRemainingSec,
+                        nextHeartbeatRemainingSec = nextHeartbeatRemainingSec
+                    )
                 } else {
                     Spacer(modifier = Modifier.width(28.dp))
                 }
@@ -1130,19 +1280,6 @@ private fun HeroGlucoseCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                val isStale = diffMinutes > 5
-                val valueColor = when {
-                    latestReading == null -> onSurfaceVariant
-                    isStale -> onSurfaceVariant.copy(alpha = 0.55f)
-                    latestReading.valueMmol < 3.0 -> ColorVeryLow
-                    latestReading.valueMmol < 3.9 -> ColorLow
-                    latestReading.valueMmol in 3.9..7.0 -> ColorTight
-                    latestReading.valueMmol in 7.01..7.8 -> ColorTargetSoft
-                    latestReading.valueMmol in 7.81..10.0 -> ColorTarget
-                    latestReading.valueMmol in 10.01..13.9 -> ColorHigh
-                    else -> ColorVeryHigh
-                }
-
                 val displayVal = if (latestReading != null) {
                     if (unit == GlucoseUnit.MMOL_L) {
                         String.format(Locale.US, "%.1f", latestReading.valueMmol)

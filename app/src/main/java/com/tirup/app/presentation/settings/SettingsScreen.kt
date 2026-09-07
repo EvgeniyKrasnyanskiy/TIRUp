@@ -830,89 +830,63 @@ fun SettingsScreen(
         // Section 3: Grouped Additional Settings Frame
         item {
             Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = ActionBlue.copy(alpha = 0.10f),
-                border = BorderStroke(1.5.dp, ActionBlue.copy(alpha = 0.45f)),
+                shape = RoundedCornerShape(20.dp),
+                color = ActionBlue.copy(alpha = 0.04f),
+                border = BorderStroke(1.4.dp, ActionBlue.copy(alpha = 0.35f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showAdvancedSettings = !showAdvancedSettings }
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Column(modifier = Modifier.padding(10.dp)) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showAdvancedSettings = !showAdvancedSettings }
+                            .padding(horizontal = 6.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = null,
-                            tint = ActionBlue,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = null,
+                                tint = ActionBlue,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
                                 Text(
                                     text = if (isRu) "Дополнительные настройки" else "Advanced Settings",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = ActionBlue.copy(alpha = 0.2f),
-                                    border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.5f))
-                                ) {
-                                    Text(
-                                        text = if (showAdvancedSettings) (if (isRu) "Развёрнуто" else "Expanded") else (if (isRu) "Свёрнуто" else "Collapsed"),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = ActionBlue,
-                                        fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (isRu) "BLE-мост, экстренное SMS, дайджест недели, время сна, автобэкап"
+                                           else "BLE Bridge, emergency SMS, weekly digest, sleep window, auto-backup",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (isRu) "BLE-мост, экстренное SMS, дайджест недели, время сна, автобэкап"
-                                       else "BLE Bridge, emergency SMS, weekly digest, sleep window, auto-backup",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
+
+                        Icon(
+                            imageVector = if (showAdvancedSettings) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (showAdvancedSettings) "Collapse" else "Expand",
+                            tint = ActionBlue,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
 
-                    Icon(
-                        imageVector = if (showAdvancedSettings) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = if (showAdvancedSettings) "Collapse" else "Expand",
-                        tint = ActionBlue,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-        }
-
-        if (showAdvancedSettings) {
-        item {
-            Surface(
-                shape = RoundedCornerShape(22.dp),
-                color = ActionBlue.copy(alpha = 0.035f),
-                border = BorderStroke(1.2.dp, ActionBlue.copy(alpha = 0.28f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    // Section: Local BLE Bridge (Broadcaster / Observer)
-                    val ble = settings.bleBridgeSettings
+                    if (showAdvancedSettings) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            // Section: Local BLE Bridge (Broadcaster / Observer)
+                            val ble = settings.bleBridgeSettings
                     BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
@@ -942,10 +916,10 @@ fun SettingsScreen(
                                         color = MaterialTheme.colorScheme.onSurface,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    val (roleBadgeText, roleBadgeColor) = when (ble.role) {
-                                        BleBridgeRole.BROADCASTER -> Pair(if (isRu) "Вещатель" else "Broadcaster", ActionBlue)
-                                        BleBridgeRole.OBSERVER -> Pair(if (isRu) "Приёмник" else "Observer", PrimaryEmerald)
-                                        else -> Pair(if (isRu) "Выкл" else "Off", MaterialTheme.colorScheme.onSurfaceVariant)
+                                    val (roleBadgeEmoji, roleBadgeColor) = when (ble.role) {
+                                        BleBridgeRole.BROADCASTER -> Pair("📡", ActionBlue)
+                                        BleBridgeRole.OBSERVER -> Pair("👂", PrimaryEmerald)
+                                        else -> Pair("⚪", MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
@@ -953,10 +927,8 @@ fun SettingsScreen(
                                         border = BorderStroke(0.8.dp, roleBadgeColor.copy(alpha = 0.4f))
                                     ) {
                                         Text(
-                                            text = roleBadgeText,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = roleBadgeColor,
-                                            fontWeight = FontWeight.SemiBold,
+                                            text = roleBadgeEmoji,
+                                            fontSize = 12.sp,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                         )
                                     }
@@ -2298,10 +2270,11 @@ fun SettingsScreen(
                     )
                 }
             }
+                        }
+                    }
                 }
             }
         }
-    }
 
         // Section 5: Community Telegram Text Link
         item {
@@ -2903,7 +2876,7 @@ fun SettingsScreen(
             }
         }
     }
-}
+    }
 }
 
 @Composable

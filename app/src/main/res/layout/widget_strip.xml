@@ -253,14 +253,20 @@
             android:paddingStart="5dp"
             android:paddingTop="1dp"
             android:paddingEnd="5dp"
-            android:paddingBottom="1dp"
-            android:singleLine="true"
-            android:text="2м"
-            android:textColor="#94A3B8"
             android:textSize="10sp"
             android:textStyle="bold"
             android:visibility="gone" />
     </LinearLayout>
+
+    <!-- 5. Optional Sparkline Chart on 5x1 wide screens -->
+    <ImageView
+        android:id="@+id/widget_chart_image"
+        android:layout_width="0dp"
+        android:layout_height="32dp"
+        android:layout_weight="1"
+        android:layout_marginStart="6dp"
+        android:scaleType="fitXY"
+        android:visibility="gone" />
 
     <!-- Dummy views for compatibility -->
     <LinearLayout

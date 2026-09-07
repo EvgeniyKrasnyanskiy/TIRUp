@@ -392,6 +392,22 @@ object TirupWidgetUpdater {
             if (badges.size > 2) View.VISIBLE else View.GONE
         )
 
+        // Render Sparkline Chart on 5x1 wide widget
+        val sparklineBitmap = drawSparklineBitmap(
+            readings = recent,
+            latest = latest,
+            widthPx = 280,
+            heightPx = 90,
+            ranges = settings.targetRanges,
+            isRu = isRu
+        )
+        if (sparklineBitmap != null) {
+            views.setImageViewBitmap(R.id.widget_chart_image, sparklineBitmap)
+            views.setViewVisibility(R.id.widget_chart_image, View.VISIBLE)
+        } else {
+            views.setViewVisibility(R.id.widget_chart_image, View.GONE)
+        }
+
         return views
     }
 

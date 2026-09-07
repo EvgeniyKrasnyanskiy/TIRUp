@@ -31,6 +31,7 @@ object BleBroadcaster {
     private const val TAG = "BleBroadcaster"
     const val BURST_1MIN_MS = 5_000L   // 5 seconds for 1-minute CGM sensors (Libre 3, Dexcom G7)
     const val BURST_5MIN_MS = 10_000L  // 10 seconds for 5-minute CGM sensors (Libre 1/2, Dexcom G6)
+    const val HEARTBEAT_BURST_MS = 12_000L // 12 seconds for 5-minute fallback heartbeat timer for max reliability
     const val TEST_PING_BURST_MS = 30_000L // 30 seconds for manual diagnostic test ping
 
     private val scope = CoroutineScope(Dispatchers.IO)
@@ -50,6 +51,9 @@ object BleBroadcaster {
 
     private val _broadcastRemainingSec = MutableStateFlow(0)
     val broadcastRemainingSec: StateFlow<Int> = _broadcastRemainingSec.asStateFlow()
+
+    private val _nextHeartbeatRemainingSec = MutableStateFlow(300)
+    val nextHeartbeatRemainingSec: StateFlow<Int> = _nextHeartbeatRemainingSec.asStateFlow()
 
     /**
      * Broadcasts a telemetry packet over BLE advertising if BLE Bridge is in BROADCASTER mode.
@@ -183,18 +187,24 @@ object BleBroadcaster {
 
                 // Schedule 5-minute fallback heartbeat if no new readings arrive
                 fallbackHeartbeatJob = launch {
-                    delay(5 * 60 * 1000L)
+                    var sec = 300
+                    while (sec > 0) {
+                        _nextHeartbeatRemainingSec.value = sec
+                        delay(1000L)
+                        sec--
+                    }
+                    _nextHeartbeatRemainingSec.value = 0
                     val cachedReading = lastReadingCache
                     val cachedSettings = lastSettingsCache
                     if (cachedReading != null && cachedSettings != null && cachedSettings.role == BleBridgeRole.BROADCASTER) {
-                        Log.i(TAG, "Triggering 5-minute fallback BLE heartbeat broadcast")
+                        Log.i(TAG, "Triggering 5-minute fallback BLE heartbeat broadcast (12s burst)")
                         broadcastReading(
                             context = context.applicationContext,
                             reading = cachedReading,
                             rateOfChange = lastRateCache,
                             iob = cachedReading.iob ?: 0.0,
                             settings = cachedSettings,
-                            burstDurationMs = burstDurationMs
+                            burstDurationMs = HEARTBEAT_BURST_MS
                         )
                     }
                 }
@@ -257,6 +267,7 @@ object BleBroadcaster {
         stopBurstJob?.cancel()
         if (cancelHeartbeat) {
             fallbackHeartbeatJob?.cancel()
+            _nextHeartbeatRemainingSec.value = 0
         }
         try {
             if (wakeLock?.isHeld == true) {
