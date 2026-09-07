@@ -182,7 +182,7 @@ class SettingsRepositoryImpl(
             isLockscreenNotificationEnabled = prefs.getBoolean(KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED, true),
             widgetBackgroundOpacity = prefs.getInt(KEY_WIDGET_BACKGROUND_OPACITY, 85),
             isFloatingBubbleEnabled = prefs.getBoolean(KEY_IS_FLOATING_BUBBLE_ENABLED, false),
-            isWeeklyDigestEnabled = prefs.getBoolean(KEY_IS_WEEKLY_DIGEST_ENABLED, true),
+            isWeeklyDigestEnabled = prefs.getBoolean(KEY_IS_WEEKLY_DIGEST_ENABLED, false),
             dismissedWeeklyDigestTimestamp = prefs.getLong(KEY_DISMISSED_WEEKLY_DIGEST_TIMESTAMP, 0L),
             showTreatmentsOnChart = prefs.getBoolean(KEY_SHOW_TREATMENTS_ON_CHART, true),
             alertSettings = AlertSettings(

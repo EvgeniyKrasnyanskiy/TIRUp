@@ -197,9 +197,17 @@ class AgpPdfGenerator(private val context: Context) {
                 String.format(Locale.US, "%d", (statistics.sdMmol * 18.0182).toInt())
             }
 
+            val minVal = readings.minOfOrNull { it.valueMmol } ?: statistics.minMmol
+            val maxVal = readings.maxOfOrNull { it.valueMmol } ?: statistics.maxMmol
+            val minMaxStr = if (isMmol) {
+                String.format(Locale.US, "%.1f – %.1f", minVal, maxVal)
+            } else {
+                String.format(Locale.US, "%d – %d", (minVal * 18.0182).toInt(), (maxVal * 18.0182).toInt())
+            }
+
             val statRows = if (isRu) {
                 listOf(
-                    Pair("Средний сахар (Mean):", meanStr),
+                    Pair("Средний сахар (Mean) • Мин/Макс:", "$meanStr • Мин/Макс: $minMaxStr"),
                     Pair("Вариабельность глюкозы (%CV):", String.format(Locale.US, "%.1f%% (Цель ≤36.0%%) • SD: %s", statistics.cvPercent, sdStr)),
                     Pair("Расчётный eA1c (ADAG):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)),
                     Pair("GRI (риск гипо / Klonoff 2022):", String.format(Locale.US, "%.1f (%s, цель ≤40.0)", statistics.gri, statistics.griLabel)),
@@ -208,7 +216,7 @@ class AgpPdfGenerator(private val context: Context) {
                 )
             } else {
                 listOf(
-                    Pair("Average Glucose (Mean):", meanStr),
+                    Pair("Average Glucose (Mean) • Min/Max:", "$meanStr • Min/Max: $minMaxStr"),
                     Pair("Glucose Variability (%CV):", String.format(Locale.US, "%.1f%% (Target ≤36.0%%) • SD: %s", statistics.cvPercent, sdStr)),
                     Pair("Estimated A1c (eA1c):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)),
                     Pair("Glycemia Risk Index (GRI / Hypo Risk):", String.format(Locale.US, "%.1f (%s, target ≤40.0)", statistics.gri, statistics.griLabel)),

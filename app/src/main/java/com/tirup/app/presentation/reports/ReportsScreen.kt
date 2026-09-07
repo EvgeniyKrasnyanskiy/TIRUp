@@ -118,7 +118,8 @@ fun ReportsScreen(
 
     val isRu = state.userSettings.language.equals("RU", ignoreCase = true)
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
         // Fixed Top Header with Menu
         Surface(
             color = MaterialTheme.colorScheme.background,
@@ -299,6 +300,70 @@ fun ReportsScreen(
                 }
             }
         )
+    }
+
+    if (state.isImporting) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.55f))
+                .clickable(enabled = false) {},
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+                modifier = Modifier
+                    .fillMaxWidth(0.85f)
+                    .padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(22.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    CircularProgressIndicator(
+                        color = ActionBlue,
+                        modifier = Modifier.size(44.dp),
+                        strokeWidth = 3.5.dp
+                    )
+                    Text(
+                        text = if (isRu) "Импорт данных..." else "Importing data...",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    val ptsStr = if (state.importedPointsCount > 0) {
+                        if (isRu) "Загружено ${state.importedPointsCount} точек" else "Loaded ${state.importedPointsCount} pts"
+                    } else ""
+                    if (ptsStr.isNotEmpty()) {
+                        Text(
+                            text = ptsStr,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    val percentInt = (state.importProgress * 100).toInt().coerceIn(0, 100)
+                    androidx.compose.material3.LinearProgressIndicator(
+                        progress = { state.importProgress.coerceIn(0f, 1f) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        color = ActionBlue,
+                        trackColor = ActionBlue.copy(alpha = 0.15f)
+                    )
+                    Text(
+                        text = "$percentInt%",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = ActionBlue
+                    )
+                }
+            }
+        }
+    }
     }
 }
 

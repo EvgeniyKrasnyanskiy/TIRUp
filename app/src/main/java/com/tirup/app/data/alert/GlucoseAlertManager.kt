@@ -62,6 +62,15 @@ data class ActiveAlertBanner(
     val timestamp: Long = System.currentTimeMillis()
 )
 
+data class AlertLogEntry(
+    val id: Long = System.currentTimeMillis(),
+    val timestamp: Long = System.currentTimeMillis(),
+    val tier: AlertTier,
+    val title: String,
+    val text: String,
+    val isTest: Boolean = false
+)
+
 object GlucoseAlertManager {
 
     private const val TAG = "GlucoseAlertManager"
@@ -69,11 +78,38 @@ object GlucoseAlertManager {
     private val _activeAlertBanner = kotlinx.coroutines.flow.MutableStateFlow<ActiveAlertBanner?>(null)
     val activeAlertBanner: kotlinx.coroutines.flow.StateFlow<ActiveAlertBanner?> = _activeAlertBanner
 
+    private val _dailyAlertLogs = kotlinx.coroutines.flow.MutableStateFlow<List<AlertLogEntry>>(emptyList())
+    val dailyAlertLogs: kotlinx.coroutines.flow.StateFlow<List<AlertLogEntry>> = _dailyAlertLogs
+
+    fun logAlert(tier: AlertTier, title: String, text: String, isTest: Boolean = false) {
+        val calendar = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val todayStart = calendar.timeInMillis
+        val newEntry = AlertLogEntry(
+            id = System.currentTimeMillis() + (0..999).random(),
+            timestamp = System.currentTimeMillis(),
+            tier = tier,
+            title = title,
+            text = text,
+            isTest = isTest
+        )
+        val current = _dailyAlertLogs.value.filter { it.timestamp >= todayStart }
+        _dailyAlertLogs.value = listOf(newEntry) + current
+    }
+
+    fun clearDailyAlertLogs() {
+        _dailyAlertLogs.value = emptyList()
+    }
+
     fun clearActiveAlertBanner() {
         _activeAlertBanner.value = null
     }
 
-    const val CHANNEL_PREDICTIVE = "tirup_alert_predictive_v2"
+    const val CHANNEL_PREDICTIVE = "tirup_alert_predictive_v3"
     const val CHANNEL_MAIN = "tirup_alert_main_v2"
     const val CHANNEL_CRITICAL = "tirup_alert_critical_v2"
     const val CHANNEL_SIGNAL_LOSS = "tirup_alert_signal_loss_v3"
@@ -128,15 +164,15 @@ object GlucoseAlertManager {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
         // Delete old v1/v2 channels that had system sound attached or didn't bypass DND
-        listOf("tirup_alert_predictive", "tirup_alert_main", "tirup_alert_critical", "tirup_alert_signal_loss_v2").forEach { id ->
+        listOf("tirup_alert_predictive", "tirup_alert_predictive_v2", "tirup_alert_main", "tirup_alert_critical", "tirup_alert_signal_loss_v2").forEach { id ->
             try { nm.deleteNotificationChannel(id) } catch (_: Exception) {}
         }
 
-        // Tier 1: Predictive (Soft) - sound handled purely by MedicalSoundPlayer
+        // Tier 1: Predictive (Soft) - sound handled purely by MedicalSoundPlayer, high importance for heads-up visibility
         val predictiveChannel = NotificationChannel(
             CHANNEL_PREDICTIVE,
             "1. Предиктивные тревоги (за 15 мин)",
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = "Мягкие упреждающие сигналы о скором выходе за целевой диапазон"
             setSound(null, null)
@@ -652,9 +688,10 @@ object GlucoseAlertManager {
         if (isInNormalRange) {
             cancelEmergencySmsTimer()
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            nm?.cancel(NOTIFICATION_ID_PREDICTIVE)
             nm?.cancel(NOTIFICATION_ID_MAIN)
-            _activeAlertBanner.value = null
+            if (_activeAlertBanner.value?.tier != AlertTier.PREDICTIVE) {
+                _activeAlertBanner.value = null
+            }
         }
 
         // ----------------------------------------------------
@@ -958,7 +995,7 @@ object GlucoseAlertManager {
             AlertTier.CRITICAL -> NotificationCompat.PRIORITY_MAX
             AlertTier.SIGNAL_LOSS -> NotificationCompat.PRIORITY_MAX
             AlertTier.MAIN -> NotificationCompat.PRIORITY_HIGH
-            AlertTier.PREDICTIVE -> NotificationCompat.PRIORITY_DEFAULT
+            AlertTier.PREDICTIVE -> NotificationCompat.PRIORITY_HIGH
         }
 
         val alertHex = when (tier) {
@@ -1033,6 +1070,9 @@ object GlucoseAlertManager {
             message = text,
             timestamp = System.currentTimeMillis()
         )
+
+        val isTestAlert = title.contains("Тест", ignoreCase = true) || title.contains("Test", ignoreCase = true)
+        logAlert(tier = tier, title = title, text = text, isTest = isTestAlert)
 
         try {
             nm.notify(notificationId, builder.build())

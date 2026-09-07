@@ -154,7 +154,7 @@ class TargetCompensatorCalculatorTest {
         org.junit.Assert.assertEquals(com.tirup.app.domain.model.CompensatorStatus.INSUFFICIENT_DATA, goal.status)
         org.junit.Assert.assertEquals(26, goal.observedPointsCount)
         org.junit.Assert.assertTrue(goal.recommendationRu.contains("Сбор данных за сегодня"))
-        org.junit.Assert.assertTrue(goal.recommendationRu.contains("требуется ≥6 ч"))
+        org.junit.Assert.assertTrue(goal.recommendationRu.contains("Полный 24ч расчёт") || goal.recommendationRu.contains("требуется ≥6 ч"))
     }
 
     @org.junit.Test

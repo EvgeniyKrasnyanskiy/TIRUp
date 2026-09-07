@@ -38,7 +38,12 @@ object BleBroadcaster {
     private var activeCallback: AdvertiseCallback? = null
     private var stopBurstJob: Job? = null
     private var countdownJob: Job? = null
+    private var fallbackHeartbeatJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
+
+    private var lastReadingCache: GlucoseReading? = null
+    private var lastRateCache: Double = 0.0
+    private var lastSettingsCache: BleBridgeSettings? = null
 
     private val _isBroadcasting = MutableStateFlow(false)
     val isBroadcasting: StateFlow<Boolean> = _isBroadcasting.asStateFlow()
@@ -152,9 +157,14 @@ object BleBroadcaster {
                 currentAdvertiser = advertiser
                 advertiser.startAdvertising(advertiseSettings, advertiseData, callback)
 
+                lastReadingCache = reading
+                lastRateCache = rateOfChange
+                lastSettingsCache = settings
+
                 // Run countdown and burst shutdown after burstDurationMs
                 stopBurstJob?.cancel()
                 countdownJob?.cancel()
+                fallbackHeartbeatJob?.cancel()
 
                 _broadcastRemainingSec.value = durationSec
 
@@ -167,8 +177,26 @@ object BleBroadcaster {
 
                 stopBurstJob = launch {
                     delay(burstDurationMs)
-                    stopAdvertisingInternal()
+                    stopAdvertisingInternal(cancelHeartbeat = false)
                     Log.d(TAG, "BLE broadcast pulse burst completed ($burstDurationMs ms)")
+                }
+
+                // Schedule 5-minute fallback heartbeat if no new readings arrive
+                fallbackHeartbeatJob = launch {
+                    delay(5 * 60 * 1000L)
+                    val cachedReading = lastReadingCache
+                    val cachedSettings = lastSettingsCache
+                    if (cachedReading != null && cachedSettings != null && cachedSettings.role == BleBridgeRole.BROADCASTER) {
+                        Log.i(TAG, "Triggering 5-minute fallback BLE heartbeat broadcast")
+                        broadcastReading(
+                            context = context.applicationContext,
+                            reading = cachedReading,
+                            rateOfChange = lastRateCache,
+                            iob = cachedReading.iob ?: 0.0,
+                            settings = cachedSettings,
+                            burstDurationMs = burstDurationMs
+                        )
+                    }
                 }
             } catch (e: SecurityException) {
                 Log.w(TAG, "SecurityException starting BLE advertising: ${e.message}")
@@ -211,11 +239,11 @@ object BleBroadcaster {
 
     fun stopAdvertising() {
         scope.launch {
-            stopAdvertisingInternal()
+            stopAdvertisingInternal(cancelHeartbeat = true)
         }
     }
 
-    private fun stopAdvertisingInternal() {
+    private fun stopAdvertisingInternal(cancelHeartbeat: Boolean = true) {
         try {
             activeCallback?.let { cb ->
                 currentAdvertiser?.stopAdvertising(cb)
@@ -227,6 +255,9 @@ object BleBroadcaster {
         _broadcastRemainingSec.value = 0
         countdownJob?.cancel()
         stopBurstJob?.cancel()
+        if (cancelHeartbeat) {
+            fallbackHeartbeatJob?.cancel()
+        }
         try {
             if (wakeLock?.isHeld == true) {
                 wakeLock?.release()

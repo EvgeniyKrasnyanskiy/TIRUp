@@ -175,10 +175,12 @@ fun StreakMotivatorDialog(
 
                 // Clinical Motivation Body Text
                 Text(
-                    text = if (isRu) {
-                        "Потрясающая дисциплина! Каждый день с TIR ≥70% надёжно защищает сосудистую систему, зрение и почки от микрососудистых повреждений, стабилизируя вариабельность сахара."
+                    text = if (streakDays > 0) {
+                        if (isRu) "Потрясающая дисциплина! Каждый день с TIR ≥70% надёжно защищает сосудистую систему, зрение и почки от микрососудистых повреждений, стабилизируя вариабельность сахара."
+                        else "Outstanding discipline! Every day spent with TIR ≥70% strongly protects your vascular system, eyes, and kidneys from microvascular stress while reducing glucose swings."
                     } else {
-                        "Outstanding discipline! Every day spent with TIR ≥70% strongly protects your vascular system, eyes, and kidneys from microvascular stress while reducing glucose swings."
+                        if (isRu) "Начните новую серию прямо сегодня! Удерживайте сахар в целевом диапазоне (TIR ≥70%), чтобы активировать стрик стабильной компенсации."
+                        else "Start a new streak today! Keep your glucose in target range (TIR ≥70%) to activate your streak."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -199,7 +201,8 @@ fun StreakMotivatorDialog(
                     )
                 ) {
                     Text(
-                        text = if (isRu) "Горжусь собой! Продолжить" else "Proud of this! Continue",
+                        text = if (streakDays > 0) (if (isRu) "Горжусь собой! Продолжить" else "Proud of this! Continue")
+                               else (if (isRu) "Ок" else "OK"),
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
                     )

@@ -65,6 +65,10 @@ import com.tirup.app.presentation.components.MetricsOrderDialog
 import com.tirup.app.presentation.components.StreakBadge
 import com.tirup.app.presentation.components.StreakMotivatorDialog
 import androidx.compose.foundation.BorderStroke
+import com.tirup.app.data.alert.AlertLogEntry
+import com.tirup.app.data.alert.GlucoseAlertManager
+import com.tirup.app.data.ble.BleBroadcaster
+import com.tirup.app.domain.model.BleBridgeRole
 import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorLow
@@ -74,6 +78,8 @@ import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
 import com.tirup.app.presentation.theme.ColorVeryLow
 import com.tirup.app.presentation.theme.PrimaryEmerald
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -82,8 +88,13 @@ fun FocusScreen(
     onOpenSettings: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
+    val dailyAlertLogs by GlucoseAlertManager.dailyAlertLogs.collectAsState()
+    val isBleBroadcasting by BleBroadcaster.isBroadcasting.collectAsState()
+    val broadcastRemainingSec by BleBroadcaster.broadcastRemainingSec.collectAsState()
+
     var detailDialogInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
     var showMetricsOrderDialog by remember { mutableStateOf(false) }
+    var showDailyAlertLogsDialog by rememberSaveable { mutableStateOf(false) }
     var focusCardMode by rememberSaveable { mutableStateOf(0) }
 
     val onSurface = MaterialTheme.colorScheme.onSurface
@@ -168,6 +179,11 @@ fun FocusScreen(
                 activeAlertBanner = state.activeAlertBanner,
                 masterBatteryPct = masterBattery,
                 isMasterBatteryStale = isMasterBatteryStale,
+                isBroadcaster = bleSettings.role == BleBridgeRole.BROADCASTER,
+                isBleBroadcasting = isBleBroadcasting,
+                broadcastRemainingSec = broadcastRemainingSec,
+                dailyAlertsCount = dailyAlertLogs.size,
+                onAlertHistoryClick = { showDailyAlertLogsDialog = true },
                 onClick = {
                     val r = state.latestReading
                     if (r != null) {
@@ -827,6 +843,15 @@ fun FocusScreen(
             onDismiss = { showMetricsOrderDialog = false }
         )
     }
+
+    // Daily Alert Logs Dialog
+    if (showDailyAlertLogsDialog) {
+        DailyAlertLogsDialog(
+            logs = dailyAlertLogs,
+            isRu = isRu,
+            onDismiss = { showDailyAlertLogsDialog = false }
+        )
+    }
 }
 
 @Composable
@@ -838,6 +863,11 @@ private fun HeroGlucoseCard(
     activeAlertBanner: ActiveAlertBanner? = null,
     masterBatteryPct: Int? = null,
     isMasterBatteryStale: Boolean = false,
+    isBroadcaster: Boolean = false,
+    isBleBroadcasting: Boolean = false,
+    broadcastRemainingSec: Int = 0,
+    dailyAlertsCount: Int = 0,
+    onAlertHistoryClick: () -> Unit = {},
     onClick: () -> Unit
 ) {
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
@@ -969,9 +999,40 @@ private fun HeroGlucoseCard(
             val hasCob = (latestReading?.cob != null && latestReading.cob > 0.0)
             val hasBattery = masterBatteryPct != null
 
-            if (hasIob || hasCob || hasBattery) {
+            // Header Row: [ Bell History ] --- [ Badges: Battery/IoB/CoB ] --- [ BLE Master pulse ]
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Left: Alert History Bell
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (dailyAlertsCount > 0) ColorHigh.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                    border = BorderStroke(0.8.dp, if (dailyAlertsCount > 0) ColorHigh.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                    modifier = Modifier.clickable { onAlertHistoryClick() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(text = "🔔", fontSize = 12.sp)
+                        if (dailyAlertsCount > 0) {
+                            Text(
+                                text = "$dailyAlertsCount",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = ColorHigh
+                            )
+                        }
+                    }
+                }
+
+                // Center: Dynamic Badges (Battery, IoB, CoB)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -994,7 +1055,7 @@ private fun HeroGlucoseCard(
                         ) {
                             Text(
                                 text = batText,
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = batColor
@@ -1003,15 +1064,15 @@ private fun HeroGlucoseCard(
                     }
 
                     if (hasIob) {
-                        if (hasBattery) Spacer(modifier = Modifier.width(6.dp))
+                        if (hasBattery) Spacer(modifier = Modifier.width(5.dp))
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = ActionBlue.copy(alpha = 0.12f),
                             border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.35f))
                         ) {
                             Text(
-                                text = String.format(Locale.US, if (isRu) "💉 %.2f Ед IoB" else "💉 %.2f U IoB", latestReading!!.iob),
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                                text = String.format(Locale.US, if (isRu) "💉 %.2f Ед" else "💉 %.2f U", latestReading!!.iob),
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = ActionBlue
@@ -1020,15 +1081,15 @@ private fun HeroGlucoseCard(
                     }
 
                     if (hasCob) {
-                        if (hasIob || hasBattery) Spacer(modifier = Modifier.width(6.dp))
+                        if (hasIob || hasBattery) Spacer(modifier = Modifier.width(5.dp))
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = PrimaryEmerald.copy(alpha = 0.12f),
                             border = BorderStroke(0.8.dp, PrimaryEmerald.copy(alpha = 0.35f))
                         ) {
                             Text(
-                                text = String.format(Locale.US, if (isRu) "🍞 %.0f г CoB" else "🍞 %.0f g CoB", latestReading!!.cob),
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                                text = String.format(Locale.US, if (isRu) "🍞 %.0f г" else "🍞 %.0f g", latestReading!!.cob),
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = PrimaryEmerald
@@ -1036,10 +1097,32 @@ private fun HeroGlucoseCard(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(6.dp))
-            } else {
-                Spacer(modifier = Modifier.height(4.dp))
+
+                // Right: Master BLE Pulse Status or placeholder spacer
+                if (isBroadcaster) {
+                    val (bleText, bleColor) = if (isBleBroadcasting) {
+                        Pair("📡 ${broadcastRemainingSec}с", ActionBlue)
+                    } else {
+                        Pair("📡 Мастер", PrimaryEmerald)
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = bleColor.copy(alpha = 0.12f),
+                        border = BorderStroke(0.8.dp, bleColor.copy(alpha = 0.4f))
+                    ) {
+                        Text(
+                            text = bleText,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = bleColor
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.width(28.dp))
+                }
             }
+            Spacer(modifier = Modifier.height(4.dp))
 
             // Large Hero Value with Trend Arrow and Delta
             Row(
@@ -1196,6 +1279,33 @@ private fun HeroGlucoseCard(
                     }
                 }
             }
+
+            if (latestReading == null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = ActionBlue.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.25f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(text = "⏳", fontSize = 18.sp)
+                        Text(
+                            text = if (isRu) "Ожидание первого замера от источника (1–5 мин). Убедитесь, что в xDrip+ включено локальное вещание (Inter-app Broadcast) или активен BLE-мост."
+                                   else "Awaiting first reading (1–5 min). Ensure xDrip+ Inter-app Broadcast is enabled or BLE Bridge is active.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -1348,4 +1458,109 @@ private fun TargetCompensatorCard(
             )
         }
     }
+}
+
+@Composable
+private fun DailyAlertLogsDialog(
+    logs: List<AlertLogEntry>,
+    isRu: Boolean,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(text = "🔔", fontSize = 20.sp)
+                Text(
+                    text = if (isRu) "Журнал оповещений за сегодня" else "Today's Alert Log",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        },
+        text = {
+            if (logs.isEmpty()) {
+                Text(
+                    text = if (isRu) "Сегодня тревожных событий и выходов за целевой диапазон не зафиксировано. Отличная компенсация! ✨"
+                           else "No alert events recorded today. Great glycemic control! ✨",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(logs.size) { idx ->
+                        val entry = logs[idx]
+                        val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(entry.timestamp))
+                        val (tierLabel, tierColor) = when (entry.tier) {
+                            AlertTier.CRITICAL -> Pair(if (isRu) "🚨 КРИТИЧЕСКИЙ" else "🚨 CRITICAL", ColorVeryLow)
+                            AlertTier.MAIN -> Pair(if (isRu) "🔔 ОСНОВНОЙ" else "🔔 MAIN", ColorHigh)
+                            AlertTier.PREDICTIVE -> Pair(if (isRu) "⚡ УПРЕЖДАЮЩИЙ" else "⚡ PREDICTIVE", ActionBlue)
+                            AlertTier.SIGNAL_LOSS -> Pair(if (isRu) "📡 ПОТЕРЯ СВЯЗИ" else "📡 SIGNAL LOSS", Color(0xFF94A3B8))
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, tierColor.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = tierColor.copy(alpha = 0.15f)
+                                    ) {
+                                        Text(
+                                            text = tierLabel,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = tierColor,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = timeStr,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Text(
+                                    text = entry.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = entry.text,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = if (isRu) "Закрыть" else "Close", color = ActionBlue, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
 }

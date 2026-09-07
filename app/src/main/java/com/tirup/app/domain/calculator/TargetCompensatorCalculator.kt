@@ -108,6 +108,8 @@ object TargetCompensatorCalculator {
         // Clinical validity: at least 6 hours (360 min) of active data to declare target completion
         val isDataSufficient = activeMonitoringMinutes >= 360 || observedPointsCount >= 72
 
+        val effectiveNeededMinutesToday = neededMinutesToday.coerceAtMost(remainingMinutesToday)
+
         val status: CompensatorStatus
         val recRu: String
         val recEn: String
@@ -115,18 +117,24 @@ object TargetCompensatorCalculator {
         when {
             // Scenario 1: Out of range right now -> urgent clinical priority
             !isCurrentlyInRange -> {
-                status = if (!isDataSufficient) CompensatorStatus.INSUFFICIENT_DATA else CompensatorStatus.REACHABLE
-                val needStrRu = formatHoursMins(neededMinutesToday, true)
                 val remainStrRu = formatHoursMins(remainingMinutesToday, true)
-                val targetPctInt = targetPercent.toInt()
-                val suffHintRu = if (!isDataSufficient) " (сбор данных: $observedPointsCount точек, требуется ≥6 ч)" else ""
-                val suffHintEn = if (!isDataSufficient) " (collecting data: $observedPointsCount pts, ≥6h required)" else ""
-
-                recRu = "Сахар вне диапазона$suffHintRu. Вернитесь в норму: из оставшихся $remainStrRu суток удержите ещё не менее $needStrRu для цели ≥$targetPctInt%."
-
-                val needStrEn = formatHoursMins(neededMinutesToday, false)
                 val remainStrEn = formatHoursMins(remainingMinutesToday, false)
-                recEn = "Glucose is out of range$suffHintEn. Return to target: out of remaining $remainStrEn, keep at least $needStrEn for ≥$targetPctInt% goal."
+                val targetPctInt = targetPercent.toInt()
+                val suffHintRu = if (!isDataSufficient) " (сбор данных: $observedPointsCount точек)" else ""
+                val suffHintEn = if (!isDataSufficient) " (collecting data: $observedPointsCount pts)" else ""
+
+                if (neededMinutesToday > remainingMinutesToday) {
+                    status = CompensatorStatus.UNREALISTIC
+                    val maxTirStr = String.format(Locale.US, "%.0f%%", maxPossibleTir)
+                    recRu = "Сахар вне диапазона$suffHintRu. До конца суток осталось $remainStrRu (макс. $targetName сегодня: $maxTirStr). Вернитесь в норму, чтобы завершить день с лучшим счётом."
+                    recEn = "Glucose is out of range$suffHintEn. $remainStrEn left today (max $targetName today: $maxTirStr). Return to target to finish with highest score."
+                } else {
+                    status = if (!isDataSufficient) CompensatorStatus.INSUFFICIENT_DATA else CompensatorStatus.REACHABLE
+                    val needStrRu = formatHoursMins(effectiveNeededMinutesToday, true)
+                    val needStrEn = formatHoursMins(effectiveNeededMinutesToday, false)
+                    recRu = "Сахар вне диапазона$suffHintRu. Вернитесь в норму: из оставшихся $remainStrRu суток удержите ещё не менее $needStrRu для цели ≥$targetPctInt%."
+                    recEn = "Glucose is out of range$suffHintEn. Return to target: out of remaining $remainStrEn, keep at least $needStrEn for ≥$targetPctInt% goal."
+                }
             }
 
             // Scenario 0: Insufficient data (< 6 hours of monitoring today) while currently in range
@@ -134,12 +142,20 @@ object TargetCompensatorCalculator {
                 status = CompensatorStatus.INSUFFICIENT_DATA
                 val coveredStrRu = formatHoursMins(activeMonitoringMinutes, true)
                 val coveredStrEn = formatHoursMins(activeMonitoringMinutes, false)
-                val needStrRu = formatHoursMins(neededMinutesToday, true)
-                val needStrEn = formatHoursMins(neededMinutesToday, false)
+                val remainStrRu = formatHoursMins(remainingMinutesToday, true)
+                val remainStrEn = formatHoursMins(remainingMinutesToday, false)
                 val targetPctInt = targetPercent.toInt()
 
-                recRu = "Сбор данных за сегодня ($observedPointsCount точек, $coveredStrRu). Для расчёта цели требуется ≥6 ч. Для цели ≥$targetPctInt% удержите в норме ещё $needStrRu."
-                recEn = "Collecting daily data ($observedPointsCount pts, $coveredStrEn). Target analysis requires ≥6h. Keep in range $needStrEn to reach ≥$targetPctInt%."
+                if (neededMinutesToday > remainingMinutesToday) {
+                    val maxTirStr = String.format(Locale.US, "%.0f%%", maxPossibleTir)
+                    recRu = "Сбор данных за сегодня ($observedPointsCount точек, $coveredStrRu). До конца суток $remainStrRu (макс. $targetName сегодня: $maxTirStr). Полный 24ч расчёт цели начнётся с завтрашнего дня."
+                    recEn = "Collecting daily data ($observedPointsCount pts, $coveredStrEn). $remainStrEn left today (max $targetName today: $maxTirStr). Full 24h target tracking starts tomorrow."
+                } else {
+                    val needStrRu = formatHoursMins(effectiveNeededMinutesToday, true)
+                    val needStrEn = formatHoursMins(effectiveNeededMinutesToday, false)
+                    recRu = "Сбор данных за сегодня ($observedPointsCount точек, $coveredStrRu). Для расчёта цели требуется ≥6 ч. Для цели ≥$targetPctInt% удержите в норме ещё $needStrRu."
+                    recEn = "Collecting daily data ($observedPointsCount pts, $coveredStrEn). Target analysis requires ≥6h. Keep in range $needStrEn to reach ≥$targetPctInt%."
+                }
             }
 
             // Scenario 3: Target already guaranteed / exceeded (> targetGoalMinutes)
@@ -165,12 +181,12 @@ object TargetCompensatorCalculator {
             // Scenario 1B: In range right now -> encouraging pace recommendation
             else -> {
                 status = if (currentScore >= targetPercent) CompensatorStatus.EXCEEDING else CompensatorStatus.REACHABLE
-                val needStrRu = formatHoursMins(neededMinutesToday, true)
+                val needStrRu = formatHoursMins(effectiveNeededMinutesToday, true)
                 val remainStrRu = formatHoursMins(remainingMinutesToday, true)
                 val targetPctInt = targetPercent.toInt()
                 recRu = "В норме. Из оставшихся $remainStrRu суток удерживайте диапазон ещё не менее $needStrRu для выполнения цели ≥$targetPctInt%."
 
-                val needStrEn = formatHoursMins(neededMinutesToday, false)
+                val needStrEn = formatHoursMins(effectiveNeededMinutesToday, false)
                 val remainStrEn = formatHoursMins(remainingMinutesToday, false)
                 recEn = "In range. Out of remaining $remainStrEn today, keep at least $needStrEn to secure ≥$targetPctInt% goal."
             }

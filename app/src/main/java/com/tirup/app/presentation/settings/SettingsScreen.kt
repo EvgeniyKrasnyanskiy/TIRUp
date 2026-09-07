@@ -159,6 +159,7 @@ fun SettingsScreen(
     var masterOffHintVisible by rememberSaveable { mutableStateOf(false) }
     var showBleHelpModal by rememberSaveable { mutableStateOf(false) }
     var showBlePinDialog by rememberSaveable { mutableStateOf(false) }
+    var showClearTreatmentsDialog by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
     val smsPermissionLauncher = rememberLauncherForActivityResult(
@@ -899,10 +900,20 @@ fun SettingsScreen(
         }
 
         if (showAdvancedSettings) {
-        // Section: Local BLE Bridge (Broadcaster / Observer)
         item {
-            val ble = settings.bleBridgeSettings
-            BentoCard(modifier = Modifier.fillMaxWidth()) {
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = ActionBlue.copy(alpha = 0.035f),
+                border = BorderStroke(1.2.dp, ActionBlue.copy(alpha = 0.28f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    // Section: Local BLE Bridge (Broadcaster / Observer)
+                    val ble = settings.bleBridgeSettings
+                    BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
                         modifier = Modifier
@@ -1390,10 +1401,8 @@ fun SettingsScreen(
             }
         }
     }
-}
 
-        // Section: Emergency SMS on Severe Hypo
-        item {
+            // Section: Emergency SMS on Severe Hypo
             val alerts = settings.alertSettings
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1478,9 +1487,56 @@ fun SettingsScreen(
                         }
                     }
 
-                    AnimatedVisibility(visible = alerts.isEmergencySmsEnabled && isSmsCardExpanded) {
+                    AnimatedVisibility(visible = isSmsCardExpanded) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFFEF4444).copy(alpha = 0.10f),
+                                    border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.35f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text("⚠️", fontSize = 16.sp)
+                                            Text(
+                                                text = if (isRu) "Требуется разрешение на отправку SMS"
+                                                       else "SMS sending permission required",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFEF4444)
+                                            )
+                                        }
+                                        Text(
+                                            text = if (isRu) "Для автоматической отправки экстренных сообщений близким при тяжёлой гипогликемии предоставьте системное разрешение."
+                                                   else "To automatically send emergency SMS to trusted contacts on severe low, grant system SMS permission.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            lineHeight = 16.sp
+                                        )
+                                        Button(
+                                            onClick = { smsPermissionLauncher.launch(Manifest.permission.SEND_SMS) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                text = if (isRu) "Предоставить доступ к SMS" else "Grant SMS Permission",
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
 
                             // Primary trusted contact phone input
                             OutlinedTextField(
@@ -1698,11 +1754,9 @@ fun SettingsScreen(
                 }
             }
         }
-    }
 
         // Section: Weekly Sunday Digest
-        item {
-            BentoCard(modifier = Modifier.fillMaxWidth()) {
+        BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(horizontal = 2.dp, vertical = 2.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1763,11 +1817,9 @@ fun SettingsScreen(
                     }
                 }
             }
-        }
 
         // Section 3: Clinical Targets & Sleep Window
-        item {
-            BentoCard(modifier = Modifier.fillMaxWidth()) {
+        BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
                         text = if (isRu) "Клинические стандарты (ATTD / ADA)" else "Clinical Standards (ATTD / ADA)",
@@ -1863,11 +1915,9 @@ fun SettingsScreen(
                     }
                 }
             }
-        }
 
         // Section: Lockscreen Notification (Постоянное уведомление на экране блокировки)
-        item {
-            BentoCard(modifier = Modifier.fillMaxWidth()) {
+        BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1901,11 +1951,9 @@ fun SettingsScreen(
                     }
                 }
             }
-        }
 
         // Section: Floating Glucose Bubble (Плавающий пузырёк поверх всех окон)
-        item {
-            BentoCard(modifier = Modifier.fillMaxWidth()) {
+        BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1953,11 +2001,9 @@ fun SettingsScreen(
                     }
                 }
             }
-        }
 
         // Section: Widget Background Opacity with Live Interactive Preview
-        item {
-            BentoCard(modifier = Modifier.fillMaxWidth()) {
+        BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -2116,11 +2162,9 @@ fun SettingsScreen(
                     }
                 }
             }
-        }
 
         // Section 4: Auto-Backup
-        item {
-            BentoCard(modifier = Modifier.fillMaxWidth()) {
+        BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -2169,11 +2213,9 @@ fun SettingsScreen(
                     }
                 }
             }
-        }
 
         // Section 5: Data Management (Clear Data)
-        item {
-            BentoCard(modifier = Modifier.fillMaxWidth()) {
+        BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         text = stringResource(R.string.clear_data),
@@ -2202,7 +2244,7 @@ fun SettingsScreen(
                     }
 
                     OutlinedButton(
-                        onClick = { viewModel.clearTreatments() },
+                        onClick = { showClearTreatmentsDialog = true },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
@@ -2224,11 +2266,9 @@ fun SettingsScreen(
                     }
                 }
             }
-        }
 
         // Section: Collapse Advanced Settings Footer
-        item {
-            Surface(
+        Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { showAdvancedSettings = false },
@@ -2256,6 +2296,8 @@ fun SettingsScreen(
                         color = ActionBlue,
                         fontWeight = FontWeight.SemiBold
                     )
+                }
+            }
                 }
             }
         }
@@ -2748,6 +2790,45 @@ fun SettingsScreen(
                 TextButton(
                     onClick = { viewModel.showClearConfirm(false) }
                 ) {
+                    Text(text = stringResource(R.string.action_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        )
+    }
+
+    if (showClearTreatmentsDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearTreatmentsDialog = false },
+            title = {
+                Text(
+                    text = if (isRu) "Очистить метки болюсов и еды?" else "Clear Insulin & Meal Marks?",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = if (isRu) "Вы действительно хотите удалить все сохранённые метки болюсов и приёмов пищи из базы данных? Сами замеры глюкозы затронуты не будут."
+                           else "Are you sure you want to delete all saved bolus and meal marks from the database? Glucose readings will remain untouched.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearTreatmentsDialog = false
+                        viewModel.clearTreatments()
+                    }
+                ) {
+                    Text(
+                        text = if (isRu) "Очистить" else "Clear",
+                        color = ColorVeryLow,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearTreatmentsDialog = false }) {
                     Text(text = stringResource(R.string.action_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
