@@ -25,6 +25,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import com.tirup.app.TirupApplication
 
 object BleBroadcaster {
 
@@ -35,11 +38,15 @@ object BleBroadcaster {
     const val TEST_PING_BURST_MS = 30_000L // 30 seconds for manual diagnostic test ping
 
     private val scope = CoroutineScope(Dispatchers.IO)
+    private val mutex = Mutex()
+    private var appContext: Context? = null
+
     private var currentAdvertiser: BluetoothLeAdvertiser? = null
     private var activeCallback: AdvertiseCallback? = null
     private var stopBurstJob: Job? = null
     private var countdownJob: Job? = null
-    private var fallbackHeartbeatJob: Job? = null
+    private var heartbeatTickerJob: Job? = null
+    private var nextHeartbeatTargetMs: Long = 0L
     private var wakeLock: PowerManager.WakeLock? = null
 
     private var lastReadingCache: GlucoseReading? = null
@@ -94,6 +101,11 @@ object BleBroadcaster {
             return
         }
 
+        appContext = context.applicationContext
+        lastReadingCache = reading
+        lastRateCache = rateOfChange
+        lastSettingsCache = settings
+
         val battery = if (settings.transmitBattery) getBatteryLevel(context) else -1
         val payload = BlePacketCodec.encodePacket(
             timestampMs = reading.timestamp,
@@ -119,104 +131,135 @@ object BleBroadcaster {
             .build()
 
         scope.launch {
-            try {
-                // Stop any previous active burst
-                stopAdvertisingInternal()
-
-                // Acquire partial WakeLock to prevent CPU sleep during burst
-                val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            mutex.withLock {
                 try {
-                    wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TIRUp:BleBroadcasterWakeLock")?.apply {
-                        setReferenceCounted(false)
-                        acquire(burstDurationMs + 5_000L)
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to acquire WakeLock: ${e.message}")
-                }
-
-                val durationSec = (burstDurationMs / 1000L).toInt()
-                val callback = object : AdvertiseCallback() {
-                    override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
-                        Log.i(TAG, "BLE broadcast started successfully for reading ts=${reading.timestamp}")
-                        _isBroadcasting.value = true
-                        onStatus?.invoke(true, "Радиоимпульс запущен ($durationSec сек)")
-                    }
-
-                    override fun onStartFailure(errorCode: Int) {
-                        Log.w(TAG, "BLE broadcast start failed with code: $errorCode")
-                        stopAdvertisingInternal()
-                        val errDesc = when (errorCode) {
-                            ADVERTISE_FAILED_DATA_TOO_LARGE -> "Пакет слишком велик"
-                            ADVERTISE_FAILED_TOO_MANY_ADVERTISERS -> "Слишком много вещателей BLE"
-                            ADVERTISE_FAILED_ALREADY_STARTED -> "Вещание уже запущено"
-                            ADVERTISE_FAILED_INTERNAL_ERROR -> "Внутренняя ошибка Bluetooth стека"
-                            ADVERTISE_FAILED_FEATURE_UNSUPPORTED -> "BLE-вещание не поддерживается чипом"
-                            else -> "Код ошибки $errorCode"
-                        }
-                        onStatus?.invoke(false, "Ошибка BLE: $errDesc")
-                    }
-                }
-
-                activeCallback = callback
-                currentAdvertiser = advertiser
-                advertiser.startAdvertising(advertiseSettings, advertiseData, callback)
-
-                lastReadingCache = reading
-                lastRateCache = rateOfChange
-                lastSettingsCache = settings
-
-                // Run countdown and burst shutdown after burstDurationMs
-                stopBurstJob?.cancel()
-                countdownJob?.cancel()
-                fallbackHeartbeatJob?.cancel()
-
-                _broadcastRemainingSec.value = durationSec
-
-                countdownJob = launch {
-                    while (_broadcastRemainingSec.value > 0) {
-                        delay(1000L)
-                        _broadcastRemainingSec.value = (_broadcastRemainingSec.value - 1).coerceAtLeast(0)
-                    }
-                }
-
-                stopBurstJob = launch {
-                    delay(burstDurationMs)
+                    // Stop any previous active burst without wiping the heartbeat target
                     stopAdvertisingInternal(cancelHeartbeat = false)
-                    Log.d(TAG, "BLE broadcast pulse burst completed ($burstDurationMs ms)")
-                }
 
-                // Schedule 5-minute fallback heartbeat if no new readings arrive
-                fallbackHeartbeatJob = launch {
-                    var sec = 300
-                    while (sec > 0) {
-                        _nextHeartbeatRemainingSec.value = sec
-                        delay(1000L)
-                        sec--
+                    // Acquire partial WakeLock to prevent CPU sleep during burst
+                    val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+                    try {
+                        wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TIRUp:BleBroadcasterWakeLock")?.apply {
+                            setReferenceCounted(false)
+                            acquire(burstDurationMs + 5_000L)
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to acquire WakeLock: ${e.message}")
                     }
-                    _nextHeartbeatRemainingSec.value = 0
-                    val cachedReading = lastReadingCache
-                    val cachedSettings = lastSettingsCache
-                    if (cachedReading != null && cachedSettings != null && cachedSettings.role == BleBridgeRole.BROADCASTER) {
-                        Log.i(TAG, "Triggering 5-minute fallback BLE heartbeat broadcast (12s burst)")
-                        broadcastReading(
-                            context = context.applicationContext,
-                            reading = cachedReading,
-                            rateOfChange = lastRateCache,
-                            iob = cachedReading.iob ?: 0.0,
-                            settings = cachedSettings,
-                            burstDurationMs = HEARTBEAT_BURST_MS
-                        )
+
+                    val durationSec = (burstDurationMs / 1000L).toInt()
+                    val callback = object : AdvertiseCallback() {
+                        override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
+                            Log.i(TAG, "BLE broadcast started successfully for reading ts=${reading.timestamp}")
+                            _isBroadcasting.value = true
+                            onStatus?.invoke(true, "Радиоимпульс запущен ($durationSec сек)")
+                        }
+
+                        override fun onStartFailure(errorCode: Int) {
+                            Log.w(TAG, "BLE broadcast start failed with code: $errorCode")
+                            scope.launch {
+                                mutex.withLock { stopAdvertisingInternal(cancelHeartbeat = false) }
+                            }
+                            val errDesc = when (errorCode) {
+                                ADVERTISE_FAILED_DATA_TOO_LARGE -> "Пакет слишком велик"
+                                ADVERTISE_FAILED_TOO_MANY_ADVERTISERS -> "Слишком много вещателей BLE"
+                                ADVERTISE_FAILED_ALREADY_STARTED -> "Вещание уже запущено"
+                                ADVERTISE_FAILED_INTERNAL_ERROR -> "Внутренняя ошибка Bluetooth стека"
+                                ADVERTISE_FAILED_FEATURE_UNSUPPORTED -> "BLE-вещание не поддерживается чипом"
+                                else -> "Код ошибки $errorCode"
+                            }
+                            onStatus?.invoke(false, "Ошибка BLE: $errDesc")
+                        }
+                    }
+
+                    activeCallback = callback
+                    currentAdvertiser = advertiser
+                    advertiser.startAdvertising(advertiseSettings, advertiseData, callback)
+
+                    _broadcastRemainingSec.value = durationSec
+
+                    countdownJob?.cancel()
+                    countdownJob = launch {
+                        while (_broadcastRemainingSec.value > 0) {
+                            delay(1000L)
+                            _broadcastRemainingSec.value = (_broadcastRemainingSec.value - 1).coerceAtLeast(0)
+                        }
+                    }
+
+                    stopBurstJob?.cancel()
+                    stopBurstJob = launch {
+                        delay(burstDurationMs)
+                        mutex.withLock {
+                            stopAdvertisingInternal(cancelHeartbeat = false)
+                            Log.d(TAG, "BLE broadcast pulse burst completed ($burstDurationMs ms)")
+                            // Reset 5-minute countdown immediately after burst completion
+                            scheduleHeartbeat(300_000L)
+                        }
+                    }
+
+                    // Reset 5-minute target timestamp right away (so UI shows 5:00 while broadcasting)
+                    scheduleHeartbeat(300_000L + burstDurationMs)
+
+                } catch (e: SecurityException) {
+                    Log.w(TAG, "SecurityException starting BLE advertising: ${e.message}")
+                    stopAdvertisingInternal(cancelHeartbeat = false)
+                    onStatus?.invoke(false, "Ошибка безопасности: нет Bluetooth-доступа")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to start BLE advertising: ${e.message}")
+                    stopAdvertisingInternal(cancelHeartbeat = false)
+                    onStatus?.invoke(false, "Сбой запуска: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private fun scheduleHeartbeat(delayMs: Long) {
+        nextHeartbeatTargetMs = System.currentTimeMillis() + delayMs
+        _nextHeartbeatRemainingSec.value = (delayMs / 1000L).toInt()
+        ensureTickerRunning()
+    }
+
+    private fun ensureTickerRunning() {
+        if (heartbeatTickerJob?.isActive == true) return
+        heartbeatTickerJob = scope.launch {
+            while (true) {
+                val now = System.currentTimeMillis()
+                if (nextHeartbeatTargetMs > 0L) {
+                    val remSec = ((nextHeartbeatTargetMs - now) / 1000L).toInt().coerceAtLeast(0)
+                    _nextHeartbeatRemainingSec.value = remSec
+                    if (remSec == 0 && !_isBroadcasting.value) {
+                        triggerFallbackHeartbeat()
                     }
                 }
-            } catch (e: SecurityException) {
-                Log.w(TAG, "SecurityException starting BLE advertising: ${e.message}")
-                stopAdvertisingInternal()
-                onStatus?.invoke(false, "Ошибка безопасности: нет Bluetooth-доступа")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to start BLE advertising: ${e.message}")
-                stopAdvertisingInternal()
-                onStatus?.invoke(false, "Сбой запуска: ${e.message}")
+                delay(500L)
             }
+        }
+    }
+
+    private suspend fun triggerFallbackHeartbeat() {
+        // Postpone next trigger to prevent repeated executions
+        scheduleHeartbeat(300_000L)
+        val ctx = appContext ?: return
+        val cachedSettings = lastSettingsCache
+        if (cachedSettings?.role != BleBridgeRole.BROADCASTER) return
+
+        var reading = lastReadingCache
+        if (reading == null) {
+            val app = ctx as? TirupApplication
+            val recent = app?.database?.glucoseReadingDao()?.getRecentReadingsSync(1)?.firstOrNull()?.toDomain()
+            reading = recent
+        }
+
+        if (reading != null) {
+            Log.i(TAG, "Triggering 5-minute fallback BLE heartbeat broadcast (12s burst)")
+            broadcastReading(
+                context = ctx,
+                reading = reading,
+                rateOfChange = lastRateCache,
+                iob = reading.iob ?: 0.0,
+                settings = cachedSettings,
+                burstDurationMs = HEARTBEAT_BURST_MS
+            )
         }
     }
 
@@ -249,7 +292,9 @@ object BleBroadcaster {
 
     fun stopAdvertising() {
         scope.launch {
-            stopAdvertisingInternal(cancelHeartbeat = true)
+            mutex.withLock {
+                stopAdvertisingInternal(cancelHeartbeat = true)
+            }
         }
     }
 
@@ -264,10 +309,14 @@ object BleBroadcaster {
         _isBroadcasting.value = false
         _broadcastRemainingSec.value = 0
         countdownJob?.cancel()
+        countdownJob = null
         stopBurstJob?.cancel()
+        stopBurstJob = null
         if (cancelHeartbeat) {
-            fallbackHeartbeatJob?.cancel()
-            _nextHeartbeatRemainingSec.value = 0
+            heartbeatTickerJob?.cancel()
+            heartbeatTickerJob = null
+            nextHeartbeatTargetMs = 0L
+            _nextHeartbeatRemainingSec.value = 300
         }
         try {
             if (wakeLock?.isHeld == true) {

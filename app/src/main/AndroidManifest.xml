@@ -61,11 +61,13 @@
         <receiver
             android:name=".data.receiver.DexdripBroadcastReceiver"
             android:exported="true">
-            <intent-filter>
+            <intent-filter android:priority="1000">
                 <action android:name="com.eveningoutpost.dexdrip.BgEstimate" />
                 <action android:name="com.eveningoutpost.dexdrip.BgEstimate.NEW_DATA" />
                 <action android:name="com.eveningoutpost.dexdrip.ACTION_NEW_BG_ESTIMATE" />
                 <action android:name="com.eveningoutpost.dexdrip.ACTION_NEW_BG" />
+                <action android:name="com.eveningoutpost.dexdrip.NEW_READING" />
+                <action android:name="glucometer.action.NEW_SGV" />
                 <action android:name="glucodata.Minute" />
                 <action android:name="de.michelinside.glucodatahandler.GLUCODATA" />
                 <action android:name="de.michelinside.glucodatahandler.MINUTE" />

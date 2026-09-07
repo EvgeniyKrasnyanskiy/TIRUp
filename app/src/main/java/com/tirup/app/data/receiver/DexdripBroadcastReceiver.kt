@@ -100,6 +100,18 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         // 2. Extract timestamp
         val timestamp = extractTimestamp(extras) ?: System.currentTimeMillis()
 
+        // Deduplication: drop duplicate echo broadcasts from multiple apps (xDrip + GDH) within 4 seconds
+        val now = System.currentTimeMillis()
+        if (Math.abs(now - lastProcessedWallClock) < 4000L &&
+            Math.abs(valueMmol - lastProcessedValue) < 0.01 &&
+            Math.abs(timestamp - lastProcessedTimestamp) < 3000L) {
+            Log.d(TAG, "Skipping duplicate broadcast (ts=$timestamp, val=$valueMmol) received within 4s")
+            return
+        }
+        lastProcessedWallClock = now
+        lastProcessedTimestamp = timestamp
+        lastProcessedValue = valueMmol
+
         // 3. Extract slope / arrow
         val slopeName = extractSlopeName(extras)
         val trendArrow = slopeToArrow(slopeName)
@@ -108,56 +120,23 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         var iob = extractIob(extras)
         var cob = extractCob(extras)
 
+        val curIob = iob
+        if (curIob != null && curIob <= 0.05) {
+            iob = null
+            cachedIob = null
+            cachedIobTimestamp = 0L
+        }
+        val curCob = cob
+        if (curCob != null && curCob <= 0.5) {
+            cob = null
+            cachedCob = null
+            cachedCobTimestamp = 0L
+        }
+
         val pendingResult = goAsync()
         scope.launch {
             try {
-                // If IoB or CoB not found in broadcast extras, query local xDrip/Nightscout web service (port 17580)
-                if (iob == null || cob == null) {
-                    val pebbleData = fetchIobCobFromLocalPebbleService()
-                    if (pebbleData != null) {
-                        if (pebbleData.first != null) {
-                            val pIob = pebbleData.first!!
-                            if (pIob <= 0.05) {
-                                iob = null
-                                cachedIob = null
-                                cachedIobTimestamp = 0L
-                            } else if (iob == null) {
-                                iob = pIob
-                                cachedIob = iob
-                                cachedIobTimestamp = System.currentTimeMillis()
-                                Log.i(TAG, "Fetched active IoB from local 17580 web service: $iob U")
-                            }
-                        }
-                        if (pebbleData.second != null) {
-                            val pCob = pebbleData.second!!
-                            if (pCob <= 0.5) {
-                                cob = null
-                                cachedCob = null
-                                cachedCobTimestamp = 0L
-                            } else if (cob == null) {
-                                cob = pCob
-                                cachedCob = cob
-                                cachedCobTimestamp = System.currentTimeMillis()
-                                Log.i(TAG, "Fetched active CoB from local 17580 web service: $cob g")
-                            }
-                        }
-                    }
-                }
-
-                val curIob = iob
-                if (curIob != null && curIob <= 0.05) {
-                    iob = null
-                    cachedIob = null
-                    cachedIobTimestamp = 0L
-                }
-                val curCob = cob
-                if (curCob != null && curCob <= 0.5) {
-                    cob = null
-                    cachedCob = null
-                    cachedCobTimestamp = 0L
-                }
-
-                Log.i(TAG, "Saving glucose: $valueMmol mmol/L at $timestamp (trend: $trendArrow, iob: $iob, cob: $cob)")
+                Log.i(TAG, "Saving glucose immediately: $valueMmol mmol/L at $timestamp (trend: $trendArrow, iob: $iob, cob: $cob)")
 
                 val app = context.applicationContext as? TirupApplication
                 val repository = app?.glucoseRepository
@@ -251,6 +230,44 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         settingsRepository = app.settingsRepository
                     )
                     com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context.applicationContext)
+
+                    // Asynchronously fetch IoB / CoB from local port 17580 if missing, without delaying the primary glucose display
+                    if (iob == null || cob == null) {
+                        scope.launch(Dispatchers.IO) {
+                            try {
+                                val pebbleData = fetchIobCobFromLocalPebbleService()
+                                if (pebbleData != null && (pebbleData.first != null || pebbleData.second != null)) {
+                                    var newIob = iob
+                                    var newCob = cob
+                                    if (pebbleData.first != null && pebbleData.first!! > 0.05) {
+                                        newIob = pebbleData.first
+                                        cachedIob = newIob
+                                        cachedIobTimestamp = System.currentTimeMillis()
+                                    }
+                                    if (pebbleData.second != null && pebbleData.second!! > 0.5) {
+                                        newCob = pebbleData.second
+                                        cachedCob = newCob
+                                        cachedCobTimestamp = System.currentTimeMillis()
+                                    }
+                                    if (newIob != iob || newCob != cob) {
+                                        repository.insertReading(
+                                            GlucoseReading(
+                                                timestamp = timestamp,
+                                                valueMmol = valueMmol,
+                                                trendArrow = trendArrow,
+                                                iob = newIob,
+                                                cob = newCob
+                                            )
+                                        )
+                                        com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context.applicationContext)
+                                        Log.i(TAG, "Asynchronously updated reading with Pebble IoB/CoB: iob=$newIob, cob=$newCob")
+                                    }
+                                }
+                            } catch (pe: Exception) {
+                                Log.d(TAG, "Background Pebble IoB/CoB fetch skipped: ${pe.message}")
+                            }
+                        }
+                    }
                 } else {
                     Log.e(TAG, "TirupApplication or repository instance is null.")
                 }
@@ -684,6 +701,13 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "DexdripReceiver"
         private const val IOB_COB_EXPIRY_MS = 30 * 60 * 1000L // 30 min cache like GDH
+
+        @Volatile
+        private var lastProcessedWallClock: Long = 0L
+        @Volatile
+        private var lastProcessedTimestamp: Long = 0L
+        @Volatile
+        private var lastProcessedValue: Double = 0.0
 
         @Volatile
         private var cachedIob: Double? = null

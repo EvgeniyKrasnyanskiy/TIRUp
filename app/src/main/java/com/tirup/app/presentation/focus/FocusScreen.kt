@@ -200,6 +200,63 @@ fun FocusScreen(
                 nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
                 dailyAlertsCount = dailyAlertLogs.size,
                 onAlertHistoryClick = { showDailyAlertLogsDialog = true },
+                onBatteryClick = {
+                    val title = if (isRu) "Заряд батареи Мастера" else "Master Phone Battery"
+                    val desc = if (isRu) {
+                        if (isMasterBatteryStale) {
+                            "Данные о заряде телефона-Мастера устарели (сигнал не обновлялся более 15 минут). Проверьте Bluetooth-соединение."
+                        } else {
+                            "Текущий уровень заряда батареи на смартфоне-Мастере: ${masterBattery ?: 0}%.\n\nТелеметрия передается автоматически с каждым радиоимпульсом BLE."
+                        }
+                    } else {
+                        "Battery level on Master device: ${masterBattery ?: 0}%."
+                    }
+                    detailDialogInfo = Pair(title, desc)
+                },
+                onIobClick = {
+                    val r = state.latestReading
+                    val iobVal = r?.iob ?: 0.0
+                    val title = if (isRu) "Активный инсулин (IoB)" else "Insulin on Board (IoB)"
+                    val desc = if (isRu) {
+                        "Расчетное количество активного короткого/ультракороткого инсулина в организме: ${String.format(Locale.US, "%.2f", iobVal)} Ед.\n\nУчитывает время действия предыдущих болюсов и помогает предотвратить опасное наслоение доз (инсулиновый стек)."
+                    } else {
+                        "Estimated remaining active insulin: ${String.format(Locale.US, "%.2f", iobVal)} U.\nHelps prevent dangerous insulin stacking."
+                    }
+                    detailDialogInfo = Pair(title, desc)
+                },
+                onCobClick = {
+                    val r = state.latestReading
+                    val cobVal = r?.cob ?: 0.0
+                    val title = if (isRu) "Активные углеводы (CoB)" else "Carbs on Board (CoB)"
+                    val desc = if (isRu) {
+                        "Расчетное количество еще не усвоенных углеводов: ${String.format(Locale.US, "%.0f", cobVal)} г.\n\nПоказывает объем углеводов от недавних приемов пищи, который еще поступит в кровоток и может вызвать рост гликемии."
+                    } else {
+                        "Estimated unabsorbed carbs: ${String.format(Locale.US, "%.0f", cobVal)} g.\nShows pending carbohydrates from recent meals."
+                    }
+                    detailDialogInfo = Pair(title, desc)
+                },
+                onBleClick = {
+                    if (isBleBroadcasting) {
+                        val title = if (isRu) "BLE-мост: Радиоимпульс" else "BLE Bridge: Broadcasting"
+                        val desc = if (isRu) {
+                            "Прямо сейчас Мастер передает радиоимпульс в эфир через Bluetooth Low Energy (осталось $broadcastRemainingSec сек).\n\nТелефоны-приемники в радиусе 10–15 м с вашим семейным PIN получают свежий замер сахара, тренд и заряд батареи."
+                        } else {
+                            "Active BLE broadcast pulse in progress ($broadcastRemainingSec s remaining)."
+                        }
+                        detailDialogInfo = Pair(title, desc)
+                    } else {
+                        val min = nextHeartbeatRemainingSec / 60
+                        val sec = nextHeartbeatRemainingSec % 60
+                        val timeStr = String.format(Locale.US, "%d:%02d", min, sec)
+                        val title = if (isRu) "BLE-мост: Режим ожидания" else "BLE Bridge: Idle"
+                        val desc = if (isRu) {
+                            "Мастер находится в режиме ожидания. До контрольного радиоимпульса (heartbeat): $timeStr.\n\nКак только от сенсора поступит свежий замер, Мастер немедленно передаст его в эфир и таймер сбросится обратно на 5:00."
+                        } else {
+                            "Master is idle. Heartbeat pulse in: $timeStr.\nArriving sensor readings are transmitted immediately, resetting the timer to 5:00."
+                        }
+                        detailDialogInfo = Pair(title, desc)
+                    }
+                },
                 onClick = {
                     val r = state.latestReading
                     if (r != null) {
@@ -875,6 +932,7 @@ private fun BleTransmitterBadge(
     isBleBroadcasting: Boolean,
     broadcastRemainingSec: Int,
     nextHeartbeatRemainingSec: Int,
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (isBleBroadcasting) {
@@ -908,14 +966,16 @@ private fun BleTransmitterBadge(
         )
 
         Surface(
-            modifier = modifier,
+            modifier = modifier
+                .size(width = 62.dp, height = 24.dp)
+                .clickable { onClick() },
             shape = RoundedCornerShape(10.dp),
             color = ActionBlue.copy(alpha = 0.14f),
             border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.45f))
         ) {
             Box(
                 modifier = Modifier
-                    .size(width = 36.dp, height = 24.dp)
+                    .fillMaxSize()
                     .padding(2.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -968,15 +1028,19 @@ private fun BleTransmitterBadge(
         val countdownText = String.format(Locale.US, "%d:%02d", minutes, seconds)
 
         Surface(
-            modifier = modifier,
+            modifier = modifier
+                .size(width = 62.dp, height = 24.dp)
+                .clickable { onClick() },
             shape = RoundedCornerShape(10.dp),
             color = ActionBlue.copy(alpha = 0.08f),
             border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.25f))
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                horizontalArrangement = Arrangement.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Bluetooth,
@@ -984,9 +1048,12 @@ private fun BleTransmitterBadge(
                     tint = ActionBlue.copy(alpha = 0.85f),
                     modifier = Modifier.size(13.dp)
                 )
+                Spacer(modifier = Modifier.width(3.dp))
                 Text(
                     text = countdownText,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontFeatureSettings = "tnum"
+                    ),
                     fontWeight = FontWeight.SemiBold,
                     color = ActionBlue.copy(alpha = 0.85f)
                 )
@@ -1010,6 +1077,10 @@ private fun HeroGlucoseCard(
     nextHeartbeatRemainingSec: Int = 300,
     dailyAlertsCount: Int = 0,
     onAlertHistoryClick: () -> Unit = {},
+    onBatteryClick: () -> Unit = {},
+    onIobClick: () -> Unit = {},
+    onCobClick: () -> Unit = {},
+    onBleClick: () -> Unit = {},
     onClick: () -> Unit
 ) {
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1214,7 +1285,8 @@ private fun HeroGlucoseCard(
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = batColor.copy(alpha = 0.12f),
-                            border = BorderStroke(0.8.dp, batColor.copy(alpha = 0.35f))
+                            border = BorderStroke(0.8.dp, batColor.copy(alpha = 0.35f)),
+                            modifier = Modifier.clickable { onBatteryClick() }
                         ) {
                             Text(
                                 text = batText,
@@ -1231,7 +1303,8 @@ private fun HeroGlucoseCard(
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = ActionBlue.copy(alpha = 0.12f),
-                            border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.35f))
+                            border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.35f)),
+                            modifier = Modifier.clickable { onIobClick() }
                         ) {
                             Text(
                                 text = String.format(Locale.US, if (isRu) "💉 %.2f Ед" else "💉 %.2f U", latestReading!!.iob),
@@ -1248,7 +1321,8 @@ private fun HeroGlucoseCard(
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = PrimaryEmerald.copy(alpha = 0.12f),
-                            border = BorderStroke(0.8.dp, PrimaryEmerald.copy(alpha = 0.35f))
+                            border = BorderStroke(0.8.dp, PrimaryEmerald.copy(alpha = 0.35f)),
+                            modifier = Modifier.clickable { onCobClick() }
                         ) {
                             Text(
                                 text = String.format(Locale.US, if (isRu) "🍞 %.0f г" else "🍞 %.0f g", latestReading!!.cob),
@@ -1266,10 +1340,11 @@ private fun HeroGlucoseCard(
                     BleTransmitterBadge(
                         isBleBroadcasting = isBleBroadcasting,
                         broadcastRemainingSec = broadcastRemainingSec,
-                        nextHeartbeatRemainingSec = nextHeartbeatRemainingSec
+                        nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
+                        onClick = onBleClick
                     )
                 } else {
-                    Spacer(modifier = Modifier.width(28.dp))
+                    Spacer(modifier = Modifier.width(62.dp))
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))
