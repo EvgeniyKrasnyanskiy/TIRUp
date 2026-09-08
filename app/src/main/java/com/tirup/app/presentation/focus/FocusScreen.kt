@@ -52,6 +52,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -140,6 +141,20 @@ fun FocusScreen(
     val shouldCelebrateStreak = state.streakDays >= 2 && state.streakDays > userSettings.lastStreakCelebratedDays
     var showStreakDialog by remember(shouldCelebrateStreak) { mutableStateOf(shouldCelebrateStreak) }
 
+    // BLE received hint: shows a 3-second top overlay when a new packet arrives (observer role)
+    val blePacketReceivedAt by viewModel.blePacketReceivedAt.collectAsState()
+    var showBleHint by remember { mutableStateOf(false) }
+    val bleSettings = userSettings.bleBridgeSettings
+    val isObserverRole = bleSettings.role == BleBridgeRole.OBSERVER
+    LaunchedEffect(blePacketReceivedAt) {
+        if (blePacketReceivedAt > 0L && isObserverRole) {
+            showBleHint = true
+            kotlinx.coroutines.delay(3000L)
+            showBleHint = false
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize()) {
         // Fixed Top Header with Menu Button, Title & Streak
         Surface(
@@ -200,50 +215,17 @@ fun FocusScreen(
         ) {
             item { Spacer(modifier = Modifier.height(2.dp)) }
 
-            if (userSettings.bleBridgeSettings.role != BleBridgeRole.DISABLED) {
-                item {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = ActionBlue.copy(alpha = 0.08f),
-                        border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.25f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Bluetooth,
-                                contentDescription = null,
-                                tint = ActionBlue,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = if (isRu) {
-                                    "BLE-мост включён: ${if (userSettings.bleBridgeSettings.role == BleBridgeRole.BROADCASTER) "вещатель" else "приёмник"}. Для отключения откройте Дополнительные настройки."
-                                } else {
-                                    "BLE Bridge enabled: ${if (userSettings.bleBridgeSettings.role == BleBridgeRole.BROADCASTER) "broadcaster" else "observer"}. Disable it in Advanced Settings."
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 16.sp
-                            )
-                        }
-                    }
-                }
-            }
 
         // 1. Hero Card: Current Glucose
         item {
-            val bleSettings = userSettings.bleBridgeSettings
-            val isObserver = bleSettings.role == com.tirup.app.domain.model.BleBridgeRole.OBSERVER
-            val packetAgeMinutes = if (bleSettings.lastPacketTimestamp > 0L) {
-                (System.currentTimeMillis() - bleSettings.lastPacketTimestamp) / 60_000L
+            val heroBleSettings = userSettings.bleBridgeSettings
+            val isObserver = heroBleSettings.role == com.tirup.app.domain.model.BleBridgeRole.OBSERVER
+            val packetAgeMinutes = if (heroBleSettings.lastPacketTimestamp > 0L) {
+                (System.currentTimeMillis() - heroBleSettings.lastPacketTimestamp) / 60_000L
             } else 999L
             val isMasterBatteryStale = packetAgeMinutes > 7
-            val masterBattery = if (isObserver && (bleSettings.lastMasterBattery in 0..100 || bleSettings.lastPacketTimestamp > 0L)) {
-                bleSettings.lastMasterBattery
+            val masterBattery = if (isObserver && (heroBleSettings.lastMasterBattery in 0..100 || heroBleSettings.lastPacketTimestamp > 0L)) {
+                heroBleSettings.lastMasterBattery
             } else null
 
             HeroGlucoseCard(
@@ -254,7 +236,7 @@ fun FocusScreen(
                 activeAlertBanner = state.activeAlertBanner,
                 masterBatteryPct = masterBattery,
                 isMasterBatteryStale = isMasterBatteryStale,
-                isBroadcaster = bleSettings.role == BleBridgeRole.BROADCASTER,
+                isBroadcaster = heroBleSettings.role == BleBridgeRole.BROADCASTER,
                 isBleBroadcasting = isBleBroadcasting,
                 broadcastRemainingSec = broadcastRemainingSec,
                 nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
@@ -262,27 +244,38 @@ fun FocusScreen(
                 onAlertHistoryClick = { showDailyAlertLogsDialog = true },
                 onBatteryClick = {
                     val title = if (isRu) "Заряд батареи вещателя" else "Broadcaster Battery"
-                    val ageMins = if (bleSettings.lastPacketTimestamp > 0L) {
-                        (System.currentTimeMillis() - bleSettings.lastPacketTimestamp) / 60000L
+                    val ageMins = if (heroBleSettings.lastPacketTimestamp > 0L) {
+                        (System.currentTimeMillis() - heroBleSettings.lastPacketTimestamp) / 60000L
                     } else null
-                    val ageStr = if (ageMins != null) {
+                    val dataReceivedStr = if (ageMins != null) {
                         val value = when {
                             ageMins < 60L -> ageMins to if (isRu) "мин." else "min"
                             ageMins < 1440L -> (ageMins / 60L) to if (isRu) "ч" else "h"
                             ageMins < 365L * 1440L -> (ageMins / 1440L) to if (isRu) "дн." else "d"
                             else -> (ageMins / (365L * 1440L)) to if (isRu) "лет" else "y"
                         }
-                        if (isRu) " (обновлено ${value.first} ${value.second} назад)" else " (updated ${value.first}${value.second} ago)"
+                        if (isRu) "Данные получены ${value.first} ${value.second} назад."
+                        else "Data received ${value.first} ${value.second} ago."
                     } else ""
+                    val disableBridgeStr = if (isRu) {
+                        "Отключить BLE-мост можно в дополнительных настройках."
+                    } else {
+                        "Disable BLE Bridge in Advanced Settings."
+                    }
                     val desc = if (isRu) {
                         if (isMasterBatteryStale) {
-                            "Данные о заряде телефона-вещателя устарели (сигнал не обновлялся более 15 минут). Проверьте Bluetooth-соединение."
+                            "Данные о заряде телефона-вещателя устарели (сигнал не обновлялся более 7 минут). Проверьте Bluetooth-соединение." +
+                                if (dataReceivedStr.isNotEmpty()) "\n\n$dataReceivedStr" else "" +
+                                "\n\n$disableBridgeStr"
                         } else {
-                            "Текущий уровень заряда батареи на смартфоне-вещателе: ${masterBattery ?: 0}%$ageStr.\n\nДанные передаются автоматически с каждым сигналом Bluetooth."
-                                "Текущий уровень заряда батареи на смартфоне-вещателе: ${masterBattery ?: 0}%$ageStr.\n\nДанные передаются автоматически с каждым сигналом Bluetooth. Отключить BLE-мост можно в дополнительных настройках."
+                            "Текущий уровень заряда батареи на смартфоне-вещателе: ${masterBattery ?: 0}%." +
+                                if (dataReceivedStr.isNotEmpty()) "\n\n$dataReceivedStr" else "" +
+                                "\n\nДанные передаются автоматически с каждым сигналом Bluetooth.\n\n$disableBridgeStr"
                         }
                     } else {
-                        "Battery level on Broadcaster device: ${masterBattery ?: 0}%$ageStr.\n\nData is sent automatically with each Bluetooth signal. Disable BLE Bridge in Advanced Settings."
+                        "Battery level on Broadcaster device: ${masterBattery ?: 0}%." +
+                            if (dataReceivedStr.isNotEmpty()) "\n\n$dataReceivedStr" else "" +
+                            "\n\nData is sent automatically with each Bluetooth signal.\n\n$disableBridgeStr"
                     }
                     detailDialogInfo = Pair(title, desc)
                 },
@@ -935,7 +928,65 @@ fun FocusScreen(
 
         item { Spacer(modifier = Modifier.height(20.dp)) }
     }
+    } // end Column
+
+    // BLE received hint overlay — top-center, auto-dismisses after 3 seconds
+    if (showBleHint) {
+        val latestGlucose = state.latestReading
+        val glucoseStr = if (latestGlucose != null) {
+            if (unit == com.tirup.app.domain.model.GlucoseUnit.MMOL_L)
+                String.format(Locale.US, "%.1f", latestGlucose.valueMmol)
+            else
+                "${(latestGlucose.valueMmol * 18.0182).toInt()}"
+        } else "--"
+        val batteryPct = bleSettings.lastMasterBattery
+        val batteryStr = if (batteryPct in 0..100) {
+            if (isRu) ", 🔋 $batteryPct%" else ", 🔋 $batteryPct%"
+        } else ""
+        val signalStr = if (bleSettings.lastRssi != 0) {
+            val quality = when {
+                bleSettings.lastRssi >= -70 -> if (isRu) "отличный" else "excellent"
+                bleSettings.lastRssi >= -85 -> if (isRu) "хороший" else "good"
+                else -> if (isRu) "слабый" else "weak"
+            }
+            if (isRu) ", сигнал $quality" else ", signal $quality"
+        } else ""
+        val hintText = "TIRUp: $glucoseStr${latestGlucose?.trendArrow ?: ""}$batteryStr$signalStr"
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 64.dp, start = 20.dp, end = 20.dp),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.92f),
+                shadowElevation = 6.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bluetooth,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.inverseOnSurface,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = hintText,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.inverseOnSurface,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
     }
+
+    } // end Box
 
     // Detail Popups
     if (detailDialogInfo != null) {

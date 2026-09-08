@@ -35,7 +35,7 @@ fun DeviceStatusChips(
     onClick: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
     ) {
@@ -43,7 +43,7 @@ fun DeviceStatusChips(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .clickable { onClick() }
-                .padding(horizontal = 8.dp, vertical = 6.dp)
+                .padding(horizontal = 6.dp, vertical = 2.dp)
         ) {
             // Pump part (if pump user)
             if (showPump) {
