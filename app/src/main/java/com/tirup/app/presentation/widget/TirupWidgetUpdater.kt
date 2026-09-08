@@ -431,7 +431,7 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_delta_value, "--")
             views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
-            views.setTextViewText(R.id.widget_compensator_text, "Ожидание данных CGM")
+            views.setTextViewText(R.id.widget_compensator_text, if (isRu) "Ожидание данных сенсора" else "Waiting for sensor data")
             views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
             views.setViewVisibility(R.id.widget_streak_text, View.GONE)
             views.setViewVisibility(R.id.widget_master_battery, View.GONE)
@@ -707,7 +707,7 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_delta_value, "--")
             views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             views.setTextViewText(R.id.widget_tir_score, "TIR: --")
-            views.setTextViewText(R.id.widget_compensator_text, "Ожидание данных CGM")
+            views.setTextViewText(R.id.widget_compensator_text, if (isRu) "Ожидание данных сенсора" else "Waiting for sensor data")
             views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
             views.setViewVisibility(R.id.widget_streak_text, View.GONE)
             views.setViewVisibility(R.id.widget_master_battery, View.GONE)
@@ -1529,12 +1529,12 @@ object TirupWidgetUpdater {
         }
     }
 
-    fun formatTimeAgoShort(diffMs: Long): String {
+    fun formatTimeAgoShort(diffMs: Long, isRu: Boolean = true): String {
         val diffMin = diffMs.coerceAtLeast(0L) / 60_000L
         return when {
-            diffMin < 60 -> "${diffMin}м"
-            diffMin < 1440 -> "${diffMin / 60}ч"
-            else -> "${diffMin / 1440}д"
+            diffMin < 60 -> "${diffMin}${if (isRu) "м" else "m"}"
+            diffMin < 1440 -> "${diffMin / 60}${if (isRu) "ч" else "h"}"
+            else -> "${diffMin / 1440}${if (isRu) "д" else "d"}"
         }
     }
 }

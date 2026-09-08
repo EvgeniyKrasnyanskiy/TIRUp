@@ -870,11 +870,13 @@ object GlucoseAlertManager {
         val mainLow = alerts.mainLowThresholdMmol
         val mainHigh = alerts.mainHighThresholdMmol
         if (alerts.isMainEnabled && sorted.size >= 2) {
-            val lastPoints = sorted.takeLast(alerts.mainConsecutivePoints)
             val is5MinCadence = (sorted.last().timestamp - sorted[sorted.size - 2].timestamp >= 3 * 60_000L)
+            // Adaptive threshold: 3 points for 5-min sensors (~15 min), full count for 1-min
+            val adaptivePoints = if (is5MinCadence) minOf(alerts.mainConsecutivePoints, 3) else alerts.mainConsecutivePoints
+            val lastPoints = sorted.takeLast(adaptivePoints)
 
             val isLowConfirmed = if (is5MinCadence) {
-                sorted.size >= alerts.mainConsecutivePoints && lastPoints.all { it.valueMmol < mainLow }
+                sorted.size >= adaptivePoints && lastPoints.all { it.valueMmol < mainLow }
             } else {
                 // 1-minute cadence: require at least 15 minutes of readings below mainLow
                 val lowPoints = sorted.takeLastWhile { it.valueMmol < mainLow }
@@ -882,7 +884,7 @@ object GlucoseAlertManager {
             }
 
             val isHighConfirmed = if (is5MinCadence) {
-                sorted.size >= alerts.mainConsecutivePoints && lastPoints.all { it.valueMmol > mainHigh }
+                sorted.size >= adaptivePoints && lastPoints.all { it.valueMmol > mainHigh }
             } else {
                 // 1-minute cadence: require at least 15 minutes of readings above mainHigh
                 val highPoints = sorted.takeLastWhile { it.valueMmol > mainHigh }

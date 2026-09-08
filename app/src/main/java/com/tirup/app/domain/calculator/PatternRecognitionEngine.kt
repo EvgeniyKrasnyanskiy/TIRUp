@@ -29,14 +29,14 @@ object PatternRecognitionEngine {
         nightStartHour: Int = 0,
         nightEndHour: Int = 6
     ): List<DetectedPattern> {
-        if (bins.isEmpty() || stats.totalCount < 50) {
+        if (bins.isEmpty() || stats.totalCount < 50 || stats.daysCount < 3) {
             return listOf(
                 DetectedPattern(
                     id = "collecting_data",
                     titleRu = "Сбор данных",
                     titleEn = "Collecting Data",
-                    descriptionRu = "Недостаточно измерений для выявления устойчивых суточных паттернов. Продолжайте носить датчик.",
-                    descriptionEn = "Insufficient readings to detect repeating daily patterns. Continue wearing the sensor.",
+                    descriptionRu = "Для выявления устойчивых паттернов нужны данные минимум за 3 дня. Продолжайте носить сенсор.",
+                    descriptionEn = "At least 3 days of data are required to detect reliable patterns. Continue wearing the sensor.",
                     severity = PatternSeverity.INFO,
                     icon = "📊"
                 )
