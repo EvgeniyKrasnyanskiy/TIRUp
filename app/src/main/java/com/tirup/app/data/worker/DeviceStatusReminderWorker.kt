@@ -10,6 +10,7 @@ import androidx.work.WorkerParameters
 import com.tirup.app.data.alert.GlucoseAlertManager
 import com.tirup.app.data.repository.SettingsRepositoryImpl
 import com.tirup.app.domain.model.daysRemaining
+import com.tirup.app.domain.model.isPumpTherapy
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
@@ -47,7 +48,7 @@ class DeviceStatusReminderWorker(
             }
 
             // Pump set check: notify if <=1 day remaining OR expired
-            val isPump = settings.patientProfile.therapyType in listOf("Инсулиновая помпа", "Insulin Pump")
+            val isPump = isPumpTherapy(settings.patientProfile.therapyType)
             if (isPump && pumpSet.installedAt > 0L) {
                 val pumpDays = pumpSet.daysRemaining
                 if (pumpDays <= 1) {

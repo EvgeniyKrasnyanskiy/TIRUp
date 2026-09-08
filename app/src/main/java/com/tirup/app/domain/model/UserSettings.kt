@@ -140,6 +140,7 @@ data class UserSettings(
     val lastBackupTimestamp: Long = 0L,
     val hasSeenOnboarding: Boolean = false,
     val lastStreakCelebratedDays: Int = 0,
+    val bestStreakDays: Int = 0,
     val metricsOrder: List<String> = DEFAULT_METRICS_ORDER,
     val hiddenMetrics: List<String> = emptyList(),
     val isLockscreenNotificationEnabled: Boolean = true,
@@ -154,6 +155,10 @@ data class UserSettings(
     val sensorStatus: SensorStatus = SensorStatus(),
     val pumpSetStatus: PumpSetStatus = PumpSetStatus()
 )
+
+fun isPumpTherapy(therapyType: String): Boolean {
+    return therapyType.trim() in listOf("Инсулиновая помпа", "Insulin Pump")
+}
 
 fun localizeTherapyType(therapy: String, isRu: Boolean): String {
     return when (therapy.trim()) {

@@ -167,7 +167,13 @@ class SettingsViewModel(
 
     fun autoUpdatePatientProfile(profile: PatientProfile) {
         viewModelScope.launch {
-            val updated = _uiState.value.userSettings.copy(patientProfile = profile)
+            val current = _uiState.value.userSettings
+            val pumpReset = if (!com.tirup.app.domain.model.isPumpTherapy(profile.therapyType)) {
+                com.tirup.app.domain.model.PumpSetStatus()
+            } else {
+                current.pumpSetStatus
+            }
+            val updated = current.copy(patientProfile = profile, pumpSetStatus = pumpReset)
             settingsRepository.updateSettings(updated)
             _uiState.update { it.copy(userSettings = updated) }
             AutoBackupManager.maybeTriggerAutoBackup(context, database, settingsRepository, force = true)

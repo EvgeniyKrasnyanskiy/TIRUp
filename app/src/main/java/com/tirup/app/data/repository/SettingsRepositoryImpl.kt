@@ -55,6 +55,7 @@ class SettingsRepositoryImpl(
             .putLong(KEY_LAST_BACKUP_TIMESTAMP, settings.lastBackupTimestamp)
             .putBoolean(KEY_HAS_SEEN_ONBOARDING, settings.hasSeenOnboarding)
             .putInt(KEY_LAST_STREAK_CELEBRATED_DAYS, settings.lastStreakCelebratedDays)
+            .putInt(KEY_BEST_STREAK_DAYS, settings.bestStreakDays)
             .putString(KEY_METRICS_ORDER, settings.metricsOrder.joinToString(","))
             .putBoolean(KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED, settings.isLockscreenNotificationEnabled)
             .putInt(KEY_WIDGET_BACKGROUND_OPACITY, settings.widgetBackgroundOpacity)
@@ -182,6 +183,7 @@ class SettingsRepositoryImpl(
             lastBackupTimestamp = lastBackupTimestamp,
             hasSeenOnboarding = hasSeenOnboarding,
             lastStreakCelebratedDays = prefs.getInt(KEY_LAST_STREAK_CELEBRATED_DAYS, 0),
+            bestStreakDays = prefs.getInt(KEY_BEST_STREAK_DAYS, 0),
             metricsOrder = prefs.getString(KEY_METRICS_ORDER, null)?.split(",")?.filter { it.isNotBlank() }
                 ?: com.tirup.app.domain.model.DEFAULT_METRICS_ORDER,
             hiddenMetrics = prefs.getString(KEY_HIDDEN_METRICS, null)?.split(",")?.filter { it.isNotBlank() }
@@ -282,6 +284,7 @@ class SettingsRepositoryImpl(
         private const val KEY_LAST_BACKUP_TIMESTAMP = "key_last_backup_timestamp"
         private const val KEY_HAS_SEEN_ONBOARDING = "key_has_seen_onboarding"
         private const val KEY_LAST_STREAK_CELEBRATED_DAYS = "key_last_streak_celebrated_days"
+        private const val KEY_BEST_STREAK_DAYS = "key_best_streak_days"
         private const val KEY_METRICS_ORDER = "key_metrics_order"
         private const val KEY_HIDDEN_METRICS = "key_hidden_metrics"
         private const val KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED = "key_is_lockscreen_notification_enabled"
