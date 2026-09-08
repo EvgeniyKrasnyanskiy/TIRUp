@@ -1,6 +1,8 @@
 package com.tirup.app.data.repository
 
 import com.tirup.app.data.local.entity.DailySummaryEntity
+import com.tirup.app.domain.model.UserSettings
+import com.tirup.app.domain.model.withUpdatedBestStreak
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.util.Calendar
@@ -111,5 +113,16 @@ class StreakCalculatorTest {
 
         // Missing yesterday breaks the streak
         assertEquals(0, streak)
+    }
+
+    @Test
+    fun testBestStreakUpdatesOnlyOnImprovement() {
+        val baseline = UserSettings(bestStreakDays = 3)
+
+        val improved = baseline.withUpdatedBestStreak(5)
+        val unchanged = baseline.withUpdatedBestStreak(2)
+
+        assertEquals(5, improved.bestStreakDays)
+        assertEquals(3, unchanged.bestStreakDays)
     }
 }

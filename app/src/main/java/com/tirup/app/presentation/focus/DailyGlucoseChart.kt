@@ -459,13 +459,28 @@ fun DailyGlucoseChart(
                                 )
                             }
 
-                            if (sel.iob != null && sel.iob > 0.0) {
-                                Text(
-                                    text = String.format(Locale.US, "💉 %.2f U", sel.iob),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = ActionBlue
-                                )
+                            if ((sel.iob != null && sel.iob > 0.0) || (sel.cob != null && sel.cob > 0.0)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (sel.iob != null && sel.iob > 0.0) {
+                                        Text(
+                                            text = String.format(Locale.US, "💉 %.2f U", sel.iob),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = ActionBlue
+                                        )
+                                    }
+                                    if (sel.cob != null && sel.cob > 0.0) {
+                                        Text(
+                                            text = String.format(Locale.US, "🍞 %.0f g", sel.cob),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFF59E0B)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

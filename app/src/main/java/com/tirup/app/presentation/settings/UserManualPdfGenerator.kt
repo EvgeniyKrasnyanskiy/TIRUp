@@ -408,7 +408,6 @@ class UserManualPdfGenerator(private val context: Context) {
                     else "• Always verify unexpected CGM values with a blood capillary meter prior to insulin dosing decisions."
                 )
             )
-            )
 
             document.finishPage(page2)
 

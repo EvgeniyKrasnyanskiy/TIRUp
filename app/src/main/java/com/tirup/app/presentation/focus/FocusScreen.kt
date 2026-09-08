@@ -200,6 +200,40 @@ fun FocusScreen(
         ) {
             item { Spacer(modifier = Modifier.height(2.dp)) }
 
+            if (userSettings.bleBridgeSettings.role != BleBridgeRole.DISABLED) {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = ActionBlue.copy(alpha = 0.08f),
+                        border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.25f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Bluetooth,
+                                contentDescription = null,
+                                tint = ActionBlue,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = if (isRu) {
+                                    "BLE-мост включён: ${if (userSettings.bleBridgeSettings.role == BleBridgeRole.BROADCASTER) "вещатель" else "приёмник"}. Для отключения откройте Дополнительные настройки."
+                                } else {
+                                    "BLE Bridge enabled: ${if (userSettings.bleBridgeSettings.role == BleBridgeRole.BROADCASTER) "broadcaster" else "observer"}. Disable it in Advanced Settings."
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+                }
+            }
+
         // 1. Hero Card: Current Glucose
         item {
             val bleSettings = userSettings.bleBridgeSettings
@@ -232,16 +266,23 @@ fun FocusScreen(
                         (System.currentTimeMillis() - bleSettings.lastPacketTimestamp) / 60000L
                     } else null
                     val ageStr = if (ageMins != null) {
-                        if (isRu) " (обновлено $ageMins мин. назад)" else " (updated $ageMins min ago)"
+                        val value = when {
+                            ageMins < 60L -> ageMins to if (isRu) "мин." else "min"
+                            ageMins < 1440L -> (ageMins / 60L) to if (isRu) "ч" else "h"
+                            ageMins < 365L * 1440L -> (ageMins / 1440L) to if (isRu) "дн." else "d"
+                            else -> (ageMins / (365L * 1440L)) to if (isRu) "лет" else "y"
+                        }
+                        if (isRu) " (обновлено ${value.first} ${value.second} назад)" else " (updated ${value.first}${value.second} ago)"
                     } else ""
                     val desc = if (isRu) {
                         if (isMasterBatteryStale) {
                             "Данные о заряде телефона-вещателя устарели (сигнал не обновлялся более 15 минут). Проверьте Bluetooth-соединение."
                         } else {
                             "Текущий уровень заряда батареи на смартфоне-вещателе: ${masterBattery ?: 0}%$ageStr.\n\nДанные передаются автоматически с каждым сигналом Bluetooth."
+                                "Текущий уровень заряда батареи на смартфоне-вещателе: ${masterBattery ?: 0}%$ageStr.\n\nДанные передаются автоматически с каждым сигналом Bluetooth. Отключить BLE-мост можно в дополнительных настройках."
                         }
                     } else {
-                        "Battery level on Broadcaster device: ${masterBattery ?: 0}%$ageStr."
+                        "Battery level on Broadcaster device: ${masterBattery ?: 0}%$ageStr.\n\nData is sent automatically with each Bluetooth signal. Disable BLE Bridge in Advanced Settings."
                     }
                     detailDialogInfo = Pair(title, desc)
                 },
@@ -1136,6 +1177,7 @@ private fun BleTransmitterBadge(
                 )
             }
         }
+
     }
 }
 
@@ -1587,7 +1629,7 @@ private fun HeroGlucoseCard(
                         Text(text = "⏳", fontSize = 18.sp)
                         Text(
                             text = if (isRu) "Ожидание первого замера от источника (1–5 мин). Убедитесь, что в xDrip+ включено локальное вещание (Inter-app Broadcast) или активен BLE-мост."
-                                   else "Awaiting first reading (1–5 min). Ensure xDrip+ Inter-app Broadcast is enabled or BLE Bridge is active.",
+                            else "Awaiting first reading (1–5 min). Ensure xDrip+ Inter-app Broadcast is enabled or BLE Bridge is active.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 16.sp
@@ -1595,6 +1637,7 @@ private fun HeroGlucoseCard(
                     }
                 }
             }
+
         }
     }
 }

@@ -16,6 +16,7 @@ import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.domain.model.SensorStatus
 import com.tirup.app.domain.model.PumpSetStatus
 import com.tirup.app.domain.model.Treatment
+import com.tirup.app.domain.model.withUpdatedBestStreak
 import com.tirup.app.domain.repository.GlucoseRepository
 import com.tirup.app.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -169,6 +170,12 @@ class FocusViewModel(
                 )
             }.collect { newState ->
                 _uiState.value = newState
+
+                val updatedBest = newState.userSettings.withUpdatedBestStreak(newState.streakDays)
+                if (updatedBest.bestStreakDays != newState.userSettings.bestStreakDays) {
+                    settingsRepository.updateSettings(updatedBest)
+                }
+
                 val latest = newState.latestReading
                 if (context != null && latest != null && newState.userSettings.isLockscreenNotificationEnabled) {
                     GlucoseAlertManager.updateLockscreenNotification(

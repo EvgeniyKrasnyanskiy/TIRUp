@@ -111,7 +111,8 @@ class SettingsViewModel(
                     context = context,
                     latestReading = latest,
                     todayReadings = todayDomain,
-                    settings = updated
+                    settings = updated,
+                    streakDays = glucoseRepository.getStreakDays().firstOrNull() ?: 0
                 )
             } else {
                 com.tirup.app.data.alert.GlucoseAlertManager.dismissLockscreenNotification(context)

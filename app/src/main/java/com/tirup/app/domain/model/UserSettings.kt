@@ -157,7 +157,20 @@ data class UserSettings(
 )
 
 fun isPumpTherapy(therapyType: String): Boolean {
-    return therapyType.trim() in listOf("Инсулиновая помпа", "Insulin Pump")
+    val normalized = therapyType.trim()
+    val haystack = normalized.lowercase()
+    return normalized in listOf(
+        "Инсулиновая помпа",
+        "Insulin Pump",
+        "Insulin pump",
+        "Pump",
+        "Помпа"
+    ) || haystack.contains("помпа") || haystack.contains("pump")
+}
+
+fun UserSettings.withUpdatedBestStreak(streakDays: Int): UserSettings {
+    val best = maxOf(this.bestStreakDays, streakDays)
+    return if (best == this.bestStreakDays) this else this.copy(bestStreakDays = best)
 }
 
 fun localizeTherapyType(therapy: String, isRu: Boolean): String {

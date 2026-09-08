@@ -59,6 +59,7 @@ import kotlin.math.abs
 fun StreakMotivatorDialog(
     streakDays: Int,
     isRu: Boolean,
+    bestStreakDays: Int = 0,
     dailySummaries: List<com.tirup.app.domain.model.DailySummary> = emptyList(),
     todayTirPercent: Double = 0.0,
     onDismiss: () -> Unit
@@ -162,6 +163,27 @@ fun StreakMotivatorDialog(
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFFF7A00),
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                        )
+                    }
+
+                    if (bestStreakDays > 0) {
+                        val bestWord = if (isRu) {
+                            val rem10 = bestStreakDays % 10
+                            val rem100 = bestStreakDays % 100
+                            when {
+                                rem100 in 11..19 -> "$bestStreakDays дней"
+                                rem10 == 1 -> "$bestStreakDays день"
+                                rem10 in 2..4 -> "$bestStreakDays дня"
+                                else -> "$bestStreakDays дней"
+                            }
+                        } else {
+                            if (bestStreakDays == 1) "1 day" else "$bestStreakDays days"
+                        }
+                        Text(
+                            text = if (isRu) "Лучшая серия: $bestWord" else "Best streak: $bestWord",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }

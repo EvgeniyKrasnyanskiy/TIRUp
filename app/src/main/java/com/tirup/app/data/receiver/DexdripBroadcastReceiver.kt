@@ -188,7 +188,8 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         context = context.applicationContext,
                         latestReading = todayDomain.lastOrNull() ?: recentDomain.lastOrNull(),
                         todayReadings = todayDomain,
-                        settings = userSettings
+                        settings = userSettings,
+                        streakDays = app.glucoseRepository.getStreakDays().first()
                     )
 
                     if (userSettings.isFloatingBubbleEnabled && android.provider.Settings.canDrawOverlays(context)) {

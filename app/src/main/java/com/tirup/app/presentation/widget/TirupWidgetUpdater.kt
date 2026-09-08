@@ -423,6 +423,7 @@ object TirupWidgetUpdater {
         val views = RemoteViews(context.packageName, R.layout.widget_dashboard)
         applyWidgetBackground(views, settings)
         views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
+        val isRu = settings.language.equals("RU", ignoreCase = true)
 
         if (latest == null) {
             views.setTextViewText(R.id.widget_glucose_value, "--")
@@ -461,7 +462,6 @@ object TirupWidgetUpdater {
         )
 
         // Render 4-hour HD Canvas Sparkline with corridor and time scale
-        val isRu = settings.language.equals("RU", ignoreCase = true)
         val sparklineBitmap = drawSparklineBitmap(
             readings = recent,
             latest = latest,
@@ -699,6 +699,7 @@ object TirupWidgetUpdater {
         val views = RemoteViews(context.packageName, R.layout.widget_dashboard_medium)
         applyWidgetBackground(views, settings)
         views.setOnClickPendingIntent(R.id.widget_root, mainIntent)
+        val isRu = settings.language.equals("RU", ignoreCase = true)
 
         if (latest == null) {
             views.setTextViewText(R.id.widget_glucose_value, "--")
@@ -737,7 +738,6 @@ object TirupWidgetUpdater {
         )
 
         // Render 4-hour HD Canvas Sparkline with corridor and time scale
-        val isRu = settings.language.equals("RU", ignoreCase = true)
         val sparklineBitmap = drawSparklineBitmap(
             readings = recent,
             latest = latest,

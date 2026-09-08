@@ -126,6 +126,8 @@ object GlucoseAlertManager {
     const val NOTIFICATION_ID_SIGNAL_LOSS = 1004
     const val NOTIFICATION_ID_LAST_CHANCE = 1005
     const val NOTIFICATION_ID_WEEKLY_DIGEST = 6000
+    const val NOTIFICATION_ID_SENSOR_REMINDER = 9201
+    const val NOTIFICATION_ID_PUMP_REMINDER = 9202
 
     const val EXTRA_GOTO_WEEKLY_DIGEST = "com.tirup.app.GOTO_WEEKLY_DIGEST"
 
@@ -277,7 +279,7 @@ object GlucoseAlertManager {
         daysRemaining: Int,
         isRu: Boolean
     ) {
-        val notifId = if (isSensor) 9201 else 9202
+        val notifId = if (isSensor) NOTIFICATION_ID_SENSOR_REMINDER else NOTIFICATION_ID_PUMP_REMINDER
         val title: String
         val text: String
         if (isSensor) {
@@ -322,6 +324,11 @@ object GlucoseAlertManager {
         } catch (e: Exception) {
             Log.e(TAG, "showDeviceReminderNotification error", e)
         }
+    }
+
+    fun cancelDeviceReminderNotification(context: Context, isSensor: Boolean) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        notificationManager?.cancel(if (isSensor) NOTIFICATION_ID_SENSOR_REMINDER else NOTIFICATION_ID_PUMP_REMINDER)
     }
 
     fun showWeeklyDigestNotification(

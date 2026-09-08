@@ -36,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Brightness4
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.ExpandLess
@@ -898,9 +899,11 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(
-                                text = "🔵",
-                                fontSize = 22.sp
+                            Icon(
+                                imageVector = Icons.Default.Bluetooth,
+                                contentDescription = null,
+                                tint = ActionBlue,
+                                modifier = Modifier.size(22.dp)
                             )
                             Column {
                                 Row(
@@ -916,7 +919,7 @@ fun SettingsScreen(
                                     val (roleBadgeEmoji, roleBadgeColor) = when (ble.role) {
                                         BleBridgeRole.BROADCASTER -> Pair("📡", ActionBlue)
                                         BleBridgeRole.OBSERVER -> Pair("📻", PrimaryEmerald)
-                                        else -> Pair("⚪", MaterialTheme.colorScheme.onSurfaceVariant)
+                                        else -> Pair("✖️", MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
@@ -1306,7 +1309,13 @@ fun SettingsScreen(
 
                                     if (ble.lastPacketTimestamp > 0L) {
                                         val ageMinutes = ((System.currentTimeMillis() - ble.lastPacketTimestamp) / 60000L).coerceAtLeast(0)
-                                        val ageStr = if (ageMinutes == 0L) { if (isRu) "только что" else "just now" } else if (ageMinutes < 60) { if (isRu) "$ageMinutes мин назад" else "${ageMinutes}m ago" } else if (ageMinutes < 1440) { val h = ageMinutes / 60; if (isRu) "$h ч назад" else "${h}h ago" } else { val d = ageMinutes / 1440; if (isRu) "$d дн назад" else "${d}d ago" }
+                                        val ageStr = when {
+                                            ageMinutes == 0L -> if (isRu) "только что" else "just now"
+                                            ageMinutes < 60L -> if (isRu) "$ageMinutes мин назад" else "${ageMinutes}m ago"
+                                            ageMinutes < 1440L -> { val h = ageMinutes / 60; if (isRu) "$h ч назад" else "${h}h ago" }
+                                            ageMinutes < 365L * 1440L -> { val d = ageMinutes / 1440; if (isRu) "$d дн назад" else "${d}d ago" }
+                                            else -> { val y = ageMinutes / (365L * 1440L); if (isRu) "$y лет назад" else "${y}y ago" }
+                                        }
                                         val signalQuality = when {
                                             ble.lastRssi >= -70 -> if (isRu) "отличный" else "excellent"
                                             ble.lastRssi >= -85 -> if (isRu) "хороший" else "good"
@@ -1772,37 +1781,46 @@ fun SettingsScreen(
 
         
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (isRu) "Напоминания об устройствах" else "Device Reminders",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (isRu) "Уведомления о замене сенсора CGM и инфузионного набора помпы" 
-                                else "Notifications for CGM sensor and infusion set changes",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 16.sp
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isRu) "Напоминания об устройствах" else "Device Reminders",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isRu) "Уведомления о замене сенсора CGM и инфузионного набора помпы"
+                                    else "Notifications for CGM sensor and infusion set changes",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Switch(
+                                checked = settings.isDeviceRemindersEnabled,
+                                onCheckedChange = { isChecked ->
+                                    viewModel.setDeviceRemindersEnabled(isChecked)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = ActionBlue
+                                )
                             )
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Switch(
-                            checked = settings.isDeviceRemindersEnabled,
-                            onCheckedChange = { isChecked ->
-                                viewModel.setDeviceRemindersEnabled(isChecked)
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = ActionBlue
-                            )
-                        )
                     }
 
         // Section 3: Clinical Targets & Sleep Window
@@ -2013,14 +2031,14 @@ fun SettingsScreen(
                         }
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = PrimaryEmerald.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.4f))
+                            color = ActionBlue.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.4f))
                         ) {
                             Text(
                                 text = "${settings.widgetBackgroundOpacity}%",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = PrimaryEmerald,
+                                color = ActionBlue,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                             )
                         }
@@ -2075,7 +2093,7 @@ fun SettingsScreen(
                                             text = "→",
                                             fontSize = 17.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = PrimaryEmerald
+                                            color = Color(0xFF4ADE80)
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
@@ -3907,6 +3925,18 @@ private fun BleBridgeHelpDialog(
                             "Direct streaming of glucose, trend, rate of change, active insulin (IOB), and phone battery directly between smartphones.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                item {
+                    Text(
+                        text = if (isRu)
+                            "Чтобы отключить BLE-мост, выберите «✖️ Выкл» в разделе «Дополнительные настройки»."
+                        else
+                            "To disable the BLE Bridge, select '✖️ Off' in Advanced Settings.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp
                     )
                 }
 

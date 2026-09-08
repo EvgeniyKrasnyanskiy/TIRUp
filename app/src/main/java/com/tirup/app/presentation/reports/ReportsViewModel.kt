@@ -208,10 +208,12 @@ class ReportsViewModel(
                 )
             }.onFailure { err ->
                 val prefix = if (isRu) "Ошибка импорта: " else "Import error: "
+                val detail = err.message?.takeIf { it.isNotBlank() }
+                    ?: if (isRu) "файл имеет неподдерживаемый или некорректный формат" else "the file is invalid or has an unsupported format"
                 _uiState.value = _uiState.value.copy(
                     isImporting = false,
                     importProgress = 0f,
-                    importMessage = prefix + err.message
+                    importMessage = prefix + detail
                 )
             }
         }

@@ -255,6 +255,14 @@ fun AgpSheetPreviewModal(
                                     }
 
                                     ReportStatLine(if (isRu) "Средний сахар (Mean):" else "Average Glucose (Mean):", meanStr)
+                                    val previewMin = readings.minOfOrNull { it.valueMmol } ?: statistics.minMmol
+                                    val previewMax = readings.maxOfOrNull { it.valueMmol } ?: statistics.maxMmol
+                                    val previewMinMax = if (isMmol) {
+                                        String.format(Locale.US, "%.1f – %.1f %s", previewMin, previewMax, if (isRu) "ммоль/л" else "mmol/L")
+                                    } else {
+                                        String.format(Locale.US, "%d – %d %s", (previewMin * 18.0182).toInt(), (previewMax * 18.0182).toInt(), if (isRu) "мг/дл" else "mg/dL")
+                                    }
+                                    ReportStatLine(if (isRu) "Минимум / максимум:" else "Minimum / maximum:", previewMinMax)
                                     ReportStatLine(if (isRu) "Вариабельность (%CV):" else "Glucose Variability (%CV):", String.format(Locale.US, "%.1f%% (%s ≤36.0%%) • SD: %s", statistics.cvPercent, if (isRu) "Цель" else "Target", sdStr))
                                     ReportStatLine(if (isRu) "Расчётный eA1c (GMI):" else "Estimated A1c (eA1c):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol))
                                     ReportStatLine(if (isRu) "GRI (риск гипо):" else "GRI (Hypo Risk):", String.format(Locale.US, "%.1f (%s, %s ≤40.0)", statistics.gri, statistics.griLabel, if (isRu) "цель" else "target"))

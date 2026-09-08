@@ -98,13 +98,13 @@ private fun DeviceTextPart(
     }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(emoji, fontSize = 19.sp)
-        Spacer(Modifier.width(4.dp))
+        Text(emoji, fontSize = 30.sp)
+        Spacer(Modifier.width(5.dp))
         Text(
             text = label,
             color = color,
             fontWeight = FontWeight.Bold,
-            fontSize = 12.sp
+            fontSize = 13.sp
         )
     }
 }

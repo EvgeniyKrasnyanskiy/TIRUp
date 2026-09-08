@@ -44,7 +44,11 @@ class DeviceStatusReminderWorker(
                         daysRemaining = sensorDays,
                         isRu = isRu
                     )
+                } else {
+                    GlucoseAlertManager.cancelDeviceReminderNotification(context, isSensor = true)
                 }
+            } else {
+                GlucoseAlertManager.cancelDeviceReminderNotification(context, isSensor = true)
             }
 
             // Pump set check: notify if <=1 day remaining OR expired
@@ -58,7 +62,11 @@ class DeviceStatusReminderWorker(
                         daysRemaining = pumpDays,
                         isRu = isRu
                     )
+                } else {
+                    GlucoseAlertManager.cancelDeviceReminderNotification(context, isSensor = false)
                 }
+            } else {
+                GlucoseAlertManager.cancelDeviceReminderNotification(context, isSensor = false)
             }
 
             Result.success()

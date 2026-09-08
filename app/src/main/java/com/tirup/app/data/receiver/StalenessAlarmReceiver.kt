@@ -45,7 +45,8 @@ class StalenessAlarmReceiver : BroadcastReceiver() {
                     context = context,
                     latestReading = latest,
                     todayReadings = todayDomain,
-                    settings = settings
+                    settings = settings,
+                    streakDays = app.glucoseRepository.getStreakDays().firstOrNull() ?: 0
                 )
 
                 // 2. Re-render all homescreen widgets with current stale status
