@@ -46,6 +46,12 @@ class FocusViewModel(
     private val _uiState = MutableStateFlow(FocusUiState(isLoading = true))
     val uiState: StateFlow<FocusUiState> = _uiState.asStateFlow()
 
+    /** Emits the timestamp of the latest received BLE packet. UI shows a 3-sec hint on each new value. */
+    private val _blePacketReceivedAt = MutableStateFlow(0L)
+    val blePacketReceivedAt: StateFlow<Long> = _blePacketReceivedAt.asStateFlow()
+
+    private var _lastTrackedPacketTs = 0L
+
     init {
         observeData()
     }
@@ -170,6 +176,13 @@ class FocusViewModel(
                 )
             }.collect { newState ->
                 _uiState.value = newState
+
+                // Detect new BLE packet: emit hint timestamp when lastPacketTimestamp changes
+                val newPacketTs = newState.userSettings.bleBridgeSettings.lastPacketTimestamp
+                if (newPacketTs > 0L && newPacketTs != _lastTrackedPacketTs) {
+                    _lastTrackedPacketTs = newPacketTs
+                    _blePacketReceivedAt.value = newPacketTs
+                }
 
                 val updatedBest = newState.userSettings.withUpdatedBestStreak(newState.streakDays)
                 if (updatedBest.bestStreakDays != newState.userSettings.bestStreakDays) {

@@ -1779,49 +1779,44 @@ fun SettingsScreen(
                 }
             }
 
-        
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
-                        modifier = Modifier.fillMaxWidth()
+
+        BentoCard(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 2.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = if (isRu) "Напоминания об устройствах" else "Device Reminders",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = if (isRu) "Уведомления о замене сенсора CGM и инфузионного набора помпы"
-                                    else "Notifications for CGM sensor and infusion set changes",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    lineHeight = 16.sp
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Switch(
-                                checked = settings.isDeviceRemindersEnabled,
-                                onCheckedChange = { isChecked ->
-                                    viewModel.setDeviceRemindersEnabled(isChecked)
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = ActionBlue
-                                )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isRu) "Напоминания об устройствах" else "Device Reminders",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isRu) "Уведомления о замене сенсора CGM и инфузионного набора помпы"
+                                else "Notifications for CGM sensor and infusion set changes",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 16.sp
                             )
                         }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Switch(
+                            checked = settings.isDeviceRemindersEnabled,
+                            onCheckedChange = { isChecked ->
+                                viewModel.setDeviceRemindersEnabled(isChecked)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = ActionBlue
+                            )
+                        )
                     }
+                }
 
         // Section 3: Clinical Targets & Sleep Window
         BentoCard(modifier = Modifier.fillMaxWidth()) {
@@ -2953,7 +2948,7 @@ private fun PatientProfileSummaryCard(
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val hasName = profile.fullName.isNotBlank()
-    val displayName = if (hasName) profile.fullName else (if (isRu) "Профиль пациента" else "Patient Profile")
+    val displayName = if (hasName) profile.fullName else (if (isRu) "Мой профиль" else "My Profile")
 
     val ageStr = if (profile.birthYear > 1900) "${profile.calculatedAge} ${if (isRu) "лет" else "y.o."}" else ""
     val diagStr = if (profile.diabetesType.isNotBlank()) localizeDiabetesType(profile.diabetesType, isRu) else ""
@@ -3085,7 +3080,7 @@ private fun PatientProfileEditDialog(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (isRu) "Профиль пациента" else "Patient Profile",
+                    text = if (isRu) "Мой профиль" else "My Profile",
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
