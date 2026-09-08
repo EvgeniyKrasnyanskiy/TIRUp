@@ -73,16 +73,17 @@ object BleBroadcaster {
         iob: Double,
         settings: BleBridgeSettings,
         burstDurationMs: Long = BURST_5MIN_MS,
+        isRu: Boolean = true,
         onStatus: ((Boolean, String) -> Unit)? = null
     ) {
         if (settings.role != BleBridgeRole.BROADCASTER) {
-            onStatus?.invoke(false, "Роль «Мастер (Вещатель)» не включена")
+            onStatus?.invoke(false, if (isRu) "Роль «Вещатель» не включена" else "Broadcaster role is not enabled")
             return
         }
 
         if (!hasAdvertisePermission(context)) {
             Log.w(TAG, "Cannot advertise: BLUETOOTH_ADVERTISE permission not granted")
-            onStatus?.invoke(false, "Нет разрешения BLUETOOTH_ADVERTISE")
+            onStatus?.invoke(false, if (isRu) "Требуется разрешение на поиск устройств поблизости" else "Nearby devices permission required")
             return
         }
 
@@ -90,14 +91,14 @@ object BleBroadcaster {
         val adapter = bm?.adapter
         if (adapter == null || !adapter.isEnabled) {
             Log.d(TAG, "Bluetooth adapter is disabled, skipping BLE broadcast")
-            onStatus?.invoke(false, "Bluetooth выключен на смартфоне")
+            onStatus?.invoke(false, if (isRu) "Bluetooth выключен на смартфоне" else "Bluetooth is disabled on device")
             return
         }
 
         val advertiser = adapter.bluetoothLeAdvertiser
         if (advertiser == null) {
             Log.w(TAG, "Device does not support BLE Peripheral advertising")
-            onStatus?.invoke(false, "Смартфон не поддерживает BLE-вещание (Peripheral mode)")
+            onStatus?.invoke(false, if (isRu) "Устройство не поддерживает режим вещания Bluetooth" else "Device does not support Bluetooth broadcasting")
             return
         }
 
@@ -152,7 +153,7 @@ object BleBroadcaster {
                         override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
                             Log.i(TAG, "BLE broadcast started successfully for reading ts=${reading.timestamp}")
                             _isBroadcasting.value = true
-                            onStatus?.invoke(true, "Радиоимпульс запущен ($durationSec сек)")
+                            onStatus?.invoke(true, if (isRu) "Передача запущена ($durationSec сек)" else "Broadcast started ($durationSec s)")
                         }
 
                         override fun onStartFailure(errorCode: Int) {
@@ -161,14 +162,14 @@ object BleBroadcaster {
                                 mutex.withLock { stopAdvertisingInternal(cancelHeartbeat = false) }
                             }
                             val errDesc = when (errorCode) {
-                                ADVERTISE_FAILED_DATA_TOO_LARGE -> "Пакет слишком велик"
-                                ADVERTISE_FAILED_TOO_MANY_ADVERTISERS -> "Слишком много вещателей BLE"
-                                ADVERTISE_FAILED_ALREADY_STARTED -> "Вещание уже запущено"
-                                ADVERTISE_FAILED_INTERNAL_ERROR -> "Внутренняя ошибка Bluetooth стека"
-                                ADVERTISE_FAILED_FEATURE_UNSUPPORTED -> "BLE-вещание не поддерживается чипом"
-                                else -> "Код ошибки $errorCode"
+                                ADVERTISE_FAILED_DATA_TOO_LARGE -> if (isRu) "Пакет слишком велик" else "Data too large"
+                                ADVERTISE_FAILED_TOO_MANY_ADVERTISERS -> if (isRu) "Слишком много вещателей BLE" else "Too many advertisers"
+                                ADVERTISE_FAILED_ALREADY_STARTED -> if (isRu) "Вещание уже запущено" else "Already advertising"
+                                ADVERTISE_FAILED_INTERNAL_ERROR -> if (isRu) "Внутренняя ошибка Bluetooth" else "Internal Bluetooth error"
+                                ADVERTISE_FAILED_FEATURE_UNSUPPORTED -> if (isRu) "BLE-вещание не поддерживается" else "BLE advertising not supported"
+                                else -> if (isRu) "Код ошибки $errorCode" else "Error code $errorCode"
                             }
-                            onStatus?.invoke(false, "Ошибка BLE: $errDesc")
+                            onStatus?.invoke(false, if (isRu) "Ошибка BLE: $errDesc" else "BLE error: $errDesc")
                         }
                     }
 
@@ -203,11 +204,11 @@ object BleBroadcaster {
                 } catch (e: SecurityException) {
                     Log.w(TAG, "SecurityException starting BLE advertising: ${e.message}")
                     stopAdvertisingInternal(cancelHeartbeat = false)
-                    onStatus?.invoke(false, "Ошибка безопасности: нет Bluetooth-доступа")
+                    onStatus?.invoke(false, if (isRu) "Ошибка безопасности: нет Bluetooth-доступа" else "Security error: Bluetooth access denied")
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to start BLE advertising: ${e.message}")
                     stopAdvertisingInternal(cancelHeartbeat = false)
-                    onStatus?.invoke(false, "Сбой запуска: ${e.message}")
+                    onStatus?.invoke(false, if (isRu) "Сбой запуска: ${e.message}" else "Launch error: ${e.message}")
                 }
             }
         }
@@ -270,6 +271,7 @@ object BleBroadcaster {
         context: Context,
         reading: GlucoseReading?,
         settings: BleBridgeSettings,
+        isRu: Boolean = true,
         onStatus: (Boolean, String) -> Unit
     ) {
         val targetReading = reading ?: GlucoseReading(
@@ -286,6 +288,7 @@ object BleBroadcaster {
             iob = targetReading.iob ?: 0.0,
             settings = settings,
             burstDurationMs = TEST_PING_BURST_MS,
+            isRu = isRu,
             onStatus = onStatus
         )
     }

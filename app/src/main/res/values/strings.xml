@@ -25,7 +25,7 @@
     <string name="card_night">Night Profile (00:00–06:00)</string>
     <string name="night_stable">Stable Night Profile</string>
     <string name="night_unstable">Night Fluctuations Detected</string>
-    <string name="no_data">No data yet. Waiting for CGM broadcast or import dataset.</string>
+    <string name="no_data">No data yet. Waiting for sensor readings or file import.</string>
     <string name="last_reading">Last reading: %s</string>
     <string name="minutes_ago">%d min ago</string>
     <string name="just_now">Just now</string>

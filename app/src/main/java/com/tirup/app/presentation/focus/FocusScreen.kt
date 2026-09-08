@@ -227,15 +227,21 @@ fun FocusScreen(
                 dailyAlertsCount = dailyAlertLogs.size,
                 onAlertHistoryClick = { showDailyAlertLogsDialog = true },
                 onBatteryClick = {
-                    val title = if (isRu) "Заряд батареи Мастера" else "Master Phone Battery"
+                    val title = if (isRu) "Заряд батареи вещателя" else "Broadcaster Battery"
+                    val ageMins = if (bleSettings.lastPacketTimestamp > 0L) {
+                        (System.currentTimeMillis() - bleSettings.lastPacketTimestamp) / 60000L
+                    } else null
+                    val ageStr = if (ageMins != null) {
+                        if (isRu) " (обновлено $ageMins мин. назад)" else " (updated $ageMins min ago)"
+                    } else ""
                     val desc = if (isRu) {
                         if (isMasterBatteryStale) {
-                            "Данные о заряде телефона-Мастера устарели (сигнал не обновлялся более 15 минут). Проверьте Bluetooth-соединение."
+                            "Данные о заряде телефона-вещателя устарели (сигнал не обновлялся более 15 минут). Проверьте Bluetooth-соединение."
                         } else {
-                            "Текущий уровень заряда батареи на смартфоне-Мастере: ${masterBattery ?: 0}%.\n\nТелеметрия передается автоматически с каждым радиоимпульсом BLE."
+                            "Текущий уровень заряда батареи на смартфоне-вещателе: ${masterBattery ?: 0}%$ageStr.\n\nДанные передаются автоматически с каждым сигналом Bluetooth."
                         }
                     } else {
-                        "Battery level on Master device: ${masterBattery ?: 0}%."
+                        "Battery level on Broadcaster device: ${masterBattery ?: 0}%$ageStr."
                     }
                     detailDialogInfo = Pair(title, desc)
                 },
@@ -263,9 +269,9 @@ fun FocusScreen(
                 },
                 onBleClick = {
                     if (isBleBroadcasting) {
-                        val title = if (isRu) "BLE-мост: Радиоимпульс" else "BLE Bridge: Broadcasting"
+                        val title = if (isRu) "BLE-мост: Передача" else "BLE Bridge: Broadcasting"
                         val desc = if (isRu) {
-                            "Прямо сейчас Мастер передает радиоимпульс в эфир через Bluetooth Low Energy (осталось $broadcastRemainingSec сек).\n\nТелефоны-приемники в радиусе 10–15 м с вашим семейным PIN получают свежий замер сахара, тренд и заряд батареи."
+                            "Прямо сейчас вещатель передает сигнал Bluetooth в эфир (осталось $broadcastRemainingSec сек).\n\nТелефоны-приемники в радиусе 10–15 м с вашим семейным PIN получают свежий замер сахара, тренд и заряд батареи."
                         } else {
                             "Active BLE broadcast pulse in progress ($broadcastRemainingSec s remaining)."
                         }
@@ -276,9 +282,9 @@ fun FocusScreen(
                         val timeStr = String.format(Locale.US, "%d:%02d", min, sec)
                         val title = if (isRu) "BLE-мост: Режим ожидания" else "BLE Bridge: Idle"
                         val desc = if (isRu) {
-                            "Мастер находится в режиме ожидания. До контрольного радиоимпульса (heartbeat): $timeStr.\n\nКак только от сенсора поступит свежий замер, Мастер немедленно передаст его в эфир и таймер сбросится обратно на 5:00."
+                            "Вещатель находится в режиме ожидания. До контрольного сигнала (heartbeat): $timeStr.\n\nКак только от сенсора поступит свежий замер, вещатель немедленно передаст его в эфир и таймер сбросится обратно на 5:00."
                         } else {
-                            "Master is idle. Heartbeat pulse in: $timeStr.\nArriving sensor readings are transmitted immediately, resetting the timer to 5:00."
+                            "Broadcaster is idle. Heartbeat pulse in: $timeStr.\nArriving sensor readings are transmitted immediately, resetting the timer to 5:00."
                         }
                         detailDialogInfo = Pair(title, desc)
                     }
@@ -617,7 +623,7 @@ fun FocusScreen(
                             "gvi" -> BentoMetricCompact(
                                 title = "GVI",
                                 value = gviValStr,
-                                unit = if (isRu) "линия" else "line",
+                                unit = "",
                                 valueColor = if (isGviGood) PrimaryEmerald else ColorHigh,
                                 modifier = modifier,
                                 onClick = {
@@ -756,7 +762,7 @@ fun FocusScreen(
                     }
 
                     detailDialogInfo = Pair(
-                        if (isRu) "Компенсация цели" else "Goal Compensation",
+                        if (isRu) "Достижение цели дня" else "Daily Goal Achievement",
                         dialogBody
                     )
                 }
@@ -1702,7 +1708,7 @@ private fun TargetCompensatorCard(
                     border = BorderStroke(0.6.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
                 ) {
                     Text(
-                        text = if (isRu) "📊 $observedPointsCount точек за сегодня ($durationStr мониторинга)"
+                        text = if (isRu) "📊 $observedPointsCount измерений за сегодня ($durationStr мониторинга)"
                                else "📊 $observedPointsCount readings today ($durationStr active)",
                         style = MaterialTheme.typography.labelSmall,
                         color = onSurfaceVariant,
@@ -1758,7 +1764,7 @@ private fun DailyAlertLogsDialog(
             ) {
                 Text(text = "🔔", fontSize = 20.sp)
                 Text(
-                    text = if (isRu) "Журнал оповещений" else "Alert Log",
+                    text = if (isRu) "Журнал тревог" else "Alert Log",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface

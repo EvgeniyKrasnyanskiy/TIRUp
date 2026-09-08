@@ -126,7 +126,7 @@ fun AgpSheetPreviewModal(
                         ) {
                             Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Text(
-                                    text = if (isRu) "АМБУЛАТОРНЫЙ ГЛЮКОЗНЫЙ ПРОФИЛЬ (AGP)" else "AMBULATORY GLUCOSE PROFILE (AGP)",
+                                    text = if (isRu) "АМБУЛАТОРНЫЙ ГЛИКЕМИЧЕСКИЙ ПРОФИЛЬ (AGP)" else "AMBULATORY GLYCEMIC PROFILE (AGP)",
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF0F172A)
@@ -153,7 +153,7 @@ fun AgpSheetPreviewModal(
 
                                 val atEmoji = if (statistics.activeTimePercent >= 90.0) "🟢" else if (statistics.activeTimePercent >= 70.0) "🟡" else "🔴"
                                 val periodLine = if (isRu) {
-                                    "Период: $periodLabel ($dateRangeStr) • $atEmoji Активное время: ${String.format(Locale.US, "%.1f%%", statistics.activeTimePercent)} • Дней: ${statistics.daysCount} • Точек: ${statistics.totalCount}"
+                                    "Период: $periodLabel ($dateRangeStr) • $atEmoji Активное время: ${String.format(Locale.US, "%.1f%%", statistics.activeTimePercent)} • Дней: ${statistics.daysCount} • Измерений: ${statistics.totalCount}"
                                 } else {
                                     "Period: $periodLabel ($dateRangeStr) • $atEmoji Active CGM Time: ${String.format(Locale.US, "%.1f%%", statistics.activeTimePercent)} • Days: ${statistics.daysCount} • Readings: ${statistics.totalCount}"
                                 }
@@ -165,7 +165,7 @@ fun AgpSheetPreviewModal(
 
                                 val genDateFmt = if (isRu) SimpleDateFormat("dd MMMM yyyy HH:mm", Locale("ru")) else SimpleDateFormat("dd MMM yyyy HH:mm", Locale.US)
                                 val genLine = if (isRu) {
-                                    "Сформировано: ${genDateFmt.format(Date())} | Движок TIRUp"
+                                    "Сформировано: ${genDateFmt.format(Date())} | Приложение TIRUp"
                                 } else {
                                     "Generated: ${genDateFmt.format(Date())} | TIRUp Engine"
                                 }

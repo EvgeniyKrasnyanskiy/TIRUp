@@ -144,7 +144,7 @@ fun StreakMotivatorDialog(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
-                        text = if (isRu) "Серия побед в диапазоне!" else "Target Range Streak!",
+                        text = if (isRu) "Дни в целевом диапазоне!" else "Target Range Streak!",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -176,10 +176,10 @@ fun StreakMotivatorDialog(
                 // Clinical Motivation Body Text
                 Text(
                     text = if (streakDays > 0) {
-                        if (isRu) "Потрясающая дисциплина! Каждый день с TIR ≥70% надёжно защищает сосудистую систему, зрение и почки от микрососудистых повреждений, стабилизируя вариабельность сахара."
+                        if (isRu) "Отличная дисциплина! Каждый день с TIR ≥70% защищает сосуды, зрение и почки от осложнений и сглаживает скачки сахара."
                         else "Outstanding discipline! Every day spent with TIR ≥70% strongly protects your vascular system, eyes, and kidneys from microvascular stress while reducing glucose swings."
                     } else {
-                        if (isRu) "Начните новую серию прямо сегодня! Удерживайте сахар в целевом диапазоне (TIR ≥70%), чтобы активировать стрик стабильной компенсации."
+                        if (isRu) "Начните новую серию прямо сегодня! Удерживайте сахар в целевом диапазоне (TIR ≥70%), чтобы начать новую серию стабильной компенсации."
                         else "Start a new streak today! Keep your glucose in target range (TIR ≥70%) to activate your streak."
                     },
                     style = MaterialTheme.typography.bodySmall,
@@ -201,7 +201,7 @@ fun StreakMotivatorDialog(
                     )
                 ) {
                     Text(
-                        text = if (streakDays > 0) (if (isRu) "Горжусь собой! Продолжить" else "Proud of this! Continue")
+                        text = if (streakDays > 0) (if (isRu) "Так держать!" else "Proud of this! Continue")
                                else (if (isRu) "Ок" else "OK"),
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp

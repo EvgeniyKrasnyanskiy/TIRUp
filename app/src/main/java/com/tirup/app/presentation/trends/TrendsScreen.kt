@@ -267,7 +267,7 @@ fun TrendsScreen(
                             }
 
                             Text(
-                                text = "${visiblePatterns.size} ${if (isRu) "событ." else "events"}",
+                                text = "${visiblePatterns.size} ${if (isRu) "событий" else "events"}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = onSurfaceVariant
                             )
@@ -412,7 +412,7 @@ fun TrendsScreen(
                     .fillMaxWidth()
                     .clickable {
                         detailDialogInfo = Pair(
-                            if (isRu) "Амбулаторный профиль глюкозы (AGP)" else "Ambulatory Glucose Profile (AGP)",
+                            if (isRu) "Амбулаторный гликемический профиль (AGP)" else "Ambulatory Glucose Profile (AGP)",
                             if (isRu) "Международный стандарт визуализации CGM: суточные профили за все дни накладываются на 24 часа. Сплошная линия — медиана 50%, тёмная полоса — 25-75% размах, светлое облако — 10-90% перцентили."
                             else "International CGM visualization standard: daily profiles from all days overlaid across 24 hours. Solid line is 50% median, darker band is 25-75% IQR, light cloud is 10-90% percentiles."
                         )
@@ -509,7 +509,7 @@ fun TrendsScreen(
                                 Text(text = "💡", fontSize = 18.sp)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (isRu) "Фокусы для роста TIR" else "Actionable TIR Focus",
+                                    text = if (isRu) "Советы для роста TIR" else "Actionable TIR Focus",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = onSurface
                                 )

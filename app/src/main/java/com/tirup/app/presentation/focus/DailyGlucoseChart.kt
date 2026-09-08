@@ -374,8 +374,14 @@ fun DailyGlucoseChart(
                     val durText = if (gap.durationMinutes >= 60) {
                         val h = gap.durationMinutes / 60
                         val m = gap.durationMinutes % 60
-                        if (m > 0) "${h}ч ${m}м" else "${h}ч"
-                    } else "${gap.durationMinutes}м"
+                        if (isRu) {
+                            if (m > 0) "${h}ч ${m}м" else "${h}ч"
+                        } else {
+                            if (m > 0) "${h}h ${m}m" else "${h}h"
+                        }
+                    } else {
+                        if (isRu) "${gap.durationMinutes}м" else "${gap.durationMinutes}m"
+                    }
 
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -399,7 +405,7 @@ fun DailyGlucoseChart(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = if (isRu) "⚠️ Разрыв связи: $durText" else "⚠️ Signal Gap: $durText",
+                                    text = if (isRu) "⚠️ Потеря сигнала: $durText" else "⚠️ Signal Gap: $durText",
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFFF59E0B)

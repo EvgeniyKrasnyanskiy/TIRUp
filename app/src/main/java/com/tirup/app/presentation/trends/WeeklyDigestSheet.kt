@@ -106,7 +106,7 @@ fun WeeklyDigestSheet(
                     }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "$currentPeriodStr (${if (isRu) "vs" else "vs"} $prevPeriodStr)",
+                        text = "$currentPeriodStr (${if (isRu) "к пред." else "vs"} $prevPeriodStr)",
                         fontSize = 12.5.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -344,7 +344,7 @@ fun WeeklyDigestSheet(
 
             // Clinical Insights Section
             Text(
-                text = if (isRu) "КЛИНИЧЕСКИЕ ИНСАЙТЫ НЕДЕЛИ" else "WEEKLY CLINICAL INSIGHTS",
+                text = if (isRu) "КЛИНИЧЕСКИЕ НАБЛЮДЕНИЯ НЕДЕЛИ" else "WEEKLY CLINICAL INSIGHTS",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = ActionBlue,

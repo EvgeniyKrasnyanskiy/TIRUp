@@ -155,7 +155,7 @@ class GuidebookPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "eA1c / GMI (Расчётный гликированный гемоглобин)" else "eA1c / GMI (Estimated HbA1c)",
                         if (isRu) "Цель: ≤7.0% (≤53 ммоль/моль)" else "Target: ≤7.0% (≤53 mmol/mol)",
-                        if (isRu) "Математическая экстраполяция лабораторного HbA1c по формуле ADAG. Отражает долгосрочный сахар без искажений от анемии. У людей без диабета: 4.0–5.6%."
+                        if (isRu) "Математическая экстраполяция лабораторного HbA1c по формуле ADAG. Отражает средний уровень глюкозы за 2–3 месяца. Не зависит от гемоглобинопатий (в отличие от лабораторного HbA1c). У людей без диабета: 4.0–5.6%."
                         else "Mathematical projection of laboratory HbA1c based on ADAG formula. Non-diabetic reference range: 4.0–5.6%."
                     ),
                     Triple(
@@ -207,13 +207,13 @@ class GuidebookPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "%CV (Коэффициент вариации) и SD (Разброс)" else "%CV (Variability) & SD (Dispersion)",
                         if (isRu) "Норма: %CV ≤36.0%, SD ≤2.0 ммоль/л" else "Target: %CV ≤36.0%, SD ≤36 mg/dL",
-                        if (isRu) "%CV = SD / Mean × 100%. При %CV > 36% диабет считается лабильным (резко возрастает риск скрытых гипогликемий). У людей без диабета %CV составляет 14–22%."
+                        if (isRu) "%CV = SD / Mean × 100%. При %CV > 36% компенсация считается нестабильной (резко возрастает риск скрытых гипогликемий). У людей без диабета %CV составляет 14–22%."
                         else "%CV = SD / Mean * 100%. Values >36% denote high glycemic variability and heightened vulnerability to unexpected hypoglycemia."
                     ),
                     Triple(
                         if (isRu) "GVI (Индекс лабильности) и GRI (Индекс риска)" else "GVI (Glycemic Variability) & GRI (Risk)",
                         if (isRu) "GVI: ≤1.20, GRI: Зона A (≤20)" else "GVI: ≤1.20, GRI: Zone A (≤20)",
-                        if (isRu) "GVI оценивает длину реальной кривой («американские горки»). GRI (0–100) — композитная шкала риска ATTD с повышенным штрафом за гипогликемию."
+                        if (isRu) "GVI оценивает «зигзагообразность» сахарной кривой за период. GRI (0–100) — композитная шкала риска ATTD с повышенным штрафом за гипогликемию."
                         else "GVI measures actual glucose curve zigzag length. GRI (0–100) scores overall glycemic safety with higher penalties for hypoglycemia."
                     ),
                     Triple(
@@ -269,7 +269,7 @@ class GuidebookPdfGenerator(private val context: Context) {
                 "• Physiological Lag: CGM sensors measure interstitial fluid; physiological lag relative to blood glucose is typically 5–15 minutes."
             }
             val discText3 = if (isRu) {
-                "• Погрешность MARD: стандартная клиническая погрешность систем CGM составляет 8–10%. Возможны ночные компрессионные ложные спады."
+                "• Погрешность MARD: стандартная клиническая погрешность систем CGM составляет 8–10%. Возможны ложные занижения показаний при сдавливании сенсора во сне (compression lows)."
             } else {
                 "• MARD Accuracy: standard mean absolute relative difference is 8–10%. Sleep compression lows may occasionally occur."
             }

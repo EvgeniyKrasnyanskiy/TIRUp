@@ -123,12 +123,11 @@ class FocusViewModel(
                         val now = latest.timestamp
                         if (prediction.event == PredictedEvent.PREDICTED_LOW) {
                             val minutesUntil = prediction.minutesUntilCrossing ?: 15
-                            val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(now + minutesUntil * 60_000L))
-                            val title = if (isRu) "📉 Скоро гипогликемия (в $timeStr)" else "📉 Predicted Low (at $timeStr)"
+                            val title = if (isRu) "📉 Прогноз гипогликемии (через $minutesUntil мин)" else "📉 Predicted Low (in $minutesUntil min)"
                             val message = if (isRu) {
-                                String.format(Locale.US, "Быстро падает (%.2f ммоль/л/мин). Возможна ГИПО в %s", abs(prediction.rateOfChangeMmolPerMin), timeStr)
+                                String.format(Locale.US, "Глюкоза падает (%.2f ммоль/л/мин).\nРекомендуется принять быстрые углеводы.", abs(prediction.rateOfChangeMmolPerMin))
                             } else {
-                                String.format(Locale.US, "Dropping fast (%.2f mmol/L/min). Possible low at %s", abs(prediction.rateOfChangeMmolPerMin), timeStr)
+                                String.format(Locale.US, "Glucose dropping (%.2f mmol/L/min).\nTake carbs now.", abs(prediction.rateOfChangeMmolPerMin))
                             }
                             ActiveAlertBanner(
                                 tier = AlertTier.PREDICTIVE,
@@ -138,12 +137,11 @@ class FocusViewModel(
                             )
                         } else if (prediction.event == PredictedEvent.PREDICTED_HIGH) {
                             val minutesUntil = prediction.minutesUntilCrossing ?: 15
-                            val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(now + minutesUntil * 60_000L))
-                            val title = if (isRu) "📈 Скоро гипергликемия (в $timeStr)" else "📈 Predicted High (at $timeStr)"
+                            val title = if (isRu) "📈 Прогноз гипергликемии (через $minutesUntil мин)" else "📈 Predicted High (in $minutesUntil min)"
                             val message = if (isRu) {
-                                String.format(Locale.US, "Быстро растёт (%.2f ммоль/л/мин). Выход из нормы в %s", prediction.rateOfChangeMmolPerMin, timeStr)
+                                String.format(Locale.US, "Глюкоза растёт (%.2f ммоль/л/мин).\nПроверьте дозу инсулина.", prediction.rateOfChangeMmolPerMin)
                             } else {
-                                String.format(Locale.US, "Rising fast (%.2f mmol/L/min). Leaving target at %s", prediction.rateOfChangeMmolPerMin, timeStr)
+                                String.format(Locale.US, "Glucose rising (%.2f mmol/L/min).\nCheck insulin.", prediction.rateOfChangeMmolPerMin)
                             }
                             ActiveAlertBanner(
                                 tier = AlertTier.PREDICTIVE,

@@ -214,11 +214,11 @@ fun ReportsScreen(
         val fmt = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
         val dateRangeStr = "${fmt.format(Date(minTs))} — ${fmt.format(Date(maxTs))}"
         val periodName = when (state.livePeriod) {
-            TrendPeriod.PERIOD_7D -> if (isRu) "7 Дней" else "7 Days"
-            TrendPeriod.PERIOD_14D -> if (isRu) "14 Дней (AGP)" else "14 Days (AGP)"
-            TrendPeriod.PERIOD_30D -> if (isRu) "30 Дней" else "30 Days"
-            TrendPeriod.PERIOD_90D -> if (isRu) "90 Дней" else "90 Days"
-            TrendPeriod.PERIOD_YEAR -> if (isRu) "1 Год" else "1 Year"
+            TrendPeriod.PERIOD_7D -> if (isRu) "7 дней" else "7 Days"
+            TrendPeriod.PERIOD_14D -> if (isRu) "14 дней (AGP)" else "14 Days (AGP)"
+            TrendPeriod.PERIOD_30D -> if (isRu) "30 дней" else "30 Days"
+            TrendPeriod.PERIOD_90D -> if (isRu) "90 дней" else "90 Days"
+            TrendPeriod.PERIOD_YEAR -> if (isRu) "1 год" else "1 Year"
             TrendPeriod.PERIOD_ALL -> if (isRu) "Всё время" else "All Time"
         }
 
@@ -335,7 +335,7 @@ fun ReportsScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     val ptsStr = if (state.importedPointsCount > 0) {
-                        if (isRu) "Загружено ${state.importedPointsCount} точек" else "Loaded ${state.importedPointsCount} pts"
+                        if (isRu) "Загружено ${state.importedPointsCount} измерений" else "Loaded ${state.importedPointsCount} pts"
                     } else ""
                     if (ptsStr.isNotEmpty()) {
                         Text(
@@ -414,7 +414,7 @@ private fun LiveReportCard(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = if (isRu) "${state.liveReadings.size} точек • ${stats.daysCount} дн. (нажмите для бланка)"
+                            text = if (isRu) "${state.liveReadings.size} измерений • ${stats.daysCount} дн. (нажмите для предпросмотра)"
                                    else "${state.liveReadings.size} readings • ${stats.daysCount} days (tap to preview)",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -555,7 +555,7 @@ private fun HistoricalReportCard(
                         )
                         Text(
                             text = if (hist.hasData) {
-                                if (isRu) "${hist.readings.size} точек • ${hist.dateRangeStr} (бланк)"
+                                if (isRu) "${hist.readings.size} измерений • ${hist.dateRangeStr} (предпросмотр)"
                                 else "${hist.readings.size} readings • ${hist.dateRangeStr} (preview)"
                             } else {
                                 if (isRu) "Импорт из xDrip CSV / ZIP" else "Import from xDrip CSV / ZIP"
@@ -657,7 +657,7 @@ private fun HistoricalReportCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         val ptsStr = if (state.importedPointsCount > 0) {
-                            if (isRu) " (${state.importedPointsCount} точек)" else " (${state.importedPointsCount} pts)"
+                            if (isRu) " (${state.importedPointsCount} измерений)" else " (${state.importedPointsCount} pts)"
                         } else ""
                         Text(
                             text = if (isRu) "Обработка и расчёт файла$ptsStr..." else "Processing and calculating$ptsStr...",
@@ -1112,7 +1112,7 @@ private fun GuidebookCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = if (isRu) "Клинические нормы ATTD/ADA, смысл метрик и дисклеймер"
+                        text = if (isRu) "Клинические нормы ATTD/ADA и смысл метрик"
                                else "ATTD/ADA clinical targets, metrics meaning & disclaimer",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant

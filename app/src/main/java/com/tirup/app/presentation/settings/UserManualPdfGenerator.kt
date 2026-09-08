@@ -216,8 +216,8 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Цветовое кодирование гликемии" else "Glycemic Range Color Standards",
                         if (isRu) "Цвета" else "Colors",
-                        if (isRu) "<3.9 ммоль/л — красный; 3.9..7.8 — бледно-зелёный (#4ADE80); 7.9..10.0 — насыщенный изумрудный (#10B981); 10.1..13.9 — оранжевый; >13.9 — красный (#EF4444)."
-                        else "<3.9 mmol/L Red; 3.9..7.8 Pale Green (#4ADE80); 7.9..10.0 Saturated Emerald (#10B981); 10.1..13.9 Orange; >13.9 Red (#EF4444). Syncs across all widgets."
+                        if (isRu) "<3.9 ммоль/л — красный; 3.9..7.8 — бледно-зелёный; 7.9..10.0 — насыщенный изумрудный; 10.1..13.9 — оранжевый; >13.9 — красный."
+                        else "<3.9 mmol/L Red; 3.9..7.8 Pale Green; 7.9..10.0 Saturated Emerald; 10.1..13.9 Orange; >13.9 Red. Syncs across all widgets."
                     ),
                     Triple(
                         if (isRu) "Бейджи IoB/CoB, Стрик (🔥 X д.) и кнопка DiaNight (🌙)" else "IoB/CoB Badges, Streak (🔥) & DiaNight (🌙)",
@@ -347,7 +347,7 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Плавающий круглый оверлей (60x60dp)" else "Floating Circular Bubble (60x60dp)",
                         if (isRu) "Оверлей" else "Overlay",
-                        if (isRu) "Фиксированный круг 60x60dp поверх всех приложений. Показывается ТОЛЬКО когда сахар вне нормы (<3.9 или >10.0). При сахаре в диапазоне 3.9..10.0 пузырёк автоматически скрыт."
+                        if (isRu) "Полупрозрачный кружок поверх экрана. Показывается ТОЛЬКО когда сахар вне нормы (<3.9 или >10.0). При сахаре в диапазоне 3.9..10.0 пузырёк автоматически скрыт."
                         else "Strictly circular 60x60dp overlay. Visible ONLY when glucose is out of range (<3.9 or >10.0). Automatically hidden during normal range (3.9..10.0)."
                     ),
                     Triple(
@@ -359,7 +359,7 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Клинический протокол снуза тревог" else "Clinical Snooze Safety Protocol",
                         if (isRu) "Безопасность" else "Safety Guard",
-                        if (isRu) "При гипо — 15м снуза с защитой от комы (сброс при <2.8 или падении ≤-0.3). При гипер — пауза 45м, а при активном инсулине (IoB ≥0.2 / ≥0.5 при >13.9) — авто-продление до 60м."
+                        if (isRu) "При гипо — 15м снуза с защитой от комы (сброс при критически низком сахаре (<2.8) или быстром падении). При гипер — пауза 45м, а при активном инсулине (IoB ≥0.2 / ≥0.5 при >13.9) — авто-продление до 60м."
                         else "Hypo: 15m snooze with coma guard (resets if <2.8 or drop rate ≤-0.3). Hyper: 45m pause, extended to 60m with active bolus (IoB ≥0.2 / ≥0.5 if >13.9)."
                     )
                 ),
@@ -376,8 +376,8 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Амбулаторный профиль глюкозы (AGP по стандарту ATTD/ADA)" else "Official Ambulatory Glucose Profile (AGP)",
                         if (isRu) "AGP Отчёт" else "AGP PDF",
-                        if (isRu) "Генерация медицинского PDF-отчёта для эндокринолога в один клик. Расчёт 12 параметров: GRI, GVI, PGS, TIR, TBR, TAR, CV, SD, eA1c. Импорт архивов баз данных SiDiary (CSV/ZIP)."
-                        else "One-click generation of official clinical PDF report. Computes 12 parameters (GRI, GVI, PGS, TIR, CV, SD, eA1c). Direct import of SiDiary CSV/ZIP archives."
+                        if (isRu) "Генерация медицинского PDF-отчёта для эндокринолога в один клик. Расчёт 12 параметров: GRI, GVI, PGS, TIR, TBR, TAR, CV, SD, eA1c. Импорт файлов xDrip+ (CSV/ZIP)."
+                        else "One-click generation of official clinical PDF report. Computes 12 parameters (GRI, GVI, PGS, TIR, CV, SD, eA1c). Direct import of xDrip+ (CSV/ZIP) archives."
                     ),
                     Triple(
                         if (isRu) "Детектор скрытых клинических паттернов" else "Clinical Pattern Recognition Engine",
@@ -388,8 +388,8 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Ежедневный автономный автобэкап в 00:00" else "Daily Exact Auto-Backup at 00:00",
                         if (isRu) "Автобэкап" else "Backup",
-                        if (isRu) "Точный будильник сохраняет настройки, пороги тревог и базу данных в изолированную песочницу без запроса опасных системных разрешений на доступ к файлам."
-                        else "Exact RTC AlarmManager backs up settings, alert thresholds, and database into app sandbox at 23:59:59 without dangerous storage permissions."
+                        if (isRu) "Автоматический бэкап в полночь: настройки и база данных сохраняются в изолированную песочницу без запроса опасных системных разрешений на доступ к файлам."
+                        else "Midnight auto-backup: settings and database are saved into app sandbox without dangerous storage permissions."
                     )
                 ),
                 cardHeight = 41f
@@ -404,9 +404,10 @@ class UserManualPdfGenerator(private val context: Context) {
                 bulletPoints = listOf(
                     if (isRu) "• Приложение TIRUp разработано исключительно для вспомогательного информационного самоконтроля."
                     else "• TIRUp is intended strictly for supplementary lifestyle informational self-monitoring.",
-                    if (isRu) "• Всегда перепроверяйте показания инвазивным глюкометром перед инъекцией доз инсулина."
+                    if (isRu) "• Всегда перепроверяйте показания глюкометром по капле крови перед инъекцией доз инсулина."
                     else "• Always verify unexpected CGM values with a blood capillary meter prior to insulin dosing decisions."
                 )
+            )
             )
 
             document.finishPage(page2)

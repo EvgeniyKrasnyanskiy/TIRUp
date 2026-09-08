@@ -282,7 +282,7 @@ object GlucoseAlertManager {
         val text: String
         if (isSensor) {
             if (daysRemaining < 0) {
-                title = if (isRu) "⚠️ Сенсор CGM истёк" else "⚠️ CGM Sensor Expired"
+                title = if (isRu) "⚠️ Срок сенсора CGM истёк" else "⚠️ CGM Sensor Expired"
                 text = if (isRu) "Срок службы сенсора истёк ${(-daysRemaining)} дн. назад. Установите новый сенсор." else "Sensor expired ${(-daysRemaining)}d ago. Install a new one."
             } else {
                 title = if (isRu) "📡 Скоро замена сенсора CGM" else "📡 CGM Sensor Expiring Soon"
@@ -290,7 +290,7 @@ object GlucoseAlertManager {
             }
         } else {
             if (daysRemaining < 0) {
-                title = if (isRu) "⚠️ Инфузионный набор истёк" else "⚠️ Infusion Set Expired"
+                title = if (isRu) "⚠️ Срок инфузионного набора истёк" else "⚠️ Infusion Set Expired"
                 text = if (isRu) "Срок службы набора истёк ${(-daysRemaining)} дн. назад. Смените набор немедленно." else "Infusion set expired ${(-daysRemaining)}d ago. Change it immediately."
             } else {
                 title = if (isRu) "💉 Скоро замена инфузионного набора" else "💉 Infusion Set Expiring Soon"
@@ -345,7 +345,7 @@ object GlucoseAlertManager {
 
         val title = digest.headline
         val bigText = buildString {
-            if (isRu) append("Сводка за неделю:\n") else append("Week summary:\n")
+            if (isRu) append("Сводка за неделю:\n") else append("Weekly summary:\n")
             digest.keyInsights.forEach { insight ->
                 append("• ").append(insight).append("\n")
             }
@@ -520,8 +520,8 @@ object GlucoseAlertManager {
         }
         val text = when (tier) {
             AlertTier.PREDICTIVE -> if (isRu) "Мягкий сигнал прогноза падения/роста." else "Soft warning before crossing range."
-            AlertTier.MAIN -> if (isRu) "Тройной сигнал с интервалом 1.5 сек при 5 точках вне нормы." else "Triple beep (1.5s pause) on confirmed out-of-range."
-            AlertTier.CRITICAL -> if (isRu) "Серия громкой сирены ~12 сек. Нажмите «Принято» для глушения." else "Loud siren series ~12s. Tap 'Dismiss' to silence."
+            AlertTier.MAIN -> if (isRu) "Тройной сигнал при подтверждённом выходе за границы диапазона." else "Triple beep (1.5s pause) on confirmed out-of-range."
+            AlertTier.CRITICAL -> if (isRu) "Серия громкой сирены ~12 сек. Нажмите «ОК» в уведомлении для отключения звука." else "Loud siren series ~12s. Tap 'Dismiss' to silence."
             AlertTier.SIGNAL_LOSS -> if (isRu) "Двухтональный сигнал при отсутствии данных более 20 минут." else "Two-tone alert on missing data for >20 minutes."
         }
 
@@ -688,9 +688,9 @@ object GlucoseAlertManager {
             }
 
             val text = if (isRu) {
-                "Сахар $glucoseStr вне нормы. До полуночи $remainStr, из них $needStr нужно провести в диапазоне. Запас на ошибку — всего $slackStr! Вернитесь в норму прямо сейчас."
+                "Сахар $glucoseStr вне нормы. До полуночи $remainStr, из них $needStr нужно провести в диапазоне. Запас времени — всего $slackStr! Примите меры для возврата в целевой диапазон."
             } else {
-                "Glucose $glucoseStr is out of range. $remainStr left today, $needStr must be in range. Error margin is only $slackStr! Return to target range now."
+                "Glucose $glucoseStr is out of range. $remainStr left today, $needStr must be in range. Remaining time buffer is only $slackStr! Take steps to return to target range."
             }
 
             sendNotification(
@@ -912,7 +912,7 @@ object GlucoseAlertManager {
                     val title = if (isRu) "🔺 Высокий сахар" else "🔺 High Glucose"
                     val text = String.format(
                         Locale.US,
-                        if (isRu) "Глюкоза: %.1f ммоль/л выше нормы %.1f."
+                        if (isRu) "Глюкоза: %.1f ммоль/л выше порога %.1f."
                         else "Glucose: %.1f mmol/L above threshold %.1f.",
                         latest.valueMmol,
                         mainHigh
@@ -1305,7 +1305,7 @@ object GlucoseAlertManager {
             arrow = ""
             hexColor = grayHex
             val lastTimeFormatted = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(latestReading.timestamp))
-            timeStr = if (isRu) "посл: $lastTimeFormatted" else "last: $lastTimeFormatted"
+            timeStr = if (isRu) "Посл: $lastTimeFormatted" else "last: $lastTimeFormatted"
         } else if (isStale) {
             glucoseStr = lastKnownGlucose
             arrow = latestReading.trendArrow ?: ""

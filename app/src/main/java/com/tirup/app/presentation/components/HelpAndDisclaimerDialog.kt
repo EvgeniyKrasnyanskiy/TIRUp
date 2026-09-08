@@ -80,7 +80,7 @@ fun HelpAndDisclaimerDialog(
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = if (isRu) "Справка и Дисклеймер" else "Help & Disclaimer",
+                    text = if (isRu) "Справка и отказ от ответственности" else "Help & Disclaimer",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = onSurface
@@ -160,10 +160,10 @@ fun HelpAndDisclaimerDialog(
                     iconTint = ColorHigh,
                     title = if (isRu) "Умные тревоги и Экстренная безопасность" else "Smart 4-Tier Alarms & Emergency Guard",
                     content = if (isRu) {
-                        "• Уровни 1–4: предиктивный прогноз выхода за диапазон, тройной тон, критическая сирена 12с и тревога потери сигнала (>20 мин).\n" +
-                        "• Экстренные SOS SMS: при критической гипо (<3.0) и молчании сирены 5 мин отправляет доверенному лицу SMS (≤67 симв.) с координатами.\n" +
+                        "• Уровни 1–4: предиктивный прогноз выхода за диапазон, тройной тон, экстренная сирена (~12 сек) и тревога при потере связи с сенсором (>20 мин).\n" +
+                        "• Экстренные SOS SMS: если сахар упал ниже 3.0 ммоль/л и тревога не подтверждена в течение 5 мин отправляет доверенному лицу SMS (≤67 симв.) с координатами.\n" +
                         "• Офлайн SMS-запрос: доверенный контакт может запросить текущий сахар и TIR по SMS без интернета («сахар», «?», «bg»).\n" +
-                        "• Умный Снуз: 15 мин при гипо (защита <2.8 ммоль/л); 30–45 мин при гипер на действие инсулина."
+                        "• Умный Снуз: 15 мин при гипогликемии (сброс при <2.8 для защиты от комы); 30–45 мин при гипер на действие инсулина."
                     } else {
                         "• Tiers 1–4: predictive target departure, confirmed boundary tone, critical 12s siren, and sensor signal loss (>20 min).\n" +
                         "• Emergency SOS SMS: sends compact SMS (≤67 chars) with GPS to trusted contact if severe hypo (<3.0) is unacknowledged for 5m.\n" +
@@ -179,7 +179,7 @@ fun HelpAndDisclaimerDialog(
                     title = if (isRu) "Воскресный дайджест и Автобэкап" else "Sunday Digest & Daily Auto-Backup",
                     content = if (isRu) {
                         "• Воскресный дайджест: каждое воскресенье в 20:00 формирует недельный обзор компенсации со сравнением с прошлой неделей.\n" +
-                        "• Точный будильник (23:59:59) сохраняет настройки и базу данных в защищённую изолированную папку приложения.\n" +
+                        "• Автоматический бэкап в полночь: настройки и базу данных в защищённую изолированную папку приложения.\n" +
                         "• Не требует опасных разрешений на доступ ко всей файловой системе смартфона.\n" +
                         "• При переустановке приложение автоматически обнаружит копию и восстановит историю."
                     } else {
@@ -227,7 +227,7 @@ fun HelpAndDisclaimerDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
                 ) {
                     Text(
-                        text = if (isRu) "Понятно и согласен" else "I Understand & Agree",
+                        text = if (isRu) "Понятно" else "Got it",
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         color = Color.White

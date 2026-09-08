@@ -363,7 +363,7 @@ fun AppNavigationRoot(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = if (isRu) "Восстановить данные и настройки профиля?" else "Restore data and profile settings?",
+                        text = if (isRu) "Вы действительно хотите заменить текущие настройки и данные конфигурацией из резервной копии?" else "Restore data and profile settings?",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )

@@ -111,9 +111,9 @@ fun BmiDetailInfoDialog(
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             BmiGradeRow("< 18.5", if (isRu) "Дефицит массы тела" else "Underweight", ActionBlue)
                             BmiGradeRow("18.5 – 24.9", if (isRu) "Нормальная масса" else "Normal weight", PrimaryEmerald)
-                            BmiGradeRow("25.0 – 29.9", if (isRu) "Избыточный вес (предожирение)" else "Overweight", ColorHigh)
+                            BmiGradeRow("25.0 – 29.9", if (isRu) "Избыточный вес" else "Overweight", ColorHigh)
                             BmiGradeRow("30.0 – 34.9", if (isRu) "Ожирение I степени" else "Obesity Class I", ColorVeryHigh)
-                            BmiGradeRow("≥ 35.0", if (isRu) "Ожирение II–III степени (морбидное)" else "Severe / Class II–III Obesity", ColorVeryHigh)
+                            BmiGradeRow("≥ 35.0", if (isRu) "Ожирение II–III степени" else "Obesity Class II–III", ColorVeryHigh)
                         }
                     }
                 }
@@ -154,7 +154,7 @@ fun BmiDetailInfoDialog(
                     ) {
                         Text(
                             text = if (isRu)
-                                "• Инсулинорезистентность: при повышенном ИМТ висцеральный жир снижает чувствительность рецепторов, что требует повышенных доз инсулина (высокий углеводный коэффициент УК и фактор чувствительности ФЧИ).\n\n" +
+                                "• Инсулинорезистентность: при повышенном ИМТ висцеральный жир снижает чувствительность рецепторов, что требует повышенных доз инсулина (больше единиц инсулина на каждую ХЕ и на снижение сахара).\n\n" +
                                         "• Дефицит массы: повышает риск стремительных ночных гипогликемий из-за сниженного депо гликогена в печени.\n\n" +
                                         "• Ограничение метода: ИМТ не разделяет мышцы и жир (у тренированных людей показатель может быть ложно завышен)."
                             else

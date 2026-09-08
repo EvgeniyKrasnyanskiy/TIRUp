@@ -55,12 +55,12 @@ fun getMetricTitle(id: String, isRu: Boolean): String {
         "cv" -> if (isRu) "%CV (Вариабельность)" else "%CV (Variability)"
         "tir" -> if (isRu) "TIR (Целевой диапазон)" else "TIR (Time in Range)"
         "ting" -> if (isRu) "TING (Узкий диапазон)" else "TING (Tight Range)"
-        "tbr" -> if (isRu) "TBR (Гипогликемия)" else "TBR (Below Range)"
-        "tar" -> if (isRu) "TAR (Гипергликемия)" else "TAR (Above Range)"
+        "tbr" -> if (isRu) "TBR (Ниже диапазона)" else "TBR (Below Range)"
+        "tar" -> if (isRu) "TAR (Выше диапазона)" else "TAR (Above Range)"
         "gri" -> if (isRu) "GRI (Индекс риска)" else "GRI (Glycemia Risk Index)"
         "gvi" -> if (isRu) "GVI (Индекс лабильности)" else "GVI (Variability Index)"
         "pgs" -> if (isRu) "PGS (Гликемический статус)" else "PGS (Patient Status)"
-        "minmax" -> if (isRu) "Min / Max (Размах суток)" else "Min / Max (Daily Span)"
+        "minmax" -> if (isRu) "Min / Max (Суточный диапазон)" else "Min / Max (Daily Span)"
         else -> id.uppercase()
     }
 }

@@ -18,14 +18,14 @@
     <string name="compensator_title">Компенсация</string>
     <string name="compensator_desc_reach">Чтобы достичь цели %1$s в %2$d%%, удерживайте ≥%3$.0f%% в оставшиеся %4$d дн.</string>
     <string name="compensator_desc_exceeding">Отличный темп! Вы опережаете цель. Поддерживайте ≥%1$.0f%% в оставшиеся %2$d дн. для закрепления результата.</string>
-    <string name="compensator_desc_impossible">В текущем периоде цель математически не закроется на 100%, но каждый день в диапазоне улучшает итоговый гликированный гемоглобин.</string>
+    <string name="compensator_desc_impossible">В оставшееся время математически невозможно достичь цели, но каждый день в диапазоне улучшает итоговый гликированный гемоглобин.</string>
     <string name="card_mean">Средний сахар</string>
     <string name="card_cv">CV (вариабельность)</string>
     <string name="card_gmi">Расчётный A1c (GMI)</string>
     <string name="card_night">Ночной профиль (00:00–06:00)</string>
     <string name="night_stable">Стабильный ночной профиль</string>
     <string name="night_unstable">Обнаружены ночные колебания</string>
-    <string name="no_data">Нет данных. Ожидание сигналов трансляции.</string>
+    <string name="no_data">Нет данных. Ожидание замеров от сенсора.</string>
     <string name="last_reading">Последнее измерение: %s</string>
     <string name="minutes_ago">%d мин назад</string>
     <string name="just_now">Только что</string>

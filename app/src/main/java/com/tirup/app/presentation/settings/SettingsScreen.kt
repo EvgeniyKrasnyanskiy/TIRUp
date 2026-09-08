@@ -156,6 +156,7 @@ fun SettingsScreen(
     var showCriticalHypoSafetyDialog by rememberSaveable { mutableStateOf(false) }
     var showMainThresholdDialog by rememberSaveable { mutableStateOf(false) }
     var showPredictiveHorizonDialog by rememberSaveable { mutableStateOf(false) }
+    var showPredictiveInfoDialog by rememberSaveable { mutableStateOf(false) }
     var masterOffHintVisible by rememberSaveable { mutableStateOf(false) }
     var showBleHelpModal by rememberSaveable { mutableStateOf(false) }
     var showBlePinDialog by rememberSaveable { mutableStateOf(false) }
@@ -184,9 +185,9 @@ fun SettingsScreen(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            Toast.makeText(context, if (isRu) "Разрешение на приём SMS-запросов предоставлено" else "RECEIVE_SMS permission granted", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, if (isRu) "Разрешение на приём SMS-запросов предоставлено" else "SMS receive permission granted", Toast.LENGTH_SHORT).show()
         } else {
-            Toast.makeText(context, if (isRu) "Разрешение на приём SMS отклонено" else "RECEIVE_SMS permission denied", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, if (isRu) "Разрешение на приём SMS отклонено" else "SMS receive permission denied", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -363,7 +364,7 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Default.Language, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
+                            Icon(imageVector = Icons.Default.Language, contentDescription = null, tint = ActionBlue, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(text = stringResource(R.string.pref_language), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -389,7 +390,7 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Default.Tune, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
+                            Icon(imageVector = Icons.Default.Tune, contentDescription = null, tint = Color(0xFF8B5CF6), modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(text = stringResource(R.string.pref_unit), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -415,7 +416,7 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Default.Brightness4, contentDescription = null, tint = PrimaryEmerald, modifier = Modifier.size(20.dp))
+                            Icon(imageVector = Icons.Default.Brightness4, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(text = if (isRu) "Тема" else "Theme", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -455,11 +456,7 @@ fun SettingsScreen(
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
-                                Text(
-                                    text = if (isRu) "Значки шприца 💉 и приёмов пищи 🍽️ на суточном графике" else "Syringe 💉 and meal 🍽️ icons on glucose curve",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+
                             }
                         }
                         Switch(
@@ -497,7 +494,7 @@ fun SettingsScreen(
                             Icon(
                                 imageVector = Icons.Default.NotificationsActive,
                                 contentDescription = null,
-                                tint = if (alerts.isAlertsMasterEnabled) PrimaryEmerald else MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = if (alerts.isAlertsMasterEnabled) Color(0xFFFBBF24) else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(24.dp)
                             )
                             Column {
@@ -668,7 +665,7 @@ fun SettingsScreen(
                         val isCriticalEffectiveEnabled = if (isCriticalInPauseState) true else (isMaster && alerts.isCriticalEnabled && !alerts.isCriticalHypoPermanentDisabled)
 
                         AlertTierConfigRow(
-                            title = if (isRu) "3. Критические и затяжные («кричащие»)" else "3. Critical & Prolonged (Alarms)",
+                            title = if (isRu) "3. Экстренные сирены (критические и затяжные)" else "3. Critical & Prolonged (Alarms)",
                             subtitle = criticalSub,
                             enabled = isCriticalEffectiveEnabled,
                             onEnabledChange = { isEnabled ->
@@ -702,7 +699,7 @@ fun SettingsScreen(
                         AlertTierConfigRow(
                             title = if (isRu) "4. Потеря сигнала сенсора (>20 мин)" else "4. Signal Loss (>20 min)",
                             subtitle = if (!isMaster) (if (isRu) "Выключено (общий тумблер выключен)" else "Disabled (master switch off)")
-                                       else if (isRu) "Нисходящий сигнал с нарастающим интервалом (20 ➔ 40 ➔ 80 мин)" else "Descending tone with geometric backoff (20 ➔ 40 ➔ 80 min)",
+                                       else if (isRu) "Нисходящий сигнал с нарастающим интервалом (20 ➔ 40 ➔ 80 мин)" else "Descending tone with increasing interval (20 ➔ 40 ➔ 80 min)",
                             enabled = isMaster && alerts.isSignalLossEnabled,
                             onEnabledChange = { isChecked ->
                                 if (isChecked) {
@@ -902,7 +899,7 @@ fun SettingsScreen(
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
-                                text = "📡",
+                                text = "🔵",
                                 fontSize = 22.sp
                             )
                             Column {
@@ -918,7 +915,7 @@ fun SettingsScreen(
                                     )
                                     val (roleBadgeEmoji, roleBadgeColor) = when (ble.role) {
                                         BleBridgeRole.BROADCASTER -> Pair("📡", ActionBlue)
-                                        BleBridgeRole.OBSERVER -> Pair("👂", PrimaryEmerald)
+                                        BleBridgeRole.OBSERVER -> Pair("📻", PrimaryEmerald)
                                         else -> Pair("⚪", MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     Surface(
@@ -1003,9 +1000,9 @@ fun SettingsScreen(
 
                     // Role Selector: 3 options (Off, Broadcaster, Observer)
                     val roles = listOf(
-                        Triple(BleBridgeRole.DISABLED, if (isRu) "Выкл" else "Off", "gray"),
+                        Triple(BleBridgeRole.DISABLED, if (isRu) "✖️ Выкл" else "✖️ Off", "gray"),
                         Triple(BleBridgeRole.BROADCASTER, if (isRu) "📡 Вещатель" else "📡 Broadcaster", "blue"),
-                        Triple(BleBridgeRole.OBSERVER, if (isRu) "👂 Приёмник" else "👂 Observer", "emerald")
+                        Triple(BleBridgeRole.OBSERVER, if (isRu) "📻 Приёмник" else "📻 Observer", "emerald")
                     )
 
                     Row(
@@ -1152,7 +1149,7 @@ fun SettingsScreen(
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = if (isRu) "Фолловер увидит процент заряда смартфона ребёнка" else "Follower will see phone battery percentage",
+                                        text = if (isRu) "Приёмник увидит процент заряда смартфона ребёнка" else "Follower will see phone battery percentage",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -1209,7 +1206,7 @@ fun SettingsScreen(
                                         }
                                         Column {
                                             Text(
-                                                text = if (isRu) "ИДЁТ ВЕЩАНИЕ В ЭФИР!" else "TRANSMITTING TELEMETRY!",
+                                                text = if (isRu) "Идёт передача данных" else "TRANSMITTING TELEMETRY!",
                                                 style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = FontWeight.Bold,
                                                 color = ActionBlue
@@ -1225,7 +1222,7 @@ fun SettingsScreen(
                                         Text("💤", fontSize = 20.sp)
                                         Column {
                                             Text(
-                                                text = if (isRu) "Вещатель в покое (радио молчит)" else "Broadcaster idle (radio silent)",
+                                                text = if (isRu) "Вещатель в ожидании замера" else "Broadcaster idle (radio silent)",
                                                 style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = MaterialTheme.colorScheme.onSurface
@@ -1292,10 +1289,10 @@ fun SettingsScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text(if (boostRemaining > 0) "⚡" else "👂", fontSize = 16.sp)
+                                        Text(if (boostRemaining > 0) "⚡" else "📻", fontSize = 16.sp)
                                         val scanStatusText = when {
                                             !isBtOn -> if (isRu) "Bluetooth выключен" else "Bluetooth is off"
-                                            boostRemaining > 0 -> if (isRu) "Активный поиск мастера (${boostRemaining}с)" else "Boost scan active (${boostRemaining}s)"
+                                            boostRemaining > 0 -> if (isRu) "Активный поиск вещателя (${boostRemaining}с)" else "Boost scan active (${boostRemaining}s)"
                                             isScanning -> if (isRu) "Приёмник активен (фоновый приём)" else "Observer active (balanced scan)"
                                             else -> if (isRu) "Ожидание разрешений сканера" else "Waiting for scanner permissions"
                                         }
@@ -1309,7 +1306,7 @@ fun SettingsScreen(
 
                                     if (ble.lastPacketTimestamp > 0L) {
                                         val ageMinutes = ((System.currentTimeMillis() - ble.lastPacketTimestamp) / 60000L).coerceAtLeast(0)
-                                        val ageStr = if (ageMinutes == 0L) (if (isRu) "только что" else "just now") else (if (isRu) "$ageMinutes мин назад" else "${ageMinutes}m ago")
+                                        val ageStr = if (ageMinutes == 0L) { if (isRu) "только что" else "just now" } else if (ageMinutes < 60) { if (isRu) "$ageMinutes мин назад" else "${ageMinutes}m ago" } else if (ageMinutes < 1440) { val h = ageMinutes / 60; if (isRu) "$h ч назад" else "${h}h ago" } else { val d = ageMinutes / 1440; if (isRu) "$d дн назад" else "${d}d ago" }
                                         val signalQuality = when {
                                             ble.lastRssi >= -70 -> if (isRu) "отличный" else "excellent"
                                             ble.lastRssi >= -85 -> if (isRu) "хороший" else "good"
@@ -1318,8 +1315,8 @@ fun SettingsScreen(
                                         val isStaleBattery = ageMinutes > 7
                                         val batteryInfo = when {
                                             ble.lastMasterBattery < 0 -> ""
-                                            isStaleBattery -> if (isRu) "\n• Батарея мастера: ? (нет связи > 7 мин)" else "\n• Master battery: ? (stale > 7m)"
-                                            else -> "\n• ${if (isRu) "Батарея мастера" else "Master battery"}: ${ble.lastMasterBattery}%"
+                                            isStaleBattery -> if (isRu) "\n• Батарея вещателя: ? (нет связи > 7 мин)" else "\n• Master battery: ? (stale > 7m)"
+                                            else -> "\n• ${if (isRu) "Батарея вещателя" else "Master battery"}: ${ble.lastMasterBattery}%"
                                         }
 
                                         Text(
@@ -1330,7 +1327,7 @@ fun SettingsScreen(
                                         )
                                     } else {
                                         Text(
-                                            text = if (isRu) "Ожидание первого радиосигнала от мастера..." else "Waiting for first beacon from master...",
+                                            text = if (isRu) "Ожидание первого радиосигнала от вещателя..." else "Waiting for first beacon from master...",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -1362,7 +1359,7 @@ fun SettingsScreen(
                                     text = if (boostRemaining > 0) {
                                         if (isRu) "⚡ Активный поиск (${boostRemaining}с)..." else "⚡ Boosting Scan (${boostRemaining}s)..."
                                     } else {
-                                        if (isRu) "🔍 Быстрый поиск мастера (30 сек)" else "🔍 Fast Master Search (30s)"
+                                        if (isRu) "🔍 Быстрый поиск вещателя (30 сек)" else "🔍 Fast Master Search (30s)"
                                     },
                                     fontWeight = FontWeight.Bold
                                 )
@@ -1405,24 +1402,7 @@ fun SettingsScreen(
                                         color = MaterialTheme.colorScheme.onSurface,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    val (smsBadgeText, smsBadgeColor) = if (alerts.isEmergencySmsEnabled) {
-                                        Pair(if (isRu) "Вкл" else "On", Color(0xFFEF4444))
-                                    } else {
-                                        Pair(if (isRu) "Выкл" else "Off", MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = smsBadgeColor.copy(alpha = 0.15f),
-                                        border = BorderStroke(0.8.dp, smsBadgeColor.copy(alpha = 0.4f))
-                                    ) {
-                                        Text(
-                                            text = smsBadgeText,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = smsBadgeColor,
-                                            fontWeight = FontWeight.SemiBold,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                        )
-                                    }
+
                                 }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
@@ -1516,7 +1496,7 @@ fun SettingsScreen(
                                 onValueChange = { phone ->
                                     viewModel.updateAlertSettings(alerts.copy(emergencyContactPhone = phone))
                                 },
-                            label = { Text(if (isRu) "Основной телефон близкого (+7...)" else "Primary trusted phone (+...)") },
+                            label = { Text(if (isRu) "Основной телефон близкого (+...)" else "Primary trusted phone (+...)") },
                             placeholder = { Text("+7 900 123-45-67") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
@@ -1557,7 +1537,7 @@ fun SettingsScreen(
                             onValueChange = { phone ->
                                 viewModel.updateAlertSettings(alerts.copy(secondaryEmergencyContactPhone = phone))
                             },
-                            label = { Text(if (isRu) "Резервный телефон (+7...)" else "Secondary trusted phone (+...)") },
+                            label = { Text(if (isRu) "Резервный телефон (+...)" else "Secondary trusted phone (+...)") },
                             placeholder = { Text(if (isRu) "+7 900 765-43-21 (резерв)" else "+... (reserve)") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
@@ -2141,8 +2121,8 @@ fun SettingsScreen(
                         valueRange = 0f..100f,
                         steps = 19,
                         colors = SliderDefaults.colors(
-                            thumbColor = PrimaryEmerald,
-                            activeTrackColor = PrimaryEmerald,
+                            thumbColor = ActionBlue,
+                            activeTrackColor = ActionBlue,
                             inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     )
@@ -2159,7 +2139,7 @@ fun SettingsScreen(
                         Text(
                             text = if (isRu) "85% (Стандарт)" else "85% (Default)",
                             style = MaterialTheme.typography.labelSmall,
-                            color = PrimaryEmerald
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = if (isRu) "100% (Глубокий)" else "100% (Solid)",
@@ -2536,6 +2516,10 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(onClick = { showPredictiveInfoDialog = true }, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = ActionBlue)
+                    }
                 }
             },
             text = {
@@ -2619,6 +2603,34 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showPredictiveHorizonDialog = false }) {
                     Text(if (isRu) "Отмена" else "Cancel")
+                }
+            }
+        )
+    }
+
+    if (showPredictiveInfoDialog) {
+        AlertDialog(
+            onDismissRequest = { showPredictiveInfoDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Info, contentDescription = null, tint = ActionBlue, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isRu) "Горизонт предиктивной тревоги" else "Predictive Alert Horizon",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Text(
+                    text = if (isRu) "Чем меньше горизонт, тем точнее предсказание. 10 мин — высокая точность, 20 мин — умеренная." else "The shorter the horizon, the more accurate the prediction. 10 min = high accuracy, 20 min = moderate.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showPredictiveInfoDialog = false }) {
+                    Text("OK")
                 }
             }
         )
@@ -3874,7 +3886,7 @@ private fun BleBridgeHelpDialog(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("📡", fontSize = 22.sp)
+                Text("🔵", fontSize = 22.sp)
                 Text(
                     text = if (isRu) "Локальный BLE-мост" else "Local BLE Bridge",
                     fontWeight = FontWeight.Bold,
@@ -3947,7 +3959,7 @@ private fun BleBridgeHelpDialog(
                         Text(
                             text = if (isRu)
                                 "Каждый пакет шифруется и защищён 3-буквенным случайным PIN-кодом семьи (например, «WKV»). " +
-                                "Чужие пакеты или пакеты с повреждённой контрольной суммой (CRC-8) моментально отбрасываются."
+                                "Чужие пакеты или пакеты с повреждённой защитой от искажений моментально отбрасываются."
                             else
                                 "Each packet is protected with a 3-letter uppercase family PIN (e.g. 'WKV'). " +
                                 "Foreign packets or corrupted checksums (CRC-8) are discarded immediately.",
@@ -3976,12 +3988,12 @@ private fun BleBridgeHelpDialog(
                             text = if (isRu)
                                 "1. На телефоне ребёнка (с сенсором/xDrip) включите роль «📡 Вещатель».\n" +
                                 "2. Запомните сгенерированный 3-буквенный PIN-код (или смените кнопкой случайного выбора).\n" +
-                                "3. На телефоне родителя включите роль «👂 Приёмник» и укажите точно такой же PIN-код.\n" +
+                                "3. На телефоне родителя включите роль «📻 Приёмник» и укажите точно такой же PIN-код.\n" +
                                 "4. Готово! При каждом замере данные мгновенно отобразятся на экране и в виджетах родителя."
                             else
                                 "1. On the patient's phone (with CGM/xDrip), enable '📡 Broadcaster'.\n" +
                                 "2. Note the generated 3-letter PIN (or regenerate with the shuffle button).\n" +
-                                "3. On the follower's phone, enable '👂 Observer' and type the exact same PIN.\n" +
+                                "3. On the follower's phone, enable '📻 Observer' and type the exact same PIN.\n" +
                                 "4. Done! Every reading will seamlessly appear on the follower's screen and widgets.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -89,7 +89,7 @@ class AgpPdfGenerator(private val context: Context) {
             canvas.drawRoundRect(headerRect, 8f, 8f, headerBgPaint)
             canvas.drawRoundRect(headerRect, 8f, 8f, borderPaint)
 
-            val headerTitle = if (isRu) "АМБУЛАТОРНЫЙ ГЛЮКОЗНЫЙ ПРОФИЛЬ (AGP)" else "AMBULATORY GLUCOSE PROFILE (AGP) REPORT"
+            val headerTitle = if (isRu) "АМБУЛАТОРНЫЙ ГЛИКЕМИЧЕСКИЙ ПРОФИЛЬ (AGP)" else "AMBULATORY GLYCEMIC PROFILE (AGP) REPORT"
             canvas.drawText(headerTitle, margin + 12f, 38f, titlePaint)
 
             // Patient details line
