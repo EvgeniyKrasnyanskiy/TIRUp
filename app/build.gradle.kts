@@ -82,6 +82,7 @@ android {
             excludes += "/META-INF/*.kotlin_module"
             excludes += "DebugProbesKt.bin"
             excludes += "kotlin-tooling-metadata.json"
+            
 			excludes += "META-INF/com.android.tools/**"
             excludes += "META-INF/proguard/**"
             excludes += "/*.proto"
