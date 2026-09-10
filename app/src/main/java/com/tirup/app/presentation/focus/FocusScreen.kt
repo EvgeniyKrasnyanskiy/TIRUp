@@ -223,7 +223,7 @@ fun FocusScreen(
             val packetAgeMinutes = if (heroBleSettings.lastPacketTimestamp > 0L) {
                 (System.currentTimeMillis() - heroBleSettings.lastPacketTimestamp) / 60_000L
             } else 999L
-            val isMasterBatteryStale = packetAgeMinutes > 7
+            val isMasterBatteryStale = packetAgeMinutes >= 5
             val masterBattery = if (isObserver && (heroBleSettings.lastMasterBattery in 0..100 || heroBleSettings.lastPacketTimestamp > 0L)) {
                 heroBleSettings.lastMasterBattery
             } else null
@@ -264,7 +264,7 @@ fun FocusScreen(
                     }
                     val desc = if (isRu) {
                         if (isMasterBatteryStale) {
-                            "Данные о заряде телефона-вещателя устарели (сигнал не обновлялся более 7 минут). Проверьте Bluetooth-соединение." +
+                            "Данные о заряде телефона-вещателя устарели (сигнал не обновлялся более 5 минут). Проверьте Bluetooth-соединение." +
                                 if (dataReceivedStr.isNotEmpty()) "\n\n$dataReceivedStr" else "" +
                                 "\n\n$disableBridgeStr"
                         } else {
@@ -1443,14 +1443,14 @@ private fun HeroGlucoseCard(
                     if (hasBattery) {
                         val grayColor = Color(0xFF94A3B8)
                         val (batText, batColor) = if (isMasterBatteryStale) {
-                            Pair("📱 🔋 ?", grayColor)
+                            Pair("🔋 ?", grayColor)
                         } else {
                             val color = when {
                                 masterBatteryPct!! <= 15 -> ColorVeryLow
                                 masterBatteryPct <= 25 -> ColorHigh
                                 else -> PrimaryEmerald
                             }
-                            Pair("📱 🔋 $masterBatteryPct%", color)
+                            Pair("🔋 $masterBatteryPct%", color)
                         }
                         Surface(
                             shape = RoundedCornerShape(10.dp),

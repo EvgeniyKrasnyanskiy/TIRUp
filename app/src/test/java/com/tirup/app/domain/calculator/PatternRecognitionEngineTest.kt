@@ -35,7 +35,7 @@ class PatternRecognitionEngineTest {
         )
         val patterns = PatternRecognitionEngine.analyze(
             bins = bins,
-            stats = GlucoseStatistics(totalCount = 100)
+            stats = GlucoseStatistics(totalCount = 100, daysCount = 7)
         )
         assertTrue(patterns.any { it.severity == PatternSeverity.ALERT && it.titleRu.contains("Ночные провалы") })
     }
@@ -57,7 +57,7 @@ class PatternRecognitionEngineTest {
         )
         val patterns = PatternRecognitionEngine.analyze(
             bins = bins,
-            stats = GlucoseStatistics(totalCount = 100),
+            stats = GlucoseStatistics(totalCount = 100, daysCount = 7),
             nightStartHour = 23,
             nightEndHour = 7
         )
@@ -92,7 +92,7 @@ class PatternRecognitionEngineTest {
         )
         val patterns = PatternRecognitionEngine.analyze(
             bins = bins,
-            stats = GlucoseStatistics(totalCount = 200)
+            stats = GlucoseStatistics(totalCount = 200, daysCount = 7)
         )
         assertTrue(patterns.any { it.titleRu.contains("Утренней зари") })
     }
@@ -125,7 +125,7 @@ class PatternRecognitionEngineTest {
         )
         val patterns = PatternRecognitionEngine.analyze(
             bins = bins,
-            stats = GlucoseStatistics(totalCount = 200, cvPercent = 25.0)
+            stats = GlucoseStatistics(totalCount = 200, daysCount = 7, cvPercent = 25.0)
         )
         assertTrue(patterns.isEmpty())
     }
