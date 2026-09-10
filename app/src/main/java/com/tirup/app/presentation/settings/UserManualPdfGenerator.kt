@@ -310,10 +310,10 @@ class UserManualPdfGenerator(private val context: Context) {
                         else "Weighted velocity regression calculates impending target departure with exact estimated time. Gentle dual-tone chime without startling."
                     ),
                     Triple(
-                        if (isRu) "Уровень 2: Основная тревога (кастомный диапазон, 5 точек)" else "Tier 2: Confirmed Departure (Custom Range, 5 pts)",
+                        if (isRu) "Уровень 2: Основная тревога (кастомный диапазон, 3–5 точек)" else "Tier 2: Confirmed Departure (Custom Range, 3–5 pts)",
                         if (isRu) "Тройной тон" else "Triple Tone",
-                        if (isRu) "Подтверждённый выход 5 точек за пороги. Тройной сигнал. Повтор: 15м (гипо) и 45м (гипер, 60м при IoB ≥0.2 / ≥0.5 при >13.9), пока сахар вне нормы."
-                        else "Confirmed departure of 5 points. Triple tone. Repeats 15m (hypo) and 45m (hyper, 60m with IoB ≥0.2 / ≥0.5 if >13.9) until in range."
+                        if (isRu) "Подтверждённый выход 3 точек (15м для 5-мин) или 5 точек (5м для 1-мин). Тройной сигнал. При падающем сахаре и наличии болюса (IoB) тревога гипергликемии глушится. Повтор: 15м (гипо) и 45м (гипер, 60м с IoB)."
+                        else "Confirmed departure: 3 pts (15m for 5-min) or 5 pts (5m for 1-min). Triple tone. Muted on falling glucose with IoB. Repeats 15m (hypo) and 45m (hyper, 60m with IoB)."
                     ),
                     Triple(
                         if (isRu) "Уровень 3: Критическая сирена («кричащая»)" else "Tier 3: Critical Siren (Extremes & Prolonged)",
@@ -322,10 +322,10 @@ class UserManualPdfGenerator(private val context: Context) {
                         else "DND bypass, volume ≥80%, camera strobe for <3.0 / >13.9. Unanswered: hypo every 5m, hyper every 15m. Snooze: 15m (hypo) / 45-60m (hyper with IoB). Mute via tap/buttons."
                     ),
                     Triple(
-                        if (isRu) "Уровень 4: Потеря сигнала (>20 мин, будильник + расписание дня/ночи)" else "Tier 4: Sleep-Aware Signal Loss Alarm (>20 min)",
+                        if (isRu) "Уровень 4: Потеря сигнала (20–25 мин, будильник + расписание дня/ночи)" else "Tier 4: Sleep-Aware Signal Loss Alarm (20–25 min)",
                         if (isRu) "Будильник DND" else "Bypass DND",
-                        if (isRu) "Приравнена к будильнику (USAGE_ALARM + Bypass DND). Ночью (в окне сна): 6 раз по 5м ➔ 6 раз по 10м ➔ 6 раз по 20м ➔ каждые 30м до утра для пробуждения. Днём: 3x5м ➔ 3x20м ➔ каждый 1 час."
-                        else "Treated as alarm (USAGE_ALARM + Bypass DND). Night (sleep window): 6x5m ➔ 6x10m ➔ 6x20m ➔ 30m until morning to wake user. Day: 3x5m ➔ 3x20m ➔ 60m. Resets on new point."
+                        if (isRu) "Приравнена к будильнику (USAGE_ALARM + Bypass DND). Срабатывает через 20–25 мин (с учётом шага сенсора 5 мин). Ночью: 6x5м ➔ 6x10м ➔ 6x20м ➔ каждые 30м. Днём: 3x5м ➔ 3x20м ➔ каждый 1 час."
+                        else "Treated as alarm (USAGE_ALARM + Bypass DND). Triggers in 20-25 min (factoring 5-min cadence). Night: 6x5m ➔ 6x10m ➔ 6x20m ➔ 30m. Day: 3x5m ➔ 3x20m ➔ 60m."
                     ),
                     Triple(
                         if (isRu) "Экстренное SOS SMS и Офлайн-запрос (при потере сознания / шатдауне)" else "Emergency SOS SMS & Offline SMS Query",
