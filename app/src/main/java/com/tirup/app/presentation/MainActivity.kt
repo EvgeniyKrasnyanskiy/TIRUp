@@ -58,9 +58,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.tirup.app.TirupApplication
 import com.tirup.app.domain.model.ThemeMode
 import com.tirup.app.presentation.components.HelpAndDisclaimerDialog
@@ -427,13 +429,30 @@ fun AppNavigationRoot(
                 focusViewModel = focusViewModel,
                 trendsViewModel = trendsViewModel,
                 reportsViewModel = reportsViewModel,
-                onOpenSettings = { navController.navigate("settings") }
+                onOpenSettings = { target ->
+                    if (!target.isNullOrBlank()) {
+                        navController.navigate("settings?target=$target")
+                    } else {
+                        navController.navigate("settings")
+                    }
+                }
             )
         }
 
-        composable("settings") {
+        composable(
+            route = "settings?target={target}",
+            arguments = listOf(
+                navArgument("target") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val target = backStackEntry.arguments?.getString("target")
             SettingsScreen(
                 viewModel = settingsViewModel,
+                target = target,
                 onNavigateBack = { navController.popBackStack() }
             )
         }
@@ -446,7 +465,7 @@ fun MainPagerScaffold(
     focusViewModel: FocusViewModel,
     trendsViewModel: TrendsViewModel,
     reportsViewModel: ReportsViewModel,
-    onOpenSettings: () -> Unit
+    onOpenSettings: (String?) -> Unit
 ) {
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })
     val coroutineScope = rememberCoroutineScope()
@@ -568,8 +587,8 @@ fun MainPagerScaffold(
             ) { page ->
                 when (page) {
                     0 -> FocusScreen(viewModel = focusViewModel, onOpenSettings = onOpenSettings)
-                    1 -> TrendsScreen(viewModel = trendsViewModel, onOpenSettings = onOpenSettings)
-                    2 -> ReportsScreen(viewModel = reportsViewModel, onOpenSettings = onOpenSettings)
+                    1 -> TrendsScreen(viewModel = trendsViewModel, onOpenSettings = { onOpenSettings(null) })
+                    2 -> ReportsScreen(viewModel = reportsViewModel, onOpenSettings = { onOpenSettings(null) })
                 }
             }
         }

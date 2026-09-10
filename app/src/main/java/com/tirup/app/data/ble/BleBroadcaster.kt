@@ -74,6 +74,7 @@ object BleBroadcaster {
         settings: BleBridgeSettings,
         burstDurationMs: Long = BURST_5MIN_MS,
         isRu: Boolean = true,
+        cob: Double = reading.cob ?: 0.0,
         onStatus: ((Boolean, String) -> Unit)? = null
     ) {
         if (settings.role != BleBridgeRole.BROADCASTER) {
@@ -115,7 +116,8 @@ object BleBroadcaster {
             rateOfChangeMmolPerMin = rateOfChange,
             iob = iob,
             batteryPercent = battery,
-            pin = settings.familyPin
+            pin = settings.familyPin,
+            cob = cob
         )
 
         val advertiseSettings = AdvertiseSettings.Builder()

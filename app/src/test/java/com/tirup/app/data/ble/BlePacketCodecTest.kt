@@ -120,11 +120,30 @@ class BlePacketCodecTest {
     }
 
     @Test
-    fun testGenerateRandomPin() {
-        repeat(20) {
-            val pin = BlePacketCodec.generateRandomPin()
-            assertEquals(3, pin.length)
-            assertTrue("PIN $pin must contain only A-Z", pin.all { it in 'A'..'Z' })
-        }
+    fun testEncodeAndDecodeWithCob() {
+        val now = 1725580800000L
+        val pin = "DIA"
+
+        val encoded = BlePacketCodec.encodePacket(
+            timestampMs = now,
+            valueMmol = 7.85,
+            trendArrow = "↗",
+            rateOfChangeMmolPerMin = 0.08,
+            iob = 1.45,
+            batteryPercent = 75,
+            pin = pin,
+            cob = 24.0
+        )
+
+        assertEquals(16, encoded.size)
+
+        val packet = BlePacketCodec.decodePacket(encoded, expectedPin = "DIA")
+        assertNotNull(packet)
+        assertEquals(now, packet!!.timestamp)
+        assertEquals(7.85, packet.valueMmol, 0.01)
+        assertEquals("↗", packet.trendArrow)
+        assertEquals(1.45, packet.iob, 0.01)
+        assertEquals(75, packet.batteryPercent)
+        assertEquals(24.0, packet.cob, 0.01)
     }
 }

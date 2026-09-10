@@ -22,5 +22,6 @@ data class BleGlucosePacket(
     val trendArrow: String,
     val rateOfChangeMmolPerMin: Double,
     val iob: Double,
-    val batteryPercent: Int
+    val batteryPercent: Int,
+    val cob: Double = 0.0
 )

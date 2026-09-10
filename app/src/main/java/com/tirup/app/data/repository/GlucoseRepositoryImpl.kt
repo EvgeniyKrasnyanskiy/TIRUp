@@ -67,9 +67,9 @@ class GlucoseRepositoryImpl(
         )
         if (existing.isNotEmpty()) {
             val closest = existing.minByOrNull { kotlin.math.abs(it.timestamp - reading.timestamp) }!!
-            // If already exists within 60s, enrich it if the incoming reading has extra information (e.g. IoB/trend)
-            val shouldUpdate = (reading.iob != null && closest.iob == null) ||
-                               (reading.cob != null && closest.cob == null) ||
+            // If already exists within 60s, enrich or update it if incoming reading has new or updated info
+            val shouldUpdate = (reading.iob != null && reading.iob != closest.iob) ||
+                               (reading.cob != null && reading.cob != closest.cob) ||
                                (!reading.trendArrow.isNullOrBlank() && closest.trendArrow.isNullOrBlank())
             if (shouldUpdate) {
                 val merged = closest.copy(

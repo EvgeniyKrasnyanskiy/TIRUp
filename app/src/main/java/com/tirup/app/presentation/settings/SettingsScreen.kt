@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -142,6 +143,7 @@ import java.util.Locale
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
+    target: String? = null,
     onNavigateBack: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -163,6 +165,32 @@ fun SettingsScreen(
     var showBlePinDialog by rememberSaveable { mutableStateOf(false) }
     var showClearTreatmentsDialog by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
+
+    val listState = rememberLazyListState()
+    var highlightBle by remember { mutableStateOf(false) }
+
+    LaunchedEffect(target) {
+        if (target == "ble_bridge") {
+            showAdvancedSettings = true
+            isBleCardExpanded = true
+            delay(150L)
+            listState.animateScrollToItem(4)
+            highlightBle = true
+            delay(2800L)
+            highlightBle = false
+        }
+    }
+
+    val highlightAnim = rememberInfiniteTransition(label = "ble_highlight")
+    val highlightBorderAlpha by highlightAnim.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "ble_border"
+    )
 
     val smsPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -340,6 +368,7 @@ fun SettingsScreen(
         }
 
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp),
@@ -893,7 +922,12 @@ fun SettingsScreen(
                         ) {
                             // Section: Local BLE Bridge (Broadcaster / Observer)
                             val ble = settings.bleBridgeSettings
-                    BentoCard(modifier = Modifier.fillMaxWidth()) {
+                    BentoCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        borderColor = if (highlightBle) ActionBlue.copy(alpha = highlightBorderAlpha) else MaterialTheme.colorScheme.outline,
+                        borderWidth = if (highlightBle) 2.2.dp else 1.dp,
+                        backgroundColor = if (highlightBle) ActionBlue.copy(alpha = 0.08f * highlightBorderAlpha) else MaterialTheme.colorScheme.surface
+                    ) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
                         modifier = Modifier
@@ -1811,8 +1845,8 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = if (isRu) "Уведомления о замене сенсора CGM и инфузионного набора помпы"
-                                else "Notifications for CGM sensor and infusion set changes",
+                                text = if (isRu) "Уведомления о замене сенсора CGM, инфузионного набора и ланцета"
+                                else "Notifications for CGM sensor, infusion set, and lancet changes",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 lineHeight = 16.sp
@@ -1831,24 +1865,27 @@ fun SettingsScreen(
                     }
 
                     if (settings.isDeviceRemindersEnabled) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             // Sensor checkbox
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
-                                    .weight(1f)
                                     .clickable { viewModel.setSensorReminderEnabled(!settings.isSensorReminderEnabled) }
                             ) {
                                 Checkbox(
                                     checked = settings.isSensorReminderEnabled,
                                     onCheckedChange = { viewModel.setSensorReminderEnabled(it) },
-                                    colors = CheckboxDefaults.colors(checkedColor = ActionBlue)
+                                    colors = CheckboxDefaults.colors(checkedColor = ActionBlue),
+                                    modifier = Modifier
+                                        .scale(0.85f)
+                                        .size(24.dp)
                                 )
+                                Spacer(modifier = Modifier.width(3.dp))
                                 Text(
                                     text = if (isRu) "Сенсор" else "Sensor",
                                     style = MaterialTheme.typography.bodySmall,
@@ -1860,14 +1897,17 @@ fun SettingsScreen(
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
-                                    .weight(1f)
                                     .clickable { viewModel.setPumpReminderEnabled(!settings.isPumpReminderEnabled) }
                             ) {
                                 Checkbox(
                                     checked = settings.isPumpReminderEnabled,
                                     onCheckedChange = { viewModel.setPumpReminderEnabled(it) },
-                                    colors = CheckboxDefaults.colors(checkedColor = ActionBlue)
+                                    colors = CheckboxDefaults.colors(checkedColor = ActionBlue),
+                                    modifier = Modifier
+                                        .scale(0.85f)
+                                        .size(24.dp)
                                 )
+                                Spacer(modifier = Modifier.width(3.dp))
                                 Text(
                                     text = if (isRu) "Инф. набор" else "Inf. set",
                                     style = MaterialTheme.typography.bodySmall,
@@ -1879,14 +1919,17 @@ fun SettingsScreen(
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
-                                    .weight(1f)
                                     .clickable { viewModel.setLancetReminderEnabled(!settings.isLancetReminderEnabled) }
                             ) {
                                 Checkbox(
                                     checked = settings.isLancetReminderEnabled,
                                     onCheckedChange = { viewModel.setLancetReminderEnabled(it) },
-                                    colors = CheckboxDefaults.colors(checkedColor = ActionBlue)
+                                    colors = CheckboxDefaults.colors(checkedColor = ActionBlue),
+                                    modifier = Modifier
+                                        .scale(0.85f)
+                                        .size(24.dp)
                                 )
+                                Spacer(modifier = Modifier.width(3.dp))
                                 Text(
                                     text = if (isRu) "Ланцет" else "Lancet",
                                     style = MaterialTheme.typography.bodySmall,

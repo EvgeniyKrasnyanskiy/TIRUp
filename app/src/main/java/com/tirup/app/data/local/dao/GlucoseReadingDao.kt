@@ -46,6 +46,9 @@ interface GlucoseReadingDao {
     @Query("DELETE FROM glucose_readings WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    @Query("UPDATE glucose_readings SET iob = :iob, cob = :cob WHERE id = :id")
+    suspend fun updateIobCob(id: Long, iob: Double?, cob: Double?)
+
     @Query("DELETE FROM glucose_readings")
     suspend fun clearAll()
 }
