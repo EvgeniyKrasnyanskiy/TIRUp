@@ -22,7 +22,8 @@ object BlePacketCodec {
         rateOfChangeMmolPerMin: Double,
         iob: Double,
         batteryPercent: Int,
-        pin: String
+        pin: String,
+        cob: Double = 0.0
     ): ByteArray {
         val buffer = ByteBuffer.allocate(PACKET_SIZE).order(ByteOrder.BIG_ENDIAN)
 
@@ -57,8 +58,9 @@ object BlePacketCodec {
         val batByte = if (batteryPercent in 0..100) batteryPercent.toByte() else 255.toByte()
         buffer.put(batByte)
 
-        // 14: Flags / Reserved
-        buffer.put(0.toByte())
+        // 14: CoB (Carbs on Board in grams, 0..255g)
+        val cobByte = (cob.coerceAtLeast(0.0).roundToInt().coerceIn(0, 255)).toByte()
+        buffer.put(cobByte)
 
         // 15: CRC-8 over bytes 0..14
         val bytes = buffer.array()
@@ -115,13 +117,18 @@ object BlePacketCodec {
         val batRaw = buffer.get().toInt() and 0xFF
         val battery = if (batRaw <= 100) batRaw else -1
 
+        // 9. CoB (Byte 14, in grams)
+        val cobRaw = buffer.get().toInt() and 0xFF
+        val cob = if (cobRaw > 0) cobRaw.toDouble() else 0.0
+
         return BleGlucosePacket(
             timestamp = timestampMs,
             valueMmol = valueMmol,
             trendArrow = arrow,
             rateOfChangeMmolPerMin = rateOfChange,
             iob = iob,
-            batteryPercent = battery
+            batteryPercent = battery,
+            cob = cob
         )
     }
 

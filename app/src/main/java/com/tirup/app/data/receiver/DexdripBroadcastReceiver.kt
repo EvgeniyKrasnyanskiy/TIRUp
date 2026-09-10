@@ -46,22 +46,20 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                     try {
                         val app = context.applicationContext as? TirupApplication
                         val db = app?.database
-                        val repo = app?.glucoseRepository
                         if (db != null && treatment != null) {
                             saveTreatmentIfNew(db, treatment)
                         }
-                        if (repo != null && db != null && (standaloneIob != null || standaloneCob != null)) {
+                        if (db != null && (standaloneIob != null || standaloneCob != null)) {
                             val latestEntity = db.glucoseReadingDao().getRecentReadingsSync(1).firstOrNull()
-                            if (latestEntity != null && (System.currentTimeMillis() - latestEntity.timestamp) <= 20 * 60_000L) {
+                            if (latestEntity != null && (System.currentTimeMillis() - latestEntity.timestamp) <= 25 * 60_000L) {
                                 val newIob = standaloneIob ?: latestEntity.iob
                                 val newCob = standaloneCob ?: latestEntity.cob
                                 if (newIob != latestEntity.iob || newCob != latestEntity.cob) {
-                                    repo.insertReading(
-                                        latestEntity.toDomain().copy(
-                                            iob = newIob,
-                                            cob = newCob
-                                        )
-                                    )
+                                    db.glucoseReadingDao().updateIobCob(latestEntity.id, newIob, newCob)
+                                    cachedIob = newIob
+                                    cachedIobTimestamp = System.currentTimeMillis()
+                                    cachedCob = newCob
+                                    cachedCobTimestamp = System.currentTimeMillis()
                                     com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context.applicationContext)
                                     Log.i(TAG, "Attached standalone IoB/CoB to reading ${latestEntity.timestamp}: iob=$newIob, cob=$newCob")
                                 }
@@ -176,6 +174,26 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                     }
                 }
 
+                // If IoB or CoB still not found, carry forward recent valid active IoB/CoB from last DB reading (< 25 min)
+                if (iob == null || cob == null) {
+                    try {
+                        val appInst = context.applicationContext as? TirupApplication
+                        val lastInDb = appInst?.database?.glucoseReadingDao()?.getRecentReadingsSync(1)?.firstOrNull()
+                        if (lastInDb != null && (now - lastInDb.timestamp) <= IOB_COB_EXPIRY_MS) {
+                            if (iob == null && lastInDb.iob != null && lastInDb.iob > 0.05) {
+                                iob = lastInDb.iob
+                                cachedIob = iob
+                                cachedIobTimestamp = lastInDb.timestamp
+                            }
+                            if (cob == null && lastInDb.cob != null && lastInDb.cob > 0.5) {
+                                cob = lastInDb.cob
+                                cachedCob = cob
+                                cachedCobTimestamp = lastInDb.timestamp
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+
                 Log.i(TAG, "Saving glucose: $valueMmol mmol/L at $timestamp (trend: $trendArrow, iob: $iob, cob: $cob)")
 
                 val app = context.applicationContext as? TirupApplication
@@ -260,7 +278,8 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                                 rateOfChange = rate,
                                 iob = latest.iob ?: 0.0,
                                 settings = userSettings.bleBridgeSettings,
-                                burstDurationMs = burstDuration
+                                burstDurationMs = burstDuration,
+                                cob = latest.cob ?: 0.0
                             )
                         }
                     }
@@ -382,7 +401,10 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             "current_iob",
             "active_insulin",
             "glucodata.Minute.IOB",
-            "de.michelinside.glucodatahandler.iob"
+            "de.michelinside.glucodatahandler.iob",
+            "iob_string",
+            "IOB_TEXT",
+            "iob_text"
         )
         for (key in candidateKeys) {
             if (extras.containsKey(key)) {
@@ -400,8 +422,31 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             }
         }
 
-        // Parse external.statusLine from xDrip+ / AndroidAPS (e.g., "2,07IE 19g", "1.50 U")
+        // Parse JSON status / suggested / bwp from AndroidAPS or xDrip
+        val jsonKeys = listOf("status", "suggested", "bwp", "iob")
+        for (jk in jsonKeys) {
+            val jsonStr = extras.getString(jk)
+            if (!jsonStr.isNullOrBlank() && (jsonStr.startsWith("{") || jsonStr.startsWith("["))) {
+                val parsed = parseStatusJson(jsonStr) ?: parsePebbleJson(jsonStr)
+                if (parsed?.first != null && parsed.first!! >= 0.0) {
+                    val num = parsed.first!!
+                    if (num <= 0.05) {
+                        cachedIob = null
+                        cachedIobTimestamp = 0L
+                        return null
+                    }
+                    cachedIob = num
+                    cachedIobTimestamp = System.currentTimeMillis()
+                    return num
+                }
+            }
+        }
+
+        // Parse statusLine from xDrip+ / AndroidAPS (e.g., "2,07IE 19g", "1.50 U")
         val statusLine = extras.getString("external.statusLine")
+            ?: extras.getString("statusLine")
+            ?: extras.getString("IOB_TEXT")
+            ?: extras.getString("iob_text")
         if (!statusLine.isNullOrBlank()) {
             val iobMatch = Regex("""(\d+[.,]\d+)\s*(?:IE|U|ЕД)""", RegexOption.IGNORE_CASE).find(statusLine)
             val parsedIob = iobMatch?.groupValues?.get(1)?.replace(',', '.')?.toDoubleOrNull()
@@ -437,7 +482,10 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             "current_cob",
             "carbs_on_board",
             "glucodata.Minute.COB",
-            "de.michelinside.glucodatahandler.cob"
+            "de.michelinside.glucodatahandler.cob",
+            "cob_string",
+            "COB_TEXT",
+            "cob_text"
         )
         for (key in candidateKeys) {
             if (extras.containsKey(key)) {
@@ -469,8 +517,31 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             }
         }
 
-        // Parse external.statusLine from xDrip+ / AndroidAPS (e.g., "2,07IE 19g", "Loop aktiv 15g")
+        // Parse JSON status / suggested / bwp from AndroidAPS or xDrip
+        val jsonKeys = listOf("status", "suggested", "bwp", "cob")
+        for (jk in jsonKeys) {
+            val jsonStr = extras.getString(jk)
+            if (!jsonStr.isNullOrBlank() && (jsonStr.startsWith("{") || jsonStr.startsWith("["))) {
+                val parsed = parseStatusJson(jsonStr) ?: parsePebbleJson(jsonStr)
+                if (parsed?.second != null && parsed.second!! >= 0.0) {
+                    val num = parsed.second!!
+                    if (num <= 0.5) {
+                        cachedCob = null
+                        cachedCobTimestamp = 0L
+                        return null
+                    }
+                    cachedCob = num
+                    cachedCobTimestamp = System.currentTimeMillis()
+                    return num
+                }
+            }
+        }
+
+        // Parse statusLine from xDrip+ / AndroidAPS (e.g., "2,07IE 19g", "Loop aktiv 15g")
         val statusLine = extras.getString("external.statusLine")
+            ?: extras.getString("statusLine")
+            ?: extras.getString("COB_TEXT")
+            ?: extras.getString("cob_text")
         if (!statusLine.isNullOrBlank()) {
             val cobMatch = Regex("""(?:IE|U|ЕД|\||\s|^)(\d+)\s*(?:g|г)\b""", RegexOption.IGNORE_CASE).find(statusLine)
             val parsedCob = cobMatch?.groupValues?.get(1)?.toDoubleOrNull()
@@ -498,7 +569,12 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         val obj = extras.get(key) ?: return null
         return when (obj) {
             is Number -> obj.toDouble()
-            is String -> obj.replace(',', '.').toDoubleOrNull()
+            is String -> {
+                val clean = obj.trim().replace(',', '.')
+                clean.toDoubleOrNull() ?: run {
+                    Regex("""^([0-9]+(?:[.,][0-9]+)?)""").find(clean)?.groupValues?.get(1)?.replace(',', '.')?.toDoubleOrNull()
+                }
+            }
             else -> null
         }
     }

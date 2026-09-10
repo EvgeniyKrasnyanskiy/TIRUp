@@ -116,7 +116,7 @@ import java.util.Locale
 @Composable
 fun FocusScreen(
     viewModel: FocusViewModel,
-    onOpenSettings: () -> Unit = {}
+    onOpenSettings: (String?) -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
     val dailyAlertLogs by GlucoseAlertManager.dailyAlertLogs.collectAsState()
@@ -143,10 +143,12 @@ fun FocusScreen(
     val pumpSetStatus = state.pumpSetStatus
     val lancetStatus = state.lancetStatus
     val showExpiredSensorDialog = remember(sensorStatus.installedAt, userSettings.isSensorReminderEnabled) { userSettings.isSensorReminderEnabled && sensorStatus.isExpired }
-    val showExpiredPumpDialog = remember(pumpSetStatus.installedAt, userSettings.isPumpReminderEnabled) { userSettings.isPumpReminderEnabled && pumpSetStatus.isExpired }
-    val showExpiredLancetDialog = remember(lancetStatus.installedAt, userSettings.isLancetReminderEnabled) { userSettings.isLancetReminderEnabled && lancetStatus.isExpired }
     var sensorExpiredDismissed by rememberSaveable { mutableStateOf(false) }
+
+    val showExpiredPumpDialog = remember(pumpSetStatus.installedAt, userSettings.isPumpReminderEnabled) { userSettings.isPumpReminderEnabled && pumpSetStatus.isExpired }
     var pumpExpiredDismissed by rememberSaveable { mutableStateOf(false) }
+
+    val showExpiredLancetDialog = remember(lancetStatus.installedAt, userSettings.isLancetReminderEnabled) { userSettings.isLancetReminderEnabled && lancetStatus.isExpired }
     var lancetExpiredDismissed by rememberSaveable { mutableStateOf(false) }
 
     val shouldCelebrateStreak = state.streakDays >= 2 && state.streakDays > userSettings.lastStreakCelebratedDays
@@ -170,7 +172,7 @@ fun FocusScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onOpenSettings) {
+                    IconButton(onClick = { onOpenSettings(null) }) {
                         Icon(
                             imageVector = Icons.Default.Menu,
                             contentDescription = "Settings Menu",
@@ -1113,7 +1115,7 @@ fun FocusScreen(
             onToggleEnable = { viewModel.toggleBleBridgeEnabled() },
             onOpenSettings = {
                 showBleStatusDialog = false
-                onOpenSettings()
+                onOpenSettings("ble_bridge")
             },
             onDismiss = { showBleStatusDialog = false }
         )
@@ -1336,34 +1338,36 @@ private fun BleBridgeBadge(
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val center = Offset(size.width / 2f, size.height / 2f)
-                        val maxRadius = size.width.coerceAtLeast(size.height) * 0.9f
+                        val arcRadius = 13.dp.toPx()
+                        val minD = 9.dp.toPx()
+                        val maxD = (size.width / 2f - 4.dp.toPx()).coerceAtLeast(minD + 1f)
 
                         val waves = listOf(wave1Progress, wave2Progress, wave3Progress)
                         for (prog in waves) {
-                            val r = (1f - prog) * maxRadius
-                            if (r > 2.dp.toPx()) {
-                                val alpha = prog.coerceIn(0.1f, 1f) * 0.85f
-                                val strokeW = (2.2f * (0.6f + prog * 0.4f)).dp.toPx()
+                            val d = minD + (1f - prog) * (maxD - minD)
+                            val alpha = (if (prog < 0.2f) prog / 0.2f else if (prog > 0.8f) (1f - prog) / 0.2f else 1f) * 0.85f
+                            val strokeW = (2.2f * (0.6f + prog * 0.4f)).dp.toPx()
 
-                                drawArc(
-                                    color = PrimaryEmerald.copy(alpha = alpha),
-                                    startAngle = -60f,
-                                    sweepAngle = 120f,
-                                    useCenter = false,
-                                    topLeft = Offset(center.x - r, center.y - r),
-                                    size = Size(r * 2, r * 2),
-                                    style = Stroke(width = strokeW)
-                                )
-                                drawArc(
-                                    color = PrimaryEmerald.copy(alpha = alpha),
-                                    startAngle = 120f,
-                                    sweepAngle = 120f,
-                                    useCenter = false,
-                                    topLeft = Offset(center.x - r, center.y - r),
-                                    size = Size(r * 2, r * 2),
-                                    style = Stroke(width = strokeW)
-                                )
-                            }
+                            // Right wave: convex front points left toward center (crest at center.x + d)
+                            drawArc(
+                                color = PrimaryEmerald.copy(alpha = alpha),
+                                startAngle = 120f,
+                                sweepAngle = 120f,
+                                useCenter = false,
+                                topLeft = Offset(center.x + d, center.y - arcRadius),
+                                size = Size(arcRadius * 2, arcRadius * 2),
+                                style = Stroke(width = strokeW)
+                            )
+                            // Left wave: convex front points right toward center (crest at center.x - d)
+                            drawArc(
+                                color = PrimaryEmerald.copy(alpha = alpha),
+                                startAngle = -60f,
+                                sweepAngle = 120f,
+                                useCenter = false,
+                                topLeft = Offset(center.x - d - arcRadius * 2, center.y - arcRadius),
+                                size = Size(arcRadius * 2, arcRadius * 2),
+                                style = Stroke(width = strokeW)
+                            )
                         }
                     }
                     Icon(

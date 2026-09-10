@@ -236,7 +236,8 @@ object BleObserverManager {
                     timestamp = packet.timestamp,
                     valueMmol = packet.valueMmol,
                     trendArrow = packet.trendArrow,
-                    iob = if (packet.iob > 0.0) packet.iob else null
+                    iob = if (packet.iob > 0.0) packet.iob else null,
+                    cob = if (packet.cob > 0.0) packet.cob else null
                 )
                 glucoseRepository.insertReading(newReading)
 
