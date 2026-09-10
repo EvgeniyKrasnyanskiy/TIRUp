@@ -245,7 +245,7 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Принцип строгих суток (00:00:00 – 23:59:59)" else "24-Hour Daily Strict Calculus",
                         if (isRu) "Математика" else "Math Engine",
-                        if (isRu) "Компенсатор рассчитывает точное время в часах и минутах, которое необходимо провести в норме до конца суток. На виджетах отображается лаконично: «В норме ещё 2ч 15м» или «Цель 100%»."
+                        if (isRu) "Компенсатор рассчитывает точное время в часах и минутах, которое необходимо провести в норме до конца суток. Виджет показывает: «Осталось 2ч 15м в норме» или «Цель 100%»."
                         else "Calculates exact remaining hours/minutes needed in target before midnight. Formatted concisely on widgets: 'In range 2h 15m' or 'Goal reached! (100%)'."
                     ),
                     Triple(
@@ -374,7 +374,7 @@ class UserManualPdfGenerator(private val context: Context) {
                 else "6. Clinical AGP Analytics, Patterns & Daily Auto-Backup",
                 items = listOf(
                     Triple(
-                        if (isRu) "Амбулаторный профиль глюкозы (AGP по стандарту ATTD/ADA)" else "Official Ambulatory Glucose Profile (AGP)",
+                        if (isRu) "Амбулаторный гликемический профиль (AGP по стандарту ATTD/ADA)" else "Official Ambulatory Glucose Profile (AGP)",
                         if (isRu) "AGP Отчёт" else "AGP PDF",
                         if (isRu) "Генерация медицинского PDF-отчёта для эндокринолога в один клик. Расчёт 12 параметров: GRI, GVI, PGS, TIR, TBR, TAR, CV, SD, eA1c. Импорт файлов xDrip+ (CSV/ZIP)."
                         else "One-click generation of official clinical PDF report. Computes 12 parameters (GRI, GVI, PGS, TIR, CV, SD, eA1c). Direct import of xDrip+ (CSV/ZIP) archives."
