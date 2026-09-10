@@ -916,6 +916,30 @@ object GlucoseAlertManager {
                 val hasActiveBolus = latest.iob != null && latest.iob >= requiredIob
                 val hyperRepeatInterval = if (hasActiveBolus) 60 * 60000L else alerts.snoozeHyperMinutes * 60000L
 
+                // Safety: Check if glucose is falling while active bolus is present
+                val prev = if (sorted.size >= 2) sorted[sorted.size - 2] else null
+                val isFalling = (prev != null && latest.valueMmol < prev.valueMmol) ||
+                        latest.trendArrow in listOf("↘", "↓", "⇊")
+
+                if (hasActiveBolus && isFalling) {
+                    // Glucose is dropping and active insulin is working: suppress the audible alarm!
+                    Log.i(TAG, "Suppressed High Glucose alert: glucose is falling (${latest.valueMmol} mmol/L) with active IoB (${latest.iob} U)")
+                    _activeAlertBanner.value = ActiveAlertBanner(
+                        tier = AlertTier.MAIN,
+                        title = if (isRu) "🔺 Сахар высокий, но снижается"
+                                else "🔺 High but dropping",
+                        message = String.format(
+                            Locale.US,
+                            if (isRu) "Глюкоза %.1f %s. Активный болюс (%.1f Ед) снижает сахар. Сигнал без звука."
+                            else "Glucose %.1f %s. Active bolus (%.1f U) is lowering glucose. Alert muted.",
+                            latest.valueMmol,
+                            latest.trendArrow ?: "↘",
+                            latest.iob
+                        )
+                    )
+                    return
+                }
+
                 if (now - lastHyperAlertTimestamp >= hyperRepeatInterval) {
                     lastHyperAlertTimestamp = now
                     val title = if (isRu) "🔺 Высокий сахар" else "🔺 High Glucose"

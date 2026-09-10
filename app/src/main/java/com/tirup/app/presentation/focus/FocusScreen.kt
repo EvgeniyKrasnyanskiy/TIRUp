@@ -234,6 +234,72 @@ fun FocusScreen(
                 unit = unit,
                 isRu = isRu,
                 activeAlertBanner = state.activeAlertBanner,
+                onAlertBannerClick = {
+                    val alert = state.activeAlertBanner
+                    if (alert != null) {
+                        val alerts = userSettings.alertSettings
+                        val title = alert.title
+                        val desc = when (alert.tier) {
+                            AlertTier.CRITICAL -> {
+                                if (isRu) {
+                                    "⚠️ КРИТИЧЕСКАЯ ТРЕВОГА (Уровень 3)\n\n" +
+                                    "Экстренное предупреждение об опасном уровне сахара: значение ниже критического (<3.0 ммоль/л) либо длительная гипогликемия (<3.9 ммоль/л более ${alerts.criticalHypoMinutes} мин).\n\n" +
+                                    "• Повтор сирены: каждые 5 минут до подтверждения или купирования.\n" +
+                                    "• При подтверждении (снуз): пауза 15 минут для действия углеводов.\n" +
+                                    "• Рекомендация: немедленно примите 15–20 г быстрых углеводов (сок, декстроза) и перепроверьте замер глюкометром."
+                                } else {
+                                    "⚠️ CRITICAL ALARM (Tier 3)\n\n" +
+                                    "Emergency glucose warning: reading is below critical threshold (<3.0 mmol/L) or prolonged low (<3.9 mmol/L for >${alerts.criticalHypoMinutes} min).\n\n" +
+                                    "• Siren repeat: every 5 min until silenced or in range.\n" +
+                                    "• Snooze: 15 min clinical grace period for carbs to take effect.\n" +
+                                    "• Take 15-20g fast-acting carbs and verify with blood meter."
+                                }
+                            }
+                            AlertTier.MAIN -> {
+                                if (isRu) {
+                                    "🔔 ОСНОВНАЯ ТРЕВОГА (Уровень 2)\n\n" +
+                                    "Сработала при подтверждённом выходе за границы целевого диапазона: 3 точки подряд вне нормы для 5-минутных сенсоров (15 мин) или 5 точек для 1-минутных (5 мин).\n\n" +
+                                    "• Пороги: < ${alerts.mainLowThresholdMmol} ммоль/л или > ${alerts.mainHighThresholdMmol} ммоль/л.\n" +
+                                    "• Повтор: 15 мин при низком сахаре, ${alerts.snoozeHyperMinutes} мин при высоком (60 мин при наличии активного болюса IoB).\n" +
+                                    "• Если сахар снижается и действует введенный инсулин (IoB), сигнал гипергликемии автоматически подавляется."
+                                } else {
+                                    "🔔 MAIN ALARM (Tier 2)\n\n" +
+                                    "Confirmed departure outside target limits: 3 points (15 min for 5-min sensors) or 5 points (5 min for 1-min sensors).\n\n" +
+                                    "• Thresholds: < ${alerts.mainLowThresholdMmol} mmol/L or > ${alerts.mainHighThresholdMmol} mmol/L.\n" +
+                                    "• Snooze: 15 min (hypo), ${alerts.snoozeHyperMinutes} min (hyper, 60 min with active IoB).\n" +
+                                    "• Muted automatically if glucose is dropping and active bolus is working."
+                                }
+                            }
+                            AlertTier.PREDICTIVE -> {
+                                if (isRu) {
+                                    "📉 ПРЕДИКТИВНАЯ ТРЕВОГА (Уровень 1)\n\n" +
+                                    "Математическая регрессия рассчитала, что в ближайшие ${alerts.predictiveMinutesAhead} минут ожидается выход за границы нормы.\n\n" +
+                                    "• Позволяет своевременно принять превентивные меры (перекус или пауза перед едой) до наступления гипо- или гипергликемии.\n" +
+                                    "• Мягкий предупреждающий сигнал без стресса."
+                                } else {
+                                    "📉 PREDICTIVE ALERT (Tier 1)\n\n" +
+                                    "Velocity regression predicted out-of-range departure in ~${alerts.predictiveMinutesAhead} min.\n\n" +
+                                    "• Allows proactive intervention before crossing clinical limits.\n" +
+                                    "• Gentle warning chime."
+                                }
+                            }
+                            AlertTier.SIGNAL_LOSS -> {
+                                if (isRu) {
+                                    "📡 ПОТЕРЯ СВЯЗИ С СЕНСОРОМ (Уровень 4)\n\n" +
+                                    "Данные от сенсора не поступают более 20 минут (срабатывание через 20–25 минут с учётом 5-минутного интервала сенсора).\n\n" +
+                                    "• Проверьте Bluetooth и работу трансмиттера рядом с телефоном.\n" +
+                                    "• Повтор сигнала: 20 ➔ 40 ➔ 80 минут с адаптивным расписанием сна."
+                                } else {
+                                    "📡 SENSOR SIGNAL LOSS (Tier 4)\n\n" +
+                                    "No CGM readings for >20 min (triggers in 20-25 min factoring 5-min sensor cadence).\n\n" +
+                                    "• Check Bluetooth and ensure receiver app is active.\n" +
+                                    "• Repeating interval: 20 ➔ 40 ➔ 80 min."
+                                }
+                            }
+                        }
+                        detailDialogInfo = Pair(title, desc)
+                    }
+                },
                 masterBatteryPct = masterBattery,
                 isMasterBatteryStale = isMasterBatteryStale,
                 isBroadcaster = heroBleSettings.role == BleBridgeRole.BROADCASTER,
@@ -1239,6 +1305,7 @@ private fun HeroGlucoseCard(
     unit: GlucoseUnit,
     isRu: Boolean,
     activeAlertBanner: ActiveAlertBanner? = null,
+    onAlertBannerClick: () -> Unit = {},
     masterBatteryPct: Int? = null,
     isMasterBatteryStale: Boolean = false,
     isBroadcaster: Boolean = false,
@@ -1589,7 +1656,8 @@ private fun HeroGlucoseCard(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
+                        .padding(horizontal = 4.dp)
+                        .clickable { onAlertBannerClick() },
                     shape = RoundedCornerShape(12.dp),
                     color = bannerColor.copy(alpha = 0.12f),
                     border = BorderStroke(1.dp, bannerColor.copy(alpha = 0.35f))

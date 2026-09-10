@@ -621,11 +621,11 @@ fun SettingsScreen(
 
                         Spacer(modifier = Modifier.height(6.dp))
 
-                        // Tier 2: Main (5 points confirmed)
+                        // Tier 2: Main (3-5 points confirmed)
                         AlertTierConfigRow(
-                            title = if (isRu) "2. Основные (5 точек вне нормы)" else "2. Main (5 points confirmed)",
+                            title = if (isRu) "2. Основные (3–5 точек вне нормы)" else "2. Main (3–5 points confirmed)",
                             subtitle = if (!isMaster) (if (isRu) "Выключено (общий тумблер выключен)" else "Disabled (master switch off)")
-                                       else if (isRu) "Тройной сигнал при подтверждённом выходе" else "Triple beep on confirmed out-of-range",
+                                       else if (isRu) "Тройной сигнал (3 точки для 5-мин / 5 точек для 1-мин). Глушится при падении с IoB" else "Triple beep (3 pts for 5-min / 5 pts for 1-min). Muted on drop with IoB",
                             enabled = isMaster && alerts.isMainEnabled,
                             onEnabledChange = { isChecked ->
                                 if (isChecked) {
@@ -704,11 +704,11 @@ fun SettingsScreen(
                         
                         Spacer(modifier = Modifier.height(6.dp))
 
-                        // Tier 4: Signal Loss (>20 min)
+                        // Tier 4: Signal Loss (20-25 min)
                         AlertTierConfigRow(
-                            title = if (isRu) "4. Потеря сигнала сенсора (>20 мин)" else "4. Signal Loss (>20 min)",
+                            title = if (isRu) "4. Потеря сигнала сенсора (20–25 мин)" else "4. Signal Loss (20–25 min)",
                             subtitle = if (!isMaster) (if (isRu) "Выключено (общий тумблер выключен)" else "Disabled (master switch off)")
-                                       else if (isRu) "Нисходящий сигнал с нарастающим интервалом (20 ➔ 40 ➔ 80 мин)" else "Descending tone with increasing interval (20 ➔ 40 ➔ 80 min)",
+                                       else if (isRu) "Нисходящий сигнал через 20–25 мин с нарастающим интервалом (➔ 40 ➔ 80 мин)" else "Descending tone after 20–25 min with increasing interval (➔ 40 ➔ 80 min)",
                             enabled = isMaster && alerts.isSignalLossEnabled,
                             onEnabledChange = { isChecked ->
                                 if (isChecked) {
