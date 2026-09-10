@@ -26,28 +26,34 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.tirup.app.presentation.theme.ActionBlue
+import com.tirup.app.domain.model.LancetStatus
 import com.tirup.app.domain.model.PumpSetStatus
 import com.tirup.app.domain.model.SensorStatus
 import com.tirup.app.domain.model.daysRemaining
 import com.tirup.app.domain.model.expiresAt
 import com.tirup.app.domain.model.isExpired
+import com.tirup.app.domain.model.millisRemaining
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 /**
- * Modal bottom-sheet-style dialog for managing CGM sensor and pump infusion set lifecycle.
+ * Modal bottom-sheet-style dialog for managing CGM sensor, pump infusion set, and lancet lifecycles.
  */
 @Composable
 fun DeviceStatusModal(
     sensorStatus: SensorStatus,
     pumpSetStatus: PumpSetStatus,
-    isPumpUser: Boolean,
+    lancetStatus: LancetStatus,
+    showSensor: Boolean = true,
+    showPump: Boolean = true,
+    showLancet: Boolean = true,
     isRu: Boolean,
     onDismiss: () -> Unit,
     onNewSensor: (durationDays: Int) -> Unit,
-    onNewPumpSet: (durationDays: Int) -> Unit
+    onNewPumpSet: (durationDays: Int) -> Unit,
+    onNewLancet: (durationDays: Int) -> Unit
 ) {
     // Sensor confirmation state
     var showSensorConfirm by remember { mutableStateOf(false) }
@@ -56,10 +62,17 @@ fun DeviceStatusModal(
 
     // Pump confirmation state
     var showPumpConfirm by remember { mutableStateOf(false) }
-    var showSensorInfo by remember { mutableStateOf(false) }
-    var showPumpInfo by remember { mutableStateOf(false) }
     var pendingPumpDays by remember { mutableStateOf(pumpSetStatus.lastUsedDurationDays.coerceIn(2, 7)) }
     var pumpPickerDays by remember { mutableStateOf(pumpSetStatus.lastUsedDurationDays.coerceIn(2, 7)) }
+
+    // Lancet confirmation state
+    var showLancetConfirm by remember { mutableStateOf(false) }
+    var pendingLancetDays by remember { mutableStateOf(lancetStatus.lastUsedDurationDays.coerceIn(1, 7)) }
+    var lancetPickerDays by remember { mutableStateOf(lancetStatus.lastUsedDurationDays.coerceIn(1, 7)) }
+
+    var showSensorInfo by remember { mutableStateOf(false) }
+    var showPumpInfo by remember { mutableStateOf(false) }
+    var showLancetInfo by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -68,59 +81,102 @@ fun DeviceStatusModal(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            shape = RoundedCornerShape(24.dp),
+                .padding(horizontal = 16.dp, vertical = 24.dp),
+            shape = RoundedCornerShape(20.dp),
             color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
         ) {
             Column(
                 modifier = Modifier
                     .verticalScroll(rememberScrollState())
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Title
-                Text(
-                    text = if (isRu) "Устройства" else "Device Status",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
+                // Header Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isRu) "Устройства и расходники" else "Device Status",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    TextButton(onClick = onDismiss) {
+                        Text(if (isRu) "Закрыть" else "Close")
+                    }
+                }
 
                 // --- SENSOR SECTION ---
-                SensorSection(
-                    status = sensorStatus,
-                    pickerDays = sensorPickerDays,
-                    isRu = isRu,
-                    onPickerChange = { sensorPickerDays = it },
-                    onNewSensor = {
-                        pendingSensorDays = sensorPickerDays
-                        showSensorConfirm = true
-                    },
-                    onShowInfo = { showSensorInfo = true }
-                )
-
-                // --- PUMP SET SECTION ---
-                if (isPumpUser) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-                    PumpSetSection(
-                        status = pumpSetStatus,
-                        pickerDays = pumpPickerDays,
+                if (showSensor) {
+                    DeviceSection(
+                        icon = "◉",
+                        title = if (isRu) "Сенсор CGM" else "CGM Sensor",
+                        installedAt = sensorStatus.installedAt,
+                        expiresAt = sensorStatus.expiresAt,
+                        millisRemaining = sensorStatus.millisRemaining,
+                        daysRemaining = sensorStatus.daysRemaining,
+                        pickerDays = sensorPickerDays,
+                        pickerMin = 1,
+                        pickerMax = 90,
                         isRu = isRu,
-                        onPickerChange = { pumpPickerDays = it },
-                        onNewPumpSet = {
-                            pendingPumpDays = pumpPickerDays
-                            showPumpConfirm = true
+                        onPickerChange = { sensorPickerDays = it },
+                        onNewClick = {
+                            pendingSensorDays = sensorPickerDays
+                            showSensorConfirm = true
                         },
-                        onShowInfo = { showPumpInfo = true }
+                        onShowInfo = { showSensorInfo = true },
+                        buttonLabel = if (isRu) "Новый сенсор" else "New Sensor"
                     )
                 }
 
-                // Close button
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.align(Alignment.End)
-                ) {
-                    Text(if (isRu) "Закрыть" else "Close")
+                // --- PUMP SET SECTION ---
+                if (showPump) {
+                    if (showSensor) HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                    DeviceSection(
+                        icon = "▣",
+                        title = if (isRu) "Инфузионный набор" else "Infusion Set",
+                        installedAt = pumpSetStatus.installedAt,
+                        expiresAt = pumpSetStatus.expiresAt,
+                        millisRemaining = pumpSetStatus.millisRemaining,
+                        daysRemaining = pumpSetStatus.daysRemaining,
+                        pickerDays = pumpPickerDays,
+                        pickerMin = 2,
+                        pickerMax = 7,
+                        isRu = isRu,
+                        onPickerChange = { pumpPickerDays = it },
+                        onNewClick = {
+                            pendingPumpDays = pumpPickerDays
+                            showPumpConfirm = true
+                        },
+                        onShowInfo = { showPumpInfo = true },
+                        buttonLabel = if (isRu) "Новый инфуз. набор" else "New Infusion Set"
+                    )
+                }
+
+                // --- LANCET SECTION ---
+                if (showLancet) {
+                    if (showSensor || showPump) HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                    DeviceSection(
+                        icon = "📍",
+                        title = if (isRu) "Ланцет (прокалыватель)" else "Lancet",
+                        installedAt = lancetStatus.installedAt,
+                        expiresAt = lancetStatus.expiresAt,
+                        millisRemaining = lancetStatus.millisRemaining,
+                        daysRemaining = lancetStatus.daysRemaining,
+                        pickerDays = lancetPickerDays,
+                        pickerMin = 1,
+                        pickerMax = 7,
+                        isRu = isRu,
+                        onPickerChange = { lancetPickerDays = it },
+                        onNewClick = {
+                            pendingLancetDays = lancetPickerDays
+                            showLancetConfirm = true
+                        },
+                        onShowInfo = { showLancetInfo = true },
+                        buttonLabel = if (isRu) "Новый ланцет" else "New Lancet"
+                    )
                 }
             }
         }
@@ -155,6 +211,22 @@ fun DeviceStatusModal(
             onDismiss = { showPumpConfirm = false }
         )
     }
+
+    // Lancet confirm dialog
+    if (showLancetConfirm) {
+        CountdownConfirmDialog(
+            title = if (isRu) "Новый ланцет" else "New Lancet",
+            message = if (isRu) "Подтвердите замену ланцета на $pendingLancetDays дн." else "Confirm new lancet for $pendingLancetDays days.",
+            isRu = isRu,
+            onConfirm = {
+                showLancetConfirm = false
+                onNewLancet(pendingLancetDays)
+                onDismiss()
+            },
+            onDismiss = { showLancetConfirm = false }
+        )
+    }
+
     if (showSensorInfo) {
         AlertDialog(
             onDismissRequest = { showSensorInfo = false },
@@ -187,69 +259,128 @@ fun DeviceStatusModal(
         )
     }
 
+    if (showLancetInfo) {
+        AlertDialog(
+            onDismissRequest = { showLancetInfo = false },
+            title = { Text(if (isRu) "Срок службы ланцета" else "Lancet Lifespan") },
+            text = { 
+                Text(if (isRu) "Рекомендуется менять ланцет не реже 1 раза в неделю. При частом использовании игла тупится, травмирует пальцы и может стать источником микротравм кожи." 
+                     else "It is recommended to change lancets at least weekly. Dull needles cause excess pain, calluses, and skin irritation.")
+            },
+            confirmButton = {
+                TextButton(onClick = { showLancetInfo = false }) {
+                    Text("OK", color = ActionBlue)
+                }
+            }
+        )
+    }
 }
 
 @Composable
-private fun SensorSection(
-    status: SensorStatus,
+private fun DeviceSection(
+    icon: String,
+    title: String,
+    installedAt: Long,
+    expiresAt: Long,
+    millisRemaining: Long,
+    daysRemaining: Int,
     pickerDays: Int,
+    pickerMin: Int,
+    pickerMax: Int,
     isRu: Boolean,
     onPickerChange: (Int) -> Unit,
-    onNewSensor: () -> Unit,
-    onShowInfo: () -> Unit
+    onNewClick: () -> Unit,
+    onShowInfo: () -> Unit,
+    buttonLabel: String
 ) {
-    val sdf = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("◉", fontSize = 20.sp)
-            Text(
-                text = if (isRu) "Сенсор CGM" else "CGM Sensor",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
+    val isSet = installedAt > 0L
+    val isExpired = isSet && millisRemaining <= 0L
 
-        if (status.installedAt > 0L) {
-            val days = status.daysRemaining
-            val color = statusColor(days)
-            val installedStr = java.text.SimpleDateFormat("dd.MM.yyyy (HH:mm)", java.util.Locale.getDefault()).format(Date(status.installedAt))
-            val expiresStr = sdf.format(Date(status.expiresAt))
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Header with title and info icon
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(icon, fontSize = 16.sp)
                 Text(
-                    text = if (isRu) "Установлен: $installedStr" else "Installed: $installedStr",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = if (isRu) "Истекает: $expiresStr" else "Expires: $expiresStr",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
                 )
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = color.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, color.copy(alpha = 0.5f))
-                ) {
+            IconButton(onClick = onShowInfo, modifier = Modifier.size(28.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "Info",
+                    tint = ActionBlue,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
+        if (isSet) {
+            val color = when {
+                isExpired -> MaterialTheme.colorScheme.error
+                millisRemaining <= 24 * 3600_000L -> Color(0xFFF59E0B)
+                daysRemaining <= 2 -> Color(0xFFF59E0B)
+                else -> Color(0xFF22C55E)
+            }
+
+            val installedStr = SimpleDateFormat("dd.MM.yyyy (HH:mm)", Locale.getDefault()).format(Date(installedAt))
+            val expiresStr = SimpleDateFormat("dd.MM.yyyy (HH:mm)", Locale.getDefault()).format(Date(expiresAt))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(
-                        text = if (days < 0) {
-                            if (isRu) "Просрочен на ${-days} дн." else "Expired ${-days}d ago"
-                        } else {
-                            if (isRu) "Осталось: $days дн." else "Remaining: $days days"
-                        },
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                        color = color,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
+                        text = if (isRu) "Уст: $installedStr" else "Inst: $installedStr",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        text = if (isRu) "До: $expiresStr" else "Exp: $expiresStr",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
                     )
                 }
-                IconButton(onClick = onShowInfo) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = "Info",
-                        tint = ActionBlue,
-                        modifier = Modifier.size(20.dp)
+
+                val statusText = when {
+                    isExpired -> {
+                        val hours = (-millisRemaining / 3600_000L).toInt().coerceAtLeast(1)
+                        if (isRu) "Просрочен: -$hours ч" else "Expired: -$hours h"
+                    }
+                    millisRemaining < 3600_000L -> {
+                        val mins = (millisRemaining / 60_000L).toInt().coerceAtLeast(1)
+                        if (isRu) "Осталось: $mins мин" else "Remaining: $mins min"
+                    }
+                    millisRemaining < 24 * 3600_000L -> {
+                        val hours = (millisRemaining / 3600_000L).toInt().coerceAtLeast(1)
+                        if (isRu) "Осталось: $hours ч" else "Remaining: $hours h"
+                    }
+                    else -> {
+                        if (isRu) "Осталось: $daysRemaining дн." else "Remaining: $daysRemaining d"
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = color.copy(alpha = 0.14f),
+                    border = BorderStroke(0.8.dp, color.copy(alpha = 0.4f))
+                ) {
+                    Text(
+                        text = statusText,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        color = color,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
                     )
                 }
             }
@@ -257,171 +388,88 @@ private fun SensorSection(
             Text(
                 text = if (isRu) "Нет данных об установке" else "No installation data",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp
             )
         }
 
-        // Duration picker
-        DurationPicker(
-            value = pickerDays,
-            min = 1,
-            max = 90,
-            label = if (isRu) "Срок (дн.)" else "Duration (days)",
-            onChange = onPickerChange
-        )
-
-        Button(
-            onClick = onNewSensor,
-            colors = ButtonDefaults.buttonColors(containerColor = ActionBlue),
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
+        // Duration picker + install button row
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(if (isRu) "Новый сенсор" else "New Sensor")
+            DurationPickerCompact(
+                value = pickerDays,
+                min = pickerMin,
+                max = pickerMax,
+                label = if (isRu) "Срок (дн):" else "Days:",
+                onChange = onPickerChange,
+                modifier = Modifier.weight(1f)
+            )
+
+            Button(
+                onClick = onNewClick,
+                colors = ButtonDefaults.buttonColors(containerColor = ActionBlue),
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(buttonLabel, fontSize = 12.sp)
+            }
         }
     }
 }
 
 @Composable
-private fun PumpSetSection(
-    status: PumpSetStatus,
-    pickerDays: Int,
-    isRu: Boolean,
-    onPickerChange: (Int) -> Unit,
-    onNewPumpSet: () -> Unit,
-    onShowInfo: () -> Unit
-) {
-    val sdf = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("▣", fontSize = 20.sp)
-            Text(
-                text = if (isRu) "Инфузионный набор" else "Infusion Set",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-
-        if (status.installedAt > 0L) {
-            val days = status.daysRemaining
-            val color = statusColor(days)
-            val installedStr = java.text.SimpleDateFormat("dd.MM.yyyy (HH:mm)", java.util.Locale.getDefault()).format(Date(status.installedAt))
-            val expiresStr = sdf.format(Date(status.expiresAt))
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = if (isRu) "Установлен: $installedStr" else "Installed: $installedStr",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = if (isRu) "Истекает: $expiresStr" else "Expires: $expiresStr",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = color.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, color.copy(alpha = 0.5f))
-                ) {
-                    Text(
-                        text = if (days < 0) {
-                            if (isRu) "Просрочен на ${-days} дн." else "Expired ${-days}d ago"
-                        } else {
-                            if (isRu) "Осталось: $days дн." else "Remaining: $days days"
-                        },
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                        color = color,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
-                }
-                IconButton(onClick = onShowInfo) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = "Info",
-                        tint = ActionBlue,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        } else {
-            Text(
-                text = if (isRu) "Нет данных об установке" else "No installation data",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        DurationPicker(
-            value = pickerDays,
-            min = 2,
-            max = 7,
-            label = if (isRu) "Срок (дн.)" else "Duration (days)",
-            onChange = onPickerChange
-        )
-
-        Button(
-            onClick = onNewPumpSet,
-            colors = ButtonDefaults.buttonColors(containerColor = ActionBlue),
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(if (isRu) "Новый инфузионный набор" else "New Infusion Set")
-        }
-    }
-}
-
-@Composable
-private fun DurationPicker(
+private fun DurationPickerCompact(
     value: Int,
     min: Int,
     max: Int,
     label: String,
-    onChange: (Int) -> Unit
+    onChange: (Int) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f)
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 12.sp
         )
         IconButton(
             onClick = { if (value > min) onChange(value - 1) },
-            modifier = Modifier.size(36.dp)
+            modifier = Modifier.size(28.dp)
         ) {
-            Icon(Icons.Default.Remove, contentDescription = "Decrease")
+            Icon(Icons.Default.Remove, contentDescription = "Decrease", modifier = Modifier.size(16.dp))
         }
         Surface(
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(6.dp),
             color = MaterialTheme.colorScheme.surfaceVariant
         ) {
             Text(
                 text = value.toString(),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
+                fontSize = 13.sp
             )
         }
         IconButton(
             onClick = { if (value < max) onChange(value + 1) },
-            modifier = Modifier.size(36.dp)
+            modifier = Modifier.size(28.dp)
         ) {
-            Icon(Icons.Default.Add, contentDescription = "Increase")
+            Icon(Icons.Default.Add, contentDescription = "Increase", modifier = Modifier.size(16.dp))
         }
     }
 }
 
 /**
  * Confirmation dialog with 3-second countdown auto-dismiss.
- * User can confirm immediately or wait for auto-cancel.
  */
 @Composable
 fun CountdownConfirmDialog(
@@ -482,27 +530,27 @@ fun CountdownConfirmDialog(
 }
 
 /**
- * In-app alert dialog shown when a device has expired, prompting user to act.
+ * In-app alert dialog shown when a device has expired.
  */
 @Composable
 fun DeviceExpiredAlertDialog(
-    isSensor: Boolean,
-    daysExpired: Int,
+    deviceType: Int, // 0 = Sensor, 1 = Pump, 2 = Lancet
     isRu: Boolean,
     onDismiss: () -> Unit,
     onInstallNow: () -> Unit
 ) {
-    val title = if (isSensor) {
-        if (isRu) "⚠️ Сенсор CGM истёк" else "⚠️ CGM Sensor Expired"
-    } else {
-        if (isRu) "⚠️ Инфузионный набор истёк" else "⚠️ Infusion Set Expired"
+    val title = when (deviceType) {
+        0 -> if (isRu) "⚠️ Сенсор CGM истёк" else "⚠️ CGM Sensor Expired"
+        1 -> if (isRu) "⚠️ Инфузионный набор истёк" else "⚠️ Infusion Set Expired"
+        else -> if (isRu) "⚠️ Ланцет истёк" else "⚠️ Lancet Expired"
     }
-    val message = if (isSensor) {
-        if (isRu) "Срок сенсора истёк $daysExpired дн. назад. Рекомендуется установить новый сенсор заранее — ему нужно 1–2 дня на прогрев."
-        else "Sensor expired $daysExpired days ago. Install a new one early — it needs 1–2 days to warm up."
-    } else {
-        if (isRu) "Срок инфузионного набора истёк $daysExpired дн. назад. Замените набор."
-        else "Infusion set expired $daysExpired days ago. Replace it now."
+    val message = when (deviceType) {
+        0 -> if (isRu) "Срок службы сенсора истёк. Рекомендуется установить новый сенсор заранее (1–2 дня на прогрев)."
+             else "Sensor has expired. Install a new one early (needs 1–2 days warm-up)."
+        1 -> if (isRu) "Срок инфузионного набора истёк. Замените набор немедленно во избежание воспаления и гипергликемии."
+             else "Infusion set expired. Replace it immediately to avoid poor absorption and occlusion."
+        else -> if (isRu) "Срок использования ланцета истёк. Установите новый ланцет."
+             else "Lancet lifespan expired. Replace the lancet."
     }
 
     AlertDialog(
@@ -520,14 +568,4 @@ fun DeviceExpiredAlertDialog(
             }
         }
     )
-}
-
-// Helper: color based on days remaining
-@Composable
-private fun statusColor(daysRemaining: Int): Color {
-    return when {
-        daysRemaining < 0 -> MaterialTheme.colorScheme.error
-        daysRemaining <= 2 -> Color(0xFFF59E0B) // amber
-        else -> Color(0xFF22C55E) // green
-    }
 }

@@ -8,6 +8,7 @@ enum class BleBridgeRole {
 
 data class BleBridgeSettings(
     val role: BleBridgeRole = BleBridgeRole.DISABLED,
+    val isEnabled: Boolean = true,
     val familyPin: String = "",
     val transmitBattery: Boolean = true,
     val lastPacketTimestamp: Long = 0L,

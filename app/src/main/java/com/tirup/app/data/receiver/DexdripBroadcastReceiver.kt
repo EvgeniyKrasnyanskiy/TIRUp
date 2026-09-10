@@ -236,8 +236,8 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         com.tirup.app.presentation.overlay.FloatingBubbleService.start(context.applicationContext)
                     }
 
-                    // BLE Bridge Broadcaster: pulse advertising if role is BROADCASTER
-                    if (userSettings.bleBridgeSettings.role == com.tirup.app.domain.model.BleBridgeRole.BROADCASTER) {
+                    // BLE Bridge Broadcaster: pulse advertising if role is BROADCASTER and enabled
+                    if (userSettings.bleBridgeSettings.isEnabled && userSettings.bleBridgeSettings.role == com.tirup.app.domain.model.BleBridgeRole.BROADCASTER) {
                         val latest = todayDomain.lastOrNull() ?: recentDomain.firstOrNull()
                         if (latest != null) {
                             val prev = recentDomain.getOrNull(1)

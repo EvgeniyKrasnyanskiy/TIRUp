@@ -10,6 +10,7 @@ import androidx.work.WorkerParameters
 import com.tirup.app.data.alert.GlucoseAlertManager
 import com.tirup.app.data.repository.SettingsRepositoryImpl
 import com.tirup.app.domain.model.daysRemaining
+import com.tirup.app.domain.model.millisRemaining
 import com.tirup.app.domain.model.isPumpTherapy
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
@@ -33,40 +34,57 @@ class DeviceStatusReminderWorker(
             val isRu = settings.language.equals("RU", ignoreCase = true)
             val sensor = settings.sensorStatus
             val pumpSet = settings.pumpSetStatus
+            val lancet = settings.lancetStatus
 
             // Sensor check: notify if <=2 days remaining OR expired
-            if (sensor.installedAt > 0L) {
-                val sensorDays = sensor.daysRemaining
-                if (sensorDays <= 2) {
+            if (settings.isSensorReminderEnabled && sensor.installedAt > 0L) {
+                val sensorMillis = sensor.millisRemaining
+                if (sensorMillis <= 2 * 86_400_000L) {
                     GlucoseAlertManager.showDeviceReminderNotification(
                         context = context,
-                        isSensor = true,
-                        daysRemaining = sensorDays,
+                        deviceType = 0,
+                        millisRemaining = sensorMillis,
                         isRu = isRu
                     )
                 } else {
-                    GlucoseAlertManager.cancelDeviceReminderNotification(context, isSensor = true)
+                    GlucoseAlertManager.cancelDeviceReminderNotification(context, deviceType = 0)
                 }
             } else {
-                GlucoseAlertManager.cancelDeviceReminderNotification(context, isSensor = true)
+                GlucoseAlertManager.cancelDeviceReminderNotification(context, deviceType = 0)
             }
 
             // Pump set check: notify if <=1 day remaining OR expired
-            val isPump = isPumpTherapy(settings.patientProfile.therapyType)
-            if (isPump && pumpSet.installedAt > 0L) {
-                val pumpDays = pumpSet.daysRemaining
-                if (pumpDays <= 1) {
+            if (settings.isPumpReminderEnabled && pumpSet.installedAt > 0L) {
+                val pumpMillis = pumpSet.millisRemaining
+                if (pumpMillis <= 86_400_000L) {
                     GlucoseAlertManager.showDeviceReminderNotification(
                         context = context,
-                        isSensor = false,
-                        daysRemaining = pumpDays,
+                        deviceType = 1,
+                        millisRemaining = pumpMillis,
                         isRu = isRu
                     )
                 } else {
-                    GlucoseAlertManager.cancelDeviceReminderNotification(context, isSensor = false)
+                    GlucoseAlertManager.cancelDeviceReminderNotification(context, deviceType = 1)
                 }
             } else {
-                GlucoseAlertManager.cancelDeviceReminderNotification(context, isSensor = false)
+                GlucoseAlertManager.cancelDeviceReminderNotification(context, deviceType = 1)
+            }
+
+            // Lancet check: notify if <=1 day remaining OR expired
+            if (settings.isLancetReminderEnabled && lancet.installedAt > 0L) {
+                val lancetMillis = lancet.millisRemaining
+                if (lancetMillis <= 86_400_000L) {
+                    GlucoseAlertManager.showDeviceReminderNotification(
+                        context = context,
+                        deviceType = 2,
+                        millisRemaining = lancetMillis,
+                        isRu = isRu
+                    )
+                } else {
+                    GlucoseAlertManager.cancelDeviceReminderNotification(context, deviceType = 2)
+                }
+            } else {
+                GlucoseAlertManager.cancelDeviceReminderNotification(context, deviceType = 2)
             }
 
             Result.success()

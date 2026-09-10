@@ -168,8 +168,9 @@ class FocusViewModel(
                     compensatorGoal = compensator,
                     streakDays = streak,
                     userSettings = settings,
-                        sensorStatus = settings.sensorStatus,
-                        pumpSetStatus = settings.pumpSetStatus,
+                    sensorStatus = settings.sensorStatus,
+                    pumpSetStatus = settings.pumpSetStatus,
+                    lancetStatus = settings.lancetStatus,
                     activeAlertBanner = effectiveAlertBanner,
                     recentDailySummaries = summaries,
                     isLoading = false
@@ -277,6 +278,37 @@ class FocusViewModel(
                     )
                 )
             )
+        }
+    }
+
+    fun updateLancetInstalled(durationDays: Int) {
+        val currentSettings = _uiState.value.userSettings
+        viewModelScope.launch {
+            settingsRepository.updateSettings(
+                currentSettings.copy(
+                    lancetStatus = com.tirup.app.domain.model.LancetStatus(
+                        installedAt = System.currentTimeMillis(),
+                        durationDays = durationDays,
+                        lastUsedDurationDays = durationDays
+                    )
+                )
+            )
+        }
+    }
+
+    fun toggleBleBridgeEnabled() {
+        val currentSettings = _uiState.value.userSettings
+        val currentBle = currentSettings.bleBridgeSettings
+        val newEnabled = !currentBle.isEnabled
+        val updatedBle = currentBle.copy(isEnabled = newEnabled)
+        viewModelScope.launch {
+            settingsRepository.updateSettings(currentSettings.copy(bleBridgeSettings = updatedBle))
+            if (!newEnabled) {
+                com.tirup.app.data.ble.BleBroadcaster.stopAdvertising()
+            }
+            if (context != null) {
+                com.tirup.app.data.ble.BleObserverManager.syncWithSettings(context, settingsRepository, glucoseRepository)
+            }
         }
     }
 }

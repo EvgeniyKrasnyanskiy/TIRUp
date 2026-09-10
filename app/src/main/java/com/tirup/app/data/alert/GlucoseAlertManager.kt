@@ -128,6 +128,7 @@ object GlucoseAlertManager {
     const val NOTIFICATION_ID_WEEKLY_DIGEST = 6000
     const val NOTIFICATION_ID_SENSOR_REMINDER = 9201
     const val NOTIFICATION_ID_PUMP_REMINDER = 9202
+    const val NOTIFICATION_ID_LANCET_REMINDER = 9203
 
     const val EXTRA_GOTO_WEEKLY_DIGEST = "com.tirup.app.GOTO_WEEKLY_DIGEST"
 
@@ -275,28 +276,64 @@ object GlucoseAlertManager {
      */
     fun showDeviceReminderNotification(
         context: Context,
-        isSensor: Boolean,
-        daysRemaining: Int,
+        deviceType: Int, // 0 = Sensor, 1 = Pump, 2 = Lancet
+        millisRemaining: Long,
         isRu: Boolean
     ) {
-        val notifId = if (isSensor) NOTIFICATION_ID_SENSOR_REMINDER else NOTIFICATION_ID_PUMP_REMINDER
+        val notifId = when (deviceType) {
+            0 -> NOTIFICATION_ID_SENSOR_REMINDER
+            1 -> NOTIFICATION_ID_PUMP_REMINDER
+            else -> NOTIFICATION_ID_LANCET_REMINDER
+        }
+
+        val isExpired = millisRemaining <= 0L
+        val expiredHours = if (isExpired) (-millisRemaining / 3600_000L).toInt().coerceAtLeast(1) else 0
+        val remainingHours = (millisRemaining / 3600_000L).toInt().coerceAtLeast(1)
+        val remainingDays = (millisRemaining / 86_400_000L).toInt()
+
+        val timeStr = when {
+            isExpired -> if (isRu) "$expiredHours ч назад" else "$expiredHours h ago"
+            millisRemaining < 3600_000L -> {
+                val mins = (millisRemaining / 60_000L).toInt().coerceAtLeast(1)
+                if (isRu) "$mins мин" else "$mins min"
+            }
+            millisRemaining < 24 * 3600_000L -> {
+                if (isRu) "$remainingHours ч" else "$remainingHours h"
+            }
+            else -> {
+                if (isRu) "$remainingDays дн." else "$remainingDays d"
+            }
+        }
+
         val title: String
         val text: String
-        if (isSensor) {
-            if (daysRemaining < 0) {
-                title = if (isRu) "⚠️ Срок сенсора CGM истёк" else "⚠️ CGM Sensor Expired"
-                text = if (isRu) "Срок службы сенсора истёк ${(-daysRemaining)} дн. назад. Установите новый сенсор." else "Sensor expired ${(-daysRemaining)}d ago. Install a new one."
-            } else {
-                title = if (isRu) "📡 Скоро замена сенсора CGM" else "📡 CGM Sensor Expiring Soon"
-                text = if (isRu) "Осталось $daysRemaining дн. Заранее подготовьте новый сенсор (1–2 дня на прогрев)." else "$daysRemaining days remaining. Prepare a new sensor early (1–2 days warm-up)."
+        when (deviceType) {
+            0 -> {
+                if (isExpired) {
+                    title = if (isRu) "⚠️ Срок сенсора CGM истёк" else "⚠️ CGM Sensor Expired"
+                    text = if (isRu) "Срок службы сенсора истёк $timeStr. Установите новый сенсор." else "Sensor expired $timeStr. Install a new one."
+                } else {
+                    title = if (isRu) "📡 Скоро замена сенсора CGM" else "📡 CGM Sensor Expiring Soon"
+                    text = if (isRu) "Осталось $timeStr. Заранее подготовьте новый сенсор (1–2 дня на прогрев)." else "$timeStr remaining. Prepare a new sensor early (1–2 days warm-up)."
+                }
             }
-        } else {
-            if (daysRemaining < 0) {
-                title = if (isRu) "⚠️ Срок инфузионного набора истёк" else "⚠️ Infusion Set Expired"
-                text = if (isRu) "Срок службы набора истёк ${(-daysRemaining)} дн. назад. Смените набор немедленно." else "Infusion set expired ${(-daysRemaining)}d ago. Change it immediately."
-            } else {
-                title = if (isRu) "💉 Скоро замена инфузионного набора" else "💉 Infusion Set Expiring Soon"
-                text = if (isRu) "Осталось $daysRemaining дн. до замены инфузионного набора помпы." else "$daysRemaining days until infusion set change."
+            1 -> {
+                if (isExpired) {
+                    title = if (isRu) "⚠️ Срок инфузионного набора истёк" else "⚠️ Infusion Set Expired"
+                    text = if (isRu) "Срок службы набора истёк $timeStr. Смените набор немедленно." else "Infusion set expired $timeStr. Change it immediately."
+                } else {
+                    title = if (isRu) "💉 Скоро замена инфузионного набора" else "💉 Infusion Set Expiring Soon"
+                    text = if (isRu) "Осталось $timeStr до замены инфузионного набора помпы." else "$timeStr until infusion set change."
+                }
+            }
+            else -> {
+                if (isExpired) {
+                    title = if (isRu) "⚠️ Срок ланцета истёк" else "⚠️ Lancet Expired"
+                    text = if (isRu) "Срок использования ланцета истёк $timeStr. Установите новый ланцет." else "Lancet expired $timeStr. Replace lancet."
+                } else {
+                    title = if (isRu) "📍 Скоро замена ланцета" else "📍 Lancet Expiring Soon"
+                    text = if (isRu) "Осталось $timeStr до замены ланцета прокалывателя." else "$timeStr until lancet change."
+                }
             }
         }
 
@@ -326,9 +363,14 @@ object GlucoseAlertManager {
         }
     }
 
-    fun cancelDeviceReminderNotification(context: Context, isSensor: Boolean) {
+    fun cancelDeviceReminderNotification(context: Context, deviceType: Int) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-        notificationManager?.cancel(if (isSensor) NOTIFICATION_ID_SENSOR_REMINDER else NOTIFICATION_ID_PUMP_REMINDER)
+        val notifId = when (deviceType) {
+            0 -> NOTIFICATION_ID_SENSOR_REMINDER
+            1 -> NOTIFICATION_ID_PUMP_REMINDER
+            else -> NOTIFICATION_ID_LANCET_REMINDER
+        }
+        notificationManager?.cancel(notifId)
     }
 
     fun showWeeklyDigestNotification(

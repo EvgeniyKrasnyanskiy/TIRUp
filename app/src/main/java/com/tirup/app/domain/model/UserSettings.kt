@@ -152,8 +152,12 @@ data class UserSettings(
     val alertSettings: AlertSettings = AlertSettings(),
     val bleBridgeSettings: BleBridgeSettings = BleBridgeSettings(),
     val isDeviceRemindersEnabled: Boolean = true,
+    val isSensorReminderEnabled: Boolean = true,
+    val isPumpReminderEnabled: Boolean = true,
+    val isLancetReminderEnabled: Boolean = true,
     val sensorStatus: SensorStatus = SensorStatus(),
-    val pumpSetStatus: PumpSetStatus = PumpSetStatus()
+    val pumpSetStatus: PumpSetStatus = PumpSetStatus(),
+    val lancetStatus: LancetStatus = LancetStatus()
 )
 
 fun isPumpTherapy(therapyType: String): Boolean {
