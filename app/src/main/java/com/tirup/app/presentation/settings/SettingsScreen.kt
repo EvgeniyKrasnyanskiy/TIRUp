@@ -249,6 +249,14 @@ fun SettingsScreen(
         }
     }
 
+    var testSmsCooldownSec by remember { mutableStateOf(0) }
+    LaunchedEffect(testSmsCooldownSec) {
+        if (testSmsCooldownSec > 0) {
+            delay(1000L)
+            testSmsCooldownSec -= 1
+        }
+    }
+
     LaunchedEffect(Unit) {
         com.tirup.app.data.ble.BleObserverManager.packetReceivedEvent.collect { pair ->
             val (packet, rssi) = pair
@@ -1692,23 +1700,29 @@ fun SettingsScreen(
                                     smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
                                 } else {
                                     viewModel.sendTestEmergencySms()
+                                    testSmsCooldownSec = 60
                                 }
                             },
+                            enabled = testSmsCooldownSec == 0,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.6f))
+                            border = BorderStroke(1.dp, if (testSmsCooldownSec == 0) ActionBlue.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Send,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp),
-                                tint = ActionBlue
+                                tint = if (testSmsCooldownSec == 0) ActionBlue else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = if (isRu) "Отправить проверочное SMS" else "Send test SMS verification",
+                                text = if (testSmsCooldownSec > 0) {
+                                    if (isRu) "Отправить проверочное SMS (${testSmsCooldownSec}с)" else "Send test SMS (${testSmsCooldownSec}s)"
+                                } else {
+                                    if (isRu) "Отправить проверочное SMS" else "Send test SMS verification"
+                                },
                                 style = MaterialTheme.typography.labelLarge,
-                                color = ActionBlue
+                                color = if (testSmsCooldownSec == 0) ActionBlue else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                             )
                         }
                     }
