@@ -279,14 +279,14 @@ fun ReportsScreen(
                         "1️⃣ Откройте приложение xDrip+ на смартфоне.\n\n" +
                         "2️⃣ Нажмите на три точки ⋮ (Меню) в верхнем правом углу экрана.\n\n" +
                         "3️⃣ Выберите пункт «Import / Export features» (Функции импорта / экспорта).\n\n" +
-                        "4️⃣ Нажмите «Export CSV (SiDiary format)» (Экспорт CSV в формате SiDiary).\n\n" +
+                        "4️⃣ Нажмите «Export CSV (SiDiary format)» (Импорт файлов xDrip+).\n\n" +
                         "5️⃣ Выберите дату начала экспорта данных. Приложение автоматически сформирует архив.\n\n" +
                         "📂 Где найти готовый файл:\nВнутренняя память смартфона → папка xdrip → файл с именем exportCSV...zip"
                     } else {
                         "1️⃣ Open the xDrip+ application on your phone.\n\n" +
                         "2️⃣ Tap the three dots ⋮ (Menu) in the upper right corner.\n\n" +
                         "3️⃣ Select 'Import / Export features'.\n\n" +
-                        "4️⃣ Tap 'Export CSV (SiDiary format)'.\n\n" +
+                        "4️⃣ Tap 'Export CSV (SiDiary format)' to export xDrip+ files.\n\n" +
                         "5️⃣ Choose the start date. xDrip+ will automatically generate the export archive.\n\n" +
                         "📂 File location:\nInternal storage → xdrip → file named exportCSV...zip"
                     },
@@ -1205,7 +1205,7 @@ private fun ParametersGuidebookModal(
                             GuidebookItemCard(
                                 title = if (isRu) "eA1c (Расчётный гликированный гемоглобин)" else "eA1c (Estimated A1c)",
                                 target = if (isRu) "Цель: ≤7.0% (≤53 ммоль/моль)" else "Target: ≤7.0% (≤53 mmol/mol)",
-                                desc = if (isRu) "Математическая экстраполяция лабораторного HbA1c по формуле ADAG. Коррелирует с долгосрочным средним сахаром за 2–3 месяца без искажений от анемии или гемоглобинопатий."
+                                desc = if (isRu) "Математическая экстраполяция лабораторного HbA1c по формуле ADAG. Отражает средний уровень глюкозы за 2–3 месяца. Не зависит от гемоглобинопатий (в отличие от лабораторного HbA1c)."
                                        else "Mathematical projection of laboratory HbA1c based on the ADAG formula."
                             )
                         }
@@ -1248,14 +1248,14 @@ private fun ParametersGuidebookModal(
                     // Section 3
                     item {
                         GuidebookSectionHeader(
-                            title = if (isRu) "3. Вариабельность и лабильность" else "3. Glucose Variability & Lability"
+                            title = if (isRu) "3. Вариабельность и качество кривой" else "3. Glucose Variability & Lability"
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             GuidebookItemCard(
                                 title = if (isRu) "%CV (Коэффициент вариации)" else "%CV (Coefficient of Variation)",
                                 target = if (isRu) "Норма: ≤36.0%" else "Target: ≤36.0%",
-                                desc = if (isRu) "Относительный разброс сахара (%CV = SD / Mean * 100%). При %CV >36% колебания становятся хаотичными, а риск скрытых ночных гипогликемий возрастает в 4 раза."
+                                desc = if (isRu) "Относительный разброс сахара (%CV = SD / Mean * 100%). При %CV > 36% компенсация считается нестабильной: резко возрастает риск скрытых гипогликемий."
                                        else "Relative glucose swing indicator. %CV > 36% strongly correlates with hypoglycemia risk."
                             )
                             GuidebookItemCard(
@@ -1267,7 +1267,7 @@ private fun ParametersGuidebookModal(
                             GuidebookItemCard(
                                 title = if (isRu) "GVI (Индекс гликемической лабильности)" else "GVI (Glycemic Variability Index)",
                                 target = if (isRu) "Идеал здорового человека: ≤1.20" else "Healthy baseline: ≤1.20",
-                                desc = if (isRu) "Отношение реальной длины кривой сахара к идеальной гладкой траектории. Выявляет пилообразные скачки сахара («американские горки»)."
+                                desc = if (isRu) "Отношение реальной длины кривой сахара к идеальной гладкой траектории. Оценивает «зигзагообразность» сахарной кривой за период."
                                        else "Trajectory distance ratio. Uncovers sharp up-and-down glucose rollercoasters."
                             )
                         }
@@ -1317,7 +1317,7 @@ private fun ParametersGuidebookModal(
                                     color = Color(0xFF92400E) // Amber 800
                                 )
                                 Text(
-                                    text = if (isRu) "• Физиологическое запаздывание: датчики CGM измеряют концентрацию глюкозы в интерстициальной (межтканевой) жидкости, а не в крови. В период быстрых изменений отставание от капиллярной крови составляет 5–15 минут.\n\n• Погрешность сенсора (MARD): современный стандарт MARD составляет 8–10%. Возможны артефакты ночного сдавливания (компрессионные гипогликемии).\n\n• Назначение отчёта: данный аналитический отчёт носит информационно-ознакомительный характер и не является клиническим диагнозом. При расхождении самочувствия с показаниями CGM выполните замер по капле крови и обратитесь к лечащему врачу."
+                                    text = if (isRu) "• Физиологическое запаздывание: датчики CGM измеряют концентрацию глюкозы в интерстициальной (межтканевой) жидкости, а не в крови. В период быстрых изменений отставание от капиллярной крови составляет 5–15 минут.\n\n• Погрешность сенсора (MARD): современный стандарт MARD составляет 8–10%. Возможны ложные занижения показаний при сдавливании сенсора во сне (compression lows).\n\n• Назначение отчёта: данный аналитический отчёт носит информационно-ознакомительный характер и не является клиническим диагнозом. При расхождении самочувствия с показаниями CGM выполните замер глюкометром по капле крови и обратитесь к лечащему врачу."
                                            else "• Physiological Lag: CGM sensors measure interstitial fluid; physiological lag relative to blood is 5–15 minutes during rapid fluctuations.\n\n• Sensor MARD: standard accuracy error is 8–10%. Compression lows during sleep may occur.\n\n• Informational Use: this report does not replace clinical consultation. Always verify unusual readings with a fingerstick blood glucose test.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color(0xFF78350F), // Amber 900

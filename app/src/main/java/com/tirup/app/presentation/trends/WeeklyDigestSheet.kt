@@ -106,7 +106,7 @@ fun WeeklyDigestSheet(
                     }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "$currentPeriodStr (${if (isRu) "к пред." else "vs"} $prevPeriodStr)",
+                        text = "$currentPeriodStr (${if (isRu) "к прошлой нед." else "vs"} $prevPeriodStr)",
                         fontSize = 12.5.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
