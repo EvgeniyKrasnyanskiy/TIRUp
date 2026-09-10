@@ -71,10 +71,31 @@ class SettingsViewModel(
         }
     }
 
-        fun setDeviceRemindersEnabled(enabled: Boolean) {
+    fun setDeviceRemindersEnabled(enabled: Boolean) {
         val current = _uiState.value.userSettings
         viewModelScope.launch {
             settingsRepository.updateSettings(current.copy(isDeviceRemindersEnabled = enabled))
+        }
+    }
+
+    fun setSensorReminderEnabled(enabled: Boolean) {
+        val current = _uiState.value.userSettings
+        viewModelScope.launch {
+            settingsRepository.updateSettings(current.copy(isSensorReminderEnabled = enabled))
+        }
+    }
+
+    fun setPumpReminderEnabled(enabled: Boolean) {
+        val current = _uiState.value.userSettings
+        viewModelScope.launch {
+            settingsRepository.updateSettings(current.copy(isPumpReminderEnabled = enabled))
+        }
+    }
+
+    fun setLancetReminderEnabled(enabled: Boolean) {
+        val current = _uiState.value.userSettings
+        viewModelScope.launch {
+            settingsRepository.updateSettings(current.copy(isLancetReminderEnabled = enabled))
         }
     }
 

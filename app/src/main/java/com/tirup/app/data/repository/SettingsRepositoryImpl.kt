@@ -98,18 +98,25 @@ class SettingsRepositoryImpl(
             .putLong(KEY_ALERT_LAST_EMERGENCY_TIMESTAMP, settings.alertSettings.lastEmergencySmsTimestamp)
             .putBoolean(KEY_ALERT_SMS_QUERY_REPLY_ENABLED, settings.alertSettings.isSmsQueryReplyEnabled)
             .putString(KEY_BLE_BRIDGE_ROLE, settings.bleBridgeSettings.role.name)
+            .putBoolean(KEY_BLE_BRIDGE_IS_ENABLED, settings.bleBridgeSettings.isEnabled)
             .putString(KEY_BLE_BRIDGE_PIN, settings.bleBridgeSettings.familyPin)
             .putBoolean(KEY_BLE_BRIDGE_TRANSMIT_BATTERY, settings.bleBridgeSettings.transmitBattery)
             .putLong(KEY_BLE_BRIDGE_LAST_TIMESTAMP, settings.bleBridgeSettings.lastPacketTimestamp)
             .putInt(KEY_BLE_BRIDGE_LAST_RSSI, settings.bleBridgeSettings.lastRssi)
             .putInt(KEY_BLE_BRIDGE_LAST_MASTER_BATTERY, settings.bleBridgeSettings.lastMasterBattery)
             .putBoolean(KEY_DEVICE_REMINDERS_ENABLED, settings.isDeviceRemindersEnabled)
+            .putBoolean(KEY_SENSOR_REMINDER_ENABLED, settings.isSensorReminderEnabled)
+            .putBoolean(KEY_PUMP_REMINDER_ENABLED, settings.isPumpReminderEnabled)
+            .putBoolean(KEY_LANCET_REMINDER_ENABLED, settings.isLancetReminderEnabled)
             .putLong(KEY_SENSOR_INSTALLED_AT, settings.sensorStatus.installedAt)
             .putInt(KEY_SENSOR_DURATION_DAYS, settings.sensorStatus.durationDays)
             .putInt(KEY_SENSOR_LAST_USED_DURATION, settings.sensorStatus.lastUsedDurationDays)
             .putLong(KEY_PUMP_SET_INSTALLED_AT, settings.pumpSetStatus.installedAt)
             .putInt(KEY_PUMP_SET_DURATION_DAYS, settings.pumpSetStatus.durationDays)
             .putInt(KEY_PUMP_SET_LAST_USED_DURATION, settings.pumpSetStatus.lastUsedDurationDays)
+            .putLong(KEY_LANCET_INSTALLED_AT, settings.lancetStatus.installedAt)
+            .putInt(KEY_LANCET_DURATION_DAYS, settings.lancetStatus.durationDays)
+            .putInt(KEY_LANCET_LAST_USED_DURATION, settings.lancetStatus.lastUsedDurationDays)
             .apply()
 
         _settingsFlow.value = settings
@@ -235,6 +242,7 @@ class SettingsRepositoryImpl(
                 } catch (_: Exception) {
                     BleBridgeRole.DISABLED
                 },
+                isEnabled = prefs.getBoolean(KEY_BLE_BRIDGE_IS_ENABLED, true),
                 familyPin = prefs.getString(KEY_BLE_BRIDGE_PIN, "")?.let { pin ->
                     val clean = pin.uppercase().filter { it in 'A'..'Z' }
                     if (clean.length == 3) clean else ""
@@ -245,6 +253,9 @@ class SettingsRepositoryImpl(
                 lastMasterBattery = prefs.getInt(KEY_BLE_BRIDGE_LAST_MASTER_BATTERY, -1)
             ),
             isDeviceRemindersEnabled = prefs.getBoolean(KEY_DEVICE_REMINDERS_ENABLED, true),
+            isSensorReminderEnabled = prefs.getBoolean(KEY_SENSOR_REMINDER_ENABLED, true),
+            isPumpReminderEnabled = prefs.getBoolean(KEY_PUMP_REMINDER_ENABLED, true),
+            isLancetReminderEnabled = prefs.getBoolean(KEY_LANCET_REMINDER_ENABLED, true),
             sensorStatus = com.tirup.app.domain.model.SensorStatus(
                 installedAt = prefs.getLong(KEY_SENSOR_INSTALLED_AT, 0L),
                 durationDays = prefs.getInt(KEY_SENSOR_DURATION_DAYS, 14),
@@ -254,6 +265,11 @@ class SettingsRepositoryImpl(
                 installedAt = prefs.getLong(KEY_PUMP_SET_INSTALLED_AT, 0L),
                 durationDays = prefs.getInt(KEY_PUMP_SET_DURATION_DAYS, 3),
                 lastUsedDurationDays = prefs.getInt(KEY_PUMP_SET_LAST_USED_DURATION, 3)
+            ),
+            lancetStatus = com.tirup.app.domain.model.LancetStatus(
+                installedAt = prefs.getLong(KEY_LANCET_INSTALLED_AT, 0L),
+                durationDays = prefs.getInt(KEY_LANCET_DURATION_DAYS, 7),
+                lastUsedDurationDays = prefs.getInt(KEY_LANCET_LAST_USED_DURATION, 7)
             )
         )
     }
@@ -329,6 +345,7 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_SMS_QUERY_REPLY_ENABLED = "key_alert_sms_query_reply_enabled"
 
         private const val KEY_BLE_BRIDGE_ROLE = "key_ble_bridge_role"
+        private const val KEY_BLE_BRIDGE_IS_ENABLED = "key_ble_bridge_is_enabled"
         private const val KEY_BLE_BRIDGE_PIN = "key_ble_bridge_pin"
         private const val KEY_BLE_BRIDGE_TRANSMIT_BATTERY = "key_ble_bridge_transmit_battery"
         private const val KEY_BLE_BRIDGE_LAST_TIMESTAMP = "key_ble_bridge_last_timestamp"
@@ -336,11 +353,17 @@ class SettingsRepositoryImpl(
         private const val KEY_BLE_BRIDGE_LAST_MASTER_BATTERY = "key_ble_bridge_last_master_battery"
 
         private const val KEY_DEVICE_REMINDERS_ENABLED = "key_device_reminders_enabled"
+        private const val KEY_SENSOR_REMINDER_ENABLED = "key_sensor_reminder_enabled"
+        private const val KEY_PUMP_REMINDER_ENABLED = "key_pump_reminder_enabled"
+        private const val KEY_LANCET_REMINDER_ENABLED = "key_lancet_reminder_enabled"
         private const val KEY_SENSOR_INSTALLED_AT = "key_sensor_installed_at"
         private const val KEY_SENSOR_DURATION_DAYS = "key_sensor_duration_days"
         private const val KEY_SENSOR_LAST_USED_DURATION = "key_sensor_last_used_duration"
         private const val KEY_PUMP_SET_INSTALLED_AT = "key_pump_set_installed_at"
         private const val KEY_PUMP_SET_DURATION_DAYS = "key_pump_set_duration_days"
         private const val KEY_PUMP_SET_LAST_USED_DURATION = "key_pump_set_last_used_duration"
+        private const val KEY_LANCET_INSTALLED_AT = "key_lancet_installed_at"
+        private const val KEY_LANCET_DURATION_DAYS = "key_lancet_duration_days"
+        private const val KEY_LANCET_LAST_USED_DURATION = "key_lancet_last_used_duration"
     }
 }

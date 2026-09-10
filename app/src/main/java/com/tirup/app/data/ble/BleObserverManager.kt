@@ -73,7 +73,7 @@ object BleObserverManager {
             val userSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
             val ble = userSettings.bleBridgeSettings
 
-            if (ble.role == BleBridgeRole.OBSERVER) {
+            if (ble.isEnabled && ble.role == BleBridgeRole.OBSERVER) {
                 startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = isBoostActive)
             } else {
                 stopScanningInternal()

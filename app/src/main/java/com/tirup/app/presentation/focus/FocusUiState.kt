@@ -22,5 +22,6 @@ data class FocusUiState(
     val recentDailySummaries: List<com.tirup.app.domain.model.DailySummary> = emptyList(),
     val isLoading: Boolean = false,
     val sensorStatus: SensorStatus = SensorStatus(),
-    val pumpSetStatus: PumpSetStatus = PumpSetStatus()
+    val pumpSetStatus: PumpSetStatus = PumpSetStatus(),
+    val lancetStatus: com.tirup.app.domain.model.LancetStatus = com.tirup.app.domain.model.LancetStatus()
 )

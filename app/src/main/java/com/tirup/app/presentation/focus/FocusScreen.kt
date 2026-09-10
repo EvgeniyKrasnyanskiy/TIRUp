@@ -7,6 +7,12 @@ import androidx.compose.ui.platform.LocalContext
 import kotlin.math.roundToInt
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -15,7 +21,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material.icons.filled.BluetoothSearching
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -132,27 +141,19 @@ fun FocusScreen(
     var showDeviceModal by remember { mutableStateOf(false) }
     val sensorStatus = state.sensorStatus
     val pumpSetStatus = state.pumpSetStatus
-    val isPumpUser = userSettings.patientProfile.therapyType in listOf("Инсулиновая помпа", "Insulin Pump")
-    val showExpiredSensorDialog = remember(sensorStatus.installedAt) { sensorStatus.isExpired }
-    val showExpiredPumpDialog = remember(pumpSetStatus.installedAt) { isPumpUser && pumpSetStatus.isExpired }
+    val lancetStatus = state.lancetStatus
+    val showExpiredSensorDialog = remember(sensorStatus.installedAt, userSettings.isSensorReminderEnabled) { userSettings.isSensorReminderEnabled && sensorStatus.isExpired }
+    val showExpiredPumpDialog = remember(pumpSetStatus.installedAt, userSettings.isPumpReminderEnabled) { userSettings.isPumpReminderEnabled && pumpSetStatus.isExpired }
+    val showExpiredLancetDialog = remember(lancetStatus.installedAt, userSettings.isLancetReminderEnabled) { userSettings.isLancetReminderEnabled && lancetStatus.isExpired }
     var sensorExpiredDismissed by rememberSaveable { mutableStateOf(false) }
     var pumpExpiredDismissed by rememberSaveable { mutableStateOf(false) }
+    var lancetExpiredDismissed by rememberSaveable { mutableStateOf(false) }
 
     val shouldCelebrateStreak = state.streakDays >= 2 && state.streakDays > userSettings.lastStreakCelebratedDays
     var showStreakDialog by remember(shouldCelebrateStreak) { mutableStateOf(shouldCelebrateStreak) }
 
-    // BLE received hint: shows a 3-second top overlay when a new packet arrives (observer role)
     val blePacketReceivedAt by viewModel.blePacketReceivedAt.collectAsState()
-    var showBleHint by remember { mutableStateOf(false) }
-    val bleSettings = userSettings.bleBridgeSettings
-    val isObserverRole = bleSettings.role == BleBridgeRole.OBSERVER
-    LaunchedEffect(blePacketReceivedAt) {
-        if (blePacketReceivedAt > 0L && isObserverRole) {
-            showBleHint = true
-            kotlinx.coroutines.delay(3000L)
-            showBleHint = false
-        }
-    }
+    var showBleStatusDialog by rememberSaveable { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -192,7 +193,10 @@ fun FocusScreen(
                         DeviceStatusChips(
                             sensorStatus = sensorStatus,
                             pumpSetStatus = pumpSetStatus,
-                            showPump = isPumpUser,
+                            lancetStatus = lancetStatus,
+                            showSensor = userSettings.isSensorReminderEnabled,
+                            showPump = userSettings.isPumpReminderEnabled,
+                            showLancet = userSettings.isLancetReminderEnabled,
                             isRu = isRu,
                             onClick = { showDeviceModal = true }
                         )
@@ -302,10 +306,11 @@ fun FocusScreen(
                 },
                 masterBatteryPct = masterBattery,
                 isMasterBatteryStale = isMasterBatteryStale,
-                isBroadcaster = heroBleSettings.role == BleBridgeRole.BROADCASTER,
+                bleBridgeSettings = heroBleSettings,
                 isBleBroadcasting = isBleBroadcasting,
                 broadcastRemainingSec = broadcastRemainingSec,
                 nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
+                blePacketReceivedAt = blePacketReceivedAt,
                 dailyAlertsCount = dailyAlertLogs.size,
                 onAlertHistoryClick = { showDailyAlertLogsDialog = true },
                 onBatteryClick = {
@@ -324,9 +329,9 @@ fun FocusScreen(
                         else "Data received ${value.first} ${value.second} ago."
                     } else ""
                     val disableBridgeStr = if (isRu) {
-                        "Отключить BLE-мост можно в дополнительных настройках."
+                        "Отключить или перенастроить BLE-мост можно кликом по иконке Bluetooth."
                     } else {
-                        "Disable BLE Bridge in Advanced Settings."
+                        "Configure BLE Bridge by tapping the Bluetooth icon."
                     }
                     val desc = if (isRu) {
                         if (isMasterBatteryStale) {
@@ -367,28 +372,7 @@ fun FocusScreen(
                     }
                     detailDialogInfo = Pair(title, desc)
                 },
-                onBleClick = {
-                    if (isBleBroadcasting) {
-                        val title = if (isRu) "BLE-мост: Передача" else "BLE Bridge: Broadcasting"
-                        val desc = if (isRu) {
-                            "Прямо сейчас вещатель передает сигнал Bluetooth в эфир (осталось $broadcastRemainingSec сек).\n\nТелефоны-приемники в радиусе 10–15 м с вашим семейным PIN получают свежий замер сахара, тренд и заряд батареи."
-                        } else {
-                            "Active BLE broadcast pulse in progress ($broadcastRemainingSec s remaining)."
-                        }
-                        detailDialogInfo = Pair(title, desc)
-                    } else {
-                        val min = nextHeartbeatRemainingSec / 60
-                        val sec = nextHeartbeatRemainingSec % 60
-                        val timeStr = String.format(Locale.US, "%d:%02d", min, sec)
-                        val title = if (isRu) "BLE-мост: Режим ожидания" else "BLE Bridge: Idle"
-                        val desc = if (isRu) {
-                            "Вещатель находится в режиме ожидания. До контрольного сигнала (heartbeat): $timeStr.\n\nКак только от сенсора поступит свежий замер, вещатель немедленно передаст его в эфир и таймер сбросится обратно на 5:00."
-                        } else {
-                            "Broadcaster is idle. Heartbeat pulse in: $timeStr.\nArriving sensor readings are transmitted immediately, resetting the timer to 5:00."
-                        }
-                        detailDialogInfo = Pair(title, desc)
-                    }
-                },
+                onBleClick = { showBleStatusDialog = true },
                 onClick = {
                     val r = state.latestReading
                     if (r != null) {
@@ -995,63 +979,6 @@ fun FocusScreen(
         item { Spacer(modifier = Modifier.height(20.dp)) }
     }
     } // end Column
-
-    // BLE received hint overlay — top-center, auto-dismisses after 3 seconds
-    if (showBleHint) {
-        val latestGlucose = state.latestReading
-        val glucoseStr = if (latestGlucose != null) {
-            if (unit == com.tirup.app.domain.model.GlucoseUnit.MMOL_L)
-                String.format(Locale.US, "%.1f", latestGlucose.valueMmol)
-            else
-                "${(latestGlucose.valueMmol * 18.0182).toInt()}"
-        } else "--"
-        val batteryPct = bleSettings.lastMasterBattery
-        val batteryStr = if (batteryPct in 0..100) {
-            if (isRu) ", 🔋 $batteryPct%" else ", 🔋 $batteryPct%"
-        } else ""
-        val signalStr = if (bleSettings.lastRssi != 0) {
-            val quality = when {
-                bleSettings.lastRssi >= -70 -> if (isRu) "отличный" else "excellent"
-                bleSettings.lastRssi >= -85 -> if (isRu) "хороший" else "good"
-                else -> if (isRu) "слабый" else "weak"
-            }
-            if (isRu) ", сигнал $quality" else ", signal $quality"
-        } else ""
-        val hintText = "TIRUp: $glucoseStr${latestGlucose?.trendArrow ?: ""}$batteryStr$signalStr"
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 64.dp, start = 20.dp, end = 20.dp),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.92f),
-                shadowElevation = 6.dp
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Bluetooth,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.inverseOnSurface,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        text = hintText,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.inverseOnSurface,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-        }
-    }
-
     } // end Box
 
     // Detail Popups
@@ -1090,19 +1017,22 @@ fun FocusScreen(
         DeviceStatusModal(
             sensorStatus = sensorStatus,
             pumpSetStatus = pumpSetStatus,
-            isPumpUser = isPumpUser,
+            lancetStatus = lancetStatus,
+            showSensor = userSettings.isSensorReminderEnabled,
+            showPump = userSettings.isPumpReminderEnabled,
+            showLancet = userSettings.isLancetReminderEnabled,
             isRu = isRu,
             onDismiss = { showDeviceModal = false },
             onNewSensor = { days -> viewModel.updateSensorInstalled(days) },
-            onNewPumpSet = { days -> viewModel.updatePumpSetInstalled(days) }
+            onNewPumpSet = { days -> viewModel.updatePumpSetInstalled(days) },
+            onNewLancet = { days -> viewModel.updateLancetInstalled(days) }
         )
     }
 
     // Expired sensor in-app alert
     if (showExpiredSensorDialog && !sensorExpiredDismissed) {
         DeviceExpiredAlertDialog(
-            isSensor = true,
-            daysExpired = -sensorStatus.daysRemaining,
+            deviceType = 0,
             isRu = isRu,
             onDismiss = { sensorExpiredDismissed = true },
             onInstallNow = {
@@ -1115,12 +1045,24 @@ fun FocusScreen(
     // Expired pump set in-app alert
     if (showExpiredPumpDialog && !pumpExpiredDismissed) {
         DeviceExpiredAlertDialog(
-            isSensor = false,
-            daysExpired = -pumpSetStatus.daysRemaining,
+            deviceType = 1,
             isRu = isRu,
             onDismiss = { pumpExpiredDismissed = true },
             onInstallNow = {
                 pumpExpiredDismissed = true
+                showDeviceModal = true
+            }
+        )
+    }
+
+    // Expired lancet in-app alert
+    if (showExpiredLancetDialog && !lancetExpiredDismissed) {
+        DeviceExpiredAlertDialog(
+            deviceType = 2,
+            isRu = isRu,
+            onDismiss = { lancetExpiredDismissed = true },
+            onInstallNow = {
+                lancetExpiredDismissed = true
                 showDeviceModal = true
             }
         )
@@ -1160,142 +1102,479 @@ fun FocusScreen(
             onDismiss = { showDailyAlertLogsDialog = false }
         )
     }
+
+    if (showBleStatusDialog) {
+        BleStatusDialog(
+            bleSettings = userSettings.bleBridgeSettings,
+            isBleBroadcasting = isBleBroadcasting,
+            broadcastRemainingSec = broadcastRemainingSec,
+            nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
+            isRu = isRu,
+            onToggleEnable = { viewModel.toggleBleBridgeEnabled() },
+            onOpenSettings = {
+                showBleStatusDialog = false
+                onOpenSettings()
+            },
+            onDismiss = { showBleStatusDialog = false }
+        )
+    }
 }
 
 @Composable
-private fun BleTransmitterBadge(
+private fun BleBridgeBadge(
+    bleSettings: com.tirup.app.domain.model.BleBridgeSettings,
     isBleBroadcasting: Boolean,
     broadcastRemainingSec: Int,
     nextHeartbeatRemainingSec: Int,
+    blePacketReceivedAt: Long,
+    isRu: Boolean,
     onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    if (isBleBroadcasting) {
-        val transition = rememberInfiniteTransition(label = "BleWaves")
-        val wave1Progress by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 1400, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "wave1"
-        )
-        val wave2Progress by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 1400, delayMillis = 450, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "wave2"
-        )
-        val wave3Progress by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 1400, delayMillis = 900, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "wave3"
-        )
-
+    if (!bleSettings.isEnabled) {
+        // Disabled state: Crossed-out / gray Bluetooth icon
         Surface(
             modifier = modifier
                 .size(width = 62.dp, height = 24.dp)
                 .clickable { onClick() },
             shape = RoundedCornerShape(10.dp),
-            color = ActionBlue.copy(alpha = 0.14f),
-            border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.45f))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(2.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val center = Offset(size.width / 2f, size.height / 2f)
-                    val maxRadius = size.width.coerceAtLeast(size.height) * 0.9f
-
-                    val waves = listOf(wave1Progress, wave2Progress, wave3Progress)
-                    for (prog in waves) {
-                        if (prog > 0.05f) {
-                            val r = prog * maxRadius
-                            val alpha = (1f - prog).coerceIn(0f, 1f) * 0.85f
-                            val strokeW = (2.2f * (1f - prog * 0.4f)).dp.toPx()
-
-                            // 120-degree wave arc to the right (centered at 0°)
-                            drawArc(
-                                color = ActionBlue.copy(alpha = alpha),
-                                startAngle = -60f,
-                                sweepAngle = 120f,
-                                useCenter = false,
-                                topLeft = Offset(center.x - r, center.y - r),
-                                size = Size(r * 2, r * 2),
-                                style = Stroke(width = strokeW)
-                            )
-                            // 120-degree wave arc to the left (centered at 180°)
-                            drawArc(
-                                color = ActionBlue.copy(alpha = alpha),
-                                startAngle = 120f,
-                                sweepAngle = 120f,
-                                useCenter = false,
-                                topLeft = Offset(center.x - r, center.y - r),
-                                size = Size(r * 2, r * 2),
-                                style = Stroke(width = strokeW)
-                            )
-                        }
-                    }
-                }
-                Icon(
-                    imageVector = Icons.Default.Bluetooth,
-                    contentDescription = "Broadcasting",
-                    tint = ActionBlue,
-                    modifier = Modifier.size(15.dp)
-                )
-            }
-        }
-    } else {
-        // Idle state: Bluetooth icon + countdown mm:ss to next periodic heartbeat
-        val minutes = (nextHeartbeatRemainingSec / 60).coerceAtLeast(0)
-        val seconds = (nextHeartbeatRemainingSec % 60).coerceAtLeast(0)
-        val countdownText = String.format(Locale.US, "%d:%02d", minutes, seconds)
-
-        Surface(
-            modifier = modifier
-                .size(width = 62.dp, height = 24.dp)
-                .clickable { onClick() },
-            shape = RoundedCornerShape(10.dp),
-            color = ActionBlue.copy(alpha = 0.08f),
-            border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.25f))
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 4.dp),
+                modifier = Modifier.fillMaxSize(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.Bluetooth,
-                    contentDescription = "Bluetooth Master",
-                    tint = ActionBlue.copy(alpha = 0.85f),
-                    modifier = Modifier.size(13.dp)
-                )
-                Spacer(modifier = Modifier.width(3.dp))
-                Text(
-                    text = countdownText,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontFeatureSettings = "tnum"
-                    ),
-                    fontWeight = FontWeight.SemiBold,
-                    color = ActionBlue.copy(alpha = 0.85f)
+                    imageVector = Icons.Default.BluetoothDisabled,
+                    contentDescription = if (isRu) "BLE-мост отключен" else "BLE Bridge Disabled",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    modifier = Modifier.size(15.dp)
                 )
             }
         }
+    } else if (bleSettings.role == BleBridgeRole.BROADCASTER) {
+        if (isBleBroadcasting) {
+            val transition = rememberInfiniteTransition(label = "BleWaves")
+            val wave1Progress by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 1400, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "wave1"
+            )
+            val wave2Progress by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 1400, delayMillis = 450, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "wave2"
+            )
+            val wave3Progress by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 1400, delayMillis = 900, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "wave3"
+            )
 
+            Surface(
+                modifier = modifier
+                    .size(width = 62.dp, height = 24.dp)
+                    .clickable { onClick() },
+                shape = RoundedCornerShape(10.dp),
+                color = ActionBlue.copy(alpha = 0.14f),
+                border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.45f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(2.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val center = Offset(size.width / 2f, size.height / 2f)
+                        val maxRadius = size.width.coerceAtLeast(size.height) * 0.9f
+
+                        val waves = listOf(wave1Progress, wave2Progress, wave3Progress)
+                        for (prog in waves) {
+                            if (prog > 0.05f) {
+                                val r = prog * maxRadius
+                                val alpha = (1f - prog).coerceIn(0f, 1f) * 0.85f
+                                val strokeW = (2.2f * (1f - prog * 0.4f)).dp.toPx()
+
+                                drawArc(
+                                    color = ActionBlue.copy(alpha = alpha),
+                                    startAngle = -60f,
+                                    sweepAngle = 120f,
+                                    useCenter = false,
+                                    topLeft = Offset(center.x - r, center.y - r),
+                                    size = Size(r * 2, r * 2),
+                                    style = Stroke(width = strokeW)
+                                )
+                                drawArc(
+                                    color = ActionBlue.copy(alpha = alpha),
+                                    startAngle = 120f,
+                                    sweepAngle = 120f,
+                                    useCenter = false,
+                                    topLeft = Offset(center.x - r, center.y - r),
+                                    size = Size(r * 2, r * 2),
+                                    style = Stroke(width = strokeW)
+                                )
+                            }
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.Default.Bluetooth,
+                        contentDescription = if (broadcastRemainingSec > 0) "Broadcasting ($broadcastRemainingSec s)" else "Broadcasting",
+                        tint = ActionBlue,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            }
+        } else {
+            // Idle state: Bluetooth icon + countdown mm:ss to next periodic heartbeat
+            val minutes = (nextHeartbeatRemainingSec / 60).coerceAtLeast(0)
+            val seconds = (nextHeartbeatRemainingSec % 60).coerceAtLeast(0)
+            val countdownText = String.format(Locale.US, "%d:%02d", minutes, seconds)
+
+            Surface(
+                modifier = modifier
+                    .size(width = 62.dp, height = 24.dp)
+                    .clickable { onClick() },
+                shape = RoundedCornerShape(10.dp),
+                color = ActionBlue.copy(alpha = 0.08f),
+                border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.25f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bluetooth,
+                        contentDescription = "Bluetooth Master",
+                        tint = ActionBlue.copy(alpha = 0.85f),
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        text = countdownText,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFeatureSettings = "tnum"
+                        ),
+                        fontWeight = FontWeight.SemiBold,
+                        color = ActionBlue.copy(alpha = 0.85f)
+                    )
+                }
+            }
+        }
+    } else {
+        // OBSERVER mode (Receiver)
+        var isReceivingAnimation by remember { mutableStateOf(false) }
+        LaunchedEffect(blePacketReceivedAt) {
+            if (blePacketReceivedAt > 0L) {
+                isReceivingAnimation = true
+                kotlinx.coroutines.delay(3500L)
+                isReceivingAnimation = false
+            }
+        }
+
+        if (isReceivingAnimation) {
+            // Inward converging wave animation (waves pointing inward to center)
+            val transition = rememberInfiniteTransition(label = "BleInwardWaves")
+            val wave1Progress by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 1100, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "inward1"
+            )
+            val wave2Progress by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 1100, delayMillis = 360, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "inward2"
+            )
+            val wave3Progress by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 1100, delayMillis = 720, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "inward3"
+            )
+
+            Surface(
+                modifier = modifier
+                    .size(width = 62.dp, height = 24.dp)
+                    .clickable { onClick() },
+                shape = RoundedCornerShape(10.dp),
+                color = PrimaryEmerald.copy(alpha = 0.14f),
+                border = BorderStroke(0.8.dp, PrimaryEmerald.copy(alpha = 0.45f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(2.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val center = Offset(size.width / 2f, size.height / 2f)
+                        val maxRadius = size.width.coerceAtLeast(size.height) * 0.9f
+
+                        val waves = listOf(wave1Progress, wave2Progress, wave3Progress)
+                        for (prog in waves) {
+                            val r = (1f - prog) * maxRadius
+                            if (r > 2.dp.toPx()) {
+                                val alpha = prog.coerceIn(0.1f, 1f) * 0.85f
+                                val strokeW = (2.2f * (0.6f + prog * 0.4f)).dp.toPx()
+
+                                drawArc(
+                                    color = PrimaryEmerald.copy(alpha = alpha),
+                                    startAngle = -60f,
+                                    sweepAngle = 120f,
+                                    useCenter = false,
+                                    topLeft = Offset(center.x - r, center.y - r),
+                                    size = Size(r * 2, r * 2),
+                                    style = Stroke(width = strokeW)
+                                )
+                                drawArc(
+                                    color = PrimaryEmerald.copy(alpha = alpha),
+                                    startAngle = 120f,
+                                    sweepAngle = 120f,
+                                    useCenter = false,
+                                    topLeft = Offset(center.x - r, center.y - r),
+                                    size = Size(r * 2, r * 2),
+                                    style = Stroke(width = strokeW)
+                                )
+                            }
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.Default.Bluetooth,
+                        contentDescription = "Receiving BLE data",
+                        tint = PrimaryEmerald,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            }
+        } else {
+            // Observer Idle: Bluetooth icon + age of last packet
+            val lastTs = bleSettings.lastPacketTimestamp
+            val nowMs = System.currentTimeMillis()
+            val ageMin = if (lastTs > 0L) ((nowMs - lastTs) / 60_000L).toInt() else -1
+
+            val (badgeText, badgeColor) = when {
+                ageMin < 0 -> Pair("RX", ActionBlue)
+                ageMin < 1 -> Pair("<1м", PrimaryEmerald)
+                ageMin < 5 -> Pair("${ageMin}м", PrimaryEmerald)
+                ageMin < 60 -> Pair("${ageMin}м", Color(0xFF94A3B8))
+                else -> Pair("${ageMin / 60}ч", Color(0xFF94A3B8))
+            }
+
+            Surface(
+                modifier = modifier
+                    .size(width = 62.dp, height = 24.dp)
+                    .clickable { onClick() },
+                shape = RoundedCornerShape(10.dp),
+                color = badgeColor.copy(alpha = 0.08f),
+                border = BorderStroke(0.8.dp, badgeColor.copy(alpha = 0.25f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bluetooth,
+                        contentDescription = "Bluetooth Receiver",
+                        tint = badgeColor.copy(alpha = 0.85f),
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        text = badgeText,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFeatureSettings = "tnum"
+                        ),
+                        fontWeight = FontWeight.SemiBold,
+                        color = badgeColor.copy(alpha = 0.85f)
+                    )
+                }
+            }
+        }
     }
+}
+
+@Composable
+private fun BleStatusDialog(
+    bleSettings: com.tirup.app.domain.model.BleBridgeSettings,
+    isBleBroadcasting: Boolean,
+    broadcastRemainingSec: Int,
+    nextHeartbeatRemainingSec: Int,
+    isRu: Boolean,
+    onToggleEnable: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val isEnabled = bleSettings.isEnabled
+    val isBroadcaster = bleSettings.role == BleBridgeRole.BROADCASTER
+
+    val dialogTitle = when {
+        !isEnabled -> if (isRu) "BLE-мост: Отключен" else "BLE Bridge: Disabled"
+        isBroadcaster -> if (isRu) "BLE-мост: Вещатель" else "BLE Bridge: Broadcaster"
+        else -> if (isRu) "BLE-мост: Приёмник" else "BLE Bridge: Receiver"
+    }
+
+    val dialogDesc = when {
+        !isEnabled -> {
+            if (isRu) {
+                "BLE-радиомост сейчас полностью отключен.\n\n" +
+                "Связь по Bluetooth между смартфонами приостановлена. Вы можете включить радиомост кнопкой ниже в любой момент."
+            } else {
+                "BLE Bridge is currently disabled.\n\n" +
+                "Bluetooth sync between phones is paused. You can enable it below at any time."
+            }
+        }
+        isBroadcaster -> {
+            if (isBleBroadcasting) {
+                if (isRu) {
+                    "Прямо сейчас вещатель передает сигнал Bluetooth в эфир (осталось $broadcastRemainingSec сек).\n\n" +
+                    "Телефоны-приемники в радиусе 10–15 м с семейным PIN (${bleSettings.familyPin}) получают свежий замер сахара, тренд и заряд батареи."
+                } else {
+                    "Broadcasting active ($broadcastRemainingSec s remaining). Receiver phones with PIN ${bleSettings.familyPin} are receiving fresh glucose, trend, and battery."
+                }
+            } else {
+                val min = nextHeartbeatRemainingSec / 60
+                val sec = nextHeartbeatRemainingSec % 60
+                val timeStr = String.format(Locale.US, "%d:%02d", min, sec)
+                if (isRu) {
+                    "Вещатель находится в режиме ожидания. До контрольного сигнала (heartbeat): $timeStr.\n\n" +
+                    "Семейный PIN: ${bleSettings.familyPin}\n" +
+                    "Как только от сенсора поступит свежий замер, вещатель немедленно передаст его в эфир."
+                } else {
+                    "Broadcaster is idle. Heartbeat pulse in: $timeStr.\nFamily PIN: ${bleSettings.familyPin}\nIncoming sensor readings are transmitted immediately."
+                }
+            }
+        }
+        else -> {
+            // Observer
+            val lastTs = bleSettings.lastPacketTimestamp
+            val nowMs = System.currentTimeMillis()
+            val ageMins = if (lastTs > 0L) (nowMs - lastTs) / 60000L else null
+            val ageStr = if (ageMins != null) {
+                when {
+                    ageMins < 1L -> if (isRu) "только что" else "just now"
+                    ageMins < 60L -> "$ageMins " + (if (isRu) "мин. назад" else "min ago")
+                    else -> "${ageMins / 60L} " + (if (isRu) "ч. назад" else "h ago")
+                }
+            } else if (isRu) "нет данных" else "no data"
+
+            val signalQuality = if (bleSettings.lastRssi != 0) {
+                when {
+                    bleSettings.lastRssi >= -70 -> if (isRu) "отличный (${bleSettings.lastRssi} dBm)" else "excellent (${bleSettings.lastRssi} dBm)"
+                    bleSettings.lastRssi >= -85 -> if (isRu) "хороший (${bleSettings.lastRssi} dBm)" else "good (${bleSettings.lastRssi} dBm)"
+                    else -> if (isRu) "слабый (${bleSettings.lastRssi} dBm)" else "weak (${bleSettings.lastRssi} dBm)"
+                }
+            } else if (isRu) "нет" else "none"
+
+            val batStr = if (bleSettings.lastMasterBattery in 0..100) "${bleSettings.lastMasterBattery}%" else if (isRu) "нет данных" else "no data"
+
+            if (isRu) {
+                "Приёмник активен и прослушивает эфир (Семейный PIN: ${bleSettings.familyPin}).\n\n" +
+                "• Последний пакет: $ageStr\n" +
+                "• Батарея вещателя: $batStr\n" +
+                "• Качество сигнала: $signalQuality"
+            } else {
+                "Receiver is active listening for packets (Family PIN: ${bleSettings.familyPin}).\n\n" +
+                "• Last packet: $ageStr\n" +
+                "• Broadcaster battery: $batStr\n" +
+                "• Signal quality: $signalQuality"
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = if (!isEnabled) Icons.Default.BluetoothDisabled else Icons.Default.Bluetooth,
+                    contentDescription = null,
+                    tint = if (!isEnabled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else ActionBlue,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = dialogTitle,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = dialogDesc,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                TextButton(
+                    onClick = onOpenSettings,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text(
+                        text = if (isRu) "⚙️ Настройки BLE..." else "⚙️ BLE Settings...",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = ActionBlue
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = if (isRu) "Закрыть" else "Close", color = ActionBlue, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            Button(
+                onClick = {
+                    onToggleEnable()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isEnabled) MaterialTheme.colorScheme.error.copy(alpha = 0.85f) else ActionBlue
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = if (isEnabled) {
+                        if (isRu) "Отключить мост" else "Disable Bridge"
+                    } else {
+                        if (isRu) "Включить мост" else "Enable Bridge"
+                    },
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    )
 }
 
 @Composable
@@ -1308,10 +1587,11 @@ private fun HeroGlucoseCard(
     onAlertBannerClick: () -> Unit = {},
     masterBatteryPct: Int? = null,
     isMasterBatteryStale: Boolean = false,
-    isBroadcaster: Boolean = false,
+    bleBridgeSettings: com.tirup.app.domain.model.BleBridgeSettings? = null,
     isBleBroadcasting: Boolean = false,
     broadcastRemainingSec: Int = 0,
     nextHeartbeatRemainingSec: Int = 300,
+    blePacketReceivedAt: Long = 0L,
     dailyAlertsCount: Int = 0,
     onAlertHistoryClick: () -> Unit = {},
     onBatteryClick: () -> Unit = {},
@@ -1572,12 +1852,15 @@ private fun HeroGlucoseCard(
                     }
                 }
 
-                // Right: Master BLE Pulse Status or placeholder spacer
-                if (isBroadcaster) {
-                    BleTransmitterBadge(
+                // Right: Master/Receiver BLE status badge
+                if (bleBridgeSettings != null) {
+                    BleBridgeBadge(
+                        bleSettings = bleBridgeSettings,
                         isBleBroadcasting = isBleBroadcasting,
                         broadcastRemainingSec = broadcastRemainingSec,
                         nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
+                        blePacketReceivedAt = blePacketReceivedAt,
+                        isRu = isRu,
                         onClick = onBleClick
                     )
                 } else {
@@ -1586,7 +1869,7 @@ private fun HeroGlucoseCard(
             }
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Large Hero Value with Trend Arrow and Delta
+            // Large Hero Value with Trend Arrow and Delta (Smooth Animated Transitions)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1600,13 +1883,22 @@ private fun HeroGlucoseCard(
                     }
                 } else "--"
 
-                Text(
-                    text = displayVal,
-                    style = MaterialTheme.typography.displayLarge,
-                    color = valueColor,
-                    fontSize = 54.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                AnimatedContent(
+                    targetState = displayVal,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = tween(350)) + slideInVertically(animationSpec = tween(350)) { height -> height / 3 })
+                            .togetherWith(fadeOut(animationSpec = tween(250)) + slideOutVertically(animationSpec = tween(250)) { height -> -height / 3 })
+                    },
+                    label = "glucoseValueAnimation"
+                ) { targetVal ->
+                    Text(
+                        text = targetVal,
+                        style = MaterialTheme.typography.displayLarge,
+                        color = valueColor,
+                        fontSize = 54.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
                 Spacer(modifier = Modifier.width(8.dp))
 
@@ -1617,29 +1909,52 @@ private fun HeroGlucoseCard(
                         color = onSurfaceVariant
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (latestReading?.trendArrow?.isNotEmpty() == true) {
-                            Text(
-                                text = latestReading.trendArrow,
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = valueColor,
-                                fontWeight = FontWeight.Bold
-                            )
+                        val trendArrow = latestReading?.trendArrow ?: ""
+                        AnimatedContent(
+                            targetState = trendArrow,
+                            transitionSpec = {
+                                fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(200))
+                            },
+                            label = "trendArrowAnimation"
+                        ) { targetArrow ->
+                            if (targetArrow.isNotEmpty()) {
+                                Text(
+                                    text = targetArrow,
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    color = valueColor,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
-                        if (delta5Min != null) {
-                            Spacer(modifier = Modifier.width(6.dp))
+
+                        val deltaFormatted = if (delta5Min != null) {
                             val deltaVal = delta5Min.second
-                            val deltaFormatted = if (unit == GlucoseUnit.MMOL_L) {
+                            if (unit == GlucoseUnit.MMOL_L) {
                                 String.format(Locale.US, "%+.1f", deltaVal)
                             } else {
                                 val mg = (deltaVal * 18.0182).roundToInt()
                                 "${if (mg > 0) "+" else ""}$mg"
                             }
-                            Text(
-                                text = deltaFormatted,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = onSurfaceVariant,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                        } else ""
+
+                        AnimatedContent(
+                            targetState = deltaFormatted,
+                            transitionSpec = {
+                                fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(200))
+                            },
+                            label = "deltaAnimation"
+                        ) { targetDelta ->
+                            if (targetDelta.isNotEmpty()) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = targetDelta,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = onSurfaceVariant,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
                         }
                     }
                 }

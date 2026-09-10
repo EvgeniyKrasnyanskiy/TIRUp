@@ -1818,7 +1818,6 @@ fun SettingsScreen(
                                 lineHeight = 16.sp
                             )
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
                         Switch(
                             checked = settings.isDeviceRemindersEnabled,
                             onCheckedChange = { isChecked ->
@@ -1829,6 +1828,72 @@ fun SettingsScreen(
                                 checkedTrackColor = ActionBlue
                             )
                         )
+                    }
+
+                    if (settings.isDeviceRemindersEnabled) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Sensor checkbox
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { viewModel.setSensorReminderEnabled(!settings.isSensorReminderEnabled) }
+                            ) {
+                                Checkbox(
+                                    checked = settings.isSensorReminderEnabled,
+                                    onCheckedChange = { viewModel.setSensorReminderEnabled(it) },
+                                    colors = CheckboxDefaults.colors(checkedColor = ActionBlue)
+                                )
+                                Text(
+                                    text = if (isRu) "Сенсор" else "Sensor",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            // Infusion set checkbox
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { viewModel.setPumpReminderEnabled(!settings.isPumpReminderEnabled) }
+                            ) {
+                                Checkbox(
+                                    checked = settings.isPumpReminderEnabled,
+                                    onCheckedChange = { viewModel.setPumpReminderEnabled(it) },
+                                    colors = CheckboxDefaults.colors(checkedColor = ActionBlue)
+                                )
+                                Text(
+                                    text = if (isRu) "Инф. набор" else "Inf. set",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            // Lancet checkbox
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { viewModel.setLancetReminderEnabled(!settings.isLancetReminderEnabled) }
+                            ) {
+                                Checkbox(
+                                    checked = settings.isLancetReminderEnabled,
+                                    onCheckedChange = { viewModel.setLancetReminderEnabled(it) },
+                                    colors = CheckboxDefaults.colors(checkedColor = ActionBlue)
+                                )
+                                Text(
+                                    text = if (isRu) "Ланцет" else "Lancet",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
                     }
                 }
 
