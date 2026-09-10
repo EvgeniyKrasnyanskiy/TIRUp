@@ -39,7 +39,7 @@
     <string name="period_year">1 Год</string>
     <string name="period_all">Всё время</string>
     <string name="period_more">...</string>
-    <string name="agp_curve_title">Амбулаторный профиль глюкозы (AGP)</string>
+    <string name="agp_curve_title">Амбулаторный гликемический профиль (AGP)</string>
     <string name="agp_median">50% Медиана</string>
     <string name="agp_interquartile">25–75% Диапазон</string>
     <string name="agp_outer">10–90% Диапазон</string>
@@ -54,7 +54,7 @@
 
     <!-- Reports -->
     <string name="reports_title">Отчёт</string>
-    <string name="reports_subtitle">Стандартизированный бланк AGP</string>
+    <string name="reports_subtitle">Стандартизированный отчёт (предпросмотр)</string>
     <string name="report_live_title">Текущий отчёт (Трансляция)</string>
     <string name="report_historical_title">Отчёт из файла xDrip+</string>
     <string name="report_period_title">Период для отчёта</string>

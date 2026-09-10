@@ -75,10 +75,10 @@ class AgpPdfGenerator(private val context: Context) {
             val dateRangeStr = "${dateRangeFmt.format(Date(minTs))} — ${dateRangeFmt.format(Date(maxTs))}"
 
             val periodName = when (selectedPeriod) {
-                TrendPeriod.PERIOD_7D -> if (isRu) "7 Дней" else "7 Days"
-                TrendPeriod.PERIOD_14D -> if (isRu) "14 Дней (AGP Стандарт)" else "14 Days (Standard AGP)"
-                TrendPeriod.PERIOD_30D -> if (isRu) "30 Дней" else "30 Days"
-                TrendPeriod.PERIOD_90D -> if (isRu) "90 Дней" else "90 Days"
+                TrendPeriod.PERIOD_7D -> if (isRu) "7 дней" else "7 Days"
+                TrendPeriod.PERIOD_14D -> if (isRu) "14 дней (AGP Стандарт)" else "14 Days (Standard AGP)"
+                TrendPeriod.PERIOD_30D -> if (isRu) "30 дней" else "30 Days"
+                TrendPeriod.PERIOD_90D -> if (isRu) "90 дней" else "90 Days"
                 TrendPeriod.PERIOD_YEAR -> if (isRu) "1 Год" else "1 Year"
                 TrendPeriod.PERIOD_ALL -> if (isRu) "Всё время" else "All Time"
             }
