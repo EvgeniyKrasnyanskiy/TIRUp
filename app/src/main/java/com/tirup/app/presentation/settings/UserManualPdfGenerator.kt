@@ -330,7 +330,7 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Экстренное SOS SMS и Офлайн-запрос (при потере сознания / шатдауне)" else "Emergency SOS SMS & Offline SMS Query",
                         if (isRu) "Близкие & SOS" else "SOS & Offline",
-                        if (isRu) "При тяжелой гипо (<3.0) и молчании сирены 5м отправляет близкому компактное SMS (≤67 симв.) с координатами. При шатдауне интернета контакт может запросить текущий сахар по SMS."
+                        if (isRu) "При тяжелой гипо (<3.0) отправляет SMS близким с координатами. При шатдауне интернета контакт запрашивает сахар по SMS («сахар»). Важно: в Android выдайте право SMS (если ответ не идёт, переключите Разрешить/Запретить)."
                         else "Sends single-segment SMS (≤67 chars) with GPS if severe hypo (<3.0) siren is ignored for 5m. Trusted contact can query real-time glucose & TIR offline via SMS."
                     )
                 ),

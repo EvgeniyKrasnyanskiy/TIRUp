@@ -1761,7 +1761,7 @@ fun SettingsScreen(
                                         modifier = Modifier.size(20.dp)
                                     )
                                     Text(
-                                        text = if (isRu) "⚠️ Требуется системное разрешение на чтение SMS. Нажмите здесь, чтобы открыть настройки приложения и разрешить SMS."
+                                        text = if (isRu) "⚠️ Требуется разрешение на SMS. Нажмите здесь: в настройках Android переключите SMS в «Запретить» и обратно в «Разрешить» для обновления прав системы."
                                                else "⚠️ Android SMS permission required. Tap here to open App Settings and grant SMS permission.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = ColorHigh,
