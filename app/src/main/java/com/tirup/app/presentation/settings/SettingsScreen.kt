@@ -1764,22 +1764,71 @@ fun SettingsScreen(
             }
         }
 
-        // Section: Weekly Sunday Digest
+                // Section: Weekly Sunday Digest
         BentoCard(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(horizontal = 2.dp, vertical = 2.dp)) {
-                    Row(
+            Column(modifier = Modifier.padding(horizontal = 2.dp, vertical = 2.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (isRu) "📅 Воскресный дайджест" else "📅 Sunday Digest",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (isRu) "Еженедельный клинический отчёт каждое воскресенье в 20:00 (динамика TIR/TING, вариабельность CV, гипо, сравнение с прошлой неделей)"
+                            else "Weekly clinical summary every Sunday at 8:00 PM (TIR/TING dynamics, CV, hypos, and week-over-week comparison)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 16.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Switch(
+                        checked = settings.isWeeklyDigestEnabled,
+                        onCheckedChange = { isChecked ->
+                            viewModel.setWeeklyDigestEnabled(isChecked)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = ActionBlue
+                        )
+                    )
+                }
+
+                if (settings.isWeeklyDigestEnabled) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = {
+                            com.tirup.app.data.worker.WeeklyDigestWorker.triggerImmediately(context)
+                            Toast.makeText(
+                                context,
+                                if (isRu) "Формируем отчёт дайджеста... Протяните шторку уведомлений"
+                                else "Generating weekly digest... Check notifications shade",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = ActionBlue)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (isRu) "📊 Воскресный дайджест" else "📊 Sunday Digest",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                                BentoCard(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = if (isRu) "Сформировать сейчас вручную" else "Generate digest now",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+
+        // Section: Device Reminders
+        BentoCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier
@@ -1891,58 +1940,8 @@ fun SettingsScreen(
                     }
                 }
             }
-        }�" else "Sensor",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
+        }
 
-                            // Infusion set checkbox
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .clickable { viewModel.setPumpReminderEnabled(!settings.isPumpReminderEnabled) }
-                            ) {
-                                Checkbox(
-                                    checked = settings.isPumpReminderEnabled,
-                                    onCheckedChange = { viewModel.setPumpReminderEnabled(it) },
-                                    colors = CheckboxDefaults.colors(checkedColor = ActionBlue),
-                                    modifier = Modifier
-                                        .scale(0.85f)
-                                        .size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text(
-                                    text = if (isRu) "Инф. набор" else "Inf. set",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-
-                            // Lancet checkbox
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .clickable { viewModel.setLancetReminderEnabled(!settings.isLancetReminderEnabled) }
-                            ) {
-                                Checkbox(
-                                    checked = settings.isLancetReminderEnabled,
-                                    onCheckedChange = { viewModel.setLancetReminderEnabled(it) },
-                                    colors = CheckboxDefaults.colors(checkedColor = ActionBlue),
-                                    modifier = Modifier
-                                        .scale(0.85f)
-                                        .size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text(
-                                    text = if (isRu) "Ланцет" else "Lancet",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-                }
 
         // Section 3: Clinical Targets & Sleep Window
         BentoCard(modifier = Modifier.fillMaxWidth()) {

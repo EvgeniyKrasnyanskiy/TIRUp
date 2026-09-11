@@ -50,10 +50,29 @@ class FocusViewModel(
     private val _blePacketReceivedAt = MutableStateFlow(0L)
     val blePacketReceivedAt: StateFlow<Long> = _blePacketReceivedAt.asStateFlow()
 
-    private var _lastTrackedPacketTs = 0L
+    private var lastPebbleSyncTime = 0L
 
     init {
         observeData()
+        observeBlePackets()
+        checkAndRefreshIobCob()
+    }
+
+    private fun observeBlePackets() {
+        viewModelScope.launch {
+            com.tirup.app.data.ble.BleObserverManager.packetReceivedEvent.collect {
+                _blePacketReceivedAt.value = System.currentTimeMillis()
+            }
+        }
+    }
+
+    private fun checkAndRefreshIobCob() {
+        val now = System.currentTimeMillis()
+        if (now - lastPebbleSyncTime < 30_000L) return
+        lastPebbleSyncTime = now
+        if (context != null) {
+            com.tirup.app.data.receiver.DexdripBroadcastReceiver.syncIobCobFromPebble(context)
+        }
     }
 
     private fun observeData() {
@@ -178,11 +197,10 @@ class FocusViewModel(
             }.collect { newState ->
                 _uiState.value = newState
 
-                // Detect new BLE packet: emit hint timestamp when lastPacketTimestamp changes
-                val newPacketTs = newState.userSettings.bleBridgeSettings.lastPacketTimestamp
-                if (newPacketTs > 0L && newPacketTs != _lastTrackedPacketTs) {
-                    _lastTrackedPacketTs = newPacketTs
-                    _blePacketReceivedAt.value = newPacketTs
+                // If latest reading is missing IoB, perform a quick Pebble sync
+                val latest = newState.latestReading
+                if (latest != null && latest.iob == null && (System.currentTimeMillis() - latest.timestamp) <= 25 * 60_000L) {
+                    checkAndRefreshIobCob()
                 }
 
                 val updatedBest = newState.userSettings.withUpdatedBestStreak(newState.streakDays)
@@ -190,7 +208,6 @@ class FocusViewModel(
                     settingsRepository.updateSettings(updatedBest)
                 }
 
-                val latest = newState.latestReading
                 if (context != null && latest != null && newState.userSettings.isLockscreenNotificationEnabled) {
                     GlucoseAlertManager.updateLockscreenNotification(
                         context = context,

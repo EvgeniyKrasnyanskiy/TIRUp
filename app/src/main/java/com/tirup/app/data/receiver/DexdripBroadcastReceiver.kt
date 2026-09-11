@@ -613,122 +613,6 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun fetchIobCobFromLocalPebbleService(): Pair<Double?, Double?>? {
-        // 1. Try /pebble endpoint
-        val pebbleResult = queryLocalEndpoint("pebble")?.let { parsePebbleJson(it) }
-        if (pebbleResult?.first != null && pebbleResult.second != null) {
-            return pebbleResult
-        }
-
-        // 2. Fallback to /status.json endpoint
-        val statusResult = queryLocalEndpoint("status.json")?.let { parseStatusJson(it) }
-        val mergedIob = pebbleResult?.first ?: statusResult?.first
-        val mergedCob = pebbleResult?.second ?: statusResult?.second
-
-        if (mergedIob != null || mergedCob != null) {
-            return Pair(mergedIob, mergedCob)
-        }
-        return null
-    }
-
-    private fun queryLocalEndpoint(endpoint: String): String? {
-        var connection: java.net.HttpURLConnection? = null
-        return try {
-            val url = java.net.URL("http://127.0.0.1:17580/$endpoint")
-            connection = (url.openConnection() as java.net.HttpURLConnection).apply {
-                connectTimeout = 600
-                readTimeout = 600
-                requestMethod = "GET"
-                setRequestProperty("Accept", "application/json")
-            }
-            if (connection.responseCode == 200) {
-                connection.inputStream.bufferedReader().use { it.readText() }
-            } else null
-        } catch (_: Exception) {
-            null
-        } finally {
-            connection?.disconnect()
-        }
-    }
-
-    private fun parseStatusJson(jsonStr: String): Pair<Double?, Double?>? {
-        try {
-            val root = org.json.JSONObject(jsonStr)
-            var iob: Double? = null
-            var cob: Double? = null
-
-            val statusArr = root.optJSONArray("status")
-            val statusObj = if (statusArr != null && statusArr.length() > 0) statusArr.optJSONObject(0) else root
-
-            if (statusObj != null) {
-                val iobObj = statusObj.optJSONObject("iob")
-                if (iobObj != null && iobObj.has("iob")) {
-                    val v = iobObj.optDouble("iob")
-                    if (!v.isNaN() && v >= 0.0) iob = v
-                } else if (statusObj.has("iob")) {
-                    val v = statusObj.optDouble("iob")
-                    if (!v.isNaN() && v >= 0.0) iob = v
-                }
-
-                val cobObj = statusObj.optJSONObject("cob")
-                if (cobObj != null && cobObj.has("cob")) {
-                    val v = cobObj.optDouble("cob")
-                    if (!v.isNaN() && v >= 0.0) cob = v
-                } else if (statusObj.has("cob")) {
-                    val v = statusObj.optDouble("cob")
-                    if (!v.isNaN() && v >= 0.0) cob = v
-                }
-            }
-            if (iob != null || cob != null) {
-                return Pair(iob, cob)
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to parse status.json: ${e.message}")
-        }
-        return null
-    }
-
-    private fun parsePebbleJson(jsonStr: String): Pair<Double?, Double?>? {
-        try {
-            val root = org.json.JSONObject(jsonStr)
-            var iob: Double? = null
-            var cob: Double? = null
-
-            // 1. Root level iob / cob
-            if (root.has("iob") && !root.isNull("iob")) {
-                val v = root.optDouble("iob")
-                if (!v.isNaN() && v >= 0.0) iob = v
-            }
-            if (root.has("cob") && !root.isNull("cob")) {
-                val v = root.optDouble("cob")
-                if (!v.isNaN() && v >= 0.0) cob = v
-            }
-
-            // 2. Nested in bgs array (Pebble format)
-            if ((iob == null || cob == null) && root.has("bgs")) {
-                val bgs = root.optJSONArray("bgs")
-                if (bgs != null && bgs.length() > 0) {
-                    val first = bgs.optJSONObject(0)
-                    if (first != null) {
-                        if (iob == null && first.has("iob") && !first.isNull("iob")) {
-                            val v = first.optDouble("iob")
-                            if (!v.isNaN() && v >= 0.0) iob = v
-                        }
-                        if (cob == null && first.has("cob") && !first.isNull("cob")) {
-                            val v = first.optDouble("cob")
-                            if (!v.isNaN() && v >= 0.0) cob = v
-                        }
-                    }
-                }
-            }
-            if (iob != null || cob != null) {
-                return Pair(iob, cob)
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to parse local pebble JSON: ${e.message}")
-        }
-        return null
-    }
 
     private fun extractTreatment(extras: Bundle, defaultTimestamp: Long): Treatment? {
         val insulin = getDoubleFromBundle(extras, "treatment.insulin")
@@ -797,6 +681,168 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         private var cachedCob: Double? = null
         @Volatile
         private var cachedCobTimestamp: Long = 0L
+
+        private val companionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        fun parseJsonDouble(obj: org.json.JSONObject, key: String): Double? {
+            if (!obj.has(key) || obj.isNull(key)) return null
+            val raw = obj.opt(key) ?: return null
+            return when (raw) {
+                is Number -> {
+                    val d = raw.toDouble()
+                    if (!d.isNaN()) d else null
+                }
+                is String -> {
+                    val clean = raw.trim().replace(',', '.')
+                    clean.toDoubleOrNull() ?: run {
+                        Regex("""^([0-9]+(?:[.,][0-9]+)?)""").find(clean)?.groupValues?.get(1)?.replace(',', '.')?.toDoubleOrNull()
+                    }
+                }
+                else -> null
+            }
+        }
+
+        fun parseStatusJson(jsonStr: String): Pair<Double?, Double?>? {
+            try {
+                val root = org.json.JSONObject(jsonStr)
+                var iob: Double? = null
+                var cob: Double? = null
+
+                val statusArr = root.optJSONArray("status")
+                val statusObj = if (statusArr != null && statusArr.length() > 0) statusArr.optJSONObject(0) else root
+
+                if (statusObj != null) {
+                    val iobObj = statusObj.optJSONObject("iob")
+                    if (iobObj != null && iobObj.has("iob")) {
+                        val v = parseJsonDouble(iobObj, "iob")
+                        if (v != null && v >= 0.0) iob = v
+                    } else if (statusObj.has("iob")) {
+                        val v = parseJsonDouble(statusObj, "iob")
+                        if (v != null && v >= 0.0) iob = v
+                    }
+
+                    val cobObj = statusObj.optJSONObject("cob")
+                    if (cobObj != null && cobObj.has("cob")) {
+                        val v = parseJsonDouble(cobObj, "cob")
+                        if (v != null && v >= 0.0) cob = v
+                    } else if (statusObj.has("cob")) {
+                        val v = parseJsonDouble(statusObj, "cob")
+                        if (v != null && v >= 0.0) cob = v
+                    }
+                }
+                if (iob != null || cob != null) {
+                    return Pair(iob, cob)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to parse status.json: ${e.message}")
+            }
+            return null
+        }
+
+        fun parsePebbleJson(jsonStr: String): Pair<Double?, Double?>? {
+            try {
+                val root = org.json.JSONObject(jsonStr)
+                var iob: Double? = null
+                var cob: Double? = null
+
+                // 1. Root level iob / cob
+                val rootIob = parseJsonDouble(root, "iob")
+                if (rootIob != null && rootIob >= 0.0) iob = rootIob
+
+                val rootCob = parseJsonDouble(root, "cob")
+                if (rootCob != null && rootCob >= 0.0) cob = rootCob
+
+                // 2. Nested in bgs array (Pebble format)
+                if ((iob == null || cob == null) && root.has("bgs")) {
+                    val bgs = root.optJSONArray("bgs")
+                    if (bgs != null && bgs.length() > 0) {
+                        val first = bgs.optJSONObject(0)
+                        if (first != null) {
+                            if (iob == null) {
+                                val v = parseJsonDouble(first, "iob")
+                                if (v != null && v >= 0.0) iob = v
+                            }
+                            if (cob == null) {
+                                val v = parseJsonDouble(first, "cob")
+                                if (v != null && v >= 0.0) cob = v
+                            }
+                        }
+                    }
+                }
+                if (iob != null || cob != null) {
+                    return Pair(iob, cob)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to parse local pebble JSON: ${e.message}")
+            }
+            return null
+        }
+
+        fun queryLocalEndpoint(endpoint: String): String? {
+            var connection: java.net.HttpURLConnection? = null
+            return try {
+                val url = java.net.URL("http://127.0.0.1:17580/$endpoint")
+                connection = (url.openConnection() as java.net.HttpURLConnection).apply {
+                    connectTimeout = 600
+                    readTimeout = 600
+                    requestMethod = "GET"
+                    setRequestProperty("Accept", "application/json")
+                }
+                if (connection.responseCode == 200) {
+                    connection.inputStream.bufferedReader().use { it.readText() }
+                } else null
+            } catch (_: Exception) {
+                null
+            } finally {
+                connection?.disconnect()
+            }
+        }
+
+        fun fetchIobCobFromLocalPebbleService(): Pair<Double?, Double?>? {
+            // 1. Try /pebble endpoint
+            val pebbleResult = queryLocalEndpoint("pebble")?.let { parsePebbleJson(it) }
+            if (pebbleResult?.first != null && pebbleResult.second != null) {
+                return pebbleResult
+            }
+
+            // 2. Fallback to /status.json endpoint
+            val statusResult = queryLocalEndpoint("status.json")?.let { parseStatusJson(it) }
+            val mergedIob = pebbleResult?.first ?: statusResult?.first
+            val mergedCob = pebbleResult?.second ?: statusResult?.second
+
+            if (mergedIob != null || mergedCob != null) {
+                return Pair(mergedIob, mergedCob)
+            }
+            return null
+        }
+
+        fun syncIobCobFromPebble(context: Context) {
+            companionScope.launch {
+                try {
+                    val pebbleData = fetchIobCobFromLocalPebbleService() ?: return@launch
+                    val (iob, cob) = pebbleData
+                    if (iob == null && cob == null) return@launch
+                    val app = context.applicationContext as? TirupApplication ?: return@launch
+                    val db = app.database
+                    val latestEntity = db.glucoseReadingDao().getRecentReadingsSync(1).firstOrNull() ?: return@launch
+                    if (System.currentTimeMillis() - latestEntity.timestamp <= IOB_COB_EXPIRY_MS) {
+                        val newIob = if (iob != null && iob > 0.05) iob else latestEntity.iob
+                        val newCob = if (cob != null && cob > 0.5) cob else latestEntity.cob
+                        if (newIob != latestEntity.iob || newCob != latestEntity.cob) {
+                            db.glucoseReadingDao().updateIobCob(latestEntity.id, newIob, newCob)
+                            cachedIob = newIob
+                            cachedIobTimestamp = System.currentTimeMillis()
+                            cachedCob = newCob
+                            cachedCobTimestamp = System.currentTimeMillis()
+                            com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context.applicationContext)
+                            Log.i(TAG, "Synced IoB/CoB from Pebble service to reading ${latestEntity.id}: iob=$newIob, cob=$newCob")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "syncIobCobFromPebble failed: ${e.message}")
+                }
+            }
+        }
 
         fun sendXdripBroadcastServiceHandshake(context: Context) {
             try {
