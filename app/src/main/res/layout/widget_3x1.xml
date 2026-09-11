@@ -103,6 +103,18 @@
             android:textColor="#10B981"
             android:textSize="10sp"
             android:textStyle="bold" />
+
+        <!-- Line 3: Horizontal TIR Progress Bar -->
+        <ProgressBar
+            android:id="@+id/widget_tir_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:layout_marginTop="2dp"
+            android:max="100"
+            android:progress="97"
+            android:progressBackgroundTint="#2E3A4B"
+            android:progressTint="#10B981" />
     </LinearLayout>
 
     <!-- 3. Right: Stacked [ IoB / Streak ] in 2 rows -->

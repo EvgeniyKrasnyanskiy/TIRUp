@@ -1,12 +1,12 @@
 <resources>
     <string name="app_name">TIRUp</string>
-    <string name="nav_focus">Current</string>
+    <string name="nav_focus">Home</string>
     <string name="nav_trends">Analytics &amp; Trends</string>
     <string name="nav_reports">Report</string>
     <string name="nav_settings">Settings</string>
 
     <!-- Focus Screen -->
-    <string name="focus_title">Current Data</string>
+    <string name="focus_title">Home</string>
     <string name="current_glucose">Glucose</string>
     <string name="unit_mmol">mmol/L</string>
     <string name="unit_mgdl">mg/dL</string>

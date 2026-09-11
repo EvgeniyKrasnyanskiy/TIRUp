@@ -13,8 +13,13 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Remove
+import android.app.TimePickerDialog
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
+import androidx.compose.ui.platform.LocalContext
+import java.util.Calendar
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,9 +56,9 @@ fun DeviceStatusModal(
     showLancet: Boolean = true,
     isRu: Boolean,
     onDismiss: () -> Unit,
-    onNewSensor: (durationDays: Int) -> Unit,
-    onNewPumpSet: (durationDays: Int) -> Unit,
-    onNewLancet: (durationDays: Int) -> Unit
+    onNewSensor: (durationDays: Int, installedAt: Long) -> Unit,
+    onNewPumpSet: (durationDays: Int, installedAt: Long) -> Unit,
+    onNewLancet: (durationDays: Int, installedAt: Long) -> Unit
 ) {
     // Sensor confirmation state
     var showSensorConfirm by remember { mutableStateOf(false) }
@@ -95,7 +100,6 @@ fun DeviceStatusModal(
                 // Header Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -103,9 +107,6 @@ fun DeviceStatusModal(
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
-                    TextButton(onClick = onDismiss) {
-                        Text(if (isRu) "Закрыть" else "Close")
-                    }
                 }
 
                 // --- SENSOR SECTION ---
@@ -178,6 +179,16 @@ fun DeviceStatusModal(
                         buttonLabel = if (isRu) "Новый ланцет" else "New Lancet"
                     )
                 }
+
+                // Bottom Close button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(if (isRu) "Закрыть" else "Close")
+                    }
+                }
             }
         }
     }
@@ -188,9 +199,9 @@ fun DeviceStatusModal(
             title = if (isRu) "Новый сенсор CGM" else "New CGM Sensor",
             message = if (isRu) "Подтвердите установку нового сенсора на $pendingSensorDays дн." else "Confirm new sensor for $pendingSensorDays days.",
             isRu = isRu,
-            onConfirm = {
+            onConfirm = { installedAt ->
                 showSensorConfirm = false
-                onNewSensor(pendingSensorDays)
+                onNewSensor(pendingSensorDays, installedAt)
                 onDismiss()
             },
             onDismiss = { showSensorConfirm = false }
@@ -203,9 +214,9 @@ fun DeviceStatusModal(
             title = if (isRu) "Новый инфузионный набор" else "New Infusion Set",
             message = if (isRu) "Подтвердите замену инфузионного набора на $pendingPumpDays дн." else "Confirm new infusion set for $pendingPumpDays days.",
             isRu = isRu,
-            onConfirm = {
+            onConfirm = { installedAt ->
                 showPumpConfirm = false
-                onNewPumpSet(pendingPumpDays)
+                onNewPumpSet(pendingPumpDays, installedAt)
                 onDismiss()
             },
             onDismiss = { showPumpConfirm = false }
@@ -218,9 +229,9 @@ fun DeviceStatusModal(
             title = if (isRu) "Новый ланцет" else "New Lancet",
             message = if (isRu) "Подтвердите замену ланцета на $pendingLancetDays дн." else "Confirm new lancet for $pendingLancetDays days.",
             isRu = isRu,
-            onConfirm = {
+            onConfirm = { installedAt ->
                 showLancetConfirm = false
-                onNewLancet(pendingLancetDays)
+                onNewLancet(pendingLancetDays, installedAt)
                 onDismiss()
             },
             onDismiss = { showLancetConfirm = false }
@@ -468,55 +479,185 @@ private fun DurationPickerCompact(
 }
 
 /**
- * Confirmation dialog with 3-second countdown auto-dismiss.
+ * Confirmation dialog with time selection and countdown auto-dismiss (when unedited).
  */
 @Composable
 fun CountdownConfirmDialog(
     title: String,
     message: String,
     isRu: Boolean,
-    onConfirm: () -> Unit,
+    onConfirm: (installedAt: Long) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var secondsLeft by remember { mutableStateOf(3) }
+    var secondsLeft by remember { mutableStateOf(5) }
     var animProgress by remember { mutableStateOf(1f) }
+    var isTimeEdited by remember { mutableStateOf(false) }
+    var selectedTimestamp by remember { mutableStateOf(System.currentTimeMillis()) }
+    val context = LocalContext.current
 
     val animatedProgress by animateFloatAsState(
         targetValue = animProgress,
-        animationSpec = tween(durationMillis = 3000, easing = LinearEasing),
+        animationSpec = tween(durationMillis = 5000, easing = LinearEasing),
         label = "countdown_progress"
     )
 
-    LaunchedEffect(Unit) {
-        animProgress = 0f
-        while (secondsLeft > 0) {
-            delay(1000L)
-            secondsLeft--
+    LaunchedEffect(isTimeEdited) {
+        if (!isTimeEdited) {
+            animProgress = 0f
+            while (secondsLeft > 0) {
+                delay(1000L)
+                secondsLeft--
+            }
+            onDismiss()
         }
-        onDismiss()
+    }
+
+    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+    val dateFormat = remember { SimpleDateFormat("d MMMM, HH:mm", if (isRu) Locale("ru") else Locale.ENGLISH) }
+
+    val isToday = remember(selectedTimestamp) {
+        val nowCal = Calendar.getInstance()
+        val selCal = Calendar.getInstance().apply { timeInMillis = selectedTimestamp }
+        nowCal.get(Calendar.YEAR) == selCal.get(Calendar.YEAR) &&
+                nowCal.get(Calendar.DAY_OF_YEAR) == selCal.get(Calendar.DAY_OF_YEAR)
+    }
+
+    val displayTimeStr = if (isToday) {
+        "${if (isRu) "Сегодня" else "Today"}, ${timeFormat.format(Date(selectedTimestamp))}"
+    } else {
+        dateFormat.format(Date(selectedTimestamp))
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.Warning, contentDescription = null) },
+        icon = { Icon(Icons.Default.AccessTime, contentDescription = null, tint = ActionBlue) },
         title = { Text(title) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(message)
-                LinearProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier.fillMaxWidth(),
-                    strokeCap = StrokeCap.Round
-                )
-                Text(
-                    text = if (isRu) "Автоотмена через $secondsLeft сек." else "Auto-cancel in $secondsLeft s",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = if (isRu) "Время установки:" else "Installation time:",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = displayTimeStr,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+
+                            Button(
+                                onClick = {
+                                    isTimeEdited = true
+                                    val currentCal = Calendar.getInstance().apply { timeInMillis = selectedTimestamp }
+                                    TimePickerDialog(
+                                        context,
+                                        { _, hourOfDay, minute ->
+                                            val newCal = Calendar.getInstance().apply {
+                                                timeInMillis = selectedTimestamp
+                                                set(Calendar.HOUR_OF_DAY, hourOfDay)
+                                                set(Calendar.MINUTE, minute)
+                                                set(Calendar.SECOND, 0)
+                                                set(Calendar.MILLISECOND, 0)
+                                            }
+                                            selectedTimestamp = newCal.timeInMillis
+                                        },
+                                        currentCal.get(Calendar.HOUR_OF_DAY),
+                                        currentCal.get(Calendar.MINUTE),
+                                        true
+                                    ).show()
+                                },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = ActionBlue.copy(alpha = 0.15f),
+                                    contentColor = ActionBlue
+                                )
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(if (isRu) "Изменить" else "Change", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    isTimeEdited = true
+                                    selectedTimestamp = System.currentTimeMillis()
+                                },
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(if (isRu) "Сейчас" else "Now", style = MaterialTheme.typography.labelSmall)
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    isTimeEdited = true
+                                    selectedTimestamp = System.currentTimeMillis() - 3600_000L
+                                },
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(if (isRu) "-1 час" else "-1h", style = MaterialTheme.typography.labelSmall)
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    isTimeEdited = true
+                                    val cal = Calendar.getInstance().apply {
+                                        timeInMillis = selectedTimestamp
+                                        add(Calendar.DAY_OF_YEAR, -1)
+                                    }
+                                    selectedTimestamp = cal.timeInMillis
+                                },
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(if (isRu) "Вчера" else "Yesterday", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                }
+
+                if (!isTimeEdited) {
+                    LinearProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier.fillMaxWidth(),
+                        strokeCap = StrokeCap.Round
+                    )
+                    Text(
+                        text = if (isRu) "Автоотмена через $secondsLeft сек." else "Auto-cancel in $secondsLeft s",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         },
         confirmButton = {
-            Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)) {
+            Button(
+                onClick = { onConfirm(selectedTimestamp) },
+                colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
+            ) {
                 Text(if (isRu) "Подтвердить" else "Confirm")
             }
         },

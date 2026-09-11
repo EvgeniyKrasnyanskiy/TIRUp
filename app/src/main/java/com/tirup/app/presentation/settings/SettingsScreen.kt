@@ -3535,7 +3535,7 @@ private fun PatientProfileEditDialog(
                                             text = carbRec.formatDailySummary(isRu),
                                             style = MaterialTheme.typography.bodySmall,
                                             fontWeight = FontWeight.Bold,
-                                            color = ActionBlue
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
 

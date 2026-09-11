@@ -54,6 +54,20 @@
         android:textSize="10sp"
         android:textStyle="bold" />
 
+    <!-- Row 3: Horizontal TIR Progress Bar -->
+    <ProgressBar
+        android:id="@+id/widget_tir_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="4dp"
+        android:layout_marginTop="2dp"
+        android:max="100"
+        android:progress="100"
+        android:progressBackgroundTint="#2E3A4B"
+        android:progressTint="#10B981" />
+
     <!-- Hidden dummy views so updater doesn't crash if referenced -->
     <TextView
         android:id="@+id/widget_time_ago"

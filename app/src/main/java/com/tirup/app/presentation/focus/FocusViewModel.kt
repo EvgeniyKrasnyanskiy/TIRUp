@@ -268,13 +268,13 @@ class FocusViewModel(
             glucoseRepository.deleteTreatmentById(treatmentId)
         }
     }
-    fun updateSensorInstalled(durationDays: Int) {
+    fun updateSensorInstalled(durationDays: Int, installedAt: Long = System.currentTimeMillis()) {
         val currentSettings = _uiState.value.userSettings
         viewModelScope.launch {
             settingsRepository.updateSettings(
                 currentSettings.copy(
                     sensorStatus = SensorStatus(
-                        installedAt = System.currentTimeMillis(),
+                        installedAt = installedAt,
                         durationDays = durationDays,
                         lastUsedDurationDays = durationDays
                     )
@@ -283,13 +283,13 @@ class FocusViewModel(
         }
     }
 
-    fun updatePumpSetInstalled(durationDays: Int) {
+    fun updatePumpSetInstalled(durationDays: Int, installedAt: Long = System.currentTimeMillis()) {
         val currentSettings = _uiState.value.userSettings
         viewModelScope.launch {
             settingsRepository.updateSettings(
                 currentSettings.copy(
                     pumpSetStatus = PumpSetStatus(
-                        installedAt = System.currentTimeMillis(),
+                        installedAt = installedAt,
                         durationDays = durationDays,
                         lastUsedDurationDays = durationDays
                     )
@@ -298,13 +298,13 @@ class FocusViewModel(
         }
     }
 
-    fun updateLancetInstalled(durationDays: Int) {
+    fun updateLancetInstalled(durationDays: Int, installedAt: Long = System.currentTimeMillis()) {
         val currentSettings = _uiState.value.userSettings
         viewModelScope.launch {
             settingsRepository.updateSettings(
                 currentSettings.copy(
                     lancetStatus = com.tirup.app.domain.model.LancetStatus(
-                        installedAt = System.currentTimeMillis(),
+                        installedAt = installedAt,
                         durationDays = durationDays,
                         lastUsedDurationDays = durationDays
                     )
