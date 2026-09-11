@@ -314,6 +314,10 @@ fun FocusScreen(
                 nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
                 blePacketReceivedAt = blePacketReceivedAt,
                 dailyAlertsCount = dailyAlertLogs.size,
+                areAlertsMuted = run {
+                    val a = userSettings.alertSettings
+                    !a.isAlertsMasterEnabled || (!a.isPredictiveEnabled && !a.isMainEnabled && !a.isSignalLossEnabled && !a.isLastChanceAlertEnabled)
+                },
                 onAlertHistoryClick = { showDailyAlertLogsDialog = true },
                 onBatteryClick = {
                     val title = if (isRu) "Заряд батареи вещателя" else "Broadcaster Battery"
@@ -860,7 +864,7 @@ fun FocusScreen(
             val nightStability = state.statistics.nightStability
             val hasNightData = nightStability.nightDurationMinutes >= 45 || (nightStability.nightReadingsCount >= 10 && nightStability.nightDurationMinutes >= 30)
 
-            val sdFormatted = if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", nightStability.sdMmol)
+            val sdFormatted = if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.2f", nightStability.sdMmol)
             else "${(nightStability.sdMmol * 18.0182).toInt()}"
             val sdTarget = if (unit == GlucoseUnit.MMOL_L) 1.5 else (1.5 * 18.0182)
 
@@ -872,8 +876,8 @@ fun FocusScreen(
                                                    else "Night hypo risk: TBR ${String.format(Locale.US, "%.1f%%", nightStability.tbrPercent)}"
                 nightStability.tarPercent > 25.0 -> if (isRu) "Ночные подъёмы: TAR ${String.format(Locale.US, "%.0f%%", nightStability.tarPercent)}, SD $sdFormatted"
                                                     else "Night highs: TAR ${String.format(Locale.US, "%.0f%%", nightStability.tarPercent)}, SD $sdFormatted"
-                nightStability.sdMmol > sdTarget -> if (isRu) "Высокая вариабельность: SD $sdFormatted"
-                                                    else "High variability: SD $sdFormatted"
+                nightStability.sdMmol > sdTarget -> if (isRu) "Разброс (SD): $sdFormatted"
+                                                    else "Variability (SD): $sdFormatted"
                 nightStability.isStable -> if (isRu) "Стабильный профиль: TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)}, SD $sdFormatted"
                                            else "Stable profile: TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)}, SD $sdFormatted"
                 else -> if (isRu) "Обнаружены колебания сахара" else "Glucose fluctuations detected"
@@ -917,7 +921,7 @@ fun FocusScreen(
                                 "• Ночной размах: $minStr – $maxStr\n" +
                                 "• Ночной TIR (3.9–10.0): ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)} (цель ≥70%)\n" +
                                 "• Ночной TING (3.9–7.8): ${String.format(Locale.US, "%.0f%%", nightStability.tingPercent)} (цель ≥50%)\n" +
-                                "• Разброс (SD): $sdStr (норма ≤1.5)\n" +
+                                "• Разброс (SD): $sdStr (норма ≤${if (unit == GlucoseUnit.MMOL_L) "1.50" else "27"})\n" +
                                 "• Вариабельность (%CV): ${String.format(Locale.US, "%.1f%%", nightStability.cvPercent)} (норма ≤36%)\n" +
                                 "• Ночные гипо (TBR): ${String.format(Locale.US, "%.1f%%", nightStability.tbrPercent)}\n" +
                                 "• Длительность сна: ${nightStability.nightDurationMinutes} мин (${nightStability.nightReadingsCount} точек)" +
@@ -1098,8 +1102,11 @@ fun FocusScreen(
 
     // Daily Alert Logs Dialog
     if (showDailyAlertLogsDialog) {
+        val a = userSettings.alertSettings
+        val areAlertsMuted = !a.isAlertsMasterEnabled || (!a.isPredictiveEnabled && !a.isMainEnabled && !a.isSignalLossEnabled && !a.isLastChanceAlertEnabled)
         DailyAlertLogsDialog(
             logs = dailyAlertLogs,
+            areAlertsMuted = areAlertsMuted,
             isRu = isRu,
             onDismiss = { showDailyAlertLogsDialog = false }
         )
@@ -1597,6 +1604,7 @@ private fun HeroGlucoseCard(
     nextHeartbeatRemainingSec: Int = 300,
     blePacketReceivedAt: Long = 0L,
     dailyAlertsCount: Int = 0,
+    areAlertsMuted: Boolean = false,
     onAlertHistoryClick: () -> Unit = {},
     onBatteryClick: () -> Unit = {},
     onIobClick: () -> Unit = {},
@@ -1774,7 +1782,7 @@ private fun HeroGlucoseCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text(text = "🔔", fontSize = 12.sp)
+                        Text(text = if (areAlertsMuted) "🔕" else "🔔", fontSize = 12.sp)
                         if (dailyAlertsCount > 0) {
                             Text(
                                 text = "$dailyAlertsCount",
@@ -2233,6 +2241,7 @@ private fun TargetCompensatorCard(
 @Composable
 private fun DailyAlertLogsDialog(
     logs: List<AlertLogEntry>,
+    areAlertsMuted: Boolean = false,
     isRu: Boolean,
     onDismiss: () -> Unit
 ) {
@@ -2243,7 +2252,7 @@ private fun DailyAlertLogsDialog(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(text = "🔔", fontSize = 20.sp)
+                Text(text = if (areAlertsMuted) "🔕" else "🔔", fontSize = 20.sp)
                 Text(
                     text = if (isRu) "Журнал тревог" else "Alert Log",
                     style = MaterialTheme.typography.titleMedium,
@@ -2253,14 +2262,41 @@ private fun DailyAlertLogsDialog(
             }
         },
         text = {
-            if (logs.isEmpty()) {
-                Text(
-                    text = if (isRu) "Сегодня тревожных событий и выходов за целевой диапазон не зафиксировано. Отличная компенсация! ✨"
-                           else "No alert events recorded today. Great glycemic control! ✨",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                if (areAlertsMuted) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = ColorHigh.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, ColorHigh.copy(alpha = 0.4f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text("🔕", fontSize = 16.sp)
+                            Text(
+                                text = if (isRu) "Оповещения отключены в настройках приложения"
+                                       else "Alerts are currently disabled in settings",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ColorHigh,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+
+                if (logs.isEmpty()) {
+                    Text(
+                        text = if (isRu) "Сегодня тревожных событий и выходов за целевой диапазон не зафиксировано. Отличная компенсация! ✨"
+                               else "No alert events recorded today. Great glycemic control! ✨",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2324,6 +2360,7 @@ private fun DailyAlertLogsDialog(
                             }
                         }
                     }
+                }
                 }
             }
         },

@@ -15,7 +15,7 @@
     <string name="mode_ting">TING (Узкий)</string>
     <string name="target_label">Цель: ≥%d%%</string>
     <string name="current_label">Текущий: %.1f%%</string>
-    <string name="compensator_title">Компенсация</string>
+    <string name="compensator_title">Компенсация дня</string>
     <string name="compensator_desc_reach">Чтобы достичь цели %1$s в %2$d%%, удерживайте ≥%3$.0f%% в оставшиеся %4$d дн.</string>
     <string name="compensator_desc_exceeding">Отличный темп! Вы опережаете цель. Поддерживайте ≥%1$.0f%% в оставшиеся %2$d дн. для закрепления результата.</string>
     <string name="compensator_desc_impossible">В оставшееся время математически невозможно достичь цели, но каждый день в диапазоне улучшает итоговый гликированный гемоглобин.</string>

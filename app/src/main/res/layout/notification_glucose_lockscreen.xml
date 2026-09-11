@@ -24,6 +24,10 @@
             android:textSize="26sp"
             android:textStyle="bold"
             android:textColor="#10B981"
+            android:shadowColor="#000000"
+            android:shadowDx="0"
+            android:shadowDy="0"
+            android:shadowRadius="3"
             android:includeFontPadding="false" />
 
         <TextView
@@ -35,6 +39,10 @@
             android:textSize="24sp"
             android:textStyle="bold"
             android:textColor="#10B981"
+            android:shadowColor="#000000"
+            android:shadowDx="0"
+            android:shadowDy="0"
+            android:shadowRadius="3"
             android:includeFontPadding="false" />
 
         <TextView
@@ -45,7 +53,11 @@
             android:text="Δ +0.2"
             android:textSize="13sp"
             android:textStyle="bold"
-            android:textColor="#94A3B8" />
+            android:textColor="#94A3B8"
+            android:shadowColor="#000000"
+            android:shadowDx="0"
+            android:shadowDy="0"
+            android:shadowRadius="3" />
 
         <FrameLayout
             android:layout_width="0dp"

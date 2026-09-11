@@ -210,9 +210,16 @@ fun SettingsScreen(
         }
     }
 
+    var hasReceiveSmsPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
     val receiveSmsPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
+        hasReceiveSmsPermission = isGranted
         if (isGranted) {
             Toast.makeText(context, if (isRu) "Разрешение на приём SMS-запросов предоставлено" else "SMS receive permission granted", Toast.LENGTH_SHORT).show()
         } else {
@@ -1725,6 +1732,43 @@ fun SettingsScreen(
                                     viewModel.updateAlertSettings(alerts.copy(isSmsQueryReplyEnabled = isChecked))
                                 }
                             )
+                        }
+
+                        if (alerts.isSmsQueryReplyEnabled && (!hasReceiveSmsPermission || ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED)) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = ColorHigh.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, ColorHigh.copy(alpha = 0.5f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        val intent = Intent(
+                                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                            Uri.fromParts("package", context.packageName, null)
+                                        )
+                                        context.startActivity(intent)
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = ColorHigh,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        text = if (isRu) "⚠️ Требуется системное разрешение на чтение SMS. Нажмите здесь, чтобы открыть настройки приложения и разрешить SMS."
+                                               else "⚠️ Android SMS permission required. Tap here to open App Settings and grant SMS permission.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = ColorHigh,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
                         }
 
                         // Send test verification SMS button
