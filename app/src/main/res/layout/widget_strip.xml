@@ -258,14 +258,11 @@
             android:visibility="gone" />
     </LinearLayout>
 
-    <!-- 5. Optional Sparkline Chart on 5x1 wide screens -->
+    <!-- 5. Sparkline Chart removed on 5x1 strip to keep 5 main columns uncompressed -->
     <ImageView
         android:id="@+id/widget_chart_image"
         android:layout_width="0dp"
-        android:layout_height="32dp"
-        android:layout_weight="1"
-        android:layout_marginStart="6dp"
-        android:scaleType="fitXY"
+        android:layout_height="0dp"
         android:visibility="gone" />
 
     <!-- Dummy views for compatibility -->

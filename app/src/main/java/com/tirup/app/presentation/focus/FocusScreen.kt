@@ -1029,9 +1029,9 @@ fun FocusScreen(
             showLancet = userSettings.isLancetReminderEnabled,
             isRu = isRu,
             onDismiss = { showDeviceModal = false },
-            onNewSensor = { days -> viewModel.updateSensorInstalled(days) },
-            onNewPumpSet = { days -> viewModel.updatePumpSetInstalled(days) },
-            onNewLancet = { days -> viewModel.updateLancetInstalled(days) }
+            onNewSensor = { days, time -> viewModel.updateSensorInstalled(days, time) },
+            onNewPumpSet = { days, time -> viewModel.updatePumpSetInstalled(days, time) },
+            onNewLancet = { days, time -> viewModel.updateLancetInstalled(days, time) }
         )
     }
 
@@ -1291,7 +1291,7 @@ private fun BleBridgeBadge(
         // OBSERVER mode (Receiver)
         var isReceivingAnimation by remember { mutableStateOf(false) }
         LaunchedEffect(blePacketReceivedAt) {
-            if (blePacketReceivedAt > 0L) {
+            if (blePacketReceivedAt > 0L && (System.currentTimeMillis() - blePacketReceivedAt) < 4000L) {
                 isReceivingAnimation = true
                 kotlinx.coroutines.delay(3500L)
                 isReceivingAnimation = false
@@ -1334,8 +1334,8 @@ private fun BleBridgeBadge(
                     .size(width = 62.dp, height = 24.dp)
                     .clickable { onClick() },
                 shape = RoundedCornerShape(10.dp),
-                color = PrimaryEmerald.copy(alpha = 0.14f),
-                border = BorderStroke(0.8.dp, PrimaryEmerald.copy(alpha = 0.45f))
+                color = ActionBlue.copy(alpha = 0.14f),
+                border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.5f))
             ) {
                 Box(
                     modifier = Modifier
@@ -1357,7 +1357,7 @@ private fun BleBridgeBadge(
 
                             // Right wave: convex front points left toward center (crest at center.x + d)
                             drawArc(
-                                color = PrimaryEmerald.copy(alpha = alpha),
+                                color = ActionBlue.copy(alpha = alpha),
                                 startAngle = 120f,
                                 sweepAngle = 120f,
                                 useCenter = false,
@@ -1367,7 +1367,7 @@ private fun BleBridgeBadge(
                             )
                             // Left wave: convex front points right toward center (crest at center.x - d)
                             drawArc(
-                                color = PrimaryEmerald.copy(alpha = alpha),
+                                color = ActionBlue.copy(alpha = alpha),
                                 startAngle = -60f,
                                 sweepAngle = 120f,
                                 useCenter = false,
@@ -1380,7 +1380,7 @@ private fun BleBridgeBadge(
                     Icon(
                         imageVector = Icons.Default.Bluetooth,
                         contentDescription = "Receiving BLE data",
-                        tint = PrimaryEmerald,
+                        tint = ActionBlue,
                         modifier = Modifier.size(15.dp)
                     )
                 }
@@ -1782,7 +1782,7 @@ private fun HeroGlucoseCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text(text = if (areAlertsMuted) "🔕" else "🔔", fontSize = 12.sp)
+                        Text(text = if (areAlertsMuted) "🔕" else "🔔", fontSize = if (areAlertsMuted) 14.5.sp else 12.sp)
                         if (dailyAlertsCount > 0) {
                             Text(
                                 text = "$dailyAlertsCount",

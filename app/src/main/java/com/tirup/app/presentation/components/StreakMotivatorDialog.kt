@@ -25,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -88,6 +89,8 @@ fun StreakMotivatorDialog(
         if (streakDays == 1) "1 day" else "$streakDays days"
     }
 
+    var showFlameEasterEgg by remember { mutableStateOf(false) }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -115,6 +118,7 @@ fun StreakMotivatorDialog(
                         .scale(pulseScale)
                         .size(80.dp)
                         .clip(CircleShape)
+                        .clickable { showFlameEasterEgg = true }
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
@@ -231,6 +235,46 @@ fun StreakMotivatorDialog(
                 }
             }
         }
+    }
+
+    if (showFlameEasterEgg) {
+        AlertDialog(
+            onDismissRequest = { showFlameEasterEgg = false },
+            title = {
+                Text(
+                    text = if (isRu) "🔥 Огонёк диабетика! 🔥" else "🔥 Diabetic Power Flame! 🔥",
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            text = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("✨ 🌟 🎆 🏆 🎆 🌟 ✨", fontSize = 22.sp)
+                    Text(
+                        text = if (isRu)
+                            "Секретная искра разблокирована!\n\nКаждый час и день в целевом диапазоне бережёт твои сосуды, нервы и дарит отличную форму. Управлять диабетом — это ежедневный подвиг.\n\nПродолжай жечь и заряжать энергией! 🔥💪"
+                        else
+                            "Secret spark unlocked!\n\nEvery hour and day in target range protects your blood vessels, nerves, and brings peak energy. Managing diabetes is an everyday triumph.\n\nKeep the fire burning! 🔥💪",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showFlameEasterEgg = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF7A00))
+                ) {
+                    Text(if (isRu) "Так держать! 💪" else "Keep it up! 💪")
+                }
+            }
+        )
     }
 }
 

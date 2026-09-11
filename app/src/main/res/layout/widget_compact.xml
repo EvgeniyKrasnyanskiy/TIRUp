@@ -153,6 +153,20 @@
         android:textSize="11sp"
         android:textStyle="bold" />
 
+    <!-- Row 3b: Horizontal TIR Progress Bar -->
+    <ProgressBar
+        android:id="@+id/widget_tir_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginTop="3dp"
+        android:max="100"
+        android:progress="82"
+        android:progressBackgroundTint="#2E3A4B"
+        android:progressTint="#10B981" />
+
     <!-- Row 4: Compensator Daily Balance Badge (+1ч 45м) -->
     <TextView
         android:id="@+id/widget_compensator_text"

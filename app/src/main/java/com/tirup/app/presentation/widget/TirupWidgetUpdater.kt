@@ -392,21 +392,8 @@ object TirupWidgetUpdater {
             if (badges.size > 2) View.VISIBLE else View.GONE
         )
 
-        // Render Sparkline Chart on 5x1 wide widget
-        val sparklineBitmap = drawSparklineBitmap(
-            readings = recent,
-            latest = latest,
-            widthPx = 280,
-            heightPx = 90,
-            ranges = settings.targetRanges,
-            isRu = isRu
-        )
-        if (sparklineBitmap != null) {
-            views.setImageViewBitmap(R.id.widget_chart_image, sparklineBitmap)
-            views.setViewVisibility(R.id.widget_chart_image, View.VISIBLE)
-        } else {
-            views.setViewVisibility(R.id.widget_chart_image, View.GONE)
-        }
+        // 6th column chart removed per user request: keep 5 clean columns without compressing
+        views.setViewVisibility(R.id.widget_chart_image, View.GONE)
 
         return views
     }
@@ -504,6 +491,7 @@ object TirupWidgetUpdater {
             views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
             views.setViewVisibility(R.id.widget_master_battery, View.GONE)
             views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
+            views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
             return views
         }
 
@@ -551,6 +539,7 @@ object TirupWidgetUpdater {
             views.setTextColor(R.id.widget_glucose_value, Color.parseColor("#94A3B8"))
             views.setTextViewText(R.id.widget_trend_arrow, "")
             views.setTextViewText(R.id.widget_tir_score, "TIR --")
+            views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
             views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             return views
         }
@@ -629,6 +618,7 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_tir_score, "$currentPercent% • $timeAgoStr")
         }
         views.setTextColor(R.id.widget_tir_score, tirColor)
+        views.setProgressBar(R.id.widget_tir_progress, 100, currentPercent.coerceIn(0, 100), false)
 
         return views
     }
@@ -781,6 +771,7 @@ object TirupWidgetUpdater {
             views.setViewVisibility(R.id.widget_iob_text, View.GONE)
             views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
             views.setViewVisibility(R.id.widget_master_battery, View.GONE)
+            views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
             return views
         }
 
@@ -814,6 +805,7 @@ object TirupWidgetUpdater {
         }
         views.setTextViewText(R.id.widget_tir_score, "$targetName: $currentPercent%")
         views.setTextColor(R.id.widget_tir_score, tirColor)
+        views.setProgressBar(R.id.widget_tir_progress, 100, currentPercent.coerceIn(0, 100), false)
 
         // Dynamic badges for right column slots (Row 1 & Row 2)
         val badges = getPrioritizedBadges(
@@ -860,6 +852,7 @@ object TirupWidgetUpdater {
             views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
             views.setViewVisibility(R.id.widget_master_battery, View.GONE)
             views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
+            views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
             return views
         }
 
@@ -893,6 +886,7 @@ object TirupWidgetUpdater {
         }
         views.setTextViewText(R.id.widget_tir_score, "$targetName: $currentPercent%")
         views.setTextColor(R.id.widget_tir_score, tirColor)
+        views.setProgressBar(R.id.widget_tir_progress, 100, currentPercent.coerceIn(0, 100), false)
 
         val compensator = TargetCompensatorCalculator.calculateDailyCompensator(
             targetMode = settings.targetMode,
