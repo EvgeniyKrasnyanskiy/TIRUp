@@ -126,14 +126,14 @@ fun BmiDetailInfoDialog(
                     ) {
                         Text(
                             text = if (isRu)
-                                "У детей фиксированные границы (18.5 и 25) НЕ применяются, так как тело активно растёт и меняются пропорции.\n\n" +
+                                "У детей фиксированные границы (18.5 и 25) не применяются, так как тело активно растёт и меняются пропорции.\n\n" +
                                         "Оценка проводится по перцентильным кривым ВОЗ (отдельно для мальчиков и девочек по годам):\n" +
                                         "• < 5-го перцентиля: Дефицит массы\n" +
                                         "• 5-й – 85-й перцентиль: Норма для данного возраста\n" +
                                         "• 85-й – 95-й перцентиль: Избыточный вес\n" +
                                         "• ≥ 95-го перцентиля: Педиатрическое ожирение"
                             else
-                                "Fixed cutoffs (18.5 and 25) CANNOT be used for children due to rapid growth and changing body composition.\n\n" +
+                                "Fixed cutoffs (18.5 and 25) cannot be used for children due to rapid growth and changing body composition.\n\n" +
                                         "Assessment uses WHO age- and sex-specific growth percentiles (z-scores):\n" +
                                         "• < 5th percentile: Underweight\n" +
                                         "• 5th – 85th percentile: Normal healthy weight\n" +

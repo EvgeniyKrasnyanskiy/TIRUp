@@ -31,7 +31,7 @@ object TirAdvisorEngine {
                     id = "collect_more_data",
                     titleRu = "Накопление данных",
                     titleEn = "Collecting Data",
-                    adviceRu = "Продолжайте непрерывный мониторинг. После накопления замеров здесь появятся персональные фокусы для роста вашего TIR.",
+                    adviceRu = "Продолжайте непрерывный мониторинг. После накопления замеров здесь появятся персональные советы для роста вашего TIR.",
                     adviceEn = "Keep monitoring continuously. Once more readings accumulate, personalized focuses for increasing your TIR will appear here.",
                     badgeRu = "Сбор данных",
                     badgeEn = "Collecting",
