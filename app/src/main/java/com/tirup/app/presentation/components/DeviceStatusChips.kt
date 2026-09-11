@@ -120,9 +120,8 @@ private fun DeviceTextPart(
     val color: Color = when {
         !isSet -> Color(0xFF9CA3AF) // grey
         isExpired -> MaterialTheme.colorScheme.error // red
-        millisRemaining <= 24 * 3600_000L -> Color(0xFFF59E0B) // amber when < 24h
-        daysRemaining <= 2 -> Color(0xFFF59E0B) // amber
-        else -> Color(0xFF22C55E) // green
+        millisRemaining <= 24 * 3600_000L -> Color(0xFFF59E0B) // amber when <= 24h
+        else -> Color(0xFF22C55E) // green when > 24h
     }
 
     val dayLabel = if (isRu) "д" else "d"
