@@ -325,7 +325,6 @@ private fun DeviceSection(
             val color = when {
                 isExpired -> MaterialTheme.colorScheme.error
                 millisRemaining <= 24 * 3600_000L -> Color(0xFFF59E0B)
-                daysRemaining <= 2 -> Color(0xFFF59E0B)
                 else -> Color(0xFF22C55E)
             }
 
