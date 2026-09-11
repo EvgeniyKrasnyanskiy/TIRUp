@@ -1017,7 +1017,7 @@ object GlucoseAlertManager {
                 lastPredictiveAlertTimestamp = now
                 val eventTime = now + (prediction.minutesUntilCrossing ?: 15) * 60000L
                 val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(eventTime))
-                val title = if (isRu) "Прогноз: ГИПО⬇️ ~ в $timeStr" else "Predict: LOW⬇️ ~ at $timeStr"
+                val title = if (isRu) "Прогноз: ГИПО ~ в $timeStr" else "Predict: LOW ~ at $timeStr"
 
                 // Derive trend arrow strictly from rate of change to prevent conflicting arrows
                 val arrow = when {
@@ -1044,7 +1044,7 @@ object GlucoseAlertManager {
                 lastPredictiveAlertTimestamp = now
                 val eventTime = now + (prediction.minutesUntilCrossing ?: 15) * 60000L
                 val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(eventTime))
-                val title = if (isRu) "Прогноз: ГИПЕР⬆️ ~ в $timeStr" else "Predict: HIGH⬆️ ~ at $timeStr"
+                val title = if (isRu) "Прогноз: ГИПЕР ~ в $timeStr" else "Predict: HIGH ~ at $timeStr"
 
                 val arrow = when {
                     prediction.rateOfChangeMmolPerMin >= 0.15 -> "⇈"
