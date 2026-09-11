@@ -174,6 +174,20 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                     }
                 }
 
+                // If IoB or CoB still not found, check treatments in DB or calculate active CoB
+                if (cob == null) {
+                    try {
+                        val appInst = context.applicationContext as? TirupApplication
+                        val recentTreatments = appInst?.database?.treatmentDao()?.getRecentTreatmentsSync(50)
+                        if (!recentTreatments.isNullOrEmpty()) {
+                            val activeCob = calculateActiveCob(recentTreatments.map { it.toDomain() }, now)
+                            cob = activeCob
+                            cachedCob = cob
+                            cachedCobTimestamp = now
+                        }
+                    } catch (_: Exception) {}
+                }
+
                 // If IoB or CoB still not found, carry forward recent valid active IoB/CoB from last DB reading (< 25 min)
                 if (iob == null || cob == null) {
                     try {
@@ -185,7 +199,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                                 cachedIob = iob
                                 cachedIobTimestamp = lastInDb.timestamp
                             }
-                            if (cob == null && lastInDb.cob != null && lastInDb.cob > 0.5) {
+                            if (cob == null && lastInDb.cob != null && lastInDb.cob >= 0.0) {
                                 cob = lastInDb.cob
                                 cachedCob = cob
                                 cachedCobTimestamp = lastInDb.timestamp
@@ -290,6 +304,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         settingsRepository = app.settingsRepository
                     )
                     com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context.applicationContext)
+                    syncIobCobFromPebble(context.applicationContext)
                 } else {
                     Log.e(TAG, "TirupApplication or repository instance is null.")
                 }
@@ -636,8 +651,9 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
         val hasInsulin = insulin != null && insulin > 0.0
         val hasCarbs = carbs != null && carbs > 0.0
+        val hasNotes = !notes.isNullOrBlank()
 
-        if (!hasInsulin && !hasCarbs) return null
+        if (!hasInsulin && !hasCarbs && !hasNotes) return null
 
         return Treatment(
             timestamp = ts,
@@ -648,18 +664,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         )
     }
 
-    private suspend fun saveTreatmentIfNew(database: AppDatabase, treatment: Treatment) {
-        val dao = database.treatmentDao()
-        val minTime = treatment.timestamp - 60_000L
-        val maxTime = treatment.timestamp + 60_000L
-        val count = dao.countSimilar(minTime, maxTime, treatment.insulinUnits, treatment.carbsGrams)
-        if (count == 0) {
-            dao.insert(TreatmentEntity.fromDomain(treatment))
-            Log.i(TAG, "Persisted new treatment: insulin=${treatment.insulinUnits} U, carbs=${treatment.carbsGrams} g at ${treatment.timestamp}")
-        } else {
-            Log.d(TAG, "Skipped duplicate treatment within 60s window: insulin=${treatment.insulinUnits}, carbs=${treatment.carbsGrams}")
-        }
-    }
+
 
     companion object {
         private const val TAG = "DexdripReceiver"
@@ -816,26 +821,158 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             return null
         }
 
+        suspend fun saveTreatmentIfNew(database: AppDatabase, treatment: Treatment) {
+            val dao = database.treatmentDao()
+            val minTime = treatment.timestamp - 60_000L
+            val maxTime = treatment.timestamp + 60_000L
+            val count = dao.countSimilar(minTime, maxTime, treatment.insulinUnits, treatment.carbsGrams)
+            if (count == 0) {
+                dao.insert(TreatmentEntity.fromDomain(treatment))
+                Log.i(TAG, "Persisted new treatment: insulin=${treatment.insulinUnits} U, carbs=${treatment.carbsGrams} g, notes=${treatment.notes} at ${treatment.timestamp}")
+            } else {
+                Log.d(TAG, "Skipped duplicate treatment within 60s window: insulin=${treatment.insulinUnits}, carbs=${treatment.carbsGrams}")
+            }
+        }
+
+        fun parseTreatmentsJson(jsonStr: String): List<Treatment> {
+            val list = mutableListOf<Treatment>()
+            try {
+                val array = org.json.JSONArray(jsonStr)
+                for (i in 0 until array.length()) {
+                    val obj = array.optJSONObject(i) ?: continue
+                    val carbs = parseJsonDouble(obj, "carbs") ?: parseJsonDouble(obj, "carbs_grams")
+                    val insulin = parseJsonDouble(obj, "insulin") ?: parseJsonDouble(obj, "insulin_units")
+                    val notes = obj.optString("notes").takeIf { it.isNotBlank() }
+                    val ts = when {
+                        obj.has("timestamp") -> obj.optLong("timestamp")
+                        obj.has("created_at") -> {
+                            val cat = obj.opt("created_at")
+                            when (cat) {
+                                is Number -> cat.toLong()
+                                is String -> cat.toLongOrNull() ?: 0L
+                                else -> 0L
+                            }
+                        }
+                        else -> 0L
+                    }
+                    val hasCarbs = carbs != null && carbs > 0.0
+                    val hasInsulin = insulin != null && insulin > 0.0
+                    val hasNotes = !notes.isNullOrBlank()
+                    if (ts > 0L && (hasCarbs || hasInsulin || hasNotes)) {
+                        list.add(
+                            Treatment(
+                                timestamp = ts,
+                                insulinUnits = if (hasInsulin) insulin else null,
+                                carbsGrams = if (hasCarbs) carbs else null,
+                                notes = notes,
+                                source = "XDRIP"
+                            )
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to parse treatments.json: ${e.message}")
+            }
+            return list
+        }
+
+        fun calculateActiveCob(treatments: List<Treatment>, now: Long = System.currentTimeMillis()): Double {
+            val maxWindowMs = 4 * 60 * 60 * 1000L
+            var totalActiveCob = 0.0
+
+            for (t in treatments) {
+                val carbs = t.carbsGrams ?: continue
+                if (carbs <= 0.0) continue
+                val elapsedMs = now - t.timestamp
+                if (elapsedMs < 0L || elapsedMs > maxWindowMs) continue
+
+                val durationMinutes = (carbs * 4.0).coerceIn(120.0, 240.0)
+                val durationMs = (durationMinutes * 60_000.0).toLong()
+
+                if (elapsedMs < durationMs) {
+                    val remainingRatio = 1.0 - (elapsedMs.toDouble() / durationMs.toDouble())
+                    totalActiveCob += carbs * remainingRatio
+                }
+            }
+            return (kotlin.math.round(totalActiveCob * 10.0) / 10.0)
+        }
+
+        fun fetchTreatmentsFromLocalService(): List<Treatment> {
+            val json = queryLocalEndpoint("treatments.json?count=50")
+                ?: queryLocalEndpoint("treatments.json")
+                ?: return emptyList()
+            return parseTreatmentsJson(json)
+        }
+
         fun syncIobCobFromPebble(context: Context) {
             companionScope.launch {
                 try {
-                    val pebbleData = fetchIobCobFromLocalPebbleService() ?: return@launch
-                    val (iob, cob) = pebbleData
-                    if (iob == null && cob == null) return@launch
                     val app = context.applicationContext as? TirupApplication ?: return@launch
                     val db = app.database
+                    val now = System.currentTimeMillis()
+
+                    // 1. Fetch treatments from xDrip local web server (port 17580)
+                    var computedCob: Double? = null
+                    val treatments = fetchTreatmentsFromLocalService()
+                    if (treatments.isNotEmpty()) {
+                        for (t in treatments) {
+                            saveTreatmentIfNew(db, t)
+                        }
+
+                        // Auto-recover pump cannula installation timestamp if user logged "канюля" in xDrip
+                        val cannulaTreatment = treatments
+                            .filter { t ->
+                                val n = t.notes?.lowercase() ?: ""
+                                n.contains("канюл") || n.contains("cannula") || n.contains("инфуз") || n.contains("infusion")
+                            }
+                            .maxByOrNull { it.timestamp }
+
+                        if (cannulaTreatment != null) {
+                            val currentSettings = app.settingsRepository.getSettings().first()
+                            if (currentSettings.pumpSetStatus.installedAt == 0L ||
+                                cannulaTreatment.timestamp > currentSettings.pumpSetStatus.installedAt
+                            ) {
+                                Log.i(TAG, "Auto-recovering pump set installation timestamp from xDrip note: ${cannulaTreatment.timestamp}")
+                                app.settingsRepository.updateSettings(
+                                    currentSettings.copy(
+                                        pumpSetStatus = currentSettings.pumpSetStatus.copy(
+                                            installedAt = cannulaTreatment.timestamp
+                                        )
+                                    )
+                                )
+                            }
+                        }
+
+                        // Calculate active CoB
+                        computedCob = calculateActiveCob(treatments, now)
+                    }
+
+                    // 2. Fetch IoB/CoB from pebble / status endpoints
+                    val pebbleData = fetchIobCobFromLocalPebbleService()
+                    val pebbleIob = pebbleData?.first
+                    val pebbleCob = pebbleData?.second
+
+                    val resolvedIob = pebbleIob
+                    val resolvedCob = pebbleCob ?: computedCob
+
+                    if (resolvedIob == null && resolvedCob == null) return@launch
+
                     val latestEntity = db.glucoseReadingDao().getRecentReadingsSync(1).firstOrNull() ?: return@launch
-                    if (System.currentTimeMillis() - latestEntity.timestamp <= IOB_COB_EXPIRY_MS) {
-                        val newIob = if (iob != null && iob > 0.05) iob else latestEntity.iob
-                        val newCob = if (cob != null && cob > 0.5) cob else latestEntity.cob
+                    if (now - latestEntity.timestamp <= IOB_COB_EXPIRY_MS) {
+                        val newIob = if (resolvedIob != null && resolvedIob >= 0.0) resolvedIob else latestEntity.iob
+                        val newCob = if (resolvedCob != null && resolvedCob >= 0.0) resolvedCob else latestEntity.cob
                         if (newIob != latestEntity.iob || newCob != latestEntity.cob) {
                             db.glucoseReadingDao().updateIobCob(latestEntity.id, newIob, newCob)
-                            cachedIob = newIob
-                            cachedIobTimestamp = System.currentTimeMillis()
-                            cachedCob = newCob
-                            cachedCobTimestamp = System.currentTimeMillis()
+                            if (newIob != null) {
+                                cachedIob = newIob
+                                cachedIobTimestamp = now
+                            }
+                            if (newCob != null) {
+                                cachedCob = newCob
+                                cachedCobTimestamp = now
+                            }
                             com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context.applicationContext)
-                            Log.i(TAG, "Synced IoB/CoB from Pebble service to reading ${latestEntity.id}: iob=$newIob, cob=$newCob")
+                            Log.i(TAG, "Synced IoB/CoB to reading ${latestEntity.id}: iob=$newIob, cob=$newCob")
                         }
                     }
                 } catch (e: Exception) {

@@ -5,10 +5,12 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.tirup.app.data.local.dao.DailySummaryDao
+import com.tirup.app.data.local.dao.DeviceInstallationDao
 import com.tirup.app.data.local.dao.GlucoseReadingDao
 import com.tirup.app.data.local.dao.HistoricalReadingDao
 import com.tirup.app.data.local.dao.TreatmentDao
 import com.tirup.app.data.local.entity.DailySummaryEntity
+import com.tirup.app.data.local.entity.DeviceInstallationEntity
 import com.tirup.app.data.local.entity.GlucoseReadingEntity
 import com.tirup.app.data.local.entity.HistoricalReadingEntity
 import com.tirup.app.data.local.entity.TreatmentEntity
@@ -18,9 +20,10 @@ import com.tirup.app.data.local.entity.TreatmentEntity
         GlucoseReadingEntity::class,
         DailySummaryEntity::class,
         HistoricalReadingEntity::class,
-        TreatmentEntity::class
+        TreatmentEntity::class,
+        DeviceInstallationEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -29,6 +32,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun dailySummaryDao(): DailySummaryDao
     abstract fun historicalReadingDao(): HistoricalReadingDao
     abstract fun treatmentDao(): TreatmentDao
+    abstract fun deviceInstallationDao(): DeviceInstallationDao
 
     companion object {
         @Volatile
@@ -67,6 +71,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `device_installations` (
+                        `deviceType` TEXT PRIMARY KEY NOT NULL,
+                        `installedAt` INTEGER NOT NULL,
+                        `durationDays` INTEGER NOT NULL,
+                        `lastUsedDurationDays` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                """.trimIndent())
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -74,7 +92,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "tirup_database.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build()
                 INSTANCE = instance

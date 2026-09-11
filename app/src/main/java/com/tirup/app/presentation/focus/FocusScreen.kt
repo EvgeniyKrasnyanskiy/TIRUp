@@ -1751,7 +1751,7 @@ private fun HeroGlucoseCard(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             val hasIob = (latestReading?.iob != null && latestReading.iob > 0.0)
-            val hasCob = (latestReading?.cob != null && latestReading.cob > 0.0)
+            val hasCob = (latestReading?.cob != null && (latestReading.cob > 0.0 || (hasIob && latestReading.cob >= 0.0)))
             val hasBattery = masterBatteryPct != null
 
             // Header Row: [ Bell History ] --- [ Badges: Battery/IoB/CoB ] --- [ BLE Master pulse ]
