@@ -61,14 +61,13 @@
 - Пульсирующий эффект «круги на воде» при гипогликемии.
 - Тап по пузырьку мгновенно глушит сирену, скрывает пузырёк на 5 минут (снуз) и открывает приложение.
 
-### 8. Виджеты рабочего стола Glance (5 форматов) и DiaNight (🌙)
+### 8. Виджеты рабочего стола Glance (5 форматов)
 - **5 форматов виджетов под любую сетку лончера**:
   - **5х1**: компактная горизонтальная полоса (сахар, тренд, дельта, TIR, IoB/CoB, стрик).
   - **4х2 / 3х2**: информативный дашборд с 4-часовым HD Canvas sparkline-графиком с сегментной раскраской точек.
   - **2х2**: эргономичный квадратный виджет-фокус.
   - **1х2**: вертикальный информационный стек.
 - **Индикаторы**: бейджи активного инсулина (💉) и углеводов (🍞), стрик дней в цели (🔥 X д.).
-- **Кнопка DiaNight (🌙)**: запуск ночных прикроватных часов прямо с виджета (крупный шрифт, дельта, график, защита от выгорания AMOLED).
 - **Настройка прозрачности (0%..100%)**: плавный ползунок прозрачности подложки виджетов с живым окном предпросмотра на фоне обоев.
 
 ### 9. Воскресный аналитический дайджест (Sunday Digest)
@@ -193,7 +192,6 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
   - Whitelisted offline SMS query: trusted contacts can text `sugar`, `?`, `bg`, or `tir` to receive real-time glucose and TIR without internet access during network shutdowns.
 - **Floating Glucose Bubble (60x60dp)**: Automatically emerges only when glucose exits the target range (< 3.9 or > 10.0 mmol/L) with hypo water ripple wave effect and 5-min tap snooze.
 - **Glance Desktop & Lockscreen Widgets (5 Formats)**: Horizontal 5x1 strip, 4x2/3x2 Canvas chart dashboard, 2x2 focus square, and 1x2 vertical glance with customizable background opacity slider (0%..100%).
-- **DiaNight Nightstand Clock (🌙)**: High-contrast nightstand dock mode with AMOLED burn-in shift protection.
 - **Sunday Compensation Digest**: Automated weekly review delivered every Sunday at 20:00 with week-over-week dynamic delta comparison ($\pm\Delta\%$) and clinical insights.
 - **Clinical AGP Reports**: Generates official Ambulatory Glucose Profile PDF sheets with 12 core clinical parameters (TIR, TING, TBR, TAR, CV, eA1c, GRI, GVI, PGS) matching ATTD/ADA standards.
 - **Permissionless Daily Auto-Backup**: Exact RTC AlarmManager backs up settings and database into the app sandbox daily at 23:59:59 without dangerous external storage permissions.

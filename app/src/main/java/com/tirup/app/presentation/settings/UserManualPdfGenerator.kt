@@ -220,10 +220,10 @@ class UserManualPdfGenerator(private val context: Context) {
                         else "<3.9 mmol/L Red; 3.9..7.8 Pale Green; 7.9..10.0 Saturated Emerald; 10.1..13.9 Orange; >13.9 Red. Syncs across all widgets."
                     ),
                     Triple(
-                        if (isRu) "Бейджи IoB/CoB, Стрик (🔥 X д.) и кнопка DiaNight (🌙)" else "IoB/CoB Badges, Streak (🔥) & DiaNight (🌙)",
+                        if (isRu) "Бейджи IoB/CoB и Стрик (🔥 X д.)" else "IoB/CoB Badges & Streak (🔥)",
                         if (isRu) "Индикаторы" else "Badges",
-                        if (isRu) "Отображают дозы активного инсулина (💉) и углеводов (🍞). Счётчик 🔥 X д. показывает серию дней в цели TIR. Кнопка 🌙 запускает ночные прикроватные часы DiaNight."
-                        else "Display active insulin (💉) & carbs (🍞). Streak badge 🔥 shows consecutive days reaching TIR target. 🌙 button opens DiaNight nightstand clock."
+                        if (isRu) "Отображают дозы активного инсулина (💉) и углеводов (🍞). Счётчик 🔥 X д. показывает серию дней в цели TIR."
+                        else "Display active insulin (💉) & carbs (🍞). Streak badge 🔥 shows consecutive days reaching TIR target."
                     ),
                     Triple(
                         if (isRu) "Экран блокировки и прозрачность подложки (0%..100%)" else "Lockscreen Status & Background Opacity",
