@@ -248,8 +248,8 @@ fun DeviceStatusModal(
             onDismissRequest = { showPumpInfo = false },
             title = { Text(if (isRu) "Срок службы набора" else "Infusion Set Lifespan") },
             text = { 
-                Text(if (isRu) "Не рекомендуется носить инфузионную канюлю дольше 3 дней (для тефлона) или 2 дней (для стали). Это повышает риск воспаления и ухудшения всасывания инсулина." 
-                     else "It is not recommended to wear the infusion cannula longer than 3 days (for teflon) or 2 days (for steel). This increases the risk of inflammation and poor insulin absorption.")
+                Text(if (isRu) "Не рекомендуется носить инфузионную канюлю дольше 3 дней (для тефлона) или 2 дней (для стали). Это повышает риск воспаления и ухудшения всасывания инсулина.\n\n💡 Автосинхронизация: TIRUp автоматически сбрасывает и обновляет этот счётчик, когда находит в xDrip+ запись с комментарием «канюля», «инфуз» или «cannula»." 
+                     else "It is not recommended to wear the infusion cannula longer than 3 days (for teflon) or 2 days (for steel). This increases the risk of inflammation and poor insulin absorption.\n\n💡 Auto-sync: TIRUp automatically resets and updates this counter whenever you log a treatment in xDrip+ with a note like \"cannula\" or \"infusion\".")
             },
             confirmButton = {
                 TextButton(onClick = { showPumpInfo = false }) {
