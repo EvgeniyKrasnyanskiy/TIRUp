@@ -15,10 +15,12 @@ import com.tirup.app.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.tirup.app.data.local.AppDatabase
+import com.tirup.app.data.local.entity.DeviceInstallationEntity
 import java.util.Locale
 
 class SettingsRepositoryImpl(
-    context: Context
+    private val context: Context
 ) : SettingsRepository {
 
     private val prefs: SharedPreferences =
@@ -118,6 +120,40 @@ class SettingsRepositoryImpl(
             .putInt(KEY_LANCET_DURATION_DAYS, settings.lancetStatus.durationDays)
             .putInt(KEY_LANCET_LAST_USED_DURATION, settings.lancetStatus.lastUsedDurationDays)
             .apply()
+
+        try {
+            val db = AppDatabase.getInstance(context)
+            if (settings.pumpSetStatus.installedAt > 0L) {
+                db.deviceInstallationDao().insertOrUpdate(
+                    DeviceInstallationEntity(
+                        deviceType = "PUMP_SET",
+                        installedAt = settings.pumpSetStatus.installedAt,
+                        durationDays = settings.pumpSetStatus.durationDays,
+                        lastUsedDurationDays = settings.pumpSetStatus.lastUsedDurationDays
+                    )
+                )
+            }
+            if (settings.sensorStatus.installedAt > 0L) {
+                db.deviceInstallationDao().insertOrUpdate(
+                    DeviceInstallationEntity(
+                        deviceType = "SENSOR",
+                        installedAt = settings.sensorStatus.installedAt,
+                        durationDays = settings.sensorStatus.durationDays,
+                        lastUsedDurationDays = settings.sensorStatus.lastUsedDurationDays
+                    )
+                )
+            }
+            if (settings.lancetStatus.installedAt > 0L) {
+                db.deviceInstallationDao().insertOrUpdate(
+                    DeviceInstallationEntity(
+                        deviceType = "LANCET",
+                        installedAt = settings.lancetStatus.installedAt,
+                        durationDays = settings.lancetStatus.durationDays,
+                        lastUsedDurationDays = settings.lancetStatus.lastUsedDurationDays
+                    )
+                )
+            }
+        } catch (_: Exception) {}
 
         _settingsFlow.value = settings
     }
@@ -256,21 +292,72 @@ class SettingsRepositoryImpl(
             isSensorReminderEnabled = prefs.getBoolean(KEY_SENSOR_REMINDER_ENABLED, true),
             isPumpReminderEnabled = prefs.getBoolean(KEY_PUMP_REMINDER_ENABLED, true),
             isLancetReminderEnabled = prefs.getBoolean(KEY_LANCET_REMINDER_ENABLED, true),
-            sensorStatus = com.tirup.app.domain.model.SensorStatus(
-                installedAt = prefs.getLong(KEY_SENSOR_INSTALLED_AT, 0L),
-                durationDays = prefs.getInt(KEY_SENSOR_DURATION_DAYS, 14),
-                lastUsedDurationDays = prefs.getInt(KEY_SENSOR_LAST_USED_DURATION, 14)
-            ),
-            pumpSetStatus = com.tirup.app.domain.model.PumpSetStatus(
-                installedAt = prefs.getLong(KEY_PUMP_SET_INSTALLED_AT, 0L),
-                durationDays = prefs.getInt(KEY_PUMP_SET_DURATION_DAYS, 3),
-                lastUsedDurationDays = prefs.getInt(KEY_PUMP_SET_LAST_USED_DURATION, 3)
-            ),
-            lancetStatus = com.tirup.app.domain.model.LancetStatus(
-                installedAt = prefs.getLong(KEY_LANCET_INSTALLED_AT, 0L),
-                durationDays = prefs.getInt(KEY_LANCET_DURATION_DAYS, 7),
-                lastUsedDurationDays = prefs.getInt(KEY_LANCET_LAST_USED_DURATION, 7)
-            )
+            sensorStatus = run {
+                var installedAt = prefs.getLong(KEY_SENSOR_INSTALLED_AT, 0L)
+                var duration = prefs.getInt(KEY_SENSOR_DURATION_DAYS, 14)
+                var lastUsed = prefs.getInt(KEY_SENSOR_LAST_USED_DURATION, 14)
+                if (installedAt == 0L) {
+                    try {
+                        val db = AppDatabase.getInstance(context)
+                        val entity = db.deviceInstallationDao().getDeviceInstallationSync("SENSOR")
+                        if (entity != null && entity.installedAt > 0L) {
+                            installedAt = entity.installedAt
+                            duration = entity.durationDays
+                            lastUsed = entity.lastUsedDurationDays
+                            prefs.edit()
+                                .putLong(KEY_SENSOR_INSTALLED_AT, installedAt)
+                                .putInt(KEY_SENSOR_DURATION_DAYS, duration)
+                                .putInt(KEY_SENSOR_LAST_USED_DURATION, lastUsed)
+                                .apply()
+                        }
+                    } catch (_: Exception) {}
+                }
+                com.tirup.app.domain.model.SensorStatus(installedAt, duration, lastUsed)
+            },
+            pumpSetStatus = run {
+                var installedAt = prefs.getLong(KEY_PUMP_SET_INSTALLED_AT, 0L)
+                var duration = prefs.getInt(KEY_PUMP_SET_DURATION_DAYS, 3)
+                var lastUsed = prefs.getInt(KEY_PUMP_SET_LAST_USED_DURATION, 3)
+                if (installedAt == 0L) {
+                    try {
+                        val db = AppDatabase.getInstance(context)
+                        val entity = db.deviceInstallationDao().getDeviceInstallationSync("PUMP_SET")
+                        if (entity != null && entity.installedAt > 0L) {
+                            installedAt = entity.installedAt
+                            duration = entity.durationDays
+                            lastUsed = entity.lastUsedDurationDays
+                            prefs.edit()
+                                .putLong(KEY_PUMP_SET_INSTALLED_AT, installedAt)
+                                .putInt(KEY_PUMP_SET_DURATION_DAYS, duration)
+                                .putInt(KEY_PUMP_SET_LAST_USED_DURATION, lastUsed)
+                                .apply()
+                        }
+                    } catch (_: Exception) {}
+                }
+                com.tirup.app.domain.model.PumpSetStatus(installedAt, duration, lastUsed)
+            },
+            lancetStatus = run {
+                var installedAt = prefs.getLong(KEY_LANCET_INSTALLED_AT, 0L)
+                var duration = prefs.getInt(KEY_LANCET_DURATION_DAYS, 7)
+                var lastUsed = prefs.getInt(KEY_LANCET_LAST_USED_DURATION, 7)
+                if (installedAt == 0L) {
+                    try {
+                        val db = AppDatabase.getInstance(context)
+                        val entity = db.deviceInstallationDao().getDeviceInstallationSync("LANCET")
+                        if (entity != null && entity.installedAt > 0L) {
+                            installedAt = entity.installedAt
+                            duration = entity.durationDays
+                            lastUsed = entity.lastUsedDurationDays
+                            prefs.edit()
+                                .putLong(KEY_LANCET_INSTALLED_AT, installedAt)
+                                .putInt(KEY_LANCET_DURATION_DAYS, duration)
+                                .putInt(KEY_LANCET_LAST_USED_DURATION, lastUsed)
+                                .apply()
+                        }
+                    } catch (_: Exception) {}
+                }
+                com.tirup.app.domain.model.LancetStatus(installedAt, duration, lastUsed)
+            }
         )
     }
 

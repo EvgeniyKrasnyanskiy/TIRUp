@@ -333,6 +333,32 @@ object AutoBackupManager {
                     writer.name("widgetBackgroundOpacity").value(settings.widgetBackgroundOpacity)
                     writer.name("isFloatingBubbleEnabled").value(settings.isFloatingBubbleEnabled)
 
+                    writer.name("isDeviceRemindersEnabled").value(settings.isDeviceRemindersEnabled)
+                    writer.name("isSensorReminderEnabled").value(settings.isSensorReminderEnabled)
+                    writer.name("isPumpReminderEnabled").value(settings.isPumpReminderEnabled)
+                    writer.name("isLancetReminderEnabled").value(settings.isLancetReminderEnabled)
+
+                    writer.name("sensorStatus")
+                    writer.beginObject()
+                    writer.name("installedAt").value(settings.sensorStatus.installedAt)
+                    writer.name("durationDays").value(settings.sensorStatus.durationDays)
+                    writer.name("lastUsedDurationDays").value(settings.sensorStatus.lastUsedDurationDays)
+                    writer.endObject()
+
+                    writer.name("pumpSetStatus")
+                    writer.beginObject()
+                    writer.name("installedAt").value(settings.pumpSetStatus.installedAt)
+                    writer.name("durationDays").value(settings.pumpSetStatus.durationDays)
+                    writer.name("lastUsedDurationDays").value(settings.pumpSetStatus.lastUsedDurationDays)
+                    writer.endObject()
+
+                    writer.name("lancetStatus")
+                    writer.beginObject()
+                    writer.name("installedAt").value(settings.lancetStatus.installedAt)
+                    writer.name("durationDays").value(settings.lancetStatus.durationDays)
+                    writer.name("lastUsedDurationDays").value(settings.lancetStatus.lastUsedDurationDays)
+                    writer.endObject()
+
                     // Alert Settings
                     val a = settings.alertSettings
                     writer.name("alertSettings")
@@ -506,11 +532,18 @@ object AutoBackupManager {
 
             // 1. Update settings
             if (restoredSettings != null) {
+                val current = settingsRepository.getSettings().first()
                 val s = restoredSettings!!
+                val mergedPump = if (s.pumpSetStatus.installedAt > 0L) s.pumpSetStatus else current.pumpSetStatus
+                val mergedSensor = if (s.sensorStatus.installedAt > 0L) s.sensorStatus else current.sensorStatus
+                val mergedLancet = if (s.lancetStatus.installedAt > 0L) s.lancetStatus else current.lancetStatus
                 settingsRepository.updateSettings(
                     s.copy(
                         hasSeenOnboarding = true,
-                        lastBackupTimestamp = System.currentTimeMillis()
+                        lastBackupTimestamp = System.currentTimeMillis(),
+                        pumpSetStatus = mergedPump,
+                        sensorStatus = mergedSensor,
+                        lancetStatus = mergedLancet
                     )
                 )
             }
@@ -546,6 +579,14 @@ object AutoBackupManager {
         var widgetOpacity = 85
         var isFloatingBubble = false
         var alertSettings = AlertSettings()
+
+        var isDeviceReminders = true
+        var isSensorReminder = true
+        var isPumpReminder = true
+        var isLancetReminder = true
+        var sensorStatus = com.tirup.app.domain.model.SensorStatus()
+        var pumpSetStatus = com.tirup.app.domain.model.PumpSetStatus()
+        var lancetStatus = com.tirup.app.domain.model.LancetStatus()
 
         reader.beginObject()
         while (reader.hasNext()) {
@@ -705,6 +746,58 @@ object AutoBackupManager {
                         lastChanceBufferMinutes = lastChanceBuffer
                     )
                 }
+                "isDeviceRemindersEnabled" -> isDeviceReminders = reader.nextBoolean()
+                "isSensorReminderEnabled" -> isSensorReminder = reader.nextBoolean()
+                "isPumpReminderEnabled" -> isPumpReminder = reader.nextBoolean()
+                "isLancetReminderEnabled" -> isLancetReminder = reader.nextBoolean()
+                "sensorStatus" -> {
+                    var installedAt = 0L
+                    var duration = 14
+                    var lastUsed = 14
+                    reader.beginObject()
+                    while (reader.hasNext()) {
+                        when (reader.nextName()) {
+                            "installedAt" -> installedAt = reader.nextLong()
+                            "durationDays" -> duration = reader.nextInt()
+                            "lastUsedDurationDays" -> lastUsed = reader.nextInt()
+                            else -> reader.skipValue()
+                        }
+                    }
+                    reader.endObject()
+                    sensorStatus = com.tirup.app.domain.model.SensorStatus(installedAt, duration, lastUsed)
+                }
+                "pumpSetStatus" -> {
+                    var installedAt = 0L
+                    var duration = 3
+                    var lastUsed = 3
+                    reader.beginObject()
+                    while (reader.hasNext()) {
+                        when (reader.nextName()) {
+                            "installedAt" -> installedAt = reader.nextLong()
+                            "durationDays" -> duration = reader.nextInt()
+                            "lastUsedDurationDays" -> lastUsed = reader.nextInt()
+                            else -> reader.skipValue()
+                        }
+                    }
+                    reader.endObject()
+                    pumpSetStatus = com.tirup.app.domain.model.PumpSetStatus(installedAt, duration, lastUsed)
+                }
+                "lancetStatus" -> {
+                    var installedAt = 0L
+                    var duration = 7
+                    var lastUsed = 7
+                    reader.beginObject()
+                    while (reader.hasNext()) {
+                        when (reader.nextName()) {
+                            "installedAt" -> installedAt = reader.nextLong()
+                            "durationDays" -> duration = reader.nextInt()
+                            "lastUsedDurationDays" -> lastUsed = reader.nextInt()
+                            else -> reader.skipValue()
+                        }
+                    }
+                    reader.endObject()
+                    lancetStatus = com.tirup.app.domain.model.LancetStatus(installedAt, duration, lastUsed)
+                }
                 else -> reader.skipValue()
             }
         }
@@ -725,6 +818,13 @@ object AutoBackupManager {
             widgetBackgroundOpacity = widgetOpacity,
             isFloatingBubbleEnabled = isFloatingBubble,
             alertSettings = alertSettings,
+            isDeviceRemindersEnabled = isDeviceReminders,
+            isSensorReminderEnabled = isSensorReminder,
+            isPumpReminderEnabled = isPumpReminder,
+            isLancetReminderEnabled = isLancetReminder,
+            sensorStatus = sensorStatus,
+            pumpSetStatus = pumpSetStatus,
+            lancetStatus = lancetStatus,
             hasSeenOnboarding = true
         )
     }
