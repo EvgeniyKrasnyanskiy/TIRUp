@@ -1660,22 +1660,22 @@ private fun HeroGlucoseCard(
                 v > 10.0 -> Pair(if (isRu) "🔺 Выше целевого диапазона" else "🔺 Above target range", ColorHigh)
                 rate <= -0.11 -> Pair(
                     if (unit == GlucoseUnit.MMOL_L) {
-                        if (isRu) String.format(Locale.US, "⚡ Быстро падает (%.2f ммоль/л/мин)", rate)
+                        if (isRu) String.format(Locale.US, "⚡ Сахар быстро падает (%.2f ммоль/л/мин)", rate)
                         else String.format(Locale.US, "⚡ Dropping fast (%.2f mmol/L/min)", rate)
                     } else {
                         val rateMg = rate * 18.0182
-                        if (isRu) String.format(Locale.US, "⚡ Быстро падает (%.1f мг/дл/мин)", rateMg)
+                        if (isRu) String.format(Locale.US, "⚡ Сахар быстро падает (%.1f мг/дл/мин)", rateMg)
                         else String.format(Locale.US, "⚡ Dropping fast (%.1f mg/dL/min)", rateMg)
                     },
                     ColorLow
                 )
                 rate >= 0.11 -> Pair(
                     if (unit == GlucoseUnit.MMOL_L) {
-                        if (isRu) String.format(Locale.US, "⚡ Быстро растёт (+%.2f ммоль/л/мин)", rate)
+                        if (isRu) String.format(Locale.US, "⚡ Сахар быстро растёт (+%.2f ммоль/л/мин)", rate)
                         else String.format(Locale.US, "⚡ Rising fast (+%.2f mmol/L/min)", rate)
                     } else {
                         val rateMg = rate * 18.0182
-                        if (isRu) String.format(Locale.US, "⚡ Быстро растёт (+%.1f мг/дл/мин)", rateMg)
+                        if (isRu) String.format(Locale.US, "⚡ Сахар быстро растёт (+%.1f мг/дл/мин)", rateMg)
                         else String.format(Locale.US, "⚡ Rising fast (+%.1f mg/dL/min)", rateMg)
                     },
                     ColorHigh

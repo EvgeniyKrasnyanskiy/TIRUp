@@ -980,7 +980,7 @@ fun DailyGlucoseChart(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = if (isRu) "📡 Активность сенсора: $sensorActivePercent%" else "📡 Sensor Active: $sensorActivePercent%",
+                            text = if (isRu) "📡 Работа сенсора: $sensorActivePercent%" else "📡 Sensor Working: $sensorActivePercent%",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = if (sensorActivePercent >= 70) PrimaryEmerald else Color(0xFFF59E0B)
@@ -995,7 +995,7 @@ fun DailyGlucoseChart(
 
                     if (sensorActivePercent < 70) {
                         Text(
-                            text = if (isRu) "⚠️ <70% (TIR приблиз.)" else "⚠️ <70% (TIR approx.)",
+                            text = if (isRu) "⚠️ <70% (мало данных)" else "⚠️ <70% (insufficient data)",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFF59E0B)

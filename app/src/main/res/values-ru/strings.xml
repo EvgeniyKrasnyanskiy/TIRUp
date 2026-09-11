@@ -65,7 +65,7 @@
     <string name="pdf_saved_toast">Отчёт сохранён: %s</string>
     <string name="export_success">Медицинский отчёт успешно создан</string>
     <string name="export_error">Ошибка создания отчёта: %s</string>
-    <string name="share_report">Поделиться бланком AGP</string>
+    <string name="share_report">Поделиться отчётом AGP</string>
     <string name="report_patient">Медицинский профиль пациента</string>
     <string name="view_details">Подробнее</string>
 

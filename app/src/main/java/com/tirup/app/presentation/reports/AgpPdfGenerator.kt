@@ -116,9 +116,9 @@ class AgpPdfGenerator(private val context: Context) {
             canvas.drawText(metaLine, margin + 12f, 70f, subTextPaint)
 
             val metaLine2 = if (isRu) {
-                "Сформировано: ${SimpleDateFormat("dd MMMM yyyy HH:mm", Locale("ru")).format(Date())} • Локальный оффлайн-движок TIRUp"
+                "Сформировано: ${SimpleDateFormat("dd MMMM yyyy HH:mm", Locale("ru")).format(Date())} • Локальный оффлайн-Приложение TIRUp"
             } else {
-                "Generated: ${SimpleDateFormat("dd MMM yyyy HH:mm", Locale.US).format(Date())} • TIRUp Offline Engine"
+                "Generated: ${SimpleDateFormat("dd MMM yyyy HH:mm", Locale.US).format(Date())} • TIRUp Offline App"
             }
             canvas.drawText(metaLine2, margin + 12f, 84f, subTextPaint)
 
