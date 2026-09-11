@@ -1779,115 +1779,119 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (isRu) "Аналитическая сводка недели каждое воскресенье в 20:00 (динамика TIR/TING, вариабельность CV, гипо, сравнение с прошлой неделей)"
-                                else "Weekly clinical summary every Sunday at 8:00 PM (TIR/TING dynamics, CV, hypos, and week-over-week comparison)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 16.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Switch(
-                            checked = settings.isWeeklyDigestEnabled,
-                            onCheckedChange = { isChecked ->
-                                viewModel.setWeeklyDigestEnabled(isChecked)
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = ActionBlue
-                            )
+                                BentoCard(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 2.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (isRu) "Напоминания об устройствах" else "Device Reminders",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (isRu) "Уведомления о замене сенсора CGM, инфузионного набора и ланцета"
+                            else "Notifications for CGM sensor, infusion set, and lancet changes",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 16.sp
                         )
                     }
+                    Switch(
+                        checked = settings.isDeviceRemindersEnabled,
+                        onCheckedChange = { isChecked ->
+                            viewModel.setDeviceRemindersEnabled(isChecked)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = ActionBlue
+                        )
+                    )
+                }
 
-                    if (settings.isWeeklyDigestEnabled) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        OutlinedButton(
-                            onClick = {
-                                com.tirup.app.data.worker.WeeklyDigestWorker.triggerImmediately(context)
-                                Toast.makeText(
-                                    context,
-                                    if (isRu) "Дайджест недели формируется... Проверьте шторку уведомлений"
-                                    else "Generating weekly digest... Check notifications shade",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ActionBlue)
+                if (settings.isDeviceRemindersEnabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Sensor checkbox
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clickable { viewModel.setSensorReminderEnabled(!settings.isSensorReminderEnabled) }
                         ) {
+                            Checkbox(
+                                checked = settings.isSensorReminderEnabled,
+                                onCheckedChange = { viewModel.setSensorReminderEnabled(it) },
+                                colors = CheckboxDefaults.colors(checkedColor = ActionBlue),
+                                modifier = Modifier
+                                    .scale(0.85f)
+                                    .size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
                             Text(
-                                text = if (isRu) "Сформировать дайджест сейчас" else "Generate digest now",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
+                                text = if (isRu) "Сенсор" else "Sensor",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        // Infusion set checkbox
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clickable { viewModel.setPumpReminderEnabled(!settings.isPumpReminderEnabled) }
+                        ) {
+                            Checkbox(
+                                checked = settings.isPumpReminderEnabled,
+                                onCheckedChange = { viewModel.setPumpReminderEnabled(it) },
+                                colors = CheckboxDefaults.colors(checkedColor = ActionBlue),
+                                modifier = Modifier
+                                    .scale(0.85f)
+                                    .size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = if (isRu) "Инф. набор" else "Inf. set",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        // Lancet checkbox
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clickable { viewModel.setLancetReminderEnabled(!settings.isLancetReminderEnabled) }
+                        ) {
+                            Checkbox(
+                                checked = settings.isLancetReminderEnabled,
+                                onCheckedChange = { viewModel.setLancetReminderEnabled(it) },
+                                colors = CheckboxDefaults.colors(checkedColor = ActionBlue),
+                                modifier = Modifier
+                                    .scale(0.85f)
+                                    .size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = if (isRu) "Ланцет" else "Lancet",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
                 }
             }
-
-
-        BentoCard(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 2.dp, vertical = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (isRu) "Напоминания об устройствах" else "Device Reminders",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (isRu) "Уведомления о замене сенсора CGM, инфузионного набора и ланцета"
-                                else "Notifications for CGM sensor, infusion set, and lancet changes",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 16.sp
-                            )
-                        }
-                        Switch(
-                            checked = settings.isDeviceRemindersEnabled,
-                            onCheckedChange = { isChecked ->
-                                viewModel.setDeviceRemindersEnabled(isChecked)
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = ActionBlue
-                            )
-                        )
-                    }
-
-                    if (settings.isDeviceRemindersEnabled) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            // Sensor checkbox
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .clickable { viewModel.setSensorReminderEnabled(!settings.isSensorReminderEnabled) }
-                            ) {
-                                Checkbox(
-                                    checked = settings.isSensorReminderEnabled,
-                                    onCheckedChange = { viewModel.setSensorReminderEnabled(it) },
-                                    colors = CheckboxDefaults.colors(checkedColor = ActionBlue),
-                                    modifier = Modifier
-                                        .scale(0.85f)
-                                        .size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text(
-                                    text = if (isRu) "Сенсор" else "Sensor",
+        }�" else "Sensor",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
