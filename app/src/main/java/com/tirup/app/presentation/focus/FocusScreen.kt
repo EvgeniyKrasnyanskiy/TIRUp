@@ -1391,21 +1391,23 @@ private fun BleBridgeBadge(
             val nowMs = System.currentTimeMillis()
             val ageMin = if (lastTs > 0L) ((nowMs - lastTs) / 60_000L).toInt() else -1
 
-            val (badgeText, badgeColor) = when {
-                ageMin < 0 -> Pair("RX", ActionBlue)
-                ageMin < 1 -> Pair("<1м", PrimaryEmerald)
-                ageMin < 5 -> Pair("${ageMin}м", PrimaryEmerald)
-                ageMin < 60 -> Pair("${ageMin}м", Color(0xFF94A3B8))
-                else -> Pair("${ageMin / 60}ч", Color(0xFF94A3B8))
+            val isStale = ageMin >= 5
+            val badgeText = when {
+                ageMin < 0 -> "RX"
+                ageMin < 1 -> "<1м"
+                ageMin < 60 -> "${ageMin}м"
+                else -> "${ageMin / 60}ч"
             }
+            val containerColor = if (isStale) Color(0xFF94A3B8) else ActionBlue
+            val textColor = if (isStale) Color(0xFF94A3B8) else ActionBlue
 
             Surface(
                 modifier = modifier
                     .size(width = 62.dp, height = 24.dp)
                     .clickable { onClick() },
                 shape = RoundedCornerShape(10.dp),
-                color = badgeColor.copy(alpha = 0.08f),
-                border = BorderStroke(0.8.dp, badgeColor.copy(alpha = 0.25f))
+                color = containerColor.copy(alpha = 0.08f),
+                border = BorderStroke(0.8.dp, containerColor.copy(alpha = 0.25f))
             ) {
                 Row(
                     modifier = Modifier
@@ -1417,7 +1419,7 @@ private fun BleBridgeBadge(
                     Icon(
                         imageVector = Icons.Default.Bluetooth,
                         contentDescription = "Bluetooth Receiver",
-                        tint = badgeColor.copy(alpha = 0.85f),
+                        tint = ActionBlue.copy(alpha = if (isStale) 0.6f else 0.9f),
                         modifier = Modifier.size(13.dp)
                     )
                     Spacer(modifier = Modifier.width(3.dp))
@@ -1427,7 +1429,7 @@ private fun BleBridgeBadge(
                             fontFeatureSettings = "tnum"
                         ),
                         fontWeight = FontWeight.SemiBold,
-                        color = badgeColor.copy(alpha = 0.85f)
+                        color = textColor.copy(alpha = 0.85f)
                     )
                 }
             }
