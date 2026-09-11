@@ -198,7 +198,7 @@ class ReportsViewModel(
                 val msg = if (total > 0) {
                     if (isRu) "Импортировано $total измерений в исторический отчёт." else "Imported $total points to historical report."
                 } else {
-                    if (isRu) "Файл не содержит распознанных данных измерений глюкозы." else "No glucose points found in file."
+                    if (isRu) "❌ В файле не обнаружены данные измерений глюкозы." else "❌ No glucose points found in file."
                 }
                 _uiState.value = _uiState.value.copy(
                     isImporting = false,
