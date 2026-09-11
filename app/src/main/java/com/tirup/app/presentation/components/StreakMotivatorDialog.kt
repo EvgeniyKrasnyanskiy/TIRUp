@@ -242,7 +242,7 @@ fun StreakMotivatorDialog(
             onDismissRequest = { showFlameEasterEgg = false },
             title = {
                 Text(
-                    text = if (isRu) "🔥 Огонёк диабетика! 🔥" else "🔥 Diabetic Power Flame! 🔥",
+                    text = if (isRu) "Огонёк диабетика! " else "Diabetic Power Flame!",
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.fillMaxWidth()
