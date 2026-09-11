@@ -54,7 +54,7 @@
 
     <!-- Reports -->
     <string name="reports_title">Отчёт</string>
-    <string name="reports_subtitle">Стандартизированный отчёт (предпросмотр)</string>
+    <string name="reports_subtitle">Стандартизированный отчёт</string>
     <string name="report_live_title">Текущий отчёт (Трансляция)</string>
     <string name="report_historical_title">Отчёт из файла xDrip+</string>
     <string name="report_period_title">Период для отчёта</string>
