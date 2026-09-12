@@ -3221,8 +3221,10 @@ private fun PatientProfileEditDialog(
     onProfileChange: (PatientProfile) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val hM = profile.heightCm.toDoubleOrNull()?.let { it / 100.0 }
-    val wKg = profile.weightKg.toDoubleOrNull()
+    var localProfile by remember(profile) { mutableStateOf(profile) }
+
+    val hM = localProfile.heightCm.toDoubleOrNull()?.let { it / 100.0 }
+    val wKg = localProfile.weightKg.toDoubleOrNull()
     val bmi = if (hM != null && wKg != null && hM > 0.5) wKg / (hM * hM) else null
 
     var showBmiGuide by remember { mutableStateOf(false) }
@@ -3231,13 +3233,16 @@ private fun PatientProfileEditDialog(
     var isCarbExpanded by rememberSaveable { mutableStateOf(false) }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            onProfileChange(localProfile)
+            onDismiss()
+        },
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Default.Person,
                     contentDescription = null,
-                    tint = if (profile.gender == "F") Color(0xFFC026D3) else ActionBlue,
+                    tint = if (localProfile.gender == "F") Color(0xFFC026D3) else ActionBlue,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -3256,9 +3261,9 @@ private fun PatientProfileEditDialog(
                 item {
                     // 1. Full Name (Text input)
                     OutlinedTextField(
-                        value = profile.fullName,
+                        value = localProfile.fullName,
                         onValueChange = { newName ->
-                            onProfileChange(profile.copy(fullName = newName))
+                            localProfile = localProfile.copy(fullName = newName)
                         },
                         label = { Text(if (isRu) "ФИО пациента" else "Full Name") },
                         placeholder = { Text(if (isRu) "Фамилия Имя Отчество" else "Last First Middle") },
@@ -3289,13 +3294,13 @@ private fun PatientProfileEditDialog(
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             LanguageChip(
                                 label = if (isRu) "Мужской ♂" else "Male ♂",
-                                isSelected = profile.gender == "M",
-                                onClick = { onProfileChange(profile.copy(gender = "M")) }
+                                isSelected = localProfile.gender == "M",
+                                onClick = { localProfile = localProfile.copy(gender = "M") }
                             )
                             LanguageChip(
                                 label = if (isRu) "Женский ♀" else "Female ♀",
-                                isSelected = profile.gender == "F",
-                                onClick = { onProfileChange(profile.copy(gender = "F")) }
+                                isSelected = localProfile.gender == "F",
+                                onClick = { localProfile = localProfile.copy(gender = "F") }
                             )
                         }
                     }
@@ -3309,11 +3314,11 @@ private fun PatientProfileEditDialog(
                     ) {
                         DropdownYearSelector(
                             label = if (isRu) "Год рождения" else "Birth Year",
-                            selectedYear = profile.birthYear,
+                            selectedYear = localProfile.birthYear,
                             yearRange = (currentYear - 100)..currentYear,
                             modifier = Modifier.weight(1f),
                             onYearSelected = { newYear ->
-                                onProfileChange(profile.copy(birthYear = newYear))
+                                localProfile = localProfile.copy(birthYear = newYear)
                             }
                         )
 
@@ -3330,7 +3335,7 @@ private fun PatientProfileEditDialog(
                                 verticalArrangement = Arrangement.Center
                             ) {
                                 Text(if (isRu) "Возраст" else "Age", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("${profile.calculatedAge} ${if (isRu) "лет" else "y.o."}", style = MaterialTheme.typography.bodyMedium, color = ActionBlue, fontWeight = FontWeight.Bold)
+                                Text("${localProfile.calculatedAge} ${if (isRu) "лет" else "y.o."}", style = MaterialTheme.typography.bodyMedium, color = ActionBlue, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -3343,18 +3348,18 @@ private fun PatientProfileEditDialog(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         OutlinedTextField(
-                            value = profile.heightCm,
+                            value = localProfile.heightCm,
                             onValueChange = { newHeight ->
-                                onProfileChange(profile.copy(heightCm = newHeight))
+                                localProfile = localProfile.copy(heightCm = newHeight)
                             },
                             label = { Text(if (isRu) "Рост (см)" else "Height (cm)") },
                             modifier = Modifier.weight(1f),
                             singleLine = true
                         )
                         OutlinedTextField(
-                            value = profile.weightKg,
+                            value = localProfile.weightKg,
                             onValueChange = { newWeight ->
-                                onProfileChange(profile.copy(weightKg = newWeight))
+                                localProfile = localProfile.copy(weightKg = newWeight)
                             },
                             label = { Text(if (isRu) "Вес (кг)" else "Weight (kg)") },
                             modifier = Modifier.weight(1f),
@@ -3364,9 +3369,9 @@ private fun PatientProfileEditDialog(
                 }
 
                 if (bmi != null) {
-                    val age = profile.calculatedAge
+                    val age = localProfile.calculatedAge
                     val isChild = age in 2..17
-                    val category = BmiCategory.fromBmi(bmi, age, profile.gender)
+                    val category = BmiCategory.fromBmi(bmi, age, localProfile.gender)
                     val catColor = when (category) {
                         BmiCategory.UNDERWEIGHT -> ActionBlue
                         BmiCategory.NORMAL -> PrimaryEmerald
@@ -3374,7 +3379,7 @@ private fun PatientProfileEditDialog(
                         BmiCategory.OBESE_1, BmiCategory.OBESE_2_3, BmiCategory.PEDIATRIC_OBESE -> ColorVeryHigh
                     }
                     val scaleNote = if (isChild) {
-                        val sexStr = if (profile.gender == "F") (if (isRu) "девочек" else "girls") else (if (isRu) "мальчиков" else "boys")
+                        val sexStr = if (localProfile.gender == "F") (if (isRu) "девочек" else "girls") else (if (isRu) "мальчиков" else "boys")
                         if (isRu) "Педиатрическая шкала ВОЗ: перцентили для $sexStr $age лет"
                         else "WHO Pediatric scale: percentiles for $sexStr age $age"
                     } else {
@@ -3490,7 +3495,7 @@ private fun PatientProfileEditDialog(
 
                     val carbRec = CarbRecommendationCalculator.calculate(
                         age = age,
-                        gender = profile.gender,
+                        gender = localProfile.gender,
                         bmiCategory = category
                     )
                     item {
@@ -3640,21 +3645,21 @@ private fun PatientProfileEditDialog(
                     ) {
                         DropdownChoiceSelector(
                             label = if (isRu) "Тип диабета" else "Diabetes Type",
-                            selectedOption = localizeDiabetesType(profile.diabetesType, isRu),
+                            selectedOption = localizeDiabetesType(localProfile.diabetesType, isRu),
                             options = if (isRu) listOf("СД1", "СД2", "LADA", "MODY", "ГСД") else listOf("T1D", "T2D", "LADA", "MODY", "GDM"),
                             modifier = Modifier.weight(1f),
                             onOptionSelected = { newType ->
-                                onProfileChange(profile.copy(diabetesType = newType))
+                                localProfile = localProfile.copy(diabetesType = newType)
                             }
                         )
 
                         DropdownYearSelector(
                             label = if (isRu) "Диагноз с года" else "Diagnosed Year",
-                            selectedYear = profile.diagnosisYear,
+                            selectedYear = localProfile.diagnosisYear,
                             yearRange = (currentYear - 60)..currentYear,
                             modifier = Modifier.weight(1f),
                             onYearSelected = { newDiagYear ->
-                                onProfileChange(profile.copy(diagnosisYear = newDiagYear))
+                                localProfile = localProfile.copy(diagnosisYear = newDiagYear)
                             }
                         )
                     }
@@ -3664,7 +3669,7 @@ private fun PatientProfileEditDialog(
                     // 5. Therapy Type Dropdown
                     DropdownChoiceSelector(
                         label = if (isRu) "Вид терапии" else "Therapy Type",
-                        selectedOption = localizeTherapyType(profile.therapyType, isRu),
+                        selectedOption = localizeTherapyType(localProfile.therapyType, isRu),
                         options = if (isRu) listOf(
                             "Инсулиновая помпа",
                             "Шприц-ручки (МДИ)",
@@ -3678,14 +3683,19 @@ private fun PatientProfileEditDialog(
                         ),
                         modifier = Modifier.fillMaxWidth(),
                         onOptionSelected = { newTherapy ->
-                            onProfileChange(profile.copy(therapyType = newTherapy))
+                            localProfile = localProfile.copy(therapyType = newTherapy)
                         }
                     )
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = {
+                    onProfileChange(localProfile)
+                    onDismiss()
+                }
+            ) {
                 Text(
                     text = if (isRu) "Готово" else "Done",
                     fontWeight = FontWeight.Bold,

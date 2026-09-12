@@ -11,7 +11,7 @@ import kotlin.math.roundToInt
 
 object WeeklyDigestCalculator {
 
-    private const val MGDL_FACTOR = 18.01559
+    private const val MGDL_FACTOR = 18.0182
     const val MIN_CGM_ACTIVE_PERCENT = 70.0
     const val MIN_POINTS_FOR_ANALYSIS = 200 // Safety minimum for 7 days
 

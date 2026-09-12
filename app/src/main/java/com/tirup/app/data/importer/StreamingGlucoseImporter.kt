@@ -92,7 +92,6 @@ class StreamingGlucoseImporter(
                 SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.US).apply { isLenient = false }
             )
 
-            val seenTimestamps = HashSet<Long>()
 
             if (isZip) {
                 Log.d(TAG, "Detected ZIP archive. Scanning for glucose CSVs...")
@@ -121,7 +120,6 @@ class StreamingGlucoseImporter(
                                 inputStream = countingStream,
                                 chunk = chunk,
                                 dateFormats = dateFormats,
-                                seenTimestamps = seenTimestamps,
                                 onProgressUpdate = { inStreamCount ->
                                     val currentBytes = bytesAccumulator + countingStream.bytesRead
                                     val prog = (currentBytes.toFloat() / totalUncompressed.toFloat()).coerceIn(0.05f, 0.98f)
@@ -146,7 +144,6 @@ class StreamingGlucoseImporter(
                     inputStream = countingStream,
                     chunk = chunk,
                     dateFormats = dateFormats,
-                    seenTimestamps = seenTimestamps,
                     onProgressUpdate = { inStreamCount ->
                         val prog = (countingStream.bytesRead.toFloat() / expectedBytes.toFloat()).coerceIn(0.05f, 0.98f)
                         onProgress(prog, inStreamCount)
@@ -175,7 +172,6 @@ class StreamingGlucoseImporter(
         inputStream: InputStream,
         chunk: ArrayList<HistoricalReadingEntity>,
         dateFormats: List<SimpleDateFormat>,
-        seenTimestamps: HashSet<Long>,
         onProgressUpdate: (Int) -> Unit
     ): Int {
         var importedInStream = 0
@@ -258,11 +254,9 @@ class StreamingGlucoseImporter(
                             // Match glycemia_processor.py is_probably_mmol heuristic: if <= 30.0 -> mmol/L, else mg/dL
                             val valueMmol = if (gVal <= 30.0) gVal else gVal / 18.0182
                             // xDrip CUTOFF filter (> 38.0 mg/dL ~ 2.109 mmol/L)
+                            // Keep all sensor records without dropping duplicates, matching DiaKiaBot
                             if (valueMmol * 18.0182 > 38.0) {
-                                // Deduplicate by timestamp (matching DiaKiaBot drop_duplicates)
-                                if (seenTimestamps.add(ts)) {
-                                    reading = HistoricalReadingEntity(timestamp = ts, valueMmol = valueMmol)
-                                }
+                                reading = HistoricalReadingEntity(timestamp = ts, valueMmol = valueMmol)
                             }
                         }
                     }
@@ -280,9 +274,7 @@ class StreamingGlucoseImporter(
                         if (ts != null) {
                             val valueMmol = if (gVal <= 30.0) gVal else gVal / 18.0182
                             if (valueMmol * 18.0182 > 38.0) {
-                                if (seenTimestamps.add(ts)) {
-                                    reading = HistoricalReadingEntity(timestamp = ts, valueMmol = valueMmol)
-                                }
+                                reading = HistoricalReadingEntity(timestamp = ts, valueMmol = valueMmol)
                             }
                         }
                     }
@@ -293,9 +285,7 @@ class StreamingGlucoseImporter(
             if (reading == null && !headerFound) {
                 val auto = autoDetectRow(parts, dateFormats)
                 if (auto != null) {
-                    if (seenTimestamps.add(auto.first.timestamp)) {
-                        reading = auto.first
-                    }
+                    reading = auto.first
                     dayCol = auto.second
                     timeCol = auto.third
                     valueCol = auto.fourth

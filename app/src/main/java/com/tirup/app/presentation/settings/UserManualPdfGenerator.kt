@@ -366,12 +366,12 @@ class UserManualPdfGenerator(private val context: Context) {
                 cardHeight = 41f
             )
 
-            // Section 6: Clinical AGP & Automated Backups
+            // Section 6: Clinical AGP, Patterns, Device Supplies & Automated Backups
             drawSection(
                 canvas = canvas2,
                 startY = y2,
-                title = if (isRu) "6. Клиническая аналитика AGP, паттерны и Автобэкап"
-                else "6. Clinical AGP Analytics, Patterns & Daily Auto-Backup",
+                title = if (isRu) "6. Клиническая аналитика AGP, паттерны, расходники и Автобэкап"
+                else "6. Clinical AGP, Patterns, Supplies Trackers & Daily Auto-Backup",
                 items = listOf(
                     Triple(
                         if (isRu) "Амбулаторный гликемический профиль (AGP по стандарту ATTD/ADA)" else "Official Ambulatory Glucose Profile (AGP)",
@@ -386,13 +386,19 @@ class UserManualPdfGenerator(private val context: Context) {
                         else "Detects hidden nocturnal dips during user sleep window, dawn phenomenon, and post-meal spikes with individual per-event dismiss (✕)."
                     ),
                     Triple(
+                        if (isRu) "Счётчики смены устройств и расходников (сенсор, канюля, ланцет)" else "Device & Supplies Change Trackers (Sensor, Cannula, Lancet)",
+                        if (isRu) "Расходники" else "Supplies",
+                        if (isRu) "Учёт срока службы сенсора CGM, канюли помпы и ланцета. Автоопределение смены из заметок («канюля»), цветовая индикация (зелёный/жёлтый/красный) и предупреждения об истечении."
+                        else "Tracks remaining lifespan of CGM sensor, infusion set/cannula and lancet. Auto-detects changes from notes ('cannula'), color alerts (green/amber/red) & timely replacement reminders."
+                    ),
+                    Triple(
                         if (isRu) "Ежедневный автономный автобэкап в 00:00" else "Daily Exact Auto-Backup at 00:00",
                         if (isRu) "Автобэкап" else "Backup",
                         if (isRu) "Автоматический бэкап в полночь: настройки и база данных сохраняются в изолированную песочницу без запроса опасных системных разрешений на доступ к файлам."
                         else "Midnight auto-backup: settings and database are saved into app sandbox without dangerous storage permissions."
                     )
                 ),
-                cardHeight = 41f
+                cardHeight = 39f
             )
 
             // Page 2 Footer Note: Medical Disclaimer

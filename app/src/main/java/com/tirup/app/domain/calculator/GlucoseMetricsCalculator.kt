@@ -19,7 +19,7 @@ import kotlin.math.sqrt
 
 object GlucoseMetricsCalculator {
 
-    private const val MGDL_FACTOR = 18.01559
+    private const val MGDL_FACTOR = 18.0182
     private const val CUTOFF_MGDL = 38.0 // xDrip & DiaKiaBot CUTOFF (~2.1 mmol/L)
     private const val CUTOFF_MMOL = CUTOFF_MGDL / MGDL_FACTOR // ~2.109 mmol/L
 
@@ -105,22 +105,22 @@ object GlucoseMetricsCalculator {
         // IFCC mmol/mol: (eA1c% - 2.15) * 10.929
         val hba1cMmolMol = ((ea1cAdag - 2.15) * 10.929).roundToInt().coerceAtLeast(0)
 
-        // 2. Ranges counting in mg/dL (exact ATTD/ADA clinical consensus thresholds)
-        // ATTD consensus: TIR 70–180 mg/dL (3.9–10.0 mmol/L) inclusive, TING 70–140 mg/dL (3.9–7.8 mmol/L) inclusive
-        val lowMgdl = 70.0
+        // 2. Ranges counting in mg/dL (exact xDrip & DiaKiaBot thresholds)
+        // 3.9 mmol/L * 18.0182 = 70.27098 mg/dL, 10.0 mmol/L = 180.0 mg/dL flat
+        val lowMgdl = 3.9 * MGDL_FACTOR
         val highMgdl = 180.0
         val tightHighMgdl = 140.0
         val tbr30Mgdl = 54.0
         val tar139Mgdl = 250.0
 
-        val inRangeCount = rawMgdl.count { it in lowMgdl..highMgdl }
+        // Range [Low, High) - High is excluded (matches DiaKiaBot & xDrip)
+        val inRangeCount = rawMgdl.count { it >= lowMgdl && it < highMgdl }
         val belowCount = rawMgdl.count { it < lowMgdl }
-        val aboveCount = rawMgdl.count { it > highMgdl }
+        val aboveCount = rawMgdl.count { it >= highMgdl }
 
-        val tightCount = rawMgdl.count { it in lowMgdl..tightHighMgdl }
+        val tightCount = rawMgdl.count { it >= lowMgdl && it < tightHighMgdl }
         val below30Count = rawMgdl.count { it < tbr30Mgdl }
-        // TAR > 13.9: strictly above 250 mg/dL (13.9 mmol/L)
-        val above139Count = rawMgdl.count { it > tar139Mgdl }
+        val above139Count = rawMgdl.count { it >= tar139Mgdl }
 
         val nightReadings = mutableListOf<GlucoseReading>()
         val calendar = Calendar.getInstance(TimeZone.getDefault())
@@ -133,11 +133,15 @@ object GlucoseMetricsCalculator {
             }
         }
 
-        val tirPercent = (inRangeCount.toDouble() / totalCount) * 100.0
-        val tingPercent = (tightCount.toDouble() / totalCount) * 100.0
         val tbrTotalPercent = (belowCount.toDouble() / totalCount) * 100.0
         val tarTotalPercent = (aboveCount.toDouble() / totalCount) * 100.0
 
+        // xDrip & DiaKiaBot integer rounding: ensures TIR + TBR + TAR = 100%
+        val tbrPctRound = kotlin.math.round(tbrTotalPercent)
+        val tarPctRound = kotlin.math.round(tarTotalPercent)
+        val tirPercent = (100.0 - tbrPctRound - tarPctRound).coerceIn(0.0, 100.0)
+
+        val tingPercent = (tightCount.toDouble() / totalCount) * 100.0
         val tbrVeryLowPercent = (below30Count.toDouble() / totalCount) * 100.0
         val tbrLowPercent = (tbrTotalPercent - tbrVeryLowPercent).coerceAtLeast(0.0)
         val tarVeryHighPercent = (above139Count.toDouble() / totalCount) * 100.0
@@ -166,7 +170,7 @@ object GlucoseMetricsCalculator {
         val griHighLowerMgdl = 10.1 * MGDL_FACTOR
         val griLowCount = rawMgdl.count { it >= tbr30Mgdl && it < griLowUpperMgdl }
         val griLowPct = (griLowCount.toDouble() / totalCount) * 100.0
-        val griHighCount = rawMgdl.count { it >= griHighLowerMgdl && it <= tar139Mgdl }
+        val griHighCount = rawMgdl.count { it >= griHighLowerMgdl && it < tar139Mgdl }
         val griHighPct = (griHighCount.toDouble() / totalCount) * 100.0
 
         val hypoComponent = tbrVeryLowPercent + (0.8 * griLowPct)
@@ -183,8 +187,8 @@ object GlucoseMetricsCalculator {
             val rawMgdl14d = readings14d.map { it.valueMmol * MGDL_FACTOR }
             val vlow14d = (rawMgdl14d.count { it < tbr30Mgdl } / total14d) * 100.0
             val low14d = (rawMgdl14d.count { it >= tbr30Mgdl && it < griLowUpperMgdl } / total14d) * 100.0
-            val high14d = (rawMgdl14d.count { it >= griHighLowerMgdl && it <= tar139Mgdl } / total14d) * 100.0
-            val vhigh14d = (rawMgdl14d.count { it > tar139Mgdl } / total14d) * 100.0
+            val high14d = (rawMgdl14d.count { it >= griHighLowerMgdl && it < tar139Mgdl } / total14d) * 100.0
+            val vhigh14d = (rawMgdl14d.count { it >= tar139Mgdl } / total14d) * 100.0
             val hypo14d = vlow14d + (0.8 * low14d)
             val hyper14d = vhigh14d + (0.5 * high14d)
             val rawGri14d = (3.0 * hypo14d) + (1.6 * hyper14d)

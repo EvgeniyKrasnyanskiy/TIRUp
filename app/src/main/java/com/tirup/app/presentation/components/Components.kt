@@ -263,15 +263,6 @@ fun BentoMetricCompact(
                 fontWeight = FontWeight.Bold,
                 maxLines = 1
             )
-            if (unit.isNotEmpty()) {
-                Text(
-                    text = unit,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = onSurfaceVariant,
-                    fontSize = 9.sp,
-                    maxLines = 1
-                )
-            }
         }
     }
 }

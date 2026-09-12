@@ -41,6 +41,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -92,6 +96,8 @@ fun ReportsScreen(
     var showXdripExportHelp by remember { mutableStateOf(false) }
     var showMetricsOrderDialog by remember { mutableStateOf(false) }
     var importErrorMessage by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val isRu = state.userSettings.language.equals("RU", ignoreCase = true)
 
     LaunchedEffect(state.importMessage) {
         val msg = state.importMessage
@@ -115,7 +121,16 @@ fun ReportsScreen(
                     context.startActivity(event.shareIntent)
                 }
                 is ReportEvent.SavedToDownloads -> {
-                    Toast.makeText(context, context.getString(R.string.pdf_saved_toast, event.filePath), Toast.LENGTH_LONG).show()
+                    val message = context.getString(R.string.pdf_saved_toast, event.filePath)
+                    val actionLabel = if (isRu) "Открыть" else "Open"
+                    val result = snackbarHostState.showSnackbar(
+                        message = message,
+                        actionLabel = actionLabel,
+                        duration = SnackbarDuration.Long
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        openSavedFileFolder(context, event.filePath)
+                    }
                 }
                 is ReportEvent.Error -> {
                     Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
@@ -123,8 +138,6 @@ fun ReportsScreen(
             }
         }
     }
-
-    val isRu = state.userSettings.language.equals("RU", ignoreCase = true)
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -397,6 +410,13 @@ fun ReportsScreen(
             }
         }
     }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+        )
     }
 }
 
@@ -1502,6 +1522,51 @@ private fun GuidebookItemCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 16.sp
             )
+        }
+    }
+}
+
+/**
+ * Opens system file manager to the Downloads directory or opens the saved PDF report directly.
+ */
+private fun openSavedFileFolder(context: android.content.Context, filePath: String) {
+    try {
+        val downloadsIntent = Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        context.startActivity(downloadsIntent)
+    } catch (e1: Exception) {
+        try {
+            val file = java.io.File(filePath)
+            val parentFolder = file.parentFile ?: android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+            val folderUri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                parentFolder
+            )
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(folderUri, "resource/folder")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+            }
+            context.startActivity(intent)
+        } catch (e2: Exception) {
+            try {
+                val file = java.io.File(filePath)
+                if (file.exists()) {
+                    val fileUri = androidx.core.content.FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        file
+                    )
+                    val viewFileIntent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(fileUri, "application/pdf")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    }
+                    context.startActivity(viewFileIntent)
+                }
+            } catch (e3: Exception) {
+                android.widget.Toast.makeText(context, filePath, android.widget.Toast.LENGTH_SHORT).show()
+            }
         }
     }
 }

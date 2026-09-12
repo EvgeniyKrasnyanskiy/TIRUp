@@ -124,26 +124,12 @@ private fun DeviceTextPart(
         else -> Color(0xFF22C55E) // green when > 24h
     }
 
-    val dayLabel = if (isRu) "д" else "d"
-    val hourLabel = if (isRu) "ч" else "h"
-    val minLabel = if (isRu) "м" else "m"
-
-    val label = when {
-        !isSet -> "?"
-        isExpired -> {
-            val expiredHours = (-millisRemaining / 3600_000L).toInt().coerceAtLeast(1)
-            "-${expiredHours}$hourLabel"
-        }
-        millisRemaining < 3600_000L -> {
-            val mins = (millisRemaining / 60_000L).toInt().coerceAtLeast(1)
-            "${mins}$minLabel"
-        }
-        millisRemaining < 24 * 3600_000L -> {
-            val hours = (millisRemaining / 3600_000L).toInt().coerceAtLeast(1)
-            "${hours}$hourLabel"
-        }
-        else -> "${daysRemaining}$dayLabel"
-    }
+    val label = com.tirup.app.domain.model.formatDeviceRemainingTime(
+        millisRemaining = millisRemaining,
+        installedAt = installedAt,
+        isRu = isRu,
+        isCompact = true
+    )
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(emoji, fontSize = 12.sp)
