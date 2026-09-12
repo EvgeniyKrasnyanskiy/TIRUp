@@ -1207,7 +1207,7 @@ fun SettingsScreen(
                                         )
                                         val displayPin = if (ble.familyPin.isNotBlank()) ble.familyPin else (if (isRu) "Не задан" else "Not set")
                                         Text(
-                                            text = if (isRu) "Код: $displayPin (нажмите для изменения)" else "Code: $displayPin (tap to edit)",
+                                            text = if (isRu) "Код: $displayPin (нажмите для смены)" else "Code: $displayPin (tap to change)",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -4260,7 +4260,7 @@ private fun BleFamilyPinDialog(
     var pinText by remember(currentPin) {
         mutableStateOf(if (currentPin.length == 3 && currentPin.all { it in 'A'..'Z' }) currentPin else BlePacketCodec.generateRandomPin())
     }
-    var isVisible by rememberSaveable { mutableStateOf(false) }
+    var isVisible by rememberSaveable { mutableStateOf(true) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
