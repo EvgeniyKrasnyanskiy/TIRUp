@@ -275,7 +275,7 @@ fun DeviceStatusModal(
             onDismissRequest = { showLancetInfo = false },
             title = { Text(if (isRu) "Срок службы ланцета" else "Lancet Lifespan") },
             text = { 
-                Text(if (isRu) "Рекомендуется менять ланцет не реже 1 раза в неделю. При частом использовании игла тупится, травмирует пальцы и может стать источником микротравм кожи." 
+                Text(if (isRu) "Рекомендуется менять ланцет не реже 1 раза в неделю. Со временем игла тупится, вызывает болезненные ощущения и повреждает кожу подушечек пальцев." 
                      else "It is recommended to change lancets at least weekly. Dull needles cause excess pain, calluses, and skin irritation.")
             },
             confirmButton = {
@@ -362,23 +362,12 @@ private fun DeviceSection(
                     )
                 }
 
-                val statusText = when {
-                    isExpired -> {
-                        val hours = (-millisRemaining / 3600_000L).toInt().coerceAtLeast(1)
-                        if (isRu) "Просрочен: -$hours ч" else "Expired: -$hours h"
-                    }
-                    millisRemaining < 3600_000L -> {
-                        val mins = (millisRemaining / 60_000L).toInt().coerceAtLeast(1)
-                        if (isRu) "Осталось: $mins мин" else "Remaining: $mins min"
-                    }
-                    millisRemaining < 24 * 3600_000L -> {
-                        val hours = (millisRemaining / 3600_000L).toInt().coerceAtLeast(1)
-                        if (isRu) "Осталось: $hours ч" else "Remaining: $hours h"
-                    }
-                    else -> {
-                        if (isRu) "Осталось: $daysRemaining дн." else "Remaining: $daysRemaining d"
-                    }
-                }
+                val statusText = com.tirup.app.domain.model.formatDeviceRemainingTime(
+                    millisRemaining = millisRemaining,
+                    installedAt = installedAt,
+                    isRu = isRu,
+                    isCompact = false
+                )
 
                 Surface(
                     shape = RoundedCornerShape(8.dp),

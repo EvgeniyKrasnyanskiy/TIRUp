@@ -61,6 +61,8 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -1498,6 +1500,45 @@ private fun BleBridgeBadge(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Telegram-style spoiler badge for sensitive text (like Family PIN).
+ * Tap reveals the text; tap again hides it under a discreet spoiler mask.
+ */
+@Composable
+fun SpoilerPinBadge(
+    pin: String,
+    modifier: Modifier = Modifier
+) {
+    var isRevealed by rememberSaveable { mutableStateOf(false) }
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = if (isRevealed) ActionBlue.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, if (isRevealed) ActionBlue.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        modifier = modifier.clickable { isRevealed = !isRevealed }
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = if (isRevealed) pin else "•".repeat(pin.length.coerceAtLeast(3)),
+                fontWeight = FontWeight.Bold,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                color = if (isRevealed) ActionBlue else MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = if (isRevealed) 1.5.sp else 2.5.sp,
+                fontSize = 13.sp
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Icon(
+                imageVector = if (isRevealed) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                contentDescription = if (isRevealed) "Hide PIN" else "Show PIN",
+                tint = if (isRevealed) ActionBlue else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(15.dp)
+            )
         }
     }
 }

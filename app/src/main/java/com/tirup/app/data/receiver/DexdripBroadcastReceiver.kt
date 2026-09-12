@@ -112,7 +112,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             else -> false
         }
 
-        val valueMmol = if (isMgdl) glucoseVal / 18.01559 else glucoseVal
+        val valueMmol = if (isMgdl) glucoseVal / 18.0182 else glucoseVal
 
         // 2. Extract timestamp
         val timestamp = extractTimestamp(extras) ?: System.currentTimeMillis()
