@@ -270,8 +270,8 @@ class SettingsViewModel(
     fun boostBleObserverScan() {
         viewModelScope.launch {
             val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
-            com.tirup.app.data.ble.BleObserverManager.boostScanFor30Sec(context, settingsRepository, glucoseRepository)
-            val msg = if (isRu) "🔍 Активный поиск мастера запущен (30 сек)" else "🔍 Boost scan active (30s)"
+            com.tirup.app.data.ble.BleObserverManager.boostScanFor60Sec(context, settingsRepository, glucoseRepository)
+            val msg = if (isRu) "🔍 Активный поиск вещателя запущен (60 сек)" else "🔍 Boost scan active (60s)"
             _uiState.update { it.copy(infoMessage = msg) }
         }
     }

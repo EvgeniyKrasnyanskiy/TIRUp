@@ -23,6 +23,15 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material.icons.filled.BluetoothSearching
+import android.Manifest
+import android.bluetooth.BluetoothManager
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.tirup.app.data.ble.BleObserverManager
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.geometry.Offset
@@ -123,17 +132,54 @@ fun FocusScreen(
     val isBleBroadcasting by BleBroadcaster.isBroadcasting.collectAsState()
     val broadcastRemainingSec by BleBroadcaster.broadcastRemainingSec.collectAsState()
     val nextHeartbeatRemainingSec by BleBroadcaster.nextHeartbeatRemainingSec.collectAsState()
+    val boostRemainingSec by BleObserverManager.boostRemainingSec.collectAsState()
+    val context = LocalContext.current
+
+    val userSettings = state.userSettings
+    val isRu = userSettings.language.equals("RU", ignoreCase = true)
+
+    val blePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.values.all { it }
+        if (!allGranted) {
+            Toast.makeText(context, if (isRu) "Для работы BLE-моста требуется доступ к Bluetooth" else "Bluetooth permissions required for BLE Bridge", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    fun checkAndRequestBlePermissions(role: BleBridgeRole): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val needed = mutableListOf<String>()
+            if (role == BleBridgeRole.BROADCASTER) {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED) {
+                    needed.add(Manifest.permission.BLUETOOTH_ADVERTISE)
+                }
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    needed.add(Manifest.permission.BLUETOOTH_CONNECT)
+                }
+            } else if (role == BleBridgeRole.OBSERVER) {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                    needed.add(Manifest.permission.BLUETOOTH_SCAN)
+                }
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    needed.add(Manifest.permission.BLUETOOTH_CONNECT)
+                }
+            }
+            if (needed.isNotEmpty()) {
+                blePermissionLauncher.launch(needed.toTypedArray())
+                return false
+            }
+        }
+        return true
+    }
 
     var detailDialogInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
     var showMetricsOrderDialog by remember { mutableStateOf(false) }
     var showDailyAlertLogsDialog by rememberSaveable { mutableStateOf(false) }
     var focusCardMode by rememberSaveable { mutableStateOf(0) }
 
-
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
-    val userSettings = state.userSettings
-    val isRu = userSettings.language.equals("RU", ignoreCase = true)
     val targetMode = userSettings.targetMode
     val unit = userSettings.unit
     val goal = state.compensatorGoal
@@ -1113,12 +1159,30 @@ fun FocusScreen(
     }
 
     if (showBleStatusDialog) {
+        val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        val isBtOn = bluetoothManager?.adapter?.isEnabled == true
+
         BleStatusDialog(
             bleSettings = userSettings.bleBridgeSettings,
             isBleBroadcasting = isBleBroadcasting,
             broadcastRemainingSec = broadcastRemainingSec,
             nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
+            boostRemainingSec = boostRemainingSec,
             isRu = isRu,
+            onTestPingClick = {
+                if (!isBtOn) {
+                    Toast.makeText(context, if (isRu) "Включите Bluetooth на смартфоне" else "Enable Bluetooth first", Toast.LENGTH_SHORT).show()
+                } else if (checkAndRequestBlePermissions(BleBridgeRole.BROADCASTER)) {
+                    viewModel.sendBleTestPing(context)
+                }
+            },
+            onBoostScanClick = {
+                if (!isBtOn) {
+                    Toast.makeText(context, if (isRu) "Включите Bluetooth на смартфоне" else "Enable Bluetooth first", Toast.LENGTH_SHORT).show()
+                } else if (checkAndRequestBlePermissions(BleBridgeRole.OBSERVER)) {
+                    viewModel.boostBleObserverScan(context)
+                }
+            },
             onToggleEnable = { viewModel.toggleBleBridgeEnabled() },
             onOpenSettings = {
                 showBleStatusDialog = false
@@ -1443,7 +1507,10 @@ private fun BleStatusDialog(
     isBleBroadcasting: Boolean,
     broadcastRemainingSec: Int,
     nextHeartbeatRemainingSec: Int,
+    boostRemainingSec: Int,
     isRu: Boolean,
+    onTestPingClick: () -> Unit,
+    onBoostScanClick: () -> Unit,
     onToggleEnable: () -> Unit,
     onOpenSettings: () -> Unit,
     onDismiss: () -> Unit
@@ -1550,6 +1617,58 @@ private fun BleStatusDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (isEnabled) {
+                    if (isBroadcaster) {
+                        Button(
+                            onClick = onTestPingClick,
+                            enabled = !isBleBroadcasting,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ActionBlue,
+                                contentColor = Color.White,
+                                disabledContainerColor = ActionBlue.copy(alpha = 0.35f),
+                                disabledContentColor = Color.White.copy(alpha = 0.6f)
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                text = if (isBleBroadcasting) {
+                                    if (isRu) "📡 Импульс вещания (${broadcastRemainingSec}с)..."
+                                    else "📡 Broadcasting (${broadcastRemainingSec}s)..."
+                                } else {
+                                    if (isRu) "📡 Тест связи (импульс 30 сек)"
+                                    else "📡 Test Link (30s Pulse)"
+                                },
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        Button(
+                            onClick = onBoostScanClick,
+                            enabled = boostRemainingSec <= 0,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ActionBlue,
+                                contentColor = Color.White,
+                                disabledContainerColor = ActionBlue.copy(alpha = 0.35f),
+                                disabledContentColor = Color.White.copy(alpha = 0.6f)
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                text = if (boostRemainingSec > 0) {
+                                    if (isRu) "⚡ Активный поиск (${boostRemainingSec}с)..."
+                                    else "⚡ Boost Scan (${boostRemainingSec}s)..."
+                                } else {
+                                    if (isRu) "🔍 Быстрый поиск вещателя (60 сек)"
+                                    else "🔍 Fast Master Search (60s)"
+                                },
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
                 TextButton(
                     onClick = onOpenSettings,
                     modifier = Modifier.align(Alignment.End)

@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -326,6 +327,37 @@ class FocusViewModel(
             if (context != null) {
                 com.tirup.app.data.ble.BleObserverManager.syncWithSettings(context, settingsRepository, glucoseRepository)
             }
+        }
+    }
+
+    fun sendBleTestPing(overrideContext: Context? = null) {
+        val ctx = overrideContext ?: context ?: return
+        viewModelScope.launch {
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            val ble = _uiState.value.userSettings.bleBridgeSettings
+            val latest = glucoseRepository.getLatestReading().firstOrNull()
+            com.tirup.app.data.ble.BleBroadcaster.broadcastTestPing(
+                context = ctx,
+                reading = latest,
+                settings = ble
+            ) { success, message ->
+                val text = if (success) {
+                    if (isRu) "📡 $message" else "📡 BLE pulse started (30s)"
+                } else {
+                    if (isRu) "⚠️ $message" else "⚠️ BLE error: $message"
+                }
+                android.widget.Toast.makeText(ctx, text, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun boostBleObserverScan(overrideContext: Context? = null) {
+        val ctx = overrideContext ?: context ?: return
+        viewModelScope.launch {
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            com.tirup.app.data.ble.BleObserverManager.boostScanFor60Sec(ctx, settingsRepository, glucoseRepository)
+            val msg = if (isRu) "🔍 Активный поиск вещателя запущен (60 сек)" else "🔍 Boost scan active (60s)"
+            android.widget.Toast.makeText(ctx, msg, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 }
