@@ -274,10 +274,11 @@ fun AgpSheetPreviewModal(
                                     val nStart = userSettings.nightStartHour
                                     val nEnd = userSettings.nightEndHour
                                     val nightStr = if (statistics.nightStability.isStable) {
-                                        if (isRu) "Стабильный (TIR ${String.format(Locale.US, "%.0f%%", statistics.nightStability.tirPercent)})"
-                                        else "Stable (TIR ${String.format(Locale.US, "%.0f%%", statistics.nightStability.tirPercent)})"
+                                        if (isRu) "Стабильный (TIR ${String.format(Locale.US, "%.1f%%", statistics.nightStability.tirPercent)})"
+                                        else "Stable (TIR ${String.format(Locale.US, "%.1f%%", statistics.nightStability.tirPercent)})"
                                     } else {
-                                        if (isRu) "Колебания" else "Fluctuations"
+                                        if (isRu) "Колебания (TIR ${String.format(Locale.US, "%.1f%%", statistics.nightStability.tirPercent)})"
+                                        else "Fluctuations (TIR ${String.format(Locale.US, "%.1f%%", statistics.nightStability.tirPercent)})"
                                     }
                                     ReportStatLine(if (isRu) "Ночной профиль (${String.format(Locale.US, "%02d:00", nStart)}–${String.format(Locale.US, "%02d:00", nEnd)}):" else "Night Sleep Profile (${String.format(Locale.US, "%02d:00", nStart)}–${String.format(Locale.US, "%02d:00", nEnd)}):", nightStr)
                                 }
