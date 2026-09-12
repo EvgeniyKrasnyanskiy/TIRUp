@@ -304,10 +304,10 @@ class UserManualPdfGenerator(private val context: Context) {
                 else "4. 4-Tier Safety Alarms & Sleep-Aware Signal Loss (Tier 1–4)",
                 items = listOf(
                     Triple(
-                        if (isRu) "Уровень 1: Предиктивный прогноз (за 15 мин)" else "Tier 1: Predictive Forecast (15 min)",
-                        if (isRu) "Мягкий сигнал" else "Soft Chime",
-                        if (isRu) "Математическая регрессия рассчитывает скорость изменения сахара и предупреждает о скором выходе за рамки с указанием точного расчетного времени. Мягкий сигнал без стресса."
-                        else "Weighted velocity regression calculates impending target departure with exact estimated time. Gentle dual-tone chime without startling."
+                        if (isRu) "Уровень 1: Предиктивный прогноз и тренд на графике" else "Tier 1: Predictive Forecast & Chart Trend",
+                        if (isRu) "Прогноз 25м" else "Forecast 25m",
+                        if (isRu) "Фиолетовые точки и пунктир на суточном графике экстраполируют сахар на 25 мин вперёд без необходимости ввода ФЧИ/УК. Мягкий сигнал тревоги за 15 мин до выхода из нормы предупреждает гипогликемию."
+                        else "Purple dots and dashed trajectory extrapolate glucose 25 min ahead without ISF/ICR. Gentle chime 15m prior to target breach prevents hypoglycemia."
                     ),
                     Triple(
                         if (isRu) "Уровень 2: Основная тревога (кастомный диапазон, 3–5 точек)" else "Tier 2: Confirmed Departure (Custom Range, 3–5 pts)",

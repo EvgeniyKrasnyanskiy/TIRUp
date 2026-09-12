@@ -50,6 +50,8 @@ import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.TargetRanges
 import com.tirup.app.domain.model.Treatment
+import com.tirup.app.domain.calculator.GlucoseTrendPredictor
+import com.tirup.app.domain.calculator.ForecastPoint
 import com.tirup.app.presentation.components.BentoCard
 import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.ColorHigh
@@ -96,6 +98,7 @@ fun DailyGlucoseChart(
     modifier: Modifier = Modifier,
     treatments: List<Treatment> = emptyList(),
     showTreatments: Boolean = true,
+    showPrediction: Boolean = true,
     onDeleteTreatment: ((Long) -> Unit)? = null,
     selectedMode: Int = 0,
     onModeChange: (Int) -> Unit = {},
@@ -136,6 +139,12 @@ fun DailyGlucoseChart(
     var selectedReading by remember { mutableStateOf<GlucoseReading?>(null) }
     var selectedGap by remember { mutableStateOf<DataGap?>(null) }
     var selectedTreatment by remember { mutableStateOf<Treatment?>(null) }
+    var selectedForecastPoint by remember { mutableStateOf<ForecastPoint?>(null) }
+
+    val forecastPoints = remember(todayReadings, showPrediction) {
+        if (!showPrediction) emptyList()
+        else GlucoseTrendPredictor.generateForecastPoints(todayReadings, horizonMinutes = 25, stepMinutes = 5)
+    }
 
     val dataGaps = remember(todayReadings, startOfDay) {
         val gaps = mutableListOf<DataGap>()
@@ -418,6 +427,54 @@ fun DailyGlucoseChart(
                             }
                         }
                     }
+                } else if (selectedForecastPoint != null) {
+                    val fp = selectedForecastPoint!!
+                    val fpVal = if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", fp.valueMmol)
+                    else "${(fp.valueMmol * 18.0182).toInt()}"
+                    val fpUnit = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL")
+                    val fpTime = timeFormatter.format(Date(fp.timestamp))
+                    val purpleColor = Color(0xFFA855F7)
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = purpleColor.copy(alpha = 0.12f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, purpleColor.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "🔮 ${if (isRu) "Прогноз" else "Forecast"} $fpTime (+${fp.minutesAhead}${if (isRu) "м" else "m"})",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = onSurface
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "~$fpVal $fpUnit",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = purpleColor
+                                )
+                            }
+
+                            Text(
+                                text = "✕",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = onSurfaceVariant,
+                                modifier = Modifier
+                                    .clickable { selectedForecastPoint = null }
+                                    .padding(horizontal = 4.dp)
+                            )
+                        }
+                    }
                 } else if (selectedReading != null) {
                     val sel = selectedReading!!
                     val selVal = if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", sel.valueMmol)
@@ -528,12 +585,31 @@ fun DailyGlucoseChart(
                                         selectedGap = if (selectedGap == tappedGap) null else tappedGap
                                         selectedReading = null
                                     } else {
-                                        val closest = todayReadings.minByOrNull { r ->
+                                        val closestFp = if (forecastPoints.isNotEmpty()) {
+                                            forecastPoints.minByOrNull { fp ->
+                                                val fMinute = (fp.timestamp - startOfDay) / 60000f
+                                                abs(fMinute - tapMinute)
+                                            }
+                                        } else null
+
+                                        val closestReading = todayReadings.minByOrNull { r ->
                                             val rMinute = (r.timestamp - startOfDay) / 60000f
                                             abs(rMinute - tapMinute)
                                         }
-                                        selectedReading = if (closest != null && selectedReading == closest) null else closest
-                                        selectedGap = null
+
+                                        val distFp = closestFp?.let { abs((it.timestamp - startOfDay) / 60000f - tapMinute) } ?: Float.MAX_VALUE
+                                        val distR = closestReading?.let { abs((it.timestamp - startOfDay) / 60000f - tapMinute) } ?: Float.MAX_VALUE
+
+                                        if (distFp < distR && distFp <= 12f) {
+                                            selectedForecastPoint = if (selectedForecastPoint == closestFp) null else closestFp
+                                            selectedReading = null
+                                            selectedGap = null
+                                            selectedTreatment = null
+                                        } else {
+                                            selectedReading = if (closestReading != null && selectedReading == closestReading) null else closestReading
+                                            selectedForecastPoint = null
+                                            selectedGap = null
+                                        }
                                     }
                                 }
                             }
@@ -802,6 +878,61 @@ fun DailyGlucoseChart(
                                 radius = radius,
                                 center = Offset(x, y)
                             )
+                        }
+
+                        // 4.0. Draw 25-Minute Trend Forecast (Purple dashed trajectory & dots)
+                        if (forecastPoints.isNotEmpty()) {
+                            val latestActual = visibleReadings.last()
+                            val latestM = (latestActual.timestamp - startOfDay) / 60000f
+                            val latestX = xForMinute(latestM)
+                            val latestY = yForMmol(latestActual.valueMmol)
+
+                            val forecastColor = Color(0xFFA855F7) // Purple
+                            val forecastPath = Path()
+                            forecastPath.moveTo(latestX, latestY)
+
+                            forecastPoints.forEach { fp ->
+                                val fm = (fp.timestamp - startOfDay) / 60000f
+                                val fx = xForMinute(fm)
+                                val fy = yForMmol(fp.valueMmol)
+                                forecastPath.lineTo(fx, fy)
+                            }
+
+                            // Dashed purple trajectory line
+                            drawPath(
+                                path = forecastPath,
+                                color = forecastColor.copy(alpha = 0.75f),
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                    width = 2.0f,
+                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f)
+                                )
+                            )
+
+                            // Forecast dots (+5m, +10m, +15m, +20m, +25m)
+                            val dotRadius = if (visibleMinutes <= 360f) 3.5f else 2.2f
+                            forecastPoints.forEach { fp ->
+                                val fm = (fp.timestamp - startOfDay) / 60000f
+                                val fx = xForMinute(fm)
+                                val fy = yForMmol(fp.valueMmol)
+
+                                if (fx in -10f..(chartRight + 10f)) {
+                                    val isFpSelected = (selectedForecastPoint == fp)
+                                    val curRadius = if (isFpSelected) dotRadius * 1.5f else dotRadius
+
+                                    // Subtle outer glow
+                                    drawCircle(
+                                        color = forecastColor.copy(alpha = if (isFpSelected) 0.45f else 0.22f),
+                                        radius = curRadius * (if (isFpSelected) 2.2f else 1.7f),
+                                        center = Offset(fx, fy)
+                                    )
+                                    // Main dot
+                                    drawCircle(
+                                        color = forecastColor.copy(alpha = 0.9f),
+                                        radius = curRadius,
+                                        center = Offset(fx, fy)
+                                    )
+                                }
+                            }
                         }
                     }
 

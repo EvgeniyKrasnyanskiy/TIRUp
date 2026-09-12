@@ -328,6 +328,14 @@ class SettingsViewModel(
         }
     }
 
+    fun setShowPredictionOnChart(enabled: Boolean) {
+        viewModelScope.launch {
+            val updated = _uiState.value.userSettings.copy(showPredictionOnChart = enabled)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+        }
+    }
+
     fun clearTreatments() {
         viewModelScope.launch {
             val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
