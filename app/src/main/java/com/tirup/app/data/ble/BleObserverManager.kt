@@ -82,9 +82,9 @@ object BleObserverManager {
     }
 
     /**
-     * Boosts scanning to SCAN_MODE_LOW_LATENCY for 30 seconds to quickly detect the master.
+     * Boosts scanning to SCAN_MODE_LOW_LATENCY for 60 seconds to quickly detect the master.
      */
-    fun boostScanFor30Sec(
+    fun boostScanFor60Sec(
         context: Context,
         settingsRepository: SettingsRepository,
         glucoseRepository: GlucoseRepository
@@ -96,7 +96,7 @@ object BleObserverManager {
 
             boostJob?.cancel()
             isBoostActive = true
-            _boostRemainingSec.value = 30
+            _boostRemainingSec.value = 60
 
             // Restart scanner in low latency mode
             stopScanningInternal()
@@ -114,6 +114,13 @@ object BleObserverManager {
             }
         }
     }
+
+    /** Legacy alias for backwards compatibility */
+    fun boostScanFor30Sec(
+        context: Context,
+        settingsRepository: SettingsRepository,
+        glucoseRepository: GlucoseRepository
+    ) = boostScanFor60Sec(context, settingsRepository, glucoseRepository)
 
     private suspend fun startScanningInternal(
         context: Context,
