@@ -1660,8 +1660,8 @@ private fun BleStatusDialog(
                                     if (isRu) "⚡ Активный поиск (${boostRemainingSec}с)..."
                                     else "⚡ Boost Scan (${boostRemainingSec}s)..."
                                 } else {
-                                    if (isRu) "🔍 Быстрый поиск вещателя (60 сек)"
-                                    else "🔍 Fast Master Search (60s)"
+                                    if (isRu) "🔍 Поиск вещателя (60 сек)"
+                                    else "🔍 Master Search (60s)"
                                 },
                                 fontWeight = FontWeight.Bold
                             )

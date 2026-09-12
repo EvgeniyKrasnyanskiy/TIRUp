@@ -1416,7 +1416,7 @@ fun SettingsScreen(
                                     text = if (boostRemaining > 0) {
                                         if (isRu) "⚡ Активный поиск (${boostRemaining}с)..." else "⚡ Boosting Scan (${boostRemaining}s)..."
                                     } else {
-                                        if (isRu) "🔍 Быстрый поиск вещателя (60 сек)" else "🔍 Fast Master Search (60s)"
+                                        if (isRu) "🔍 Поиск вещателя (60 сек)" else "🔍 Master Search (60s)"
                                     },
                                     fontWeight = FontWeight.Bold
                                 )
