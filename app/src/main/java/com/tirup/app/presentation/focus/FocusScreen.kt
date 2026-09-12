@@ -541,6 +541,7 @@ fun FocusScreen(
                 isRu = isRu,
                 treatments = state.treatments,
                 showTreatments = userSettings.showTreatmentsOnChart,
+                showPrediction = userSettings.showPredictionOnChart,
                 onDeleteTreatment = { viewModel.deleteTreatment(it) },
                 selectedMode = focusCardMode,
                 onModeChange = { focusCardMode = it },

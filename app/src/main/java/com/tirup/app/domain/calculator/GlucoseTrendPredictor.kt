@@ -21,6 +21,12 @@ data class PredictionResult(
     val currentReading: GlucoseReading?
 )
 
+data class ForecastPoint(
+    val timestamp: Long,
+    val valueMmol: Double,
+    val minutesAhead: Int
+)
+
 object GlucoseTrendPredictor {
 
     private const val MIN_POINTS = 5
@@ -144,5 +150,75 @@ object GlucoseTrendPredictor {
             confidenceR2 = (r2 * 100.0).roundToInt() / 100.0,
             currentReading = latest
         )
+    }
+
+    /**
+     * Generates forward extrapolation forecast points for the chart.
+     * Default horizon is 25 minutes with a 5-minute interval (+5m, +10m, +15m, +20m, +25m).
+     * Applies a gentle damping factor so that the forecast trajectory naturally flattens.
+     * Returns empty list if data is stale (> 15 min) or points are insufficient.
+     */
+    fun generateForecastPoints(
+        readings: List<GlucoseReading>,
+        horizonMinutes: Int = 25,
+        stepMinutes: Int = 5
+    ): List<ForecastPoint> {
+        if (readings.size < MIN_POINTS) return emptyList()
+
+        val sorted = readings.sortedBy { it.timestamp }
+        val latest = sorted.last()
+
+        // Check freshness: if latest reading is older than 15 minutes, do not forecast
+        val now = System.currentTimeMillis()
+        if (now - latest.timestamp > 15 * 60 * 1000L) {
+            return emptyList()
+        }
+
+        // Regression on recent 30-min window
+        val windowStartTime = latest.timestamp - 30 * 60 * 1000L
+        val timeBasedWindow = sorted.filter { it.timestamp >= windowStartTime }
+        val window = if (timeBasedWindow.size >= MIN_POINTS) timeBasedWindow else sorted.takeLast(MIN_POINTS)
+
+        val t0 = window.first().timestamp
+        val x = window.map { (it.timestamp - t0).toDouble() / 60000.0 }
+        val y = window.map { it.valueMmol }
+        val n = x.size
+
+        val xMean = x.average()
+        val yMean = y.average()
+
+        var ssXx = 0.0
+        var ssXy = 0.0
+
+        for (i in 0 until n) {
+            val dx = x[i] - xMean
+            val dy = y[i] - yMean
+            ssXx += dx * dx
+            ssXy += dx * dy
+        }
+
+        if (ssXx == 0.0) return emptyList()
+
+        val slope = ssXy / ssXx // mmol/L per minute
+
+        val points = mutableListOf<ForecastPoint>()
+        var t = stepMinutes
+        while (t <= horizonMinutes) {
+            // Gentle physiological damping: velocity dampens by ~1.5% per minute
+            val damping = (1.0 - 0.015 * t).coerceAtLeast(0.4)
+            val deltaG = slope * t.toDouble() * damping
+            val predicted = (latest.valueMmol + deltaG).coerceIn(1.5, 25.0)
+            val rounded = (predicted * 10.0).roundToInt() / 10.0
+            points.add(
+                ForecastPoint(
+                    timestamp = latest.timestamp + t * 60_000L,
+                    valueMmol = rounded,
+                    minutesAhead = t
+                )
+            )
+            t += stepMinutes
+        }
+
+        return points
     }
 }
