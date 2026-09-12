@@ -136,10 +136,7 @@ object GlucoseMetricsCalculator {
         val tbrTotalPercent = (belowCount.toDouble() / totalCount) * 100.0
         val tarTotalPercent = (aboveCount.toDouble() / totalCount) * 100.0
 
-        // xDrip & DiaKiaBot integer rounding: ensures TIR + TBR + TAR = 100%
-        val tbrPctRound = kotlin.math.round(tbrTotalPercent)
-        val tarPctRound = kotlin.math.round(tarTotalPercent)
-        val tirPercent = (100.0 - tbrPctRound - tarPctRound).coerceIn(0.0, 100.0)
+        val tirPercent = (inRangeCount.toDouble() / totalCount * 100.0).coerceIn(0.0, 100.0)
 
         val tingPercent = (tightCount.toDouble() / totalCount) * 100.0
         val tbrVeryLowPercent = (below30Count.toDouble() / totalCount) * 100.0
@@ -400,7 +397,7 @@ object GlucoseMetricsCalculator {
         evalItems.add(
             ClinicalMetricStatus(
                 title = tirTitle,
-                valueStr = String.format(Locale.US, "%.0f%%", tirPercent),
+                valueStr = String.format(Locale.US, "%.1f%%", tirPercent),
                 targetStr = if (isRu) "цель ≥70%" else "target ≥70%",
                 isMet = tirMet,
                 isWarning = tirWarn
@@ -419,7 +416,7 @@ object GlucoseMetricsCalculator {
         evalItems.add(
             ClinicalMetricStatus(
                 title = tingTitle,
-                valueStr = String.format(Locale.US, "%.0f%%", tingPercent),
+                valueStr = String.format(Locale.US, "%.1f%%", tingPercent),
                 targetStr = if (isRu) "цель ≥50%" else "target ≥50%",
                 isMet = tingMet,
                 isWarning = tingWarn
@@ -438,7 +435,7 @@ object GlucoseMetricsCalculator {
         evalItems.add(
             ClinicalMetricStatus(
                 title = tbrTitle,
-                valueStr = "${tbrTotalPercent.roundToInt()}%",
+                valueStr = String.format(Locale.US, "%.1f%%", tbrTotalPercent),
                 targetStr = if (isRu) "цель <4%" else "target <4%",
                 isMet = tbrMet,
                 isWarning = tbrWarn
@@ -477,7 +474,7 @@ object GlucoseMetricsCalculator {
         evalItems.add(
             ClinicalMetricStatus(
                 title = tarTitle,
-                valueStr = String.format(Locale.US, "%.0f%%", tarTotalPercent),
+                valueStr = String.format(Locale.US, "%.1f%%", tarTotalPercent),
                 targetStr = if (isRu) "цель <25%" else "target <25%",
                 isMet = tarMet,
                 isWarning = tarWarn

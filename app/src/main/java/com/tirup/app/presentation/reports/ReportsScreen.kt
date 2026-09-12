@@ -1010,7 +1010,7 @@ private fun ReportMetricsColumn(
                     ReportMetricRow(
                         label = tirLabel,
                         target = if (isRu) "Цель: ≥70%" else "Target: ≥70%",
-                        value = String.format(Locale.US, "%.0f%%", stats.tirPercent),
+                        value = String.format(Locale.US, "%.1f%%", stats.tirPercent),
                         valueColor = tirColor
                     )
                 }
@@ -1023,7 +1023,7 @@ private fun ReportMetricsColumn(
                     ReportMetricRow(
                         label = tingLabel,
                         target = if (isRu) "Цель: ≥50%" else "Target: ≥50%",
-                        value = String.format(Locale.US, "%.0f%%", stats.tingPercent),
+                        value = String.format(Locale.US, "%.1f%%", stats.tingPercent),
                         valueColor = if (stats.tingPercent >= 50.0) PrimaryEmerald else ColorHigh
                     )
                 }
@@ -1049,7 +1049,7 @@ private fun ReportMetricsColumn(
                     ReportMetricRow(
                         label = tarLabel,
                         target = if (isRu) "Цель: <25%" else "Target: <25%",
-                        value = String.format(Locale.US, "%.0f%%", tarTotal),
+                        value = String.format(Locale.US, "%.1f%%", tarTotal),
                         valueColor = if (tarTotal <= 25.0) PrimaryEmerald else ColorHigh
                     )
                 }
