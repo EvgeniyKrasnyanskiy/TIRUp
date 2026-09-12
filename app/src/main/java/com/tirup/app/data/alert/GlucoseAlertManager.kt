@@ -796,13 +796,21 @@ object GlucoseAlertManager {
         val tirLow = targetRanges.tirLowMmol
         val tirHigh = if (settings.targetMode.name == "TING") targetRanges.tingHighMmol else targetRanges.tirHighMmol
 
-        // Auto-dismiss stale out-of-range notifications when back in normal range
+        // Auto-dismiss stale out-of-range & predictive notifications when back in normal range
         val isInNormalRange = latest.valueMmol in tirLow..tirHigh
         if (isInNormalRange) {
             cancelEmergencySmsTimer()
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             nm?.cancel(NOTIFICATION_ID_MAIN)
-            if (_activeAlertBanner.value?.tier != AlertTier.PREDICTIVE) {
+            nm?.cancel(NOTIFICATION_ID_PREDICTIVE)
+            _activeAlertBanner.value = null
+        }
+
+        // Auto-dismiss predictive notification if older than 30 minutes
+        if (lastPredictiveAlertTimestamp > 0L && (now - lastPredictiveAlertTimestamp) > 30 * 60000L) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            nm?.cancel(NOTIFICATION_ID_PREDICTIVE)
+            if (_activeAlertBanner.value?.tier == AlertTier.PREDICTIVE) {
                 _activeAlertBanner.value = null
             }
         }

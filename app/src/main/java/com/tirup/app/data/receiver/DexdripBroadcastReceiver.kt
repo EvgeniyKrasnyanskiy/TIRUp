@@ -915,6 +915,25 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                     var computedCob: Double? = null
                     val treatments = fetchTreatmentsFromLocalService()
                     if (treatments.isNotEmpty()) {
+                        // Reconcile deletions: remove any local treatments that were deleted in xDrip
+                        try {
+                            val oldestXdripTs = treatments.minOf { it.timestamp }
+                            val recentLocal = db.treatmentDao().getRecentTreatmentsSync(100)
+                            for (local in recentLocal) {
+                                if (local.source == "XDRIP" && local.timestamp >= oldestXdripTs) {
+                                    val stillExistsInXdrip = treatments.any { xt ->
+                                        kotlin.math.abs(xt.timestamp - local.timestamp) < 60_000L
+                                    }
+                                    if (!stillExistsInXdrip) {
+                                        db.treatmentDao().deleteById(local.id)
+                                        Log.i(TAG, "Reconciled deleted treatment from xDrip: ${local.id} at ${local.timestamp}")
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error reconciling treatments deletion: ${e.message}")
+                        }
+
                         for (t in treatments) {
                             saveTreatmentIfNew(db, t)
                         }

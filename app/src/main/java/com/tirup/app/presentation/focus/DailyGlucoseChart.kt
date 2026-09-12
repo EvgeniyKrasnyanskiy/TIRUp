@@ -297,7 +297,8 @@ fun DailyGlucoseChart(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.weight(1f, fill = false)
                             ) {
                                 Text(
                                     text = "⏱ $trTime",
@@ -329,10 +330,14 @@ fun DailyGlucoseChart(
                                 }
 
                                 if (!tr.notes.isNullOrBlank()) {
+                                    val cleanNote = tr.notes.trim()
+                                    val truncatedNote = if (cleanNote.length > 12) cleanNote.take(11) + "…" else cleanNote
                                     Text(
-                                        text = "• ${tr.notes}",
+                                        text = "• $truncatedNote",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = onSurfaceVariant
+                                        color = onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                     )
                                 }
                             }
