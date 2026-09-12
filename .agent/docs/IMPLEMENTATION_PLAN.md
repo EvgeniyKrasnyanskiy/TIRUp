@@ -35,3 +35,21 @@
 - Приведен коэффициент `MGDL_FACTOR` к `18.0182`.
 - Синхронизированы полуинтервалы TIR, TING, TBR, TAR, диапазоны GRI и формула xDrip `tir = 100 - tbr - tar`.
 
+## 2. Итерация 2: [Completed] Доработка модальных окон, Snackbar и спойлера PIN (Пункты 5 и 7)
+
+### Пункт 5. [Completed] Спойлер PIN в модальном окне «BLE-мост: Приёмник/Вещатель» (`FocusScreen.kt`, `SettingsScreen.kt`)
+- В `FocusScreen.kt` в диалоге `BleStatusDialog` открытый PIN удален из всех текстовых шаблонов описания.
+- Добавлена аккуратная плашка `Семейный PIN: [ SpoilerPinBadge ]`, скрывающая PIN под `•••` и открывающая его по нажатию.
+- В `SettingsScreen.kt` в плитке настроек отображается реальный установленный PIN (`Код: $familyPin`).
+
+### Пункт 7. [Completed] Snackbar внутри диалогов и «Сохранить руководство» (`ReportsScreen.kt`, `AgpSheetPreviewModal.kt`, `HelpAndDisclaimerDialog.kt`, `SettingsViewModel.kt`, `SettingsScreen.kt`)
+- В `ReportsScreen.kt` и `AgpSheetPreviewModal.kt`:
+  - Встроен `SnackbarHost` внутрь `ParametersGuidebookModal` и `AgpSheetPreviewModal`, Snackbar с кнопкой «Открыть» отображается сразу при сохранении без необходимости закрывать модальное окно.
+- В `HelpAndDisclaimerDialog.kt`:
+  - Кнопка переименована в «Сохранить руководство» (EN: «Save User Manual»).
+  - Убран лишний эмодзи `📄`, используется единственная векторная иконка `Download`.
+  - Встроен `SnackbarHost` для отображения статуса сохранения прямо в диалоге.
+- В `SettingsViewModel.kt` и `SettingsScreen.kt`:
+  - Добавлен метод `saveUserManualToDownloads()` с сохранением PDF руководства в системную папку «Загрузки».
+  - Подключен `Snackbar` с действием «Открыть» через `openSavedFileFolder`.
+

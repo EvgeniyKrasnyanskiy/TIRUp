@@ -12,14 +12,22 @@ import com.tirup.app.domain.model.TargetRanges
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.domain.repository.GlucoseRepository
 import com.tirup.app.domain.repository.SettingsRepository
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+sealed interface SettingsEvent {
+    data class SavedToDownloads(val filePath: String) : SettingsEvent
+    data class Info(val message: String) : SettingsEvent
+}
 
 data class SettingsUiState(
     val userSettings: UserSettings = UserSettings(),
@@ -36,6 +44,9 @@ class SettingsViewModel(
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    private val _events = MutableSharedFlow<SettingsEvent>()
+    val events: SharedFlow<SettingsEvent> = _events.asSharedFlow()
 
     val latestReading: StateFlow<GlucoseReading?> = glucoseRepository.getLatestReading()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -346,6 +357,48 @@ class SettingsViewModel(
     }
 
     private val manualPdfGenerator = UserManualPdfGenerator(context)
+
+    fun saveUserManualToDownloads() {
+        viewModelScope.launch {
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            manualPdfGenerator.generateUserManualPdf(isRu).onSuccess { pdfFile ->
+                val fileName = "TIRUp_User_Manual_${System.currentTimeMillis()}.pdf"
+                try {
+                    var savedPath = ""
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        val contentValues = android.content.ContentValues().apply {
+                            put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                            put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
+                            put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+                        }
+                        val uri = context.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                        if (uri != null) {
+                            context.contentResolver.openOutputStream(uri)?.use { out ->
+                                java.io.FileInputStream(pdfFile).use { input ->
+                                    input.copyTo(out)
+                                }
+                            }
+                            savedPath = "Downloads/$fileName"
+                        }
+                    } else {
+                        val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                        val destFile = java.io.File(downloadsDir, fileName)
+                        java.io.FileInputStream(pdfFile).use { input ->
+                            java.io.FileOutputStream(destFile).use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        savedPath = destFile.absolutePath
+                    }
+                    _events.emit(SettingsEvent.SavedToDownloads(savedPath))
+                } catch (e: Exception) {
+                    _events.emit(SettingsEvent.Info("Save failed: ${e.message}"))
+                }
+            }.onFailure { error ->
+                _events.emit(SettingsEvent.Info("Error: ${error.localizedMessage}"))
+            }
+        }
+    }
 
     fun printOrShareUserManual() {
         viewModelScope.launch {

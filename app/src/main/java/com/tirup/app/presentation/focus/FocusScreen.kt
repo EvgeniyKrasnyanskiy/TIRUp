@@ -1580,9 +1580,9 @@ private fun BleStatusDialog(
             if (isBleBroadcasting) {
                 if (isRu) {
                     "Прямо сейчас вещатель передает сигнал Bluetooth в эфир (осталось $broadcastRemainingSec сек).\n\n" +
-                    "Телефоны-приемники в радиусе 10–15 м с семейным PIN (${bleSettings.familyPin}) получают свежий замер сахара, тренд и заряд батареи."
+                    "Телефоны-приемники в радиусе 10–15 м получают свежий замер сахара, тренд и заряд батареи."
                 } else {
-                    "Broadcasting active ($broadcastRemainingSec s remaining). Receiver phones with PIN ${bleSettings.familyPin} are receiving fresh glucose, trend, and battery."
+                    "Broadcasting active ($broadcastRemainingSec s remaining). Receiver phones are receiving fresh glucose, trend, and battery."
                 }
             } else {
                 val min = nextHeartbeatRemainingSec / 60
@@ -1590,10 +1590,9 @@ private fun BleStatusDialog(
                 val timeStr = String.format(Locale.US, "%d:%02d", min, sec)
                 if (isRu) {
                     "Вещатель находится в режиме ожидания. До контрольного сигнала (heartbeat): $timeStr.\n\n" +
-                    "Семейный PIN: ${bleSettings.familyPin}\n" +
                     "Как только от сенсора поступит свежий замер, вещатель немедленно передаст его в эфир."
                 } else {
-                    "Broadcaster is idle. Heartbeat pulse in: $timeStr.\nFamily PIN: ${bleSettings.familyPin}\nIncoming sensor readings are transmitted immediately."
+                    "Broadcaster is idle. Heartbeat pulse in: $timeStr.\n\nIncoming sensor readings are transmitted immediately."
                 }
             }
         }
@@ -1621,12 +1620,12 @@ private fun BleStatusDialog(
             val batStr = if (bleSettings.lastMasterBattery in 0..100) "${bleSettings.lastMasterBattery}%" else if (isRu) "нет данных" else "no data"
 
             if (isRu) {
-                "Приёмник активен и прослушивает эфир (Семейный PIN: ${bleSettings.familyPin}).\n\n" +
+                "Приёмник активен и прослушивает эфир.\n\n" +
                 "• Последний пакет: $ageStr\n" +
                 "• Батарея вещателя: $batStr\n" +
                 "• Качество сигнала: $signalQuality"
             } else {
-                "Receiver is active listening for packets (Family PIN: ${bleSettings.familyPin}).\n\n" +
+                "Receiver is active listening for packets.\n\n" +
                 "• Last packet: $ageStr\n" +
                 "• Broadcaster battery: $batStr\n" +
                 "• Signal quality: $signalQuality"
@@ -1659,6 +1658,27 @@ private fun BleStatusDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (isEnabled && bleSettings.familyPin.isNotBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = if (isRu) "Семейный PIN:" else "Family PIN:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        SpoilerPinBadge(pin = bleSettings.familyPin)
+                    }
+                }
                 if (isEnabled) {
                     if (isBroadcaster) {
                         Button(
