@@ -1636,8 +1636,8 @@ private fun BleStatusDialog(
                                     if (isRu) "📡 Импульс вещания (${broadcastRemainingSec}с)..."
                                     else "📡 Broadcasting (${broadcastRemainingSec}s)..."
                                 } else {
-                                    if (isRu) "📡 Тест связи (импульс 30 сек)"
-                                    else "📡 Test Link (30s Pulse)"
+                                    if (isRu) "📡 Тест связи (30 сек)"
+                                    else "📡 Test Link (30s)"
                                 },
                                 fontWeight = FontWeight.Bold
                             )

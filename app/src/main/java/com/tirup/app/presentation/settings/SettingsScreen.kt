@@ -1321,7 +1321,7 @@ fun SettingsScreen(
                                 shape = RoundedCornerShape(10.dp)
                             ) {
                                 Text(
-                                    text = if (isRu) "📡 Тест связи (импульс 30 сек)" else "📡 Test Link (30s Pulse)",
+                                    text = if (isRu) "📡 Тест связи (30 сек)" else "📡 Test Link (30s)",
                                     fontWeight = FontWeight.Bold
                                 )
                             }
