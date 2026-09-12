@@ -413,7 +413,7 @@ fun AppNavigationRoot(
         val isRu = settingsState.userSettings.language.equals("RU", ignoreCase = true)
         HelpAndDisclaimerDialog(
             isRu = isRu,
-            onPrintManual = { settingsViewModel.printOrShareUserManual() },
+            onSaveManual = { settingsViewModel.saveUserManualToDownloads() },
             onDismiss = {
                 settingsViewModel.setHasSeenOnboarding(true)
             }

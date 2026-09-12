@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.NotificationsActive
@@ -28,6 +29,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,7 +50,8 @@ import com.tirup.app.presentation.theme.PrimaryEmerald
 @Composable
 fun HelpAndDisclaimerDialog(
     isRu: Boolean,
-    onPrintManual: () -> Unit = {},
+    onSaveManual: () -> Unit = {},
+    snackbarHostState: SnackbarHostState? = null,
     onDismiss: () -> Unit
 ) {
     val onSurface = MaterialTheme.colorScheme.onSurface
@@ -196,22 +200,25 @@ fun HelpAndDisclaimerDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                if (snackbarHostState != null) {
+                    SnackbarHost(hostState = snackbarHostState)
+                }
                 OutlinedButton(
-                    onClick = onPrintManual,
+                    onClick = onSaveManual,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(44.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.PictureAsPdf,
+                        imageVector = Icons.Default.Download,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
                         tint = ActionBlue
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isRu) "📄 Распечатать руководство" else "📄 Print User Manual",
+                        text = if (isRu) "Сохранить руководство" else "Save User Manual",
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
                         color = ActionBlue

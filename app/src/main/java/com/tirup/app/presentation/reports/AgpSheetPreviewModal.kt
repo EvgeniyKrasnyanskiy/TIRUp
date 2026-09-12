@@ -28,6 +28,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,6 +65,7 @@ fun AgpSheetPreviewModal(
     statistics: GlucoseStatistics,
     userSettings: UserSettings,
     isGenerating: Boolean,
+    snackbarHostState: SnackbarHostState? = null,
     onSavePdf: () -> Unit,
     onSharePdf: () -> Unit,
     onDismiss: () -> Unit
@@ -84,7 +87,8 @@ fun AgpSheetPreviewModal(
             color = Color(0xFFF8FAFC),
             shadowElevation = 12.dp
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize()) {
                 // Modal Top Toolbar (Theme adaptive)
                 Row(
                     modifier = Modifier
@@ -444,6 +448,16 @@ fun AgpSheetPreviewModal(
                             )
                         }
                     }
+                }
+            }
+
+            if (snackbarHostState != null) {
+                    SnackbarHost(
+                        hostState = snackbarHostState,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 70.dp, start = 12.dp, end = 12.dp)
+                    )
                 }
             }
         }

@@ -87,11 +87,16 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.ui.draw.scale
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.tirup.app.presentation.reports.openSavedFileFolder
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -164,6 +169,7 @@ fun SettingsScreen(
     var showBleHelpModal by rememberSaveable { mutableStateOf(false) }
     var showBlePinDialog by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val listState = rememberLazyListState()
     var highlightBle by remember { mutableStateOf(false) }
@@ -322,6 +328,28 @@ fun SettingsScreen(
         if (masterOffHintVisible) {
             delay(3000L)
             masterOffHintVisible = false
+        }
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is SettingsEvent.SavedToDownloads -> {
+                    val msg = if (isRu) "Руководство сохранено в Загрузки" else "Manual saved to Downloads"
+                    val actionLabel = if (isRu) "Открыть" else "Open"
+                    val result = snackbarHostState.showSnackbar(
+                        message = msg,
+                        actionLabel = actionLabel,
+                        duration = SnackbarDuration.Long
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        openSavedFileFolder(context, event.filePath)
+                    }
+                }
+                is SettingsEvent.Info -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
+            }
         }
     }
 
@@ -1177,9 +1205,9 @@ fun SettingsScreen(
                                             fontWeight = FontWeight.Medium,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
-                                        val maskedPin = if (ble.familyPin.length == 3) "• • •" else (if (isRu) "Не задан" else "Not set")
+                                        val displayPin = if (ble.familyPin.isNotBlank()) ble.familyPin else (if (isRu) "Не задан" else "Not set")
                                         Text(
-                                            text = if (isRu) "Код: $maskedPin (нажмите для изменения)" else "Code: $maskedPin (tap to edit)",
+                                            text = if (isRu) "Код: $displayPin (нажмите для изменения)" else "Code: $displayPin (tap to edit)",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -2585,10 +2613,18 @@ fun SettingsScreen(
     }
     }
 
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
+    )
+
     if (showHelpDialog) {
         HelpAndDisclaimerDialog(
             isRu = isRu,
-            onPrintManual = { viewModel.printOrShareUserManual() },
+            onSaveManual = { viewModel.saveUserManualToDownloads() },
+            snackbarHostState = snackbarHostState,
             onDismiss = { showHelpDialog = false }
         )
     }

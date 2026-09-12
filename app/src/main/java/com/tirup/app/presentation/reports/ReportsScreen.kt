@@ -251,6 +251,7 @@ fun ReportsScreen(
             statistics = state.liveStatistics,
             userSettings = state.userSettings,
             isGenerating = state.isGeneratingLive,
+            snackbarHostState = snackbarHostState,
             onSavePdf = { viewModel.saveLivePdfToDownloads() },
             onSharePdf = { viewModel.generateAndShareLivePdf() },
             onDismiss = { viewModel.showLiveDetails(false) }
@@ -268,6 +269,7 @@ fun ReportsScreen(
             statistics = hist.statistics,
             userSettings = state.userSettings,
             isGenerating = state.isGeneratingHistorical,
+            snackbarHostState = snackbarHostState,
             onSavePdf = { viewModel.saveHistoricalPdfToDownloads() },
             onSharePdf = { viewModel.generateAndShareHistoricalPdf() },
             onDismiss = { viewModel.showHistoricalDetails(false) }
@@ -278,6 +280,7 @@ fun ReportsScreen(
     if (showGuidebookModal) {
         ParametersGuidebookModal(
             isRu = isRu,
+            snackbarHostState = snackbarHostState,
             onSavePdf = { viewModel.saveGuidebookPdfToDownloads() },
             onSharePdf = { viewModel.generateAndShareGuidebookPdf() },
             onDismiss = { showGuidebookModal = false }
@@ -1182,6 +1185,7 @@ private fun GuidebookCard(
 @Composable
 private fun ParametersGuidebookModal(
     isRu: Boolean,
+    snackbarHostState: SnackbarHostState,
     onSavePdf: () -> Unit,
     onSharePdf: () -> Unit,
     onDismiss: () -> Unit
@@ -1198,7 +1202,8 @@ private fun ParametersGuidebookModal(
             color = MaterialTheme.colorScheme.background,
             shadowElevation = 12.dp
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize()) {
                 // Modal Top Toolbar
                 Row(
                     modifier = Modifier
@@ -1465,6 +1470,14 @@ private fun ParametersGuidebookModal(
                     }
                 }
             }
+
+            SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 70.dp, start = 12.dp, end = 12.dp)
+                )
+            }
         }
     }
 }
@@ -1529,7 +1542,7 @@ private fun GuidebookItemCard(
 /**
  * Opens system file manager to the Downloads directory or opens the saved PDF report directly.
  */
-private fun openSavedFileFolder(context: android.content.Context, filePath: String) {
+internal fun openSavedFileFolder(context: android.content.Context, filePath: String) {
     try {
         val downloadsIntent = Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
