@@ -52,7 +52,11 @@ class StalenessAlarmReceiver : BroadcastReceiver() {
                 // 2. Re-render all homescreen widgets with current stale status
                 TirupWidgetUpdater.updateAllWidgets(context)
 
-                // 3. Schedule next periodic tick while stale (to update elapsed minutes string)
+                // 3. Dismiss outdated predictive alert if reading is stale
+                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                nm?.cancel(GlucoseAlertManager.NOTIFICATION_ID_PREDICTIVE)
+
+                // 4. Schedule next periodic tick while stale (to update elapsed minutes string)
                 GlucoseAlertManager.scheduleNextStalenessCheck(context, latest.timestamp)
                 Log.d(TAG, "Successfully refreshed stale notification and widgets for ts=${latest.timestamp}")
             } catch (e: Exception) {

@@ -163,7 +163,6 @@ fun SettingsScreen(
     var masterOffHintVisible by rememberSaveable { mutableStateOf(false) }
     var showBleHelpModal by rememberSaveable { mutableStateOf(false) }
     var showBlePinDialog by rememberSaveable { mutableStateOf(false) }
-    var showClearTreatmentsDialog by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
     val listState = rememberLazyListState()
@@ -2047,11 +2046,18 @@ fun SettingsScreen(
                         }
                     }
 
-                    Text(
-                        text = if (isRu) "Ночной профиль (окно сна)" else "Night Profile (Sleep Window)",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = if (isRu) "Ночной профиль (окно сна)" else "Night Profile (Sleep Window)",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (isRu) "Приблизительные часы сна (с шагом в 1 час)" else "Approximate sleep hours (1-hour step)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
 
                     // Night Profile Hours (Sleep window)
                     Row(
@@ -2061,6 +2067,7 @@ fun SettingsScreen(
                         DropdownHourSelector(
                             label = if (isRu) "Начало сна" else "Sleep Start",
                             selectedHour = settings.nightStartHour,
+                            isRu = isRu,
                             modifier = Modifier.weight(1f),
                             onHourSelected = { newStart ->
                                 viewModel.autoUpdateNightHours(
@@ -2073,6 +2080,7 @@ fun SettingsScreen(
                         DropdownHourSelector(
                             label = if (isRu) "Конец сна" else "Sleep End",
                             selectedHour = settings.nightEndHour,
+                            isRu = isRu,
                             modifier = Modifier.weight(1f),
                             onHourSelected = { newEnd ->
                                 viewModel.autoUpdateNightHours(
@@ -2412,19 +2420,7 @@ fun SettingsScreen(
                         Text(text = stringResource(R.string.clear_data))
                     }
 
-                    OutlinedButton(
-                        onClick = { showClearTreatmentsDialog = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    ) {
-                        Text("💉", fontSize = 16.sp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = if (isRu) "Очистить метки болюсов и еды" else "Clear Insulin & Meal Marks")
-                    }
+
 
                     if (state.infoMessage != null) {
                         Text(
@@ -2998,44 +2994,6 @@ fun SettingsScreen(
         )
     }
 
-    if (showClearTreatmentsDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearTreatmentsDialog = false },
-            title = {
-                Text(
-                    text = if (isRu) "Очистить метки болюсов и еды?" else "Clear Insulin & Meal Marks?",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(
-                    text = if (isRu) "Вы действительно хотите удалить все сохранённые метки болюсов и приёмов пищи из базы данных? Сами замеры глюкозы затронуты не будут."
-                           else "Are you sure you want to delete all saved bolus and meal marks from the database? Glucose readings will remain untouched.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showClearTreatmentsDialog = false
-                        viewModel.clearTreatments()
-                    }
-                ) {
-                    Text(
-                        text = if (isRu) "Очистить" else "Clear",
-                        color = ColorVeryLow,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearTreatmentsDialog = false }) {
-                    Text(text = stringResource(R.string.action_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        )
-    }
 
     if (showProfileDialog) {
         PatientProfileEditDialog(
@@ -3764,14 +3722,16 @@ fun DropdownYearSelector(
 fun DropdownHourSelector(
     label: String,
     selectedHour: Int,
+    isRu: Boolean = true,
     modifier: Modifier = Modifier,
     onHourSelected: (Int) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val hourSuffix = if (isRu) " ч" else " h"
 
     Box(modifier = modifier) {
         OutlinedTextField(
-            value = String.format(Locale.US, "%02d:00", selectedHour),
+            value = "$selectedHour$hourSuffix",
             onValueChange = {},
             readOnly = true,
             label = { Text(label) },
@@ -3791,7 +3751,7 @@ fun DropdownHourSelector(
         ) {
             (0..23).forEach { hr ->
                 DropdownMenuItem(
-                    text = { Text(String.format(Locale.US, "%02d:00", hr)) },
+                    text = { Text("$hr$hourSuffix") },
                     onClick = {
                         onHourSelected(hr)
                         expanded = false

@@ -91,6 +91,14 @@ fun ReportsScreen(
     var showGuidebookModal by remember { mutableStateOf(false) }
     var showXdripExportHelp by remember { mutableStateOf(false) }
     var showMetricsOrderDialog by remember { mutableStateOf(false) }
+    var importErrorMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(state.importMessage) {
+        val msg = state.importMessage
+        if (msg != null && (msg.contains("❌") || msg.contains("Ошибка") || msg.contains("Error"))) {
+            importErrorMessage = msg
+        }
+    }
 
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -296,6 +304,31 @@ fun ReportsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showXdripExportHelp = false }) {
+                    Text(text = if (isRu) "Понятно" else "Got it", color = ActionBlue, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
+    if (importErrorMessage != null) {
+        AlertDialog(
+            onDismissRequest = { importErrorMessage = null },
+            title = {
+                Text(
+                    text = if (isRu) "Ошибка импорта" else "Import Error",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+            },
+            text = {
+                Text(
+                    text = importErrorMessage ?: "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { importErrorMessage = null }) {
                     Text(text = if (isRu) "Понятно" else "Got it", color = ActionBlue, fontWeight = FontWeight.Bold)
                 }
             }
@@ -795,10 +828,13 @@ private fun HistoricalReportCard(
             }
 
             if (state.importMessage != null) {
+                val isError = state.importMessage.contains("❌") ||
+                        state.importMessage.contains("Ошибка") ||
+                        state.importMessage.contains("Error")
                 Text(
-                    text = state.importMessage ?: "",
+                    text = state.importMessage,
                     style = MaterialTheme.typography.bodySmall,
-                    color = PrimaryEmerald
+                    color = if (isError) MaterialTheme.colorScheme.error else PrimaryEmerald
                 )
             }
         }
