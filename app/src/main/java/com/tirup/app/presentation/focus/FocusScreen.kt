@@ -86,6 +86,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tirup.app.R
@@ -923,13 +924,13 @@ fun FocusScreen(
                                                        else "Deep-sleep surge (GH): max ${String.format(Locale.US, "%.1f", nightStability.maxMmol)}"
                 nightStability.tbrPercent > 1.0 -> if (isRu) "Риск ночных гипо: TBR ${String.format(Locale.US, "%.1f%%", nightStability.tbrPercent)}"
                                                    else "Night hypo risk: TBR ${String.format(Locale.US, "%.1f%%", nightStability.tbrPercent)}"
-                nightStability.tarPercent > 25.0 -> if (isRu) "Ночные подъёмы: TAR ${String.format(Locale.US, "%.0f%%", nightStability.tarPercent)}, SD $sdFormatted"
-                                                    else "Night highs: TAR ${String.format(Locale.US, "%.0f%%", nightStability.tarPercent)}, SD $sdFormatted"
+                nightStability.tarPercent > 25.0 -> if (isRu) "Ночные подъёмы: TAR ${String.format(Locale.US, "%.1f%%", nightStability.tarPercent)} • SD $sdFormatted"
+                                                    else "Night highs: TAR ${String.format(Locale.US, "%.1f%%", nightStability.tarPercent)} • SD $sdFormatted"
                 nightStability.sdMmol > sdTarget -> if (isRu) "Разброс (SD): $sdFormatted"
                                                     else "Variability (SD): $sdFormatted"
-                nightStability.isStable -> if (isRu) "Стабильный профиль: TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)}, SD $sdFormatted"
-                                           else "Stable profile: TIR ${String.format(Locale.US, "%.0f%%", nightStability.tirPercent)}, SD $sdFormatted"
-                else -> if (isRu) "Обнаружены колебания сахара" else "Glucose fluctuations detected"
+                nightStability.isStable -> if (isRu) "Стабильно: TIR ${String.format(Locale.US, "%.1f%%", nightStability.tirPercent)} • SD $sdFormatted"
+                                           else "Stable: TIR ${String.format(Locale.US, "%.1f%%", nightStability.tirPercent)} • SD $sdFormatted"
+                else -> if (isRu) "Колебания сахара" else "Glucose fluctuations"
             }
 
             val statusColor = when {
@@ -1007,16 +1008,19 @@ fun FocusScreen(
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = if (isRu) "Ночной профиль" else "Night Sleep Profile",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodySmall,
                                 color = onSurfaceVariant
                             )
                             Text(
                                 text = nightStatusText,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = statusColor
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = statusColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }

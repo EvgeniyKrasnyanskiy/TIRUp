@@ -64,6 +64,7 @@ import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
 import com.tirup.app.presentation.theme.ColorVeryLow
 import com.tirup.app.presentation.theme.PrimaryEmerald
+import java.util.Calendar
 import java.util.Locale
 
 @Composable
@@ -224,7 +225,7 @@ fun TrendsScreen(
             item { Spacer(modifier = Modifier.height(2.dp)) }
 
             // 0. Weekly Sunday Digest Banner (Can be dismissed by user with ✕)
-            if (weeklyDigest != null && !isDigestBannerDismissed && state.userSettings.isWeeklyDigestEnabled) {
+            if (weeklyDigest != null && !isDigestBannerDismissed && state.userSettings.isWeeklyDigestEnabled && isWeeklyDigestBannerWindow()) {
                 item {
                     WeeklyDigestBanner(
                         digest = weeklyDigest!!,
@@ -1112,3 +1113,14 @@ private fun AgpMetricsGrid(
         }
     }
 }
+
+/**
+ * Displays the weekly digest banner starting Sunday evening (18:00) through Monday (23:59).
+ */
+private fun isWeeklyDigestBannerWindow(): Boolean {
+    val cal = Calendar.getInstance()
+    val day = cal.get(Calendar.DAY_OF_WEEK)
+    val hour = cal.get(Calendar.HOUR_OF_DAY)
+    return (day == Calendar.SUNDAY && hour >= 18) || (day == Calendar.MONDAY)
+}
+
