@@ -97,11 +97,10 @@ class ReportsViewModel(
         viewModelScope.launch {
             combine(
                 _livePeriod,
-                glucoseRepository.getLatestReading(),
-                settingsRepository.getSettings()
-            ) { period, latest, settings ->
-                Triple(period, latest, settings)
-            }.flatMapLatest { (period, latest, settings) ->
+                glucoseRepository.getLatestReading()
+            ) { period, latest ->
+                Pair(period, latest)
+            }.flatMapLatest { (period, latest) ->
                 val now = System.currentTimeMillis()
                 val referenceTime = latest?.timestamp ?: now
                 val startTime = if (period.days > 0) {

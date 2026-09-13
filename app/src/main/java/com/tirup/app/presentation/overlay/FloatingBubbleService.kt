@@ -184,13 +184,7 @@ class FloatingBubbleService : Service() {
                                 val snoozeDuration = snoozeMinutes * 60 * 1000L
                                 snoozeUntilTimestamp = System.currentTimeMillis() + snoozeDuration
                                 setHypoRipple(false)
-
-                                if (lastKnownSettings?.isFloatingBubbleAlwaysVisible == true && lastKnownReading != null) {
-                                    applyBubbleMode(isMini = true)
-                                    bubbleView?.visibility = View.VISIBLE
-                                } else {
-                                    bubbleView?.visibility = View.GONE
-                                }
+                                bubbleView?.visibility = View.GONE
 
                                 snoozeJob?.cancel()
                                 snoozeJob = serviceScope.launch {
@@ -218,12 +212,19 @@ class FloatingBubbleService : Service() {
 
     private fun snapToEdge(params: WindowManager.LayoutParams) {
         val screenWidth = resources.displayMetrics.widthPixels
-        val bubbleWidth = bubbleView?.width ?: dpToPx(76)
+        val screenHeight = resources.displayMetrics.heightPixels
+        val bubbleWidth = params.width
+        val edgeMargin = dpToPx(4)
+
         val targetX = if (params.x + bubbleWidth / 2 < screenWidth / 2) {
-            dpToPx(4)
+            edgeMargin
         } else {
-            screenWidth - bubbleWidth - dpToPx(4)
+            screenWidth - bubbleWidth - edgeMargin
         }
+
+        val minY = dpToPx(28)
+        val maxY = screenHeight - bubbleWidth - dpToPx(48)
+        params.y = params.y.coerceIn(minY, maxY)
 
         val startX = params.x
         edgeAnimator?.cancel()
@@ -272,6 +273,25 @@ class FloatingBubbleService : Service() {
                 containerSizePx,
                 Gravity.CENTER
             )
+
+            // Guaranteed screen boundary safety: prevent circle from hiding off-screen!
+            val screenWidth = resources.displayMetrics.widthPixels
+            val screenHeight = resources.displayMetrics.heightPixels
+            val edgeMargin = dpToPx(4)
+
+            // Re-snap X: if bubble was on the right half, pin to right edge with new width; else pin to left edge
+            val isRightSide = (params.x + targetSizePx / 2) > (screenWidth / 2)
+            params.x = if (isRightSide) {
+                screenWidth - targetSizePx - edgeMargin
+            } else {
+                edgeMargin
+            }
+
+            // Clamp Y within screen bounds (avoiding status bar and navigation bar)
+            val minY = dpToPx(28)
+            val maxY = screenHeight - targetSizePx - dpToPx(48)
+            params.y = params.y.coerceIn(minY, maxY)
+
             if (view.isAttachedToWindow) {
                 windowManager.updateViewLayout(view, params)
             }
@@ -365,13 +385,32 @@ class FloatingBubbleService : Service() {
         }
 
         val isSnoozed = now < snoozeUntilTimestamp
-        val isAlarmActive = isOutOfRange && !isSnoozed
 
-        if (!isAlarmActive) {
-            if (!isOutOfRange) {
-                wasOutOfRange = false
-                wasHypoActive = false
+        if (isOutOfRange) {
+            if (isSnoozed) {
+                // Alarm is snoozed: bubble is completely hidden while glucose is out of range!
+                bubbleView?.visibility = View.GONE
+                setHypoRipple(false)
+                return
+            } else {
+                val wasPreviouslyOutOfRange = wasOutOfRange
+                wasOutOfRange = true
+                wasHypoActive = isHypo
+
+                applyBubbleMode(isMini = false)
+                bubbleView?.visibility = View.VISIBLE
+
+                // Play PopIn sound ONLY on first transition into out-of-range!
+                // Never play sound when quietly re-appearing after snooze expiration!
+                if (!wasPreviouslyOutOfRange) {
+                    MedicalSoundPlayer.playBubblePopIn()
+                }
             }
+        } else {
+            // In range (3.9 .. 10.0)!
+            wasOutOfRange = false
+            wasHypoActive = false
+            snoozeUntilTimestamp = 0L // clear snooze because glucose normalized!
             setHypoRipple(false)
 
             if (settings.isFloatingBubbleAlwaysVisible) {
@@ -380,19 +419,6 @@ class FloatingBubbleService : Service() {
             } else {
                 bubbleView?.visibility = View.GONE
                 return
-            }
-        } else {
-            val wasPreviouslyOutOfRange = wasOutOfRange
-            wasOutOfRange = true
-            wasHypoActive = isHypo
-
-            applyBubbleMode(isMini = false)
-            bubbleView?.visibility = View.VISIBLE
-
-            // Play PopIn sound ONLY on first transition into out-of-range!
-            // Never play sound when quietly re-appearing after snooze expiration!
-            if (!wasPreviouslyOutOfRange) {
-                MedicalSoundPlayer.playBubblePopIn()
             }
         }
 
