@@ -165,6 +165,7 @@ object WeeklyDigestCalculator {
         )
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun generateInsightsAndAdvice(
         hasSufficientData: Boolean,
         activePercent: Double,

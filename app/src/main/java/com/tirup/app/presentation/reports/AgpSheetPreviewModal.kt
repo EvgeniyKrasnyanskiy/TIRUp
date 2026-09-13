@@ -99,7 +99,7 @@ fun AgpSheetPreviewModal(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (isRu) "Предпросмотр отчёта AGP" else "AGP Report Sheet Preview",
+                        text = title.ifBlank { if (isRu) "Предпросмотр отчёта AGP" else "AGP Report Sheet Preview" },
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold

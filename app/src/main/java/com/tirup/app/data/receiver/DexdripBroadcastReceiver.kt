@@ -485,6 +485,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         return null
     }
 
+    @Suppress("DEPRECATION")
     private fun extractCob(extras: Bundle): Double? {
         val candidateKeys = listOf(
             "predict.COB",
@@ -580,6 +581,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         return null
     }
 
+    @Suppress("DEPRECATION")
     private fun getDoubleFromBundle(extras: Bundle, key: String): Double? {
         val obj = extras.get(key) ?: return null
         return when (obj) {
@@ -594,6 +596,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun getLongFromBundle(extras: Bundle, key: String): Long? {
         val obj = extras.get(key) ?: return null
         return when (obj) {
@@ -603,6 +606,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun extrasSummary(extras: Bundle): String {
         return extras.keySet().joinToString(", ") { key ->
             "$key=${extras.get(key)}"

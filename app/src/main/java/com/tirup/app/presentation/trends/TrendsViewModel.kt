@@ -127,11 +127,10 @@ class TrendsViewModel(
         viewModelScope.launch {
             combine(
                 _selectedPeriod,
-                settingsRepository.getSettings(),
                 glucoseRepository.getLatestReading()
-            ) { period, settings, latestReading ->
-                Triple(period, settings, latestReading)
-            }.flatMapLatest { (period, settings, latestReading) ->
+            ) { period, latestReading ->
+                Pair(period, latestReading)
+            }.flatMapLatest { (period, latestReading) ->
                 val now = System.currentTimeMillis()
                 // Use latest reading timestamp or now as reference point
                 val referenceTime = latestReading?.timestamp ?: now
