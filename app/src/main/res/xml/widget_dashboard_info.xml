@@ -10,7 +10,7 @@
     android:maxResizeWidth="600dp"
     android:maxResizeHeight="300dp"
     android:previewLayout="@layout/widget_dashboard"
-    android:previewImage="@mipmap/ic_launcher"
+    android:previewImage="@drawable/widget_dashboard_preview"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="0"
     android:widgetCategory="home_screen" />

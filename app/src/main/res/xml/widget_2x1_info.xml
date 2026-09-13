@@ -10,7 +10,7 @@
     android:maxResizeWidth="300dp"
     android:maxResizeHeight="100dp"
     android:previewLayout="@layout/widget_2x1"
-    android:previewImage="@mipmap/ic_launcher"
+    android:previewImage="@drawable/widget_2x1_preview"
     android:resizeMode="horizontal"
     android:updatePeriodMillis="0"
     android:widgetCategory="home_screen" />

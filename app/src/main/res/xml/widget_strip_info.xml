@@ -10,7 +10,7 @@
     android:maxResizeWidth="600dp"
     android:maxResizeHeight="120dp"
     android:previewLayout="@layout/widget_strip"
-    android:previewImage="@mipmap/ic_launcher"
+    android:previewImage="@drawable/widget_strip_preview"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="0"
     android:widgetCategory="home_screen" />
