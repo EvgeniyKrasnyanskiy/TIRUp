@@ -678,19 +678,19 @@ private fun WeeklyDigestBanner(
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = digest.headline,
-                    fontSize = 13.5.sp,
+                    text = if (isRu) "НЕДЕЛЬНЫЙ ДАЙДЖЕСТ" else "WEEKLY DIGEST",
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    color = ActionBlue,
+                    letterSpacing = 0.5.sp,
+                    maxLines = 1
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                val subText = digest.keyInsights.firstOrNull() ?: if (isRu) "Нажмите для подробного разбора недели" else "Tap for weekly breakdown"
                 Text(
-                    text = subText,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = digest.headline,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
