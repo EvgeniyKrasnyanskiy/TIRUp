@@ -21,6 +21,7 @@ import android.view.View
 import android.view.WindowManager
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
+import android.view.animation.OvershootInterpolator
 import android.widget.TextView
 import com.tirup.app.R
 import com.tirup.app.TirupApplication
@@ -66,6 +67,7 @@ class FloatingBubbleService : Service() {
     private var wasHypoActive: Boolean = false
     private var windowLayoutParams: WindowManager.LayoutParams? = null
     private var isCurrentlyMiniMode: Boolean = false
+    private var isFirstModeApplication: Boolean = true
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -258,56 +260,131 @@ class FloatingBubbleService : Service() {
     private fun applyBubbleMode(isMini: Boolean) {
         val params = windowLayoutParams ?: return
         val view = bubbleView ?: return
+        val container = bubbleContainer ?: return
+
+        if (!isFirstModeApplication && isCurrentlyMiniMode == isMini) {
+            return
+        }
 
         val targetSizeDp = if (isMini) 38 else 76
         val targetSizePx = dpToPx(targetSizeDp)
         val containerSizePx = dpToPx(if (isMini) 34 else 60)
 
-        val sizeChanged = (params.width != targetSizePx)
-        if (sizeChanged) {
+        val screenWidth = resources.displayMetrics.widthPixels
+        val screenHeight = resources.displayMetrics.heightPixels
+        val edgeMargin = dpToPx(4)
+        val minY = dpToPx(28)
+        val maxY = screenHeight - targetSizePx - dpToPx(48)
+
+        if (isFirstModeApplication) {
+            isFirstModeApplication = false
+            isCurrentlyMiniMode = isMini
+
             params.width = targetSizePx
             params.height = targetSizePx
 
-            bubbleContainer?.layoutParams = android.widget.FrameLayout.LayoutParams(
+            container.scaleX = 1.0f
+            container.scaleY = 1.0f
+            container.layoutParams = android.widget.FrameLayout.LayoutParams(
                 containerSizePx,
                 containerSizePx,
                 Gravity.CENTER
             )
 
-            // Guaranteed screen boundary safety: prevent circle from hiding off-screen!
-            val screenWidth = resources.displayMetrics.widthPixels
-            val screenHeight = resources.displayMetrics.heightPixels
-            val edgeMargin = dpToPx(4)
-
-            // Re-snap X: if bubble was on the right half, pin to right edge with new width; else pin to left edge
             val isRightSide = (params.x + targetSizePx / 2) > (screenWidth / 2)
-            params.x = if (isRightSide) {
-                screenWidth - targetSizePx - edgeMargin
-            } else {
-                edgeMargin
-            }
-
-            // Clamp Y within screen bounds (avoiding status bar and navigation bar)
-            val minY = dpToPx(28)
-            val maxY = screenHeight - targetSizePx - dpToPx(48)
+            params.x = if (isRightSide) screenWidth - targetSizePx - edgeMargin else edgeMargin
             params.y = params.y.coerceIn(minY, maxY)
+
+            if (isMini) {
+                tvArrow?.visibility = View.GONE
+                tvDelta?.visibility = View.GONE
+                tvGlucose?.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11.5f)
+                bubbleRipple?.visibility = View.GONE
+            } else {
+                tvArrow?.visibility = View.VISIBLE
+                tvGlucose?.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15f)
+            }
 
             if (view.isAttachedToWindow) {
                 windowManager.updateViewLayout(view, params)
             }
-        }
-
-        if (isMini) {
-            tvArrow?.visibility = View.GONE
-            tvDelta?.visibility = View.GONE
-            tvGlucose?.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11.5f)
-            bubbleRipple?.visibility = View.GONE
-        } else {
-            tvArrow?.visibility = View.VISIBLE
-            tvGlucose?.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15f)
+            return
         }
 
         isCurrentlyMiniMode = isMini
+        container.animate().cancel()
+
+        val isRightSide = (params.x + params.width / 2) > (screenWidth / 2)
+
+        if (isMini) {
+            // Smoothly shrink from Alarm (60dp) to Mini (34dp)
+            tvArrow?.visibility = View.GONE
+            tvDelta?.visibility = View.GONE
+            bubbleRipple?.visibility = View.GONE
+
+            container.pivotX = if (isRightSide) container.width.toFloat() else 0f
+            container.pivotY = container.height / 2f
+
+            container.animate()
+                .scaleX(34f / 60f)
+                .scaleY(34f / 60f)
+                .setDuration(250)
+                .setInterpolator(DecelerateInterpolator())
+                .withEndAction {
+                    val currentParams = windowLayoutParams ?: return@withEndAction
+                    val currentView = bubbleView ?: return@withEndAction
+
+                    currentParams.width = targetSizePx
+                    currentParams.height = targetSizePx
+                    currentParams.x = if (isRightSide) screenWidth - targetSizePx - edgeMargin else edgeMargin
+                    currentParams.y = currentParams.y.coerceIn(minY, maxY)
+
+                    container.scaleX = 1.0f
+                    container.scaleY = 1.0f
+                    container.layoutParams = android.widget.FrameLayout.LayoutParams(
+                        containerSizePx,
+                        containerSizePx,
+                        Gravity.CENTER
+                    )
+                    tvGlucose?.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11.5f)
+
+                    if (currentView.isAttachedToWindow) {
+                        windowManager.updateViewLayout(currentView, currentParams)
+                    }
+                }
+                .start()
+        } else {
+            // Smoothly expand from Mini (34dp) to Alarm (60dp)
+            params.width = targetSizePx
+            params.height = targetSizePx
+            params.x = if (isRightSide) screenWidth - targetSizePx - edgeMargin else edgeMargin
+            params.y = params.y.coerceIn(minY, maxY)
+
+            container.layoutParams = android.widget.FrameLayout.LayoutParams(
+                containerSizePx,
+                containerSizePx,
+                Gravity.CENTER
+            )
+
+            if (view.isAttachedToWindow) {
+                windowManager.updateViewLayout(view, params)
+            }
+
+            container.pivotX = if (isRightSide) containerSizePx.toFloat() else 0f
+            container.pivotY = containerSizePx / 2f
+            container.scaleX = 34f / 60f
+            container.scaleY = 34f / 60f
+
+            tvArrow?.visibility = View.VISIBLE
+            tvGlucose?.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15f)
+
+            container.animate()
+                .scaleX(1.0f)
+                .scaleY(1.0f)
+                .setDuration(300)
+                .setInterpolator(OvershootInterpolator(1.25f))
+                .start()
+        }
     }
 
     private fun observeData() {
@@ -358,18 +435,21 @@ class FloatingBubbleService : Service() {
         val valueMmol = reading.valueMmol
         val now = System.currentTimeMillis()
 
-        // 1. Hysteresis calculation for out-of-range state
-        // When in-range: triggers out-of-range if < 3.9 or > 10.0
-        // When out-of-range: stays out-of-range until comfortably back in target:
-        //    Low -> must rise to >= 4.1
-        //    High -> must drop to <= 9.8
-        val isOutOfRange = if (wasOutOfRange) {
-            when {
-                wasHypoActive -> valueMmol < 4.1
-                else -> valueMmol > 9.8
-            }
-        } else {
+        // 1. Out-of-range calculation:
+        // When floating bubble is always visible: strictly follow target range (3.9 - 10.0)
+        // so returning to 3.9 or 10.0 immediately switches into mini-mode without getting stuck in alarm mode.
+        val isOutOfRange = if (settings.isFloatingBubbleAlwaysVisible) {
             valueMmol < 3.9 || valueMmol > 10.0
+        } else {
+            // When only shown on alarm, use hysteresis to avoid flickering alarms around thresholds
+            if (wasOutOfRange) {
+                when {
+                    wasHypoActive -> valueMmol < 4.1
+                    else -> valueMmol > 9.8
+                }
+            } else {
+                valueMmol < 3.9 || valueMmol > 10.0
+            }
         }
 
         val isHypo = valueMmol < 3.9
