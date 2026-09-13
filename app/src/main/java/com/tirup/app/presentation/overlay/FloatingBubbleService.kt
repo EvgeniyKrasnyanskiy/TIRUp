@@ -7,8 +7,13 @@ import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorFilter
+import android.graphics.Paint
 import android.graphics.PixelFormat
+import android.graphics.RectF
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.IBinder
@@ -27,12 +32,15 @@ import com.tirup.app.R
 import com.tirup.app.TirupApplication
 import com.tirup.app.data.alert.GlucoseAlertManager
 import com.tirup.app.data.alert.MedicalSoundPlayer
+import com.tirup.app.domain.calculator.GlucoseMetricsCalculator
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.presentation.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.util.Calendar
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -387,6 +395,26 @@ class FloatingBubbleService : Service() {
         }
     }
 
+    private suspend fun calculateTodayTir(app: TirupApplication, settings: UserSettings): Float {
+        return try {
+            val calendar = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val todayEntities = app.database.glucoseReadingDao()
+                .getReadingsBetweenSync(calendar.timeInMillis, System.currentTimeMillis() + 60_000L)
+            val todayReadings = todayEntities.map { it.toDomain() }
+            if (todayReadings.isNotEmpty()) {
+                val stats = GlucoseMetricsCalculator.calculateStatistics(todayReadings, settings.targetRanges)
+                stats.tirPercent.toFloat()
+            } else 100f
+        } catch (_: Exception) {
+            100f
+        }
+    }
+
     private fun observeData() {
         serviceScope.launch {
             try {
@@ -402,7 +430,10 @@ class FloatingBubbleService : Service() {
                         return@collectLatest
                     }
                     if (reading != null) {
-                        updateBubble(reading, settings)
+                        val todayTir = withContext(Dispatchers.IO) {
+                            calculateTodayTir(app, settings)
+                        }
+                        updateBubble(reading, settings, todayTir)
                     } else {
                         bubbleView?.visibility = View.GONE
                         setHypoRipple(false)
@@ -421,7 +452,10 @@ class FloatingBubbleService : Service() {
                 val latest = app.glucoseRepository.getLatestReading().first()
                 val settings = app.settingsRepository.getSettings().first()
                 if (latest != null && settings.isFloatingBubbleEnabled) {
-                    updateBubble(latest, settings)
+                    val todayTir = withContext(Dispatchers.IO) {
+                        calculateTodayTir(app, settings)
+                    }
+                    updateBubble(latest, settings, todayTir)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to recheck bubble: ${e.message}")
@@ -429,7 +463,7 @@ class FloatingBubbleService : Service() {
         }
     }
 
-    private fun updateBubble(reading: GlucoseReading, settings: UserSettings) {
+    private fun updateBubble(reading: GlucoseReading, settings: UserSettings, todayTir: Float = 100f) {
         lastKnownReading = reading
         lastKnownSettings = settings
         val valueMmol = reading.valueMmol
@@ -523,12 +557,15 @@ class FloatingBubbleService : Service() {
             else -> Color.parseColor("#EF4444")
         }
 
-        val strokeWidth = if (isCurrentlyMiniMode) dpToPx(2) else dpToPx(3)
-        val bg = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(Color.parseColor("#F00F172A")) // Deep dark slate (94% opaque)
-            setStroke(strokeWidth, ringColor)
-        }
+        val strokeWidthPx = if (isCurrentlyMiniMode) dpToPxF(2.2f) else dpToPxF(3.2f)
+        val tirProgress = if (isOutOfRange) 100f else todayTir.coerceIn(0f, 100f)
+        val bg = TirRingDrawable(
+            strokeWidthPx = strokeWidthPx,
+            trackColor = Color.parseColor("#334155"),
+            progressColor = ringColor,
+            bgColor = Color.parseColor("#F00F172A"),
+            progressPercent = tirProgress
+        )
         bubbleContainer?.background = bg
 
         // Water ripple waves on hypoglycemia (< 3.9 mmol/L) only in alarm mode
@@ -623,6 +660,10 @@ class FloatingBubbleService : Service() {
         return (dp * resources.displayMetrics.density).toInt()
     }
 
+    private fun dpToPxF(dp: Float): Float {
+        return dp * resources.displayMetrics.density
+    }
+
     companion object {
         private const val TAG = "FloatingBubbleService"
 
@@ -646,4 +687,66 @@ class FloatingBubbleService : Service() {
             }
         }
     }
+}
+
+private class TirRingDrawable(
+    private val strokeWidthPx: Float,
+    private val trackColor: Int,
+    private val progressColor: Int,
+    private val bgColor: Int,
+    var progressPercent: Float = 100f
+) : Drawable() {
+    private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = bgColor
+    }
+    private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = strokeWidthPx
+        color = trackColor
+        strokeCap = Paint.Cap.ROUND
+    }
+    private val progressPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = strokeWidthPx
+        color = progressColor
+        strokeCap = Paint.Cap.ROUND
+    }
+    private val arcRect = RectF()
+
+    override fun draw(canvas: Canvas) {
+        val halfStroke = strokeWidthPx / 2f
+        arcRect.set(
+            bounds.left + halfStroke,
+            bounds.top + halfStroke,
+            bounds.right - halfStroke,
+            bounds.bottom - halfStroke
+        )
+
+        val radius = ((bounds.width() - strokeWidthPx) / 2f).coerceAtLeast(0f)
+        canvas.drawCircle(bounds.exactCenterX(), bounds.exactCenterY(), radius, bgPaint)
+        canvas.drawOval(arcRect, trackPaint)
+
+        if (progressPercent >= 99.5f) {
+            canvas.drawOval(arcRect, progressPaint)
+        } else if (progressPercent > 0.5f) {
+            val sweepAngle = (progressPercent / 100f).coerceIn(0f, 1f) * 360f
+            canvas.drawArc(arcRect, -90f, sweepAngle, false, progressPaint)
+        }
+    }
+
+    override fun setAlpha(alpha: Int) {
+        bgPaint.alpha = alpha
+        trackPaint.alpha = alpha
+        progressPaint.alpha = alpha
+    }
+
+    override fun setColorFilter(colorFilter: ColorFilter?) {
+        bgPaint.colorFilter = colorFilter
+        trackPaint.colorFilter = colorFilter
+        progressPaint.colorFilter = colorFilter
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
 }
