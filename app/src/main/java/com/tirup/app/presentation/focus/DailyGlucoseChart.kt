@@ -78,6 +78,83 @@ data class DataGap(
     val endMinute: Float
 )
 
+data class TreatmentCluster(
+    val treatments: List<Treatment>,
+    val isInsulin: Boolean
+) {
+    val id: Long get() = treatments.first().id
+    val timestamp: Long get() = treatments.first().timestamp
+    val totalInsulin: Double get() = treatments.sumOf { it.insulinUnits ?: 0.0 }
+    val totalCarbs: Double get() = treatments.sumOf { it.carbsGrams ?: 0.0 }
+    val isSingle: Boolean get() = treatments.size == 1
+    val isCombo: Boolean get() = isSingle && treatments.first().isCombo
+    val notes: String? get() = treatments.mapNotNull { it.notes?.trim()?.takeIf { n -> n.isNotEmpty() } }.joinToString("; ").takeIf { it.isNotEmpty() }
+
+    val displayText: String get() {
+        return if (isInsulin) {
+            val doses = treatments.mapNotNull { it.insulinUnits }
+            if (doses.size <= 1) {
+                val ins = totalInsulin
+                if (ins == ins.toInt().toDouble()) "${ins.toInt()}U" else String.format(Locale.US, "%.1fU", ins)
+            } else {
+                val joined = doses.joinToString("+") {
+                    if (it == it.toInt().toDouble()) "${it.toInt()}" else String.format(Locale.US, "%.1f", it)
+                } + "U"
+                if (joined.length <= 8) {
+                    joined
+                } else {
+                    val ins = totalInsulin
+                    val sumStr = if (ins == ins.toInt().toDouble()) "${ins.toInt()}" else String.format(Locale.US, "%.1f", ins)
+                    "${sumStr}U (+)"
+                }
+            }
+        } else {
+            val doses = treatments.mapNotNull { it.carbsGrams }
+            if (doses.size <= 1) {
+                "${totalCarbs.toInt()}g"
+            } else {
+                val joined = doses.joinToString("+") { "${it.toInt()}" } + "g"
+                if (joined.length <= 8) {
+                    joined
+                } else {
+                    "${totalCarbs.toInt()}g (+)"
+                }
+            }
+        }
+    }
+}
+
+internal fun clusterTreatments(
+    treatments: List<Treatment>,
+    isInsulin: Boolean,
+    thresholdMs: Long = 5 * 60 * 1000L
+): List<TreatmentCluster> {
+    val items = treatments.filter { if (isInsulin) it.hasInsulin else it.hasCarbs }
+        .sortedBy { it.timestamp }
+    if (items.isEmpty()) return emptyList()
+
+    val clusters = mutableListOf<TreatmentCluster>()
+    var currentGroup = mutableListOf<Treatment>()
+
+    for (tr in items) {
+        if (currentGroup.isEmpty()) {
+            currentGroup.add(tr)
+        } else {
+            val first = currentGroup.first()
+            if (tr.timestamp - first.timestamp <= thresholdMs) {
+                currentGroup.add(tr)
+            } else {
+                clusters.add(TreatmentCluster(currentGroup.toList(), isInsulin))
+                currentGroup = mutableListOf(tr)
+            }
+        }
+    }
+    if (currentGroup.isNotEmpty()) {
+        clusters.add(TreatmentCluster(currentGroup.toList(), isInsulin))
+    }
+    return clusters
+}
+
 /**
  * Interactive 24-hour daily glucose chart for the Focus screen.
  * Supports:
@@ -87,7 +164,7 @@ data class DataGap(
  * - Clinical target corridor (3.9 - 10.0 mmol/L / 70 - 180 mg/dL)
  * - Real-time "Now" indicator line
  * - Tab toggle between [📊 График] and [🔢 Параметры]
- * - Insulin bolus 💉 and meal/carb 🍽️ treatment markers overlay
+ * - Insulin bolus 💉 and meal/carb 🍽️ treatment markers overlay with 5m clustering & multi-tier staggering
  */
 @Composable
 fun DailyGlucoseChart(
@@ -131,6 +208,14 @@ fun DailyGlucoseChart(
         else treatments.sortedBy { it.timestamp }
     }
 
+    val insulinClusters = remember(todayTreatments) {
+        clusterTreatments(todayTreatments, isInsulin = true)
+    }
+
+    val carbsClusters = remember(todayTreatments) {
+        clusterTreatments(todayTreatments, isInsulin = false)
+    }
+
     var visibleMinutes by remember { mutableFloatStateOf(360f) }
     var windowStartMinute by remember {
         mutableFloatStateOf((currentMinuteOfDay - 300f).coerceIn(0f, (1440f - 360f).coerceAtLeast(0f)))
@@ -138,7 +223,7 @@ fun DailyGlucoseChart(
 
     var selectedReading by remember { mutableStateOf<GlucoseReading?>(null) }
     var selectedGap by remember { mutableStateOf<DataGap?>(null) }
-    var selectedTreatment by remember { mutableStateOf<Treatment?>(null) }
+    var selectedTreatmentCluster by remember { mutableStateOf<TreatmentCluster?>(null) }
     var selectedForecastPoint by remember { mutableStateOf<ForecastPoint?>(null) }
 
     val forecastPoints = remember(todayReadings, showPrediction) {
@@ -283,12 +368,12 @@ fun DailyGlucoseChart(
             if (selectedMode == 1) {
                 metricsContent?.invoke()
             } else {
-                // Selected Treatment, Gap or Reading Inspector Banner
-                if (selectedTreatment != null) {
-                    val tr = selectedTreatment!!
-                    val trTime = timeFormatter.format(Date(tr.timestamp))
-                    val bannerColor = if (tr.isCombo) Color(0xFF8B5CF6)
-                    else if (tr.hasInsulin) ActionBlue
+                // Selected Treatment Cluster, Gap or Reading Inspector Banner
+                if (selectedTreatmentCluster != null) {
+                    val cluster = selectedTreatmentCluster!!
+                    val trTime = timeFormatter.format(Date(cluster.timestamp))
+                    val bannerColor = if (cluster.isCombo) Color(0xFF8B5CF6)
+                    else if (cluster.isInsulin) ActionBlue
                     else Color(0xFFF59E0B)
 
                     Surface(
@@ -316,31 +401,56 @@ fun DailyGlucoseChart(
                                     color = onSurface
                                 )
 
-                                if (tr.hasInsulin) {
-                                    val ins = tr.insulinUnits!!
-                                    val insStr = if (ins == ins.toInt().toDouble()) "${ins.toInt()}" else String.format(Locale.US, "%.1f", ins)
+                                if (cluster.isInsulin) {
+                                    val totalIns = cluster.totalInsulin
+                                    val totalStr = if (totalIns == totalIns.toInt().toDouble()) "${totalIns.toInt()}" else String.format(Locale.US, "%.1f", totalIns)
+                                    val insDetail = if (cluster.isSingle) {
+                                        if (isRu) "💉 $totalStr Ед" else "💉 $totalStr U"
+                                    } else {
+                                        val breakdown = cluster.treatments.mapNotNull { it.insulinUnits }.joinToString("+") {
+                                            if (it == it.toInt().toDouble()) "${it.toInt()}" else String.format(Locale.US, "%.1f", it)
+                                        }
+                                        if (isRu) "💉 $breakdown=$totalStr Ед (${cluster.treatments.size} подколки)"
+                                        else "💉 $breakdown=${totalStr}U (${cluster.treatments.size} boluses)"
+                                    }
                                     Text(
-                                        text = if (isRu) "💉 $insStr Ед" else "💉 $insStr U",
+                                        text = insDetail,
                                         style = MaterialTheme.typography.bodySmall,
                                         fontWeight = FontWeight.Bold,
                                         color = ActionBlue
                                     )
-                                }
 
-                                if (tr.hasCarbs) {
-                                    val carbsG = tr.carbsGrams!!
-                                    val xeStr = String.format(Locale.US, "%.1f", carbsG / 12.0)
+                                    if (cluster.isCombo) {
+                                        val carbsG = cluster.treatments.first().carbsGrams ?: 0.0
+                                        val xeStr = String.format(Locale.US, "%.1f", carbsG / 12.0)
+                                        Text(
+                                            text = if (isRu) "🍽️ ${carbsG.toInt()} г ($xeStr ХЕ)" else "🍽️ ${carbsG.toInt()} g ($xeStr XE)",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFF59E0B)
+                                        )
+                                    }
+                                } else {
+                                    val totalCarbs = cluster.totalCarbs
+                                    val xeStr = String.format(Locale.US, "%.1f", totalCarbs / 12.0)
+                                    val carbsDetail = if (cluster.isSingle) {
+                                        if (isRu) "🍽️ ${totalCarbs.toInt()} г ($xeStr ХЕ)" else "🍽️ ${totalCarbs.toInt()} g ($xeStr XE)"
+                                    } else {
+                                        val breakdown = cluster.treatments.mapNotNull { it.carbsGrams }.joinToString("+") { "${it.toInt()}" }
+                                        if (isRu) "🍽️ $breakdown=${totalCarbs.toInt()} г ($xeStr ХЕ, ${cluster.treatments.size} приёма)"
+                                        else "🍽️ $breakdown=${totalCarbs.toInt()} g ($xeStr XE, ${cluster.treatments.size} meals)"
+                                    }
                                     Text(
-                                        text = if (isRu) "🍽️ ${carbsG.toInt()} г ($xeStr ХЕ)" else "🍽️ ${carbsG.toInt()} g ($xeStr XE)",
+                                        text = carbsDetail,
                                         style = MaterialTheme.typography.bodySmall,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFFF59E0B)
                                     )
                                 }
 
-                                if (!tr.notes.isNullOrBlank()) {
-                                    val cleanNote = tr.notes.trim()
-                                    val truncatedNote = if (cleanNote.length > 12) cleanNote.take(11) + "…" else cleanNote
+                                val noteText = cluster.notes
+                                if (!noteText.isNullOrBlank()) {
+                                    val truncatedNote = if (noteText.length > 14) noteText.take(13) + "…" else noteText
                                     Text(
                                         text = "• $truncatedNote",
                                         style = MaterialTheme.typography.bodySmall,
@@ -363,8 +473,8 @@ fun DailyGlucoseChart(
                                         modifier = Modifier
                                             .size(18.dp)
                                             .clickable {
-                                                onDeleteTreatment(tr.id)
-                                                selectedTreatment = null
+                                                cluster.treatments.forEach { onDeleteTreatment(it.id) }
+                                                selectedTreatmentCluster = null
                                             }
                                     )
                                 }
@@ -375,7 +485,7 @@ fun DailyGlucoseChart(
                                     fontWeight = FontWeight.Bold,
                                     color = onSurfaceVariant,
                                     modifier = Modifier
-                                        .clickable { selectedTreatment = null }
+                                        .clickable { selectedTreatmentCluster = null }
                                         .padding(horizontal = 4.dp)
                                 )
                             }
@@ -555,28 +665,36 @@ fun DailyGlucoseChart(
                     .height(200.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .background(surfaceBg.copy(alpha = 0.5f))
-                    .pointerInput(todayReadings, dataGaps, todayTreatments) {
+                    .pointerInput(todayReadings, dataGaps, todayTreatments, insulinClusters, carbsClusters) {
                         detectTapGestures { tapOffset ->
-                            // Find reading, treatment, or gap closest to tap
+                            // Find reading, treatment cluster, or gap closest to tap
                             val chartWidth = size.width - 70f // right margin for labels
-                            if (chartWidth > 0 && (todayReadings.isNotEmpty() || todayTreatments.isNotEmpty())) {
+                            if (chartWidth > 0 && (todayReadings.isNotEmpty() || insulinClusters.isNotEmpty() || carbsClusters.isNotEmpty())) {
                                 val tapMinute = windowStartMinute + (tapOffset.x / chartWidth) * visibleMinutes
+                                val toleranceMin = (visibleMinutes / 30f).coerceIn(6f, 30f)
 
-                                val tappedTreatment = todayTreatments.minByOrNull { tr ->
-                                    val trMinute = (tr.timestamp - startOfDay) / 60000f
-                                    abs(trMinute - tapMinute)
-                                }?.takeIf { tr ->
-                                    val trMinute = (tr.timestamp - startOfDay) / 60000f
-                                    val toleranceMin = (visibleMinutes / 30f).coerceIn(6f, 30f)
-                                    abs(trMinute - tapMinute) <= toleranceMin
+                                val candidateClusters = (insulinClusters + carbsClusters).filter { cl ->
+                                    val clMinute = (cl.timestamp - startOfDay) / 60000f
+                                    abs(clMinute - tapMinute) <= toleranceMin
                                 }
 
-                                if (tappedTreatment != null) {
-                                    selectedTreatment = if (selectedTreatment == tappedTreatment) null else tappedTreatment
+                                val tappedCluster = if (candidateClusters.isNotEmpty()) {
+                                    val prefersInsulin = tapOffset.y < (size.height * 0.5f)
+                                    candidateClusters.minByOrNull { cl ->
+                                        val clMinute = (cl.timestamp - startOfDay) / 60000f
+                                        val timeDiff = abs(clMinute - tapMinute)
+                                        val yPenalty = if (cl.isInsulin == prefersInsulin) 0f else 15f
+                                        timeDiff + yPenalty
+                                    }
+                                } else null
+
+                                if (tappedCluster != null) {
+                                    selectedTreatmentCluster = if (selectedTreatmentCluster == tappedCluster) null else tappedCluster
                                     selectedReading = null
                                     selectedGap = null
+                                    selectedForecastPoint = null
                                 } else {
-                                    selectedTreatment = null
+                                    selectedTreatmentCluster = null
                                     val tappedGap = dataGaps.firstOrNull { gap ->
                                         tapMinute in (gap.startMinute - 4f)..(gap.endMinute + 4f)
                                     }
@@ -584,6 +702,7 @@ fun DailyGlucoseChart(
                                     if (tappedGap != null) {
                                         selectedGap = if (selectedGap == tappedGap) null else tappedGap
                                         selectedReading = null
+                                        selectedForecastPoint = null
                                     } else {
                                         val closestFp = if (forecastPoints.isNotEmpty()) {
                                             forecastPoints.minByOrNull { fp ->
@@ -604,7 +723,7 @@ fun DailyGlucoseChart(
                                             selectedForecastPoint = if (selectedForecastPoint == closestFp) null else closestFp
                                             selectedReading = null
                                             selectedGap = null
-                                            selectedTreatment = null
+                                            selectedTreatmentCluster = null
                                         } else {
                                             selectedReading = if (closestReading != null && selectedReading == closestReading) null else closestReading
                                             selectedForecastPoint = null
@@ -952,111 +1071,174 @@ fun DailyGlucoseChart(
                         textAlign = Paint.Align.CENTER
                     }
 
-                    val visibleTreatments = todayTreatments.filter { tr ->
-                        val m = (tr.timestamp - startOfDay) / 60000f
+                    // 4.1.1. Draw Insulin Clusters (Top Area with Staggering)
+                    val visibleInsulinClusters = insulinClusters.filter { cl ->
+                        val m = (cl.timestamp - startOfDay) / 60000f
                         m in (windowStartMinute - 15f)..(windowStartMinute + visibleMinutes + 15f)
                     }
 
-                    visibleTreatments.forEach { tr ->
-                        val m = (tr.timestamp - startOfDay) / 60000f
+                    var lastInsulinRight0 = -Float.MAX_VALUE
+                    var lastInsulinRight1 = -Float.MAX_VALUE
+
+                    visibleInsulinClusters.forEach { cluster ->
+                        val m = (cluster.timestamp - startOfDay) / 60000f
                         val x = xForMinute(m)
 
                         if (x in -20f..(chartRight + 20f)) {
-                            val isSelected = (selectedTreatment == tr)
+                            val isSelected = (selectedTreatmentCluster == cluster)
+                            val insText = cluster.displayText
+                            val textW = insulinPaint.measureText(insText)
+                            val badgeW = textW + 16f
+                            val badgeH = 22f
+                            val badgeLeft = (x - badgeW / 2f).coerceIn(2f, chartRight - badgeW - 2f)
 
-                            // 1. Insulin Pin in Top Area
-                            if (tr.hasInsulin) {
-                                val ins = tr.insulinUnits!!
-                                val insText = if (ins == ins.toInt().toDouble()) "${ins.toInt()}U" else String.format(Locale.US, "%.1fU", ins)
-                                val textW = insulinPaint.measureText(insText)
-                                val badgeW = textW + 16f
-                                val badgeH = 22f
-                                val badgeLeft = (x - badgeW / 2f).coerceIn(2f, chartRight - badgeW - 2f)
-                                val badgeTop = chartTop + 6f
+                            // Multi-tier staggering: choose Level 0 or Level 1 to prevent overlapping
+                            val margin = 4f
+                            val level = when {
+                                badgeLeft >= lastInsulinRight0 + margin -> 0
+                                badgeLeft >= lastInsulinRight1 + margin -> 1
+                                else -> if (lastInsulinRight0 <= lastInsulinRight1) 0 else 1
+                            }
+                            if (level == 0) {
+                                lastInsulinRight0 = badgeLeft + badgeW
+                            } else {
+                                lastInsulinRight1 = badgeLeft + badgeW
+                            }
 
-                                // Vertical dashed guideline connecting pin down through glucose chart
+                            val badgeTop = chartTop + 6f + (level * 24f)
+
+                            // Vertical dashed guideline connecting pin down through glucose chart
+                            if (level > 0) {
                                 drawLine(
                                     color = ActionBlue.copy(alpha = if (isSelected) 0.85f else 0.4f),
-                                    start = Offset(x, badgeTop + badgeH),
-                                    end = Offset(x, chartBottom),
+                                    start = Offset(x, chartTop),
+                                    end = Offset(x, badgeTop),
                                     strokeWidth = if (isSelected) 2.5f else 1.5f,
                                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
                                 )
+                            }
+                            drawLine(
+                                color = ActionBlue.copy(alpha = if (isSelected) 0.85f else 0.4f),
+                                start = Offset(x, badgeTop + badgeH),
+                                end = Offset(x, chartBottom),
+                                strokeWidth = if (isSelected) 2.5f else 1.5f,
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
+                            )
 
-                                // Glow if selected
-                                if (isSelected) {
-                                    drawRoundRect(
-                                        color = ActionBlue.copy(alpha = 0.35f),
-                                        topLeft = Offset(badgeLeft - 3f, badgeTop - 3f),
-                                        size = Size(badgeW + 6f, badgeH + 6f),
-                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f)
-                                    )
-                                }
-
-                                // Insulin Badge Background
+                            // Glow if selected
+                            if (isSelected) {
                                 drawRoundRect(
-                                    color = ActionBlue,
-                                    topLeft = Offset(badgeLeft, badgeTop),
-                                    size = Size(badgeW, badgeH),
-                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f)
-                                )
-
-                                // Insulin Text
-                                drawContext.canvas.nativeCanvas.drawText(
-                                    insText,
-                                    badgeLeft + badgeW / 2f,
-                                    badgeTop + 16.5f,
-                                    insulinPaint
+                                    color = ActionBlue.copy(alpha = 0.35f),
+                                    topLeft = Offset(badgeLeft - 3f, badgeTop - 3f),
+                                    size = Size(badgeW + 6f, badgeH + 6f),
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f)
                                 )
                             }
 
-                            // 2. Carbs Pin in Bottom Area
-                            if (tr.hasCarbs) {
-                                val carbsG = tr.carbsGrams!!
-                                val carbsText = "${carbsG.toInt()}g"
-                                val textW = carbsPaint.measureText(carbsText)
-                                val badgeW = textW + 16f
-                                val badgeH = 22f
-                                val badgeLeft = (x - badgeW / 2f).coerceIn(2f, chartRight - badgeW - 2f)
-                                val badgeTop = chartBottom - 26f
+                            // Insulin Badge Background
+                            drawRoundRect(
+                                color = ActionBlue,
+                                topLeft = Offset(badgeLeft, badgeTop),
+                                size = Size(badgeW, badgeH),
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f)
+                            )
 
-                                if (!tr.hasInsulin) {
-                                    // Vertical dashed guideline up
+                            // Insulin Text
+                            drawContext.canvas.nativeCanvas.drawText(
+                                insText,
+                                badgeLeft + badgeW / 2f,
+                                badgeTop + 16.5f,
+                                insulinPaint
+                            )
+                        }
+                    }
+
+                    // 4.1.2. Draw Carbs Clusters (Bottom Area with Staggering)
+                    val visibleCarbsClusters = carbsClusters.filter { cl ->
+                        val m = (cl.timestamp - startOfDay) / 60000f
+                        m in (windowStartMinute - 15f)..(windowStartMinute + visibleMinutes + 15f)
+                    }
+
+                    var lastCarbsRight0 = -Float.MAX_VALUE
+                    var lastCarbsRight1 = -Float.MAX_VALUE
+
+                    visibleCarbsClusters.forEach { cluster ->
+                        val m = (cluster.timestamp - startOfDay) / 60000f
+                        val x = xForMinute(m)
+
+                        if (x in -20f..(chartRight + 20f)) {
+                            val isSelected = (selectedTreatmentCluster == cluster)
+                            val carbsText = cluster.displayText
+                            val textW = carbsPaint.measureText(carbsText)
+                            val badgeW = textW + 16f
+                            val badgeH = 22f
+                            val badgeLeft = (x - badgeW / 2f).coerceIn(2f, chartRight - badgeW - 2f)
+
+                            // Multi-tier staggering: choose Level 0 or Level 1 to prevent overlapping
+                            val margin = 4f
+                            val level = when {
+                                badgeLeft >= lastCarbsRight0 + margin -> 0
+                                badgeLeft >= lastCarbsRight1 + margin -> 1
+                                else -> if (lastCarbsRight0 <= lastCarbsRight1) 0 else 1
+                            }
+                            if (level == 0) {
+                                lastCarbsRight0 = badgeLeft + badgeW
+                            } else {
+                                lastCarbsRight1 = badgeLeft + badgeW
+                            }
+
+                            val badgeTop = chartBottom - 26f - (level * 24f)
+
+                            // Vertical dashed guideline up if no insulin at this same time
+                            val hasInsulinAtSameTime = visibleInsulinClusters.any {
+                                val insM = (it.timestamp - startOfDay) / 60000f
+                                abs(xForMinute(insM) - x) < 4f
+                            }
+
+                            if (!hasInsulinAtSameTime) {
+                                drawLine(
+                                    color = Color(0xFFF59E0B).copy(alpha = if (isSelected) 0.85f else 0.4f),
+                                    start = Offset(x, chartTop + 10f),
+                                    end = Offset(x, badgeTop),
+                                    strokeWidth = if (isSelected) 2.5f else 1.5f,
+                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
+                                )
+                                if (level > 0) {
                                     drawLine(
                                         color = Color(0xFFF59E0B).copy(alpha = if (isSelected) 0.85f else 0.4f),
-                                        start = Offset(x, chartTop + 10f),
-                                        end = Offset(x, badgeTop),
+                                        start = Offset(x, badgeTop + badgeH),
+                                        end = Offset(x, chartBottom),
                                         strokeWidth = if (isSelected) 2.5f else 1.5f,
                                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
                                     )
                                 }
+                            }
 
-                                // Glow if selected
-                                if (isSelected) {
-                                    drawRoundRect(
-                                        color = Color(0xFFF59E0B).copy(alpha = 0.35f),
-                                        topLeft = Offset(badgeLeft - 3f, badgeTop - 3f),
-                                        size = Size(badgeW + 6f, badgeH + 6f),
-                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f)
-                                    )
-                                }
-
-                                // Carbs Badge Background
+                            // Glow if selected
+                            if (isSelected) {
                                 drawRoundRect(
-                                    color = Color(0xFFF59E0B),
-                                    topLeft = Offset(badgeLeft, badgeTop),
-                                    size = Size(badgeW, badgeH),
-                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f)
-                                )
-
-                                // Carbs Text
-                                drawContext.canvas.nativeCanvas.drawText(
-                                    carbsText,
-                                    badgeLeft + badgeW / 2f,
-                                    badgeTop + 16.5f,
-                                    carbsPaint
+                                    color = Color(0xFFF59E0B).copy(alpha = 0.35f),
+                                    topLeft = Offset(badgeLeft - 3f, badgeTop - 3f),
+                                    size = Size(badgeW + 6f, badgeH + 6f),
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f)
                                 )
                             }
+
+                            // Carbs Badge Background
+                            drawRoundRect(
+                                color = Color(0xFFF59E0B),
+                                topLeft = Offset(badgeLeft, badgeTop),
+                                size = Size(badgeW, badgeH),
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f)
+                            )
+
+                            // Carbs Text
+                            drawContext.canvas.nativeCanvas.drawText(
+                                carbsText,
+                                badgeLeft + badgeW / 2f,
+                                badgeTop + 16.5f,
+                                carbsPaint
+                            )
                         }
                     }
 
