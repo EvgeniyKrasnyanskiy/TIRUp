@@ -53,3 +53,27 @@
   - Добавлен метод `saveUserManualToDownloads()` с сохранением PDF руководства в системную папку «Загрузки».
   - Подключен `Snackbar` с действием «Открыть» через `openSavedFileFolder`.
 
+## 3. Итерация 3: Заголовок дайджеста и постоянный плавающий кружок
+
+### Этап 1. [Completed] Заголовок «Недельный дайджест» в шторке и баннере
+- `GlucoseAlertManager.kt`: добавлены `setSubText("Недельный дайджест")`, `setContentTitle("Недельный дайджест")`, `setContentText(digest.headline)`.
+- `TrendsScreen.kt`: в `WeeklyDigestBanner` строго сохранены 2 строки:
+  - Строка 1: `📊 НЕДЕЛЬНЫЙ ДАЙДЖЕСТ` (11sp, bold, ActionBlue).
+  - Строка 2: `digest.headline` (13.5sp, semi-bold).
+
+### Этап 2. [Completed] Постоянно плавающий кружок (50% мини-режим в норме) + документация
+- **2.1. Модель данных и репозиторий**:
+  - `UserSettings.kt`: добавлен флаг `isFloatingBubbleAlwaysVisible: Boolean = false`.
+  - `SettingsRepositoryImpl.kt`: сохранение/загрузка `KEY_IS_FLOATING_BUBBLE_ALWAYS_VISIBLE`.
+  - `AutoBackupManager.kt`: поддержка ключа `isFloatingBubbleAlwaysVisible` при резервном копировании.
+  - `SettingsViewModel.kt`: метод `toggleFloatingBubbleAlwaysVisible(enabled: Boolean)`.
+- **2.2. Настройки (UI)**:
+  - `SettingsScreen.kt`: чекбокс/свитч «Отображать постоянно» с подробным пояснением логики мини-режима и действий по тапу/удержанию.
+- **2.3. Логика FloatingBubbleService**:
+  - Адаптивный размер `WindowManager.LayoutParams`: `40dp` в мини-режиме (без перекрытия полезной площади экрана кликами) и `76dp` в режиме тревоги.
+  - В норме (3.9–10.0): мини-режим 50% (диаметр кружка 36dp, скрытие стрелки, шрифт сахара 12sp, зелёный/изумрудный контур), тап открывает `MainActivity`.
+  - Вне нормы (< 3.9 или > 10.0): полный размер (60dp, стрелка, сирена/волны), короткий тап глушит/снузит, длинный тап (≥500мс) глушит и открывает приложение.
+- **2.4. Документация**:
+  - `HelpAndDisclaimerDialog.kt`: описание функции в карточке умных тревог.
+  - `UserManualPdfGenerator.kt`: описание в PDF-руководстве пользователя.
+

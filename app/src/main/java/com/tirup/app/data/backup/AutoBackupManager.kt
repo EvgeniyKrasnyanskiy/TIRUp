@@ -332,6 +332,7 @@ object AutoBackupManager {
                     writer.name("isLockscreenNotificationEnabled").value(settings.isLockscreenNotificationEnabled)
                     writer.name("widgetBackgroundOpacity").value(settings.widgetBackgroundOpacity)
                     writer.name("isFloatingBubbleEnabled").value(settings.isFloatingBubbleEnabled)
+                    writer.name("isFloatingBubbleAlwaysVisible").value(settings.isFloatingBubbleAlwaysVisible)
 
                     writer.name("isDeviceRemindersEnabled").value(settings.isDeviceRemindersEnabled)
                     writer.name("isSensorReminderEnabled").value(settings.isSensorReminderEnabled)
@@ -578,6 +579,7 @@ object AutoBackupManager {
         var isLockscreenEnabled = false
         var widgetOpacity = 85
         var isFloatingBubble = false
+        var isFloatingBubbleAlwaysVisible = false
         var alertSettings = AlertSettings()
 
         var isDeviceReminders = true
@@ -602,6 +604,7 @@ object AutoBackupManager {
                 "isLockscreenNotificationEnabled" -> isLockscreenEnabled = reader.nextBoolean()
                 "widgetBackgroundOpacity" -> widgetOpacity = reader.nextInt()
                 "isFloatingBubbleEnabled" -> isFloatingBubble = reader.nextBoolean()
+                "isFloatingBubbleAlwaysVisible" -> isFloatingBubbleAlwaysVisible = reader.nextBoolean()
                 "targetRanges" -> {
                     var tirLow = 3.9
                     var tirHigh = 10.0
@@ -817,6 +820,7 @@ object AutoBackupManager {
             isLockscreenNotificationEnabled = isLockscreenEnabled,
             widgetBackgroundOpacity = widgetOpacity,
             isFloatingBubbleEnabled = isFloatingBubble,
+            isFloatingBubbleAlwaysVisible = isFloatingBubbleAlwaysVisible,
             alertSettings = alertSettings,
             isDeviceRemindersEnabled = isDeviceReminders,
             isSensorReminderEnabled = isSensorReminder,

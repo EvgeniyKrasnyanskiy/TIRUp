@@ -146,6 +146,7 @@ data class UserSettings(
     val isLockscreenNotificationEnabled: Boolean = true,
     val widgetBackgroundOpacity: Int = 85,
     val isFloatingBubbleEnabled: Boolean = false,
+    val isFloatingBubbleAlwaysVisible: Boolean = false,
     val isWeeklyDigestEnabled: Boolean = false,
     val dismissedWeeklyDigestTimestamp: Long = 0L,
     val showTreatmentsOnChart: Boolean = true,

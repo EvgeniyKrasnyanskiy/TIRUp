@@ -2239,6 +2239,45 @@ fun SettingsScreen(
                             )
                         )
                     }
+
+                    if (settings.isFloatingBubbleEnabled) {
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                            thickness = 0.5.dp
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isRu) "Отображать постоянно" else "Always visible",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (isRu) "В норме (3.9–10.0) — мини-кружок (50% размера), тап открывает TIRUp. Вне нормы — тревожный режим (тап глушит/снузит, удержание открывает TIRUp)"
+                                    else "In target (3.9–10.0) — mini-circle (50% size), tap opens TIRUp. Out of range — alarm mode (tap silences/snoozes, hold opens TIRUp)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Switch(
+                                checked = settings.isFloatingBubbleAlwaysVisible,
+                                onCheckedChange = { isChecked ->
+                                    viewModel.toggleFloatingBubbleAlwaysVisible(isChecked)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = ActionBlue
+                                )
+                            )
+                        }
+                    }
                 }
             }
 
