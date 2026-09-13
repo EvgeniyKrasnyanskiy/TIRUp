@@ -17,6 +17,9 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.IBinder
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
@@ -28,6 +31,7 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import android.widget.TextView
+import android.widget.Toast
 import com.tirup.app.R
 import com.tirup.app.TirupApplication
 import com.tirup.app.data.alert.GlucoseAlertManager
@@ -76,6 +80,46 @@ class FloatingBubbleService : Service() {
     private var windowLayoutParams: WindowManager.LayoutParams? = null
     private var isCurrentlyMiniMode: Boolean = false
     private var isFirstModeApplication: Boolean = true
+    private var miniCountdownJob: Job? = null
+    private var countdownToast: Toast? = null
+
+    @Suppress("DEPRECATION")
+    private fun vibrateTick() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vm?.defaultVibrator?.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                v?.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE))
+            }
+        } catch (_: Exception) {}
+    }
+
+    @Suppress("DEPRECATION")
+    private fun vibrateSuccess() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vm?.defaultVibrator?.vibrate(VibrationEffect.createOneShot(120, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                v?.vibrate(VibrationEffect.createOneShot(120, VibrationEffect.DEFAULT_AMPLITUDE))
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun showCountdownToast(text: String) {
+        countdownToast?.cancel()
+        countdownToast = Toast.makeText(applicationContext, text, Toast.LENGTH_SHORT).apply {
+            show()
+        }
+    }
+
+    private fun cancelCountdownToast() {
+        countdownToast?.cancel()
+        countdownToast = null
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -137,6 +181,8 @@ class FloatingBubbleService : Service() {
         var initialTouchX = 0f
         var initialTouchY = 0f
         var touchStartTime = 0L
+        var isCountdownActive = false
+        var isDisableTriggered = false
 
         view.setOnTouchListener { _, event ->
             when (event.action) {
@@ -146,23 +192,88 @@ class FloatingBubbleService : Service() {
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
                     touchStartTime = System.currentTimeMillis()
+                    isCountdownActive = false
+                    isDisableTriggered = false
+
+                    if (isCurrentlyMiniMode) {
+                        miniCountdownJob?.cancel()
+                        miniCountdownJob = serviceScope.launch {
+                            delay(450)
+                            isCountdownActive = true
+
+                            // 3 seconds left
+                            showCountdownToast("⏳ Удерживайте ещё 3 сек. для отключения")
+                            vibrateTick()
+                            delay(1000)
+
+                            // 2 seconds left
+                            showCountdownToast("⏳ Удерживайте ещё 2 сек. для отключения")
+                            vibrateTick()
+                            delay(1000)
+
+                            // 1 second left
+                            showCountdownToast("⏳ Удерживайте ещё 1 сек. для отключения")
+                            vibrateTick()
+                            delay(1000)
+
+                            // 3 full seconds completed!
+                            isDisableTriggered = true
+                            vibrateSuccess()
+                            cancelCountdownToast()
+                            Toast.makeText(applicationContext, "Постоянный кружок отключён", Toast.LENGTH_SHORT).show()
+
+                            // Disable isFloatingBubbleAlwaysVisible in repository
+                            try {
+                                val app = applicationContext as? TirupApplication
+                                val settings = lastKnownSettings ?: app?.settingsRepository?.getSettings()?.first()
+                                if (app != null && settings != null) {
+                                    app.settingsRepository.updateSettings(
+                                        settings.copy(isFloatingBubbleAlwaysVisible = false)
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to disable permanent bubble: ${e.message}")
+                            }
+
+                            // Hide bubble immediately since sugar is in normal range
+                            bubbleView?.visibility = View.GONE
+                            setHypoRipple(false)
+                        }
+                    }
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (event.rawX - initialTouchX).toInt()
-                    params.y = initialY + (event.rawY - initialTouchY).toInt()
-                    if (view.isAttachedToWindow) {
-                        windowManager.updateViewLayout(view, params)
+                    val dx = kotlin.math.abs(event.rawX - initialTouchX)
+                    val dy = kotlin.math.abs(event.rawY - initialTouchY)
+                    if (dx > 20 || dy > 20) {
+                        if (isCountdownActive || miniCountdownJob?.isActive == true) {
+                            miniCountdownJob?.cancel()
+                            cancelCountdownToast()
+                            isCountdownActive = false
+                        }
+                        params.x = initialX + (event.rawX - initialTouchX).toInt()
+                        params.y = initialY + (event.rawY - initialTouchY).toInt()
+                        if (view.isAttachedToWindow) {
+                            windowManager.updateViewLayout(view, params)
+                        }
                     }
                     true
                 }
                 MotionEvent.ACTION_UP -> {
+                    miniCountdownJob?.cancel()
+                    cancelCountdownToast()
+
                     val duration = System.currentTimeMillis() - touchStartTime
                     val dx = kotlin.math.abs(event.rawX - initialTouchX)
                     val dy = kotlin.math.abs(event.rawY - initialTouchY)
                     val isClick = dx < 20 && dy < 20
 
-                    if (isClick) {
+                    if (isDisableTriggered) {
+                        isDisableTriggered = false
+                    } else if (isCountdownActive) {
+                        // User held the bubble long enough to start countdown, but released early
+                        isCountdownActive = false
+                    } else if (isClick) {
                         if (isCurrentlyMiniMode) {
                             openMainActivity()
                         } else {
@@ -206,6 +317,13 @@ class FloatingBubbleService : Service() {
                     } else {
                         snapToEdge(params)
                     }
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    miniCountdownJob?.cancel()
+                    cancelCountdownToast()
+                    isCountdownActive = false
+                    isDisableTriggered = false
                     true
                 }
                 else -> false
@@ -632,6 +750,8 @@ class FloatingBubbleService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        miniCountdownJob?.cancel()
+        cancelCountdownToast()
         serviceScope.cancel()
         snoozeJob?.cancel()
         edgeAnimator?.cancel()
