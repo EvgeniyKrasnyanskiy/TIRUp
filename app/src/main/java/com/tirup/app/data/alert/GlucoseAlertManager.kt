@@ -1494,7 +1494,7 @@ object GlucoseAlertManager {
         val packetAgeMinutes = if (ble.lastPacketTimestamp > 0L) {
             (System.currentTimeMillis() - ble.lastPacketTimestamp) / 60_000L
         } else 999L
-        val isStaleBattery = packetAgeMinutes > 7
+        val isStaleBattery = packetAgeMinutes >= 5
         val hasMasterBattery = isObserver && (ble.lastMasterBattery in 0..100 || ble.lastPacketTimestamp > 0L)
         if (hasMasterBattery) {
             val bat = ble.lastMasterBattery
@@ -1595,13 +1595,14 @@ object GlucoseAlertManager {
             if (hasMasterBattery) {
                 setViewVisibility(R.id.notif_dot3, android.view.View.VISIBLE)
                 setViewVisibility(R.id.notif_battery, android.view.View.VISIBLE)
-                setTextViewText(R.id.notif_battery, "🔋 ${ble.lastMasterBattery}%")
+                val batText = if (isExpired || isStaleBattery) "🔋 ?" else "🔋 ${ble.lastMasterBattery}%"
+                setTextViewText(R.id.notif_battery, batText)
                 val batColor = when {
                     ble.lastMasterBattery <= 15 -> Color.parseColor("#EF4444")
                     ble.lastMasterBattery <= 25 -> Color.parseColor("#F59E0B")
                     else -> Color.parseColor("#10B981")
                 }
-                setTextColor(R.id.notif_battery, if (isExpired) grayColor else batColor)
+                setTextColor(R.id.notif_battery, if (isExpired || isStaleBattery) grayColor else batColor)
             } else {
                 setViewVisibility(R.id.notif_dot3, android.view.View.GONE)
                 setViewVisibility(R.id.notif_battery, android.view.View.GONE)
