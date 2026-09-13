@@ -2259,8 +2259,8 @@ fun SettingsScreen(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = if (isRu) "В норме (3.9–10.0) — мини-кружок (50% размера), тап открывает TIRUp. Вне нормы — тревожный режим (тап глушит/снузит, удержание открывает TIRUp)"
-                                    else "In target (3.9–10.0) — mini-circle (50% size), tap opens TIRUp. Out of range — alarm mode (tap silences/snoozes, hold opens TIRUp)",
+                                    text = if (isRu) "В норме (3.9–10.0) — мини-кружок (50%), тап открывает TIRUp, удержание 3 сек отключает. Вне нормы — тревожный режим (тап глушит/снузит, удержание открывает TIRUp)"
+                                    else "In target (3.9–10.0) — mini-circle (50%), tap opens TIRUp, 3s hold turns off. Out of range — alarm mode (tap silences/snoozes, hold opens TIRUp)",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
