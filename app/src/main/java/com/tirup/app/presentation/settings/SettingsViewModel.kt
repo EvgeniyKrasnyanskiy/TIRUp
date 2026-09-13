@@ -313,6 +313,17 @@ class SettingsViewModel(
         }
     }
 
+    fun toggleFloatingBubbleAlwaysVisible(enabled: Boolean) {
+        viewModelScope.launch {
+            val updated = _uiState.value.userSettings.copy(isFloatingBubbleAlwaysVisible = enabled)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+            if (updated.isFloatingBubbleEnabled) {
+                com.tirup.app.presentation.overlay.FloatingBubbleService.start(context)
+            }
+        }
+    }
+
     fun testAlert(tier: com.tirup.app.data.alert.AlertTier) {
         val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
         com.tirup.app.data.alert.GlucoseAlertManager.sendTestAlert(context, tier, isRu)

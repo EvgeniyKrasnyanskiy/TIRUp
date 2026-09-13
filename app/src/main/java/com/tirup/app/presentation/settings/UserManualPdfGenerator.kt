@@ -345,16 +345,16 @@ class UserManualPdfGenerator(private val context: Context) {
                 else "5. Floating Glucose Bubble & Adaptive Snooze",
                 items = listOf(
                     Triple(
-                        if (isRu) "Плавающий круглый оверлей (60x60dp)" else "Floating Circular Bubble (60x60dp)",
+                        if (isRu) "Плавающий оверлей (60x60dp и мини 50%)" else "Floating Bubble (60x60dp & 50% mini)",
                         if (isRu) "Оверлей" else "Overlay",
-                        if (isRu) "Полупрозрачный кружок поверх экрана. Показывается ТОЛЬКО когда сахар вне нормы (<3.9 или >10.0). При сахаре в диапазоне 3.9..10.0 пузырёк автоматически скрыт."
-                        else "Strictly circular 60x60dp overlay. Visible ONLY when glucose is out of range (<3.9 or >10.0). Automatically hidden during normal range (3.9..10.0)."
+                        if (isRu) "Кружок поверх экрана. В норме скрыт или (при включении постоянного режима) уменьшен в 2 раза (тап открывает TIRUp). Вне нормы — тревожный размер 60dp."
+                        else "Strictly circular overlay. In target: hidden or (if always-on enabled) compact 50% (tap opens TIRUp). Out of range: expands to 60dp alarm mode."
                     ),
                     Triple(
-                        if (isRu) "Умный снуз (15м гипо / 45м гипер) и круги на воде" else "Smart Snooze (15m hypo / 45m hyper) & Water Ripple Wave",
-                        if (isRu) "Снуз & Волна" else "Tap Snooze",
-                        if (isRu) "Тап по пузырьку глушит звук и скрывает его на 15 мин (гипо) или 45 мин (гипер). Повторный показ из паузы беззвучен. При гипо (<3.9) воспроизводит пульсацию «круги на воде»."
-                        else "Tapping bubble silences sound and snoozes for 15m (hypo) or 45m (hyper). Quiet re-emergence. Hypoglycemia (<3.9) triggers pulsating outward water ripple waves."
+                        if (isRu) "Умный снуз, удержание и круги на воде" else "Smart Snooze, Hold to Open & Ripple Wave",
+                        if (isRu) "Снуз & Тап" else "Tap & Hold",
+                        if (isRu) "При тревоге: короткий тап глушит звук и снузит на 15/45м, долгое нажатие (≥0.5с) открывает TIRUp. При гипо (<3.9) пульсируют «круги на воде»."
+                        else "In alarm: short tap silences sound & snoozes for 15/45m, hold (≥0.5s) opens TIRUp. Hypoglycemia (<3.9) triggers pulsating outward water ripple waves."
                     ),
                     Triple(
                         if (isRu) "Клинический протокол снуза тревог" else "Clinical Snooze Safety Protocol",

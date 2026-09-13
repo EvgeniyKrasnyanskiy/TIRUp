@@ -64,6 +64,8 @@ class FloatingBubbleService : Service() {
     private var lastKnownSettings: UserSettings? = null
     private var wasOutOfRange: Boolean = false
     private var wasHypoActive: Boolean = false
+    private var windowLayoutParams: WindowManager.LayoutParams? = null
+    private var isCurrentlyMiniMode: Boolean = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -118,6 +120,7 @@ class FloatingBubbleService : Service() {
             x = dpToPx(12)
             y = dpToPx(200)
         }
+        windowLayoutParams = params
 
         var initialX = 0
         var initialY = 0
@@ -147,37 +150,54 @@ class FloatingBubbleService : Service() {
                     val duration = System.currentTimeMillis() - touchStartTime
                     val dx = kotlin.math.abs(event.rawX - initialTouchX)
                     val dy = kotlin.math.abs(event.rawY - initialTouchY)
-                    if (duration < 250 && dx < 20 && dy < 20) {
-                        // Instantly silence actively playing sound and dismiss alarm
-                        GlucoseAlertManager.silenceCurrentSoundOnly()
-                        GlucoseAlertManager.dismissCriticalAlarm(this@FloatingBubbleService, fromUser = true)
+                    val isClick = dx < 20 && dy < 20
 
-                        // Play soft bubble pop-out sound feedback
-                        MedicalSoundPlayer.playBubblePopOut()
-
-                        val currentMmol = lastKnownReading?.valueMmol ?: 5.0
-                        val alertSettings = lastKnownSettings?.alertSettings
-                        val isHypo = currentMmol < 3.9
-                        val iob = lastKnownReading?.iob ?: 0.0
-                        val isExtremeHigh = currentMmol > 13.9
-                        val requiredIob = if (isExtremeHigh) 0.5 else 0.2
-
-                        val snoozeMinutes = if (isHypo) {
-                            alertSettings?.snoozeHypoMinutes ?: 15
+                    if (isClick) {
+                        if (isCurrentlyMiniMode) {
+                            openMainActivity()
                         } else {
-                            val baseHyper = alertSettings?.snoozeHyperMinutes ?: 45
-                            if (iob >= requiredIob) maxOf(baseHyper, 60) else baseHyper
-                        }
+                            if (duration >= 500) {
+                                // Long-press in alarm mode: silence + open TIRUp
+                                GlucoseAlertManager.silenceCurrentSoundOnly()
+                                GlucoseAlertManager.dismissCriticalAlarm(this@FloatingBubbleService, fromUser = true)
+                                openMainActivity()
+                            } else {
+                                // Short tap in alarm mode: silence + snooze
+                                GlucoseAlertManager.silenceCurrentSoundOnly()
+                                GlucoseAlertManager.dismissCriticalAlarm(this@FloatingBubbleService, fromUser = true)
+                                MedicalSoundPlayer.playBubblePopOut()
 
-                        val snoozeDuration = snoozeMinutes * 60 * 1000L
-                        snoozeUntilTimestamp = System.currentTimeMillis() + snoozeDuration
-                        bubbleView?.visibility = View.GONE
-                        setHypoRipple(false)
+                                val currentMmol = lastKnownReading?.valueMmol ?: 5.0
+                                val alertSettings = lastKnownSettings?.alertSettings
+                                val isHypo = currentMmol < 3.9
+                                val iob = lastKnownReading?.iob ?: 0.0
+                                val isExtremeHigh = currentMmol > 13.9
+                                val requiredIob = if (isExtremeHigh) 0.5 else 0.2
 
-                        snoozeJob?.cancel()
-                        snoozeJob = serviceScope.launch {
-                            delay(snoozeDuration)
-                            recheckCurrentBubble()
+                                val snoozeMinutes = if (isHypo) {
+                                    alertSettings?.snoozeHypoMinutes ?: 15
+                                } else {
+                                    val baseHyper = alertSettings?.snoozeHyperMinutes ?: 45
+                                    if (iob >= requiredIob) maxOf(baseHyper, 60) else baseHyper
+                                }
+
+                                val snoozeDuration = snoozeMinutes * 60 * 1000L
+                                snoozeUntilTimestamp = System.currentTimeMillis() + snoozeDuration
+                                setHypoRipple(false)
+
+                                if (lastKnownSettings?.isFloatingBubbleAlwaysVisible == true && lastKnownReading != null) {
+                                    applyBubbleMode(isMini = true)
+                                    bubbleView?.visibility = View.VISIBLE
+                                } else {
+                                    bubbleView?.visibility = View.GONE
+                                }
+
+                                snoozeJob?.cancel()
+                                snoozeJob = serviceScope.launch {
+                                    delay(snoozeDuration)
+                                    recheckCurrentBubble()
+                                }
+                            }
                         }
                     } else {
                         snapToEdge(params)
@@ -221,6 +241,53 @@ class FloatingBubbleService : Service() {
         }
         edgeAnimator = animator
         animator.start()
+    }
+
+    private fun openMainActivity() {
+        try {
+            val appIntent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            startActivity(appIntent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to open MainActivity: ${e.message}")
+        }
+    }
+
+    private fun applyBubbleMode(isMini: Boolean) {
+        val params = windowLayoutParams ?: return
+        val view = bubbleView ?: return
+
+        val targetSizeDp = if (isMini) 38 else 76
+        val targetSizePx = dpToPx(targetSizeDp)
+        val containerSizePx = dpToPx(if (isMini) 34 else 60)
+
+        val sizeChanged = (params.width != targetSizePx)
+        if (sizeChanged) {
+            params.width = targetSizePx
+            params.height = targetSizePx
+
+            bubbleContainer?.layoutParams = android.widget.FrameLayout.LayoutParams(
+                containerSizePx,
+                containerSizePx,
+                Gravity.CENTER
+            )
+            if (view.isAttachedToWindow) {
+                windowManager.updateViewLayout(view, params)
+            }
+        }
+
+        if (isMini) {
+            tvArrow?.visibility = View.GONE
+            tvDelta?.visibility = View.GONE
+            tvGlucose?.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11.5f)
+            bubbleRipple?.visibility = View.GONE
+        } else {
+            tvArrow?.visibility = View.VISIBLE
+            tvGlucose?.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15f)
+        }
+
+        isCurrentlyMiniMode = isMini
     }
 
     private fun observeData() {
@@ -298,20 +365,28 @@ class FloatingBubbleService : Service() {
         }
 
         val isSnoozed = now < snoozeUntilTimestamp
+        val isAlarmActive = isOutOfRange && !isSnoozed
 
-        if (!isOutOfRange || isSnoozed) {
-            bubbleView?.visibility = View.GONE
-            setHypoRipple(false)
+        if (!isAlarmActive) {
             if (!isOutOfRange) {
                 wasOutOfRange = false
                 wasHypoActive = false
             }
-            return
+            setHypoRipple(false)
+
+            if (settings.isFloatingBubbleAlwaysVisible) {
+                applyBubbleMode(isMini = true)
+                bubbleView?.visibility = View.VISIBLE
+            } else {
+                bubbleView?.visibility = View.GONE
+                return
+            }
         } else {
             val wasPreviouslyOutOfRange = wasOutOfRange
             wasOutOfRange = true
             wasHypoActive = isHypo
 
+            applyBubbleMode(isMini = false)
             bubbleView?.visibility = View.VISIBLE
 
             // Play PopIn sound ONLY on first transition into out-of-range!
@@ -342,15 +417,20 @@ class FloatingBubbleService : Service() {
             else -> Color.parseColor("#EF4444")
         }
 
+        val strokeWidth = if (isCurrentlyMiniMode) dpToPx(2) else dpToPx(3)
         val bg = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.parseColor("#F00F172A")) // Deep dark slate (94% opaque)
-            setStroke(dpToPx(3), ringColor)
+            setStroke(strokeWidth, ringColor)
         }
         bubbleContainer?.background = bg
 
-        // Water ripple waves on hypoglycemia (< 3.9 mmol/L)
-        setHypoRipple(isHypo)
+        // Water ripple waves on hypoglycemia (< 3.9 mmol/L) only in alarm mode
+        if (isCurrentlyMiniMode) {
+            setHypoRipple(false)
+        } else {
+            setHypoRipple(isHypo)
+        }
     }
 
     private fun setHypoRipple(isHypo: Boolean) {
@@ -430,6 +510,7 @@ class FloatingBubbleService : Service() {
         tvGlucose = null
         tvArrow = null
         tvDelta = null
+        windowLayoutParams = null
     }
 
     private fun dpToPx(dp: Int): Int {

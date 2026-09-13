@@ -167,12 +167,14 @@ fun HelpAndDisclaimerDialog(
                         "• Уровни 1–4: предиктивный прогноз выхода за диапазон, тройной тон, экстренная сирена (~12 сек) и тревога при потере связи с сенсором (>20 мин).\n" +
                         "• Экстренные SOS SMS: если сахар упал ниже 3.0 ммоль/л и тревога не подтверждена в течение 5 мин отправляет доверенному лицу SMS (≤67 симв.) с координатами.\n" +
                         "• Офлайн SMS-запрос: доверенный контакт может запросить текущий сахар и TIR по SMS без интернета («сахар», «?», «bg»).\n" +
-                        "• Умный Снуз: 15 мин при гипогликемии (сброс при <2.8 для защиты от комы); 30–45 мин при гипер на действие инсулина."
+                        "• Умный Снуз: 15 мин при гипогликемии (сброс при <2.8 для защиты от комы); 30–45 мин при гипер на действие инсулина.\n" +
+                        "• Плавающий кружок поверх окон: в норме (3.9–10.0) компактный (50%), тап открывает TIRUp. Вне нормы — тревожный режим, короткий тап глушит/снузит алерт, долгое нажатие открывает приложение."
                     } else {
                         "• Tiers 1–4: predictive target departure, confirmed boundary tone, critical 12s siren, and sensor signal loss (>20 min).\n" +
                         "• Emergency SOS SMS: sends compact SMS (≤67 chars) with GPS to trusted contact if severe hypo (<3.0) is unacknowledged for 5m.\n" +
                         "• Offline SMS Query: trusted contact can query real-time glucose & TIR via SMS without internet ('sugar', '?', 'bg').\n" +
-                        "• Smart Snooze: 15 min for hypo (<2.8 coma guard); 30-45 min for hyper."
+                        "• Smart Snooze: 15 min for hypo (<2.8 coma guard); 30-45 min for hyper.\n" +
+                        "• Floating Bubble: in target (3.9–10.0) compact 50%, tap opens TIRUp. Out of range — alarm mode, tap silences/snoozes, hold opens the app."
                     }
                 )
 

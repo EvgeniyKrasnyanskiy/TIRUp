@@ -62,6 +62,7 @@ class SettingsRepositoryImpl(
             .putBoolean(KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED, settings.isLockscreenNotificationEnabled)
             .putInt(KEY_WIDGET_BACKGROUND_OPACITY, settings.widgetBackgroundOpacity)
             .putBoolean(KEY_IS_FLOATING_BUBBLE_ENABLED, settings.isFloatingBubbleEnabled)
+            .putBoolean(KEY_IS_FLOATING_BUBBLE_ALWAYS_VISIBLE, settings.isFloatingBubbleAlwaysVisible)
             .putBoolean(KEY_IS_WEEKLY_DIGEST_ENABLED, settings.isWeeklyDigestEnabled)
             .putLong(KEY_DISMISSED_WEEKLY_DIGEST_TIMESTAMP, settings.dismissedWeeklyDigestTimestamp)
             .putBoolean(KEY_SHOW_TREATMENTS_ON_CHART, settings.showTreatmentsOnChart)
@@ -235,6 +236,7 @@ class SettingsRepositoryImpl(
             isLockscreenNotificationEnabled = prefs.getBoolean(KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED, true),
             widgetBackgroundOpacity = prefs.getInt(KEY_WIDGET_BACKGROUND_OPACITY, 85),
             isFloatingBubbleEnabled = prefs.getBoolean(KEY_IS_FLOATING_BUBBLE_ENABLED, false),
+            isFloatingBubbleAlwaysVisible = prefs.getBoolean(KEY_IS_FLOATING_BUBBLE_ALWAYS_VISIBLE, false),
             isWeeklyDigestEnabled = prefs.getBoolean(KEY_IS_WEEKLY_DIGEST_ENABLED, false),
             dismissedWeeklyDigestTimestamp = prefs.getLong(KEY_DISMISSED_WEEKLY_DIGEST_TIMESTAMP, 0L),
             showTreatmentsOnChart = prefs.getBoolean(KEY_SHOW_TREATMENTS_ON_CHART, true),
@@ -395,6 +397,7 @@ class SettingsRepositoryImpl(
         private const val KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED = "key_is_lockscreen_notification_enabled"
         private const val KEY_WIDGET_BACKGROUND_OPACITY = "key_widget_background_opacity"
         private const val KEY_IS_FLOATING_BUBBLE_ENABLED = "key_is_floating_bubble_enabled"
+        private const val KEY_IS_FLOATING_BUBBLE_ALWAYS_VISIBLE = "key_is_floating_bubble_always_visible"
         private const val KEY_IS_WEEKLY_DIGEST_ENABLED = "key_is_weekly_digest_enabled"
         private const val KEY_DISMISSED_WEEKLY_DIGEST_TIMESTAMP = "key_dismissed_weekly_digest_timestamp"
         private const val KEY_SHOW_TREATMENTS_ON_CHART = "key_show_treatments_on_chart"
