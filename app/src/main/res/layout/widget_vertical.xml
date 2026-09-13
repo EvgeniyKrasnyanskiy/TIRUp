@@ -103,8 +103,7 @@
         android:text="+3ч 45м"
         android:textColor="#10B981"
         android:textSize="10sp"
-        android:textStyle="bold"
-        android:visibility="gone" />
+        android:textStyle="bold" />
 
     <!-- 4. IoB (💉 0.7 U) -->
     <TextView
@@ -122,8 +121,7 @@
         android:text="💉 0.7 U"
         android:textColor="#38BDF8"
         android:textSize="10sp"
-        android:textStyle="bold"
-        android:visibility="gone" />
+        android:textStyle="bold" />
 
     <!-- 5. Streak (🔥 4 д.) -->
     <TextView

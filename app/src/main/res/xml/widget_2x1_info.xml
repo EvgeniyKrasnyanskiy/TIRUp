@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_2x1_description"
     android:initialKeyguardLayout="@layout/widget_2x1"
@@ -9,6 +9,7 @@
     android:targetCellHeight="1"
     android:maxResizeWidth="300dp"
     android:maxResizeHeight="100dp"
+    android:previewLayout="@layout/widget_2x1"
     android:previewImage="@mipmap/ic_launcher"
     android:resizeMode="horizontal"
     android:updatePeriodMillis="0"

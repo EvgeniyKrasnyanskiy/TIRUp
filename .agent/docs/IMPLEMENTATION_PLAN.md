@@ -110,4 +110,14 @@
 - **6.3. Версионирование (`build.gradle.kts`)**:
   - Обновлены параметры сборки: `versionCode = 11`, `versionName = "2.0.9"`.
 
+## 7. Итерация 7: [Completed] Предпросмотр всех 8 виджетов рабочего стола (`android:previewLayout`)
+- **7.1. Включение `android:previewLayout` в метаданных AppWidgetProviderInfo (`xml/widget_*_info.xml`)**:
+  - Для всех 8 типов виджетов (`widget_2x1`, `widget_3x1`, `widget_compact`, `widget_dashboard`, `widget_dashboard_medium`, `widget_minimal`, `widget_strip`, `widget_vertical`) прописан атрибут `android:previewLayout="@layout/widget_..."`.
+  - В лаунчерах Android 12+ (API 31+) в меню выбора виджетов теперь отрисовывается не системная иконка приложения, а живой реалистичный макет виджета.
+- **7.2. Векторный график гликемии для предпросмотра (`widget_preview_chart.xml`)**:
+  - Создан векторный drawable `widget_preview_chart.xml` со сглаженной гликемической волной целевого диапазона, полосой нормы (3.9–10.0 ммоль/л), точками измерений и светящейся точкой текущего сахара.
+  - Подключен в качестве дефолтного источника `android:src="@drawable/widget_preview_chart"` для графиков в `widget_dashboard.xml` и `widget_dashboard_medium.xml`.
+- **7.3. Калибровка макетов под предпросмотр (`widget_*.xml`)**:
+  - В `widget_2x1.xml`, `widget_3x1.xml`, `widget_compact.xml`, `widget_strip.xml`, `widget_vertical.xml` бейджи IoB, Streak и Compensator выставлены в видимое состояние по умолчанию для демонстрации полного набора возможностей виджета в каталоге лаунчера (при добавлении на экран `TirupWidgetUpdater` динамически переключает видимость согласно реальным настройкам пользователя).
+
 

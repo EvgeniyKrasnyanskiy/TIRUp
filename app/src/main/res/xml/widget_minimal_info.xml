@@ -9,6 +9,7 @@
     android:targetCellHeight="1"
     android:maxResizeWidth="120dp"
     android:maxResizeHeight="120dp"
+    android:previewLayout="@layout/widget_minimal"
     android:previewImage="@mipmap/ic_launcher"
     android:resizeMode="vertical"
     android:updatePeriodMillis="0"

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="300dp"
+    android:height="90dp"
+    android:viewportWidth="300"
+    android:viewportHeight="90">
+
+    <!-- Target Range Background Band (3.9 - 10.0 mmol/L zone) -->
+    <path
+        android:fillColor="#1510B981"
+        android:pathData="M0,24 L300,24 L300,64 L0,64 Z" />
+
+    <!-- Target Range Upper Guideline (10.0 mmol/L) -->
+    <path
+        android:pathData="M0,24 L300,24"
+        android:strokeColor="#2E3A4B"
+        android:strokeWidth="1" />
+
+    <!-- Target Range Lower Guideline (3.9 mmol/L) -->
+    <path
+        android:pathData="M0,64 L300,64"
+        android:strokeColor="#2E3A4B"
+        android:strokeWidth="1" />
+
+    <!-- Glycemic Sparkline Curve -->
+    <path
+        android:pathData="M0,48 C35,48 50,36 80,36 C115,36 135,44 165,44 C205,44 225,32 255,32 C275,32 288,38 300,38"
+        android:strokeColor="#10B981"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Glucose Sample Points -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M20,47m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M50,40m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M80,36m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M110,38m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M140,42m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M170,44m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M200,41m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M230,35m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M260,32m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+    <path
+        android:fillColor="#28B5E8"
+        android:pathData="M285,35m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+
+    <!-- Current (Latest) Glucose Point with Outer Ring -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M300,38m-4,0a4,4 0 1,0 8,0a4,4 0 1,0 -8,0" />
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M300,38m-2.2,0a2.2,2.2 0 1,0 4.4,0a2.2,2.2 0 1,0 -4.4,0" />
+</vector>
