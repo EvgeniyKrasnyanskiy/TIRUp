@@ -192,8 +192,7 @@
             android:text="💉 1.2 U"
             android:textColor="#38BDF8"
             android:textSize="10sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
+            android:textStyle="bold" />
 
         <!-- Line 2: Streak -->
         <TextView
@@ -211,8 +210,7 @@
             android:text="🔥 5 д."
             android:textColor="#F59E0B"
             android:textSize="10sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
+            android:textStyle="bold" />
     </LinearLayout>
 
     <!-- 4. Right Column 2: Stacked [ Battery / Time Ago ] in 2 rows -->
