@@ -1432,10 +1432,10 @@ fun SettingsScreen(
                                             ble.lastRssi >= -85 -> if (isRu) "хороший" else "good"
                                             else -> if (isRu) "слабый" else "weak"
                                         }
-                                        val isStaleBattery = ageMinutes > 7
+                                        val isStaleBattery = ageMinutes >= 5
                                         val batteryInfo = when {
                                             ble.lastMasterBattery < 0 -> ""
-                                            isStaleBattery -> if (isRu) "\n• Батарея вещателя: ? (нет связи > 7 мин)" else "\n• Master battery: ? (stale > 7m)"
+                                            isStaleBattery -> if (isRu) "\n• Батарея вещателя: ? (нет связи ≥ 5 мин)" else "\n• Master battery: ? (stale ≥ 5m)"
                                             else -> "\n• ${if (isRu) "Батарея вещателя" else "Master battery"}: ${ble.lastMasterBattery}%"
                                         }
 
