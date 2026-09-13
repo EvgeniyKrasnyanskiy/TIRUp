@@ -1,4 +1,4 @@
-﻿package com.tirup.app.data.local.dao
+package com.tirup.app.data.local.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
@@ -24,6 +24,21 @@ interface TreatmentDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBatch(treatments: List<TreatmentEntity>)
+
+    @Query("SELECT COUNT(*) FROM treatments")
+    suspend fun getTotalCount(): Long
+
+    @Query("SELECT MIN(timestamp) FROM treatments")
+    suspend fun getEarliestTimestamp(): Long?
+
+    @Query("SELECT MAX(timestamp) FROM treatments")
+    suspend fun getLatestTimestamp(): Long?
+
+    @Query("SELECT * FROM treatments ORDER BY timestamp ASC LIMIT :limit OFFSET :offset")
+    suspend fun getTreatmentsPaginated(limit: Int, offset: Int): List<TreatmentEntity>
+
+    @Query("SELECT * FROM treatments ORDER BY timestamp ASC")
+    suspend fun getAllTreatments(): List<TreatmentEntity>
 
     @Query("SELECT COUNT(*) FROM treatments WHERE timestamp BETWEEN :minTime AND :maxTime AND ((:insulin IS NULL AND insulin_units IS NULL) OR ABS(insulin_units - :insulin) < 0.05) AND ((:carbs IS NULL AND carbs_grams IS NULL) OR ABS(carbs_grams - :carbs) < 0.5)")
     suspend fun countSimilar(minTime: Long, maxTime: Long, insulin: Double?, carbs: Double?): Int

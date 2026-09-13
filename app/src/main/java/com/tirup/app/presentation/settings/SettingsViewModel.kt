@@ -17,22 +17,32 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import android.net.Uri
+import com.tirup.app.data.backup.BackupSummary
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 
 sealed interface SettingsEvent {
     data class SavedToDownloads(val filePath: String) : SettingsEvent
     data class Info(val message: String) : SettingsEvent
+    data class ShareFile(val file: File, val mimeType: String, val title: String) : SettingsEvent
 }
 
 data class SettingsUiState(
     val userSettings: UserSettings = UserSettings(),
     val showClearDialog: Boolean = false,
-    val infoMessage: String? = null
+    val infoMessage: String? = null,
+    val backupSummary: BackupSummary? = null,
+    val pendingRestoreSummary: BackupSummary? = null,
+    val pendingRestoreUri: Uri? = null,
+    val isBackupInProgress: Boolean = false,
+    val isRestoreInProgress: Boolean = false
 )
 
 class SettingsViewModel(
@@ -57,6 +67,7 @@ class SettingsViewModel(
                 _uiState.update { it.copy(userSettings = settings) }
             }
         }
+        loadBackupSummary()
     }
 
     fun setLanguage(language: String) {
@@ -223,6 +234,129 @@ class SettingsViewModel(
                 AutoBackupManager.maybeTriggerAutoBackup(context, database, settingsRepository, force = true)
             } else {
                 AutoBackupManager.cancelDailyBackup(context)
+            }
+        }
+    }
+
+    fun loadBackupSummary() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val summary = AutoBackupManager.getBackupSummary(context)
+            _uiState.update { it.copy(backupSummary = summary) }
+        }
+    }
+
+    fun createBackupNow() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBackupInProgress = true) }
+            val current = _uiState.value.userSettings
+            val res = AutoBackupManager.performBackup(context, database, current)
+            val now = System.currentTimeMillis()
+            val isRu = current.language.equals("RU", ignoreCase = true)
+            if (res.isSuccess) {
+                settingsRepository.updateSettings(current.copy(lastBackupTimestamp = now))
+                _uiState.update { it.copy(userSettings = current.copy(lastBackupTimestamp = now)) }
+                loadBackupSummary()
+                _events.emit(SettingsEvent.Info(if (isRu) "Резервная копия сохранена в Документы/TIRUp/Backups/" else "Backup saved to Documents/TIRUp/Backups/"))
+            } else {
+                _events.emit(SettingsEvent.Info(if (isRu) "Ошибка создания бэкапа: ${res.exceptionOrNull()?.message}" else "Backup failed: ${res.exceptionOrNull()?.message}"))
+            }
+            _uiState.update { it.copy(isBackupInProgress = false) }
+        }
+    }
+
+    fun shareBackup() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBackupInProgress = true) }
+            try {
+                val current = _uiState.value.userSettings
+                val zipFile = AutoBackupManager.createZipBackup(context, database, current)
+                val isRu = current.language.equals("RU", ignoreCase = true)
+                _events.emit(
+                    SettingsEvent.ShareFile(
+                        file = zipFile,
+                        mimeType = "application/zip",
+                        title = if (isRu) "Поделиться резервной копией TIRUp" else "Share TIRUp Backup"
+                    )
+                )
+            } catch (e: Exception) {
+                val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+                _events.emit(SettingsEvent.Info(if (isRu) "Ошибка архивации: ${e.message}" else "Archive failed: ${e.message}"))
+            } finally {
+                _uiState.update { it.copy(isBackupInProgress = false) }
+            }
+        }
+    }
+
+    fun exportBackupToUri(targetUri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isBackupInProgress = true) }
+            try {
+                val current = _uiState.value.userSettings
+                val zipFile = AutoBackupManager.createZipBackup(context, database, current)
+                context.contentResolver.openOutputStream(targetUri)?.use { os ->
+                    zipFile.inputStream().use { it.copyTo(os) }
+                }
+                val isRu = current.language.equals("RU", ignoreCase = true)
+                _events.emit(SettingsEvent.Info(if (isRu) "Резервная копия успешно экспортирована" else "Backup exported successfully"))
+            } catch (e: Exception) {
+                val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+                _events.emit(SettingsEvent.Info(if (isRu) "Ошибка экспорта: ${e.message}" else "Export failed: ${e.message}"))
+            } finally {
+                _uiState.update { it.copy(isBackupInProgress = false) }
+            }
+        }
+    }
+
+    fun prepareRestoreFromUri(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val summary = AutoBackupManager.inspectBackupUri(context, uri)
+            if (summary != null) {
+                _uiState.update {
+                    it.copy(
+                        pendingRestoreSummary = summary,
+                        pendingRestoreUri = uri
+                    )
+                }
+            } else {
+                val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+                _events.emit(SettingsEvent.Info(if (isRu) "Не удалось прочитать выбранный файл бэкапа" else "Could not read chosen backup file"))
+            }
+        }
+    }
+
+    fun dismissRestoreDialog() {
+        _uiState.update {
+            it.copy(pendingRestoreSummary = null, pendingRestoreUri = null)
+        }
+    }
+
+    fun confirmRestore() {
+        val uri = _uiState.value.pendingRestoreUri ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRestoreInProgress = true) }
+            val res = AutoBackupManager.restoreFromUri(context, uri, database, settingsRepository)
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            if (res.isSuccess) {
+                val result = res.getOrNull()!!
+                val msg = if (isRu) {
+                    "Восстановлено: ${result.readingsRestored} замеров, ${result.treatmentsRestored} меток" +
+                            (if (result.settingsRestored) ", настройки" else "")
+                } else {
+                    "Restored: ${result.readingsRestored} readings, ${result.treatmentsRestored} treatments" +
+                            (if (result.settingsRestored) ", settings" else "")
+                }
+                _events.emit(SettingsEvent.Info(msg))
+                loadBackupSummary()
+            } else {
+                val err = res.exceptionOrNull()?.message ?: "Unknown error"
+                _events.emit(SettingsEvent.Info(if (isRu) "Ошибка восстановления: $err" else "Restore failed: $err"))
+            }
+            _uiState.update {
+                it.copy(
+                    isRestoreInProgress = false,
+                    pendingRestoreSummary = null,
+                    pendingRestoreUri = null
+                )
             }
         }
     }
