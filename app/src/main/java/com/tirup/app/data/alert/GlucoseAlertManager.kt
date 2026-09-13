@@ -392,8 +392,11 @@ object GlucoseAlertManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = digest.headline
+        val digestCategory = if (isRu) "Недельный дайджест" else "Weekly Digest"
+        val title = digestCategory
+        val shortText = digest.headline
         val bigText = buildString {
+            append(digest.headline).append("\n\n")
             if (isRu) append("Сводка за неделю:\n") else append("Weekly summary:\n")
             digest.keyInsights.forEach { insight ->
                 append("• ").append(insight).append("\n")
@@ -403,11 +406,10 @@ object GlucoseAlertManager {
             }
         }.trim()
 
-        val shortText = digest.keyInsights.firstOrNull() ?: digest.recommendation
-
         val builder = NotificationCompat.Builder(context, CHANNEL_WEEKLY_DIGEST)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setColor(Color.parseColor("#38BDF8"))
+            .setSubText(digestCategory)
             .setContentTitle(title)
             .setContentText(shortText)
             .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
