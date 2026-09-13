@@ -1,14 +1,22 @@
 package com.tirup.app.data.backup
 
+import android.content.Context
+import android.net.Uri
 import android.os.Environment
 import android.util.JsonReader
 import android.util.JsonWriter
 import android.util.Log
 import com.tirup.app.data.local.AppDatabase
 import com.tirup.app.data.local.entity.GlucoseReadingEntity
+import com.tirup.app.data.local.entity.TreatmentEntity
 import com.tirup.app.domain.model.AlertSettings
+import com.tirup.app.domain.model.BleBridgeRole
+import com.tirup.app.domain.model.BleBridgeSettings
 import com.tirup.app.domain.model.GlucoseUnit
+import com.tirup.app.domain.model.LancetStatus
 import com.tirup.app.domain.model.PatientProfile
+import com.tirup.app.domain.model.PumpSetStatus
+import com.tirup.app.domain.model.SensorStatus
 import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.domain.model.TargetRanges
 import com.tirup.app.domain.model.ThemeMode
@@ -18,30 +26,69 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
+import java.io.BufferedInputStream
+import java.io.BufferedReader
+import java.io.BufferedWriter
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.FileReader
 import java.io.FileWriter
+import java.io.InputStream
+import java.io.InputStreamReader
+import java.io.OutputStreamWriter
+import java.io.StringReader
+import java.io.StringWriter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 
 data class BackupSummary(
-    val patientName: String,
-    val readingsCount: Int,
-    val exportedAt: Long,
-    val earliestTimestamp: Long,
-    val latestTimestamp: Long,
-    val diabetesType: String,
-    val backupFile: File
+    val patientName: String = "",
+    val readingsCount: Int = 0,
+    val exportedAt: Long = 0L,
+    val earliestTimestamp: Long = 0L,
+    val latestTimestamp: Long = 0L,
+    val diabetesType: String = "",
+    val backupFile: File? = null,
+    val treatmentsCount: Int = 0,
+    val backupLocation: String = "",
+    val hasSettings: Boolean = false
+)
+
+data class BackupRestoreResult(
+    val readingsRestored: Int,
+    val treatmentsRestored: Int,
+    val settingsRestored: Boolean
 )
 
 object AutoBackupManager {
 
     private const val TAG = "AutoBackupManager"
+    const val SETTINGS_FILE_NAME = "tirup_settings.json"
+    const val READINGS_FILE_NAME = "tirup_readings.csv"
+    const val TREATMENTS_FILE_NAME = "tirup_treatments.csv"
+    const val LEGACY_BACKUP_FILE_NAME = "tirup_backup.json"
     private const val BACKUP_DIR_NAME = "Backups"
-    private const val BACKUP_FILE_NAME = "tirup_backup.json"
-    private const val BACKUP_BAK_NAME = "tirup_backup.json.bak"
-    private const val BACKUP_TMP_NAME = "tirup_backup.json.tmp"
     private const val ALARM_REQUEST_CODE = 9021
 
-    fun getBackupDirectory(context: android.content.Context? = null): File {
+    fun getPublicBackupDirectory(): File {
+        val root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+        val dir = File(root, "TIRUp/$BACKUP_DIR_NAME")
+        if (!dir.exists()) {
+            try {
+                dir.mkdirs()
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not create public backup dir: ${e.message}")
+            }
+        }
+        return dir
+    }
+
+    fun getInternalBackupDirectory(context: Context? = null): File {
         if (context != null) {
             val dir = File(context.getExternalFilesDir(null), BACKUP_DIR_NAME)
             if (!dir.exists()) dir.mkdirs()
@@ -53,23 +100,28 @@ object AutoBackupManager {
         return dir
     }
 
-    fun getBackupFile(context: android.content.Context? = null): File {
-        return File(getBackupDirectory(context), BACKUP_FILE_NAME)
+    fun getBackupDirectory(context: Context? = null): File {
+        try {
+            val pub = getPublicBackupDirectory()
+            if (pub.exists() && pub.canWrite()) {
+                return pub
+            }
+        } catch (_: Exception) {}
+        return getInternalBackupDirectory(context)
     }
 
-    private fun getBakFile(context: android.content.Context? = null): File {
-        return File(getBackupDirectory(context), BACKUP_BAK_NAME)
-    }
-
-    private fun getTmpFile(context: android.content.Context? = null): File {
-        return File(getBackupDirectory(context), BACKUP_TMP_NAME)
+    fun getBackupFile(context: Context? = null): File {
+        val dir = getBackupDirectory(context)
+        val legacy = File(dir, LEGACY_BACKUP_FILE_NAME)
+        if (legacy.exists() && legacy.length() > 0L) return legacy
+        return File(dir, SETTINGS_FILE_NAME)
     }
 
     /**
      * Schedules exact 23:59:59 daily auto-backup alarm using AlarmManager.
      */
-    fun scheduleNextDailyBackup(context: android.content.Context) {
-        val alarmManager = context.getSystemService(android.content.Context.ALARM_SERVICE) as? android.app.AlarmManager ?: return
+    fun scheduleNextDailyBackup(context: Context) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? android.app.AlarmManager ?: return
         val intent = android.content.Intent(context, com.tirup.app.data.receiver.BackupAlarmReceiver::class.java)
         val pendingIntent = android.app.PendingIntent.getBroadcast(
             context,
@@ -132,8 +184,8 @@ object AutoBackupManager {
         }
     }
 
-    fun cancelDailyBackup(context: android.content.Context) {
-        val alarmManager = context.getSystemService(android.content.Context.ALARM_SERVICE) as? android.app.AlarmManager ?: return
+    fun cancelDailyBackup(context: Context) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? android.app.AlarmManager ?: return
         val intent = android.content.Intent(context, com.tirup.app.data.receiver.BackupAlarmReceiver::class.java)
         val pendingIntent = android.app.PendingIntent.getBroadcast(
             context,
@@ -148,43 +200,480 @@ object AutoBackupManager {
         }
     }
 
-    /**
-     * Self-healing: if the main backup file is missing or corrupted,
-     * but a valid .bak file exists, automatically restore .bak -> backup.json.
-     */
-    fun checkAndSelfHealBak(context: android.content.Context? = null): Boolean {
-        return try {
-            val mainFile = getBackupFile(context)
-            val bakFile = getBakFile(context)
+    private val backupMutex = Mutex()
 
-            if ((!mainFile.exists() || mainFile.length() == 0L) && bakFile.exists() && bakFile.length() > 0L) {
-                Log.w(TAG, "Main backup missing/empty. Self-healing from .bak file...")
-                if (mainFile.exists()) mainFile.delete()
-                bakFile.renameTo(mainFile)
-            } else {
-                false
+    private fun isDifferentDay(t1: Long, t2: Long): Boolean {
+        if (t1 <= 0L || t2 <= 0L) return true
+        val c1 = java.util.Calendar.getInstance().apply { timeInMillis = t1 }
+        val c2 = java.util.Calendar.getInstance().apply { timeInMillis = t2 }
+        return c1.get(java.util.Calendar.YEAR) != c2.get(java.util.Calendar.YEAR) ||
+               c1.get(java.util.Calendar.DAY_OF_YEAR) != c2.get(java.util.Calendar.DAY_OF_YEAR)
+    }
+
+    /**
+     * Checks if auto-backup is enabled and if backup should be executed.
+     */
+    suspend fun maybeTriggerAutoBackup(
+        context: Context? = null,
+        database: AppDatabase,
+        settingsRepository: SettingsRepository,
+        force: Boolean = false
+    ) = withContext(Dispatchers.IO) {
+        if (!backupMutex.tryLock()) return@withContext
+
+        try {
+            val settings = settingsRepository.getSettings().first()
+            if (!settings.isAutoBackupEnabled) return@withContext
+
+            val count = database.glucoseReadingDao().getTotalCount()
+            if (count == 0L) return@withContext
+
+            val now = System.currentTimeMillis()
+            val isMissedDay = isDifferentDay(now, settings.lastBackupTimestamp) && settings.lastBackupTimestamp > 0L
+
+            if (force || isMissedDay || settings.lastBackupTimestamp == 0L) {
+                val res = performBackup(context, database, settings)
+                if (res.isSuccess) {
+                    settingsRepository.updateSettings(settings.copy(lastBackupTimestamp = now))
+                }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Self-heal check failed: ${e.message}", e)
-            false
+            Log.e(TAG, "maybeTriggerAutoBackup error: ${e.message}")
+        } finally {
+            backupMutex.unlock()
         }
     }
 
     /**
-     * Reads a quick header summary of the backup file without loading all points into memory.
+     * Performs a complete backup:
+     * 1. Writes tirup_settings.json
+     * 2. Writes tirup_readings.csv
+     * 3. Writes tirup_treatments.csv
+     * 4. Writes legacy tirup_backup.json for backward compatibility
+     * Replicates to both Documents/TIRUp/Backups/ and Android/data/.../Backups/.
      */
-    fun getBackupSummary(context: android.content.Context? = null): BackupSummary? {
-        checkAndSelfHealBak(context)
-        var file = getBackupFile(context)
-        if (!file.exists() || file.length() == 0L) {
-            if (context != null) {
-                file = getBackupFile(null)
+    suspend fun performBackup(
+        context: Context? = null,
+        database: AppDatabase,
+        settings: UserSettings
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val pubDir = getPublicBackupDirectory()
+            val internalDir = getInternalBackupDirectory(context)
+            val primaryDir = if (pubDir.exists() && pubDir.canWrite()) pubDir else internalDir
+
+            val totalReadings = database.glucoseReadingDao().getTotalCount()
+            val totalTreatments = database.treatmentDao().getTotalCount()
+            val earliest = database.glucoseReadingDao().getEarliestTimestamp() ?: 0L
+            val latest = database.glucoseReadingDao().getLatestTimestamp() ?: 0L
+            val now = System.currentTimeMillis()
+
+            // 1. Write Settings JSON
+            val settingsFile = File(primaryDir, SETTINGS_FILE_NAME)
+            writeSettingsJsonFile(settingsFile, settings, now)
+
+            // 2. Write Readings CSV
+            val readingsFile = File(primaryDir, READINGS_FILE_NAME)
+            writeReadingsCsvFile(readingsFile, database, totalReadings)
+
+            // 3. Write Treatments CSV
+            val treatmentsFile = File(primaryDir, TREATMENTS_FILE_NAME)
+            writeTreatmentsCsvFile(treatmentsFile, database, totalTreatments)
+
+            // 4. Write Legacy Backup JSON (for full backward compatibility)
+            val legacyFile = File(primaryDir, LEGACY_BACKUP_FILE_NAME)
+            writeLegacyBackupJsonFile(legacyFile, database, settings, totalReadings, earliest, latest, now)
+
+            // 5. Mirror to internalDir if primaryDir is public
+            if (primaryDir.absolutePath != internalDir.absolutePath && internalDir.exists()) {
+                try {
+                    if (settingsFile.exists()) settingsFile.copyTo(File(internalDir, SETTINGS_FILE_NAME), overwrite = true)
+                    if (readingsFile.exists()) readingsFile.copyTo(File(internalDir, READINGS_FILE_NAME), overwrite = true)
+                    if (treatmentsFile.exists()) treatmentsFile.copyTo(File(internalDir, TREATMENTS_FILE_NAME), overwrite = true)
+                    if (legacyFile.exists()) legacyFile.copyTo(File(internalDir, LEGACY_BACKUP_FILE_NAME), overwrite = true)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Mirroring backup to internal storage encountered warning: ${e.message}")
+                }
             }
-            if (!file.exists() || file.length() == 0L) {
-                return null
+
+            Log.i(TAG, "Backup successfully completed: $totalReadings readings, $totalTreatments treatments in ${primaryDir.absolutePath}")
+            Result.success(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Backup failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    private fun writeSettingsJsonFile(file: File, settings: UserSettings, exportedAt: Long) {
+        val tmp = File(file.parentFile, file.name + ".tmp")
+        FileWriter(tmp).use { fw ->
+            JsonWriter(fw).use { writer ->
+                writer.setIndent("  ")
+                writer.beginObject()
+                writer.name("version").value(2)
+                writer.name("appName").value("TIRUp")
+                writer.name("exportedAt").value(exportedAt)
+                writer.name("settings")
+                writeSettingsObject(writer, settings)
+                writer.endObject()
             }
         }
+        if (file.exists()) file.delete()
+        tmp.renameTo(file)
+    }
 
+    private fun writeSettingsObject(writer: JsonWriter, settings: UserSettings) {
+        writer.beginObject()
+        writer.name("language").value(settings.language)
+        writer.name("unit").value(settings.unit.name)
+        writer.name("targetMode").value(settings.targetMode.name)
+        writer.name("periodDays").value(settings.periodDays)
+        writer.name("nightStartHour").value(settings.nightStartHour)
+        writer.name("nightEndHour").value(settings.nightEndHour)
+        writer.name("themeMode").value(settings.themeMode.name)
+
+        // Target Ranges
+        writer.name("targetRanges")
+        writer.beginObject()
+        writer.name("tirLowMmol").value(settings.targetRanges.tirLowMmol)
+        writer.name("tirHighMmol").value(settings.targetRanges.tirHighMmol)
+        writer.name("tingHighMmol").value(settings.targetRanges.tingHighMmol)
+        writer.name("tirGoalPercent").value(settings.targetRanges.tirGoalPercent)
+        writer.name("tingGoalPercent").value(settings.targetRanges.tingGoalPercent)
+        writer.endObject()
+
+        // Patient Profile
+        val p = settings.patientProfile
+        writer.name("patientProfile")
+        writer.beginObject()
+        writer.name("fullName").value(p.fullName)
+        writer.name("gender").value(p.gender)
+        writer.name("birthYear").value(p.birthYear)
+        writer.name("birthMonth").value(p.birthMonth)
+        writer.name("heightCm").value(p.heightCm)
+        writer.name("weightKg").value(p.weightKg)
+        writer.name("diabetesType").value(p.diabetesType)
+        writer.name("diagnosisYear").value(p.diagnosisYear)
+        writer.name("therapyType").value(p.therapyType)
+        writer.endObject()
+
+        writer.name("isAutoBackupEnabled").value(settings.isAutoBackupEnabled)
+        writer.name("isLockscreenNotificationEnabled").value(settings.isLockscreenNotificationEnabled)
+        writer.name("widgetBackgroundOpacity").value(settings.widgetBackgroundOpacity)
+        writer.name("isFloatingBubbleEnabled").value(settings.isFloatingBubbleEnabled)
+        writer.name("isFloatingBubbleAlwaysVisible").value(settings.isFloatingBubbleAlwaysVisible)
+
+        writer.name("isDeviceRemindersEnabled").value(settings.isDeviceRemindersEnabled)
+        writer.name("isSensorReminderEnabled").value(settings.isSensorReminderEnabled)
+        writer.name("isPumpReminderEnabled").value(settings.isPumpReminderEnabled)
+        writer.name("isLancetReminderEnabled").value(settings.isLancetReminderEnabled)
+
+        writer.name("sensorStatus")
+        writer.beginObject()
+        writer.name("installedAt").value(settings.sensorStatus.installedAt)
+        writer.name("durationDays").value(settings.sensorStatus.durationDays)
+        writer.name("lastUsedDurationDays").value(settings.sensorStatus.lastUsedDurationDays)
+        writer.endObject()
+
+        writer.name("pumpSetStatus")
+        writer.beginObject()
+        writer.name("installedAt").value(settings.pumpSetStatus.installedAt)
+        writer.name("durationDays").value(settings.pumpSetStatus.durationDays)
+        writer.name("lastUsedDurationDays").value(settings.pumpSetStatus.lastUsedDurationDays)
+        writer.endObject()
+
+        writer.name("lancetStatus")
+        writer.beginObject()
+        writer.name("installedAt").value(settings.lancetStatus.installedAt)
+        writer.name("durationDays").value(settings.lancetStatus.durationDays)
+        writer.name("lastUsedDurationDays").value(settings.lancetStatus.lastUsedDurationDays)
+        writer.endObject()
+
+        // Alert Settings
+        val a = settings.alertSettings
+        writer.name("alertSettings")
+        writer.beginObject()
+        writer.name("isAlertsMasterEnabled").value(a.isAlertsMasterEnabled)
+        writer.name("isPredictiveEnabled").value(a.isPredictiveEnabled)
+        writer.name("predictiveMinutesAhead").value(a.predictiveMinutesAhead)
+        writer.name("isPredictiveVibrate").value(a.isPredictiveVibrate)
+        writer.name("isPredictiveFlash").value(a.isPredictiveFlash)
+        writer.name("isMainEnabled").value(a.isMainEnabled)
+        writer.name("mainConsecutivePoints").value(a.mainConsecutivePoints)
+        writer.name("isMainVibrate").value(a.isMainVibrate)
+        writer.name("isMainFlash").value(a.isMainFlash)
+        writer.name("mainLowThresholdMmol").value(a.mainLowThresholdMmol)
+        writer.name("mainHighThresholdMmol").value(a.mainHighThresholdMmol)
+        writer.name("isCriticalEnabled").value(a.isCriticalEnabled)
+        writer.name("criticalHypoMinutes").value(a.criticalHypoMinutes)
+        writer.name("criticalHyperMinutes").value(a.criticalHyperMinutes)
+        writer.name("isCriticalVibrate").value(a.isCriticalVibrate)
+        writer.name("isCriticalFlash").value(a.isCriticalFlash)
+        writer.name("criticalHypoPauseUntilTimestamp").value(a.criticalHypoPauseUntilTimestamp)
+        writer.name("isCriticalHypoPermanentDisabled").value(a.isCriticalHypoPermanentDisabled)
+        writer.name("isSignalLossEnabled").value(a.isSignalLossEnabled)
+        writer.name("signalLossMinutes").value(a.signalLossMinutes)
+        writer.name("isSignalLossVibrate").value(a.isSignalLossVibrate)
+        writer.name("isSignalLossFlash").value(a.isSignalLossFlash)
+        writer.name("snoozeHypoMinutes").value(a.snoozeHypoMinutes)
+        writer.name("snoozeHyperMinutes").value(a.snoozeHyperMinutes)
+        writer.name("isLastChanceAlertEnabled").value(a.isLastChanceAlertEnabled)
+        writer.name("lastChanceBufferMinutes").value(a.lastChanceBufferMinutes)
+        writer.name("isEmergencySmsEnabled").value(a.isEmergencySmsEnabled)
+        writer.name("emergencyContactPhone").value(a.emergencyContactPhone)
+        writer.name("emergencyContactName").value(a.emergencyContactName)
+        writer.name("secondaryEmergencyContactPhone").value(a.secondaryEmergencyContactPhone)
+        writer.name("secondaryEmergencyContactName").value(a.secondaryEmergencyContactName)
+        writer.name("emergencySmsDelayMinutes").value(a.emergencySmsDelayMinutes)
+        writer.name("includeLocationInEmergencySms").value(a.includeLocationInEmergencySms)
+        writer.name("lastEmergencySmsTimestamp").value(a.lastEmergencySmsTimestamp)
+        writer.name("isSmsQueryReplyEnabled").value(a.isSmsQueryReplyEnabled)
+        writer.endObject()
+
+        // BLE Bridge Settings
+        val ble = settings.bleBridgeSettings
+        writer.name("bleBridgeSettings")
+        writer.beginObject()
+        writer.name("role").value(ble.role.name)
+        writer.name("isEnabled").value(ble.isEnabled)
+        writer.name("familyPin").value(ble.familyPin)
+        writer.name("transmitBattery").value(ble.transmitBattery)
+        writer.endObject()
+
+        writer.endObject()
+    }
+
+    private suspend fun writeReadingsCsvFile(file: File, database: AppDatabase, totalCount: Long) {
+        val tmp = File(file.parentFile, file.name + ".tmp")
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+        val pageSize = 5000
+        var offset = 0
+
+        FileWriter(tmp).use { fw ->
+            val bw = BufferedWriter(fw, 32768)
+            bw.write("Timestamp,DateTime,Glucose_mmol,TrendArrow,IOB,COB\n")
+            while (offset < totalCount) {
+                val page = database.glucoseReadingDao().getReadingsPaginated(limit = pageSize, offset = offset)
+                if (page.isEmpty()) break
+                for (r in page) {
+                    val dt = dateFormat.format(Date(r.timestamp))
+                    val arrow = r.trendArrow ?: ""
+                    val iob = r.iob?.toString() ?: ""
+                    val cob = r.cob?.toString() ?: ""
+                    bw.write("${r.timestamp},$dt,${r.valueMmol},$arrow,$iob,$cob\n")
+                }
+                offset += page.size
+            }
+            bw.flush()
+        }
+        if (file.exists()) file.delete()
+        tmp.renameTo(file)
+    }
+
+    private suspend fun writeTreatmentsCsvFile(file: File, database: AppDatabase, totalCount: Long) {
+        val tmp = File(file.parentFile, file.name + ".tmp")
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+        val pageSize = 1000
+        var offset = 0
+
+        FileWriter(tmp).use { fw ->
+            val bw = BufferedWriter(fw, 16384)
+            bw.write("Timestamp,DateTime,InsulinUnits,CarbsGrams,Notes,Source\n")
+            while (offset < totalCount) {
+                val page = database.treatmentDao().getTreatmentsPaginated(limit = pageSize, offset = offset)
+                if (page.isEmpty()) break
+                for (t in page) {
+                    val dt = dateFormat.format(Date(t.timestamp))
+                    val ins = t.insulinUnits?.toString() ?: ""
+                    val carbs = t.carbsGrams?.toString() ?: ""
+                    val notes = escapeCsv(t.notes ?: "")
+                    val src = escapeCsv(t.source)
+                    bw.write("${t.timestamp},$dt,$ins,$carbs,$notes,$src\n")
+                }
+                offset += page.size
+            }
+            bw.flush()
+        }
+        if (file.exists()) file.delete()
+        tmp.renameTo(file)
+    }
+
+    private suspend fun writeLegacyBackupJsonFile(
+        file: File,
+        database: AppDatabase,
+        settings: UserSettings,
+        totalCount: Long,
+        earliest: Long,
+        latest: Long,
+        now: Long
+    ) {
+        val tmp = File(file.parentFile, file.name + ".tmp")
+        FileWriter(tmp).use { fw ->
+            JsonWriter(fw).use { writer ->
+                writer.setIndent("  ")
+                writer.beginObject()
+                writer.name("version").value(1)
+                writer.name("appName").value("TIRUp")
+                writer.name("exportedAt").value(now)
+                writer.name("readingsCount").value(totalCount)
+                writer.name("earliestTimestamp").value(earliest)
+                writer.name("latestTimestamp").value(latest)
+
+                writer.name("settings")
+                writeSettingsObject(writer, settings)
+
+                writer.name("readings")
+                writer.beginArray()
+                val pageSize = 5000
+                var offset = 0
+                while (offset < totalCount) {
+                    val page = database.glucoseReadingDao().getReadingsPaginated(limit = pageSize, offset = offset)
+                    if (page.isEmpty()) break
+                    page.forEach { r ->
+                        writer.beginObject()
+                        writer.name("t").value(r.timestamp)
+                        writer.name("v").value(r.valueMmol)
+                        if (!r.trendArrow.isNullOrEmpty()) writer.name("a").value(r.trendArrow)
+                        if (r.iob != null) writer.name("iob").value(r.iob)
+                        if (r.cob != null) writer.name("cob").value(r.cob)
+                        writer.endObject()
+                    }
+                    offset += page.size
+                }
+                writer.endArray()
+                writer.endObject()
+            }
+        }
+        if (file.exists()) file.delete()
+        tmp.renameTo(file)
+    }
+
+    private fun escapeCsv(value: String): String {
+        if (value.isEmpty()) return ""
+        if (value.contains(',') || value.contains('"') || value.contains('\n') || value.contains('\r')) {
+            return "\"" + value.replace("\"", "\"\"") + "\""
+        }
+        return value
+    }
+
+    /**
+     * Reads quick header summary from the backup directory.
+     */
+    fun getBackupSummary(context: Context? = null): BackupSummary? {
+        val pubDir = getPublicBackupDirectory()
+        val intDir = getInternalBackupDirectory(context)
+
+        val candidateDirs = listOf(pubDir, intDir).distinctBy { it.absolutePath }
+        for (dir in candidateDirs) {
+            val settingsFile = File(dir, SETTINGS_FILE_NAME)
+            val readingsFile = File(dir, READINGS_FILE_NAME)
+            val legacyFile = File(dir, LEGACY_BACKUP_FILE_NAME)
+
+            if (settingsFile.exists() && settingsFile.length() > 0L) {
+                val summary = readSummaryFromFiles(dir, settingsFile, readingsFile)
+                if (summary != null) return summary
+            }
+
+            if (legacyFile.exists() && legacyFile.length() > 0L) {
+                val summary = readSummaryFromLegacyJson(legacyFile)
+                if (summary != null) return summary
+            }
+        }
+        return null
+    }
+
+    private fun readSummaryFromFiles(dir: File, settingsFile: File, readingsFile: File): BackupSummary? {
+        return try {
+            var patientName = ""
+            var diabetesType = ""
+            var exportedAt = settingsFile.lastModified()
+
+            FileReader(settingsFile).use { fr ->
+                JsonReader(fr).use { reader ->
+                    reader.beginObject()
+                    while (reader.hasNext()) {
+                        when (reader.nextName()) {
+                            "exportedAt" -> exportedAt = reader.nextLong()
+                            "settings" -> {
+                                reader.beginObject()
+                                while (reader.hasNext()) {
+                                    if (reader.nextName() == "patientProfile") {
+                                        reader.beginObject()
+                                        while (reader.hasNext()) {
+                                            when (reader.nextName()) {
+                                                "fullName" -> patientName = reader.nextString()
+                                                "diabetesType" -> diabetesType = reader.nextString()
+                                                else -> reader.skipValue()
+                                            }
+                                        }
+                                        reader.endObject()
+                                    } else {
+                                        reader.skipValue()
+                                    }
+                                }
+                                reader.endObject()
+                            }
+                            else -> reader.skipValue()
+                        }
+                    }
+                    reader.endObject()
+                }
+            }
+
+            var readingsCount = 0
+            var earliest = 0L
+            var latest = 0L
+            if (readingsFile.exists() && readingsFile.length() > 0L) {
+                BufferedReader(FileReader(readingsFile)).use { br ->
+                    br.readLine() // Header
+                    var isFirst = true
+                    while (true) {
+                        val line = br.readLine() ?: break
+                        if (line.isNotBlank()) {
+                            readingsCount++
+                            val ts = line.substringBefore(',').toLongOrNull()
+                            if (ts != null && ts > 0L) {
+                                if (isFirst) {
+                                    earliest = ts
+                                    isFirst = false
+                                }
+                                latest = ts
+                            }
+                        }
+                    }
+                }
+            }
+
+            var treatmentsCount = 0
+            val treatFile = File(dir, TREATMENTS_FILE_NAME)
+            if (treatFile.exists() && treatFile.length() > 0L) {
+                BufferedReader(FileReader(treatFile)).use { br ->
+                    br.readLine() // Header
+                    while (br.readLine() != null) {
+                        treatmentsCount++
+                    }
+                }
+            }
+
+            BackupSummary(
+                patientName = patientName,
+                readingsCount = readingsCount,
+                treatmentsCount = treatmentsCount,
+                exportedAt = exportedAt,
+                earliestTimestamp = earliest,
+                latestTimestamp = latest,
+                diabetesType = diabetesType,
+                backupFile = settingsFile,
+                backupLocation = dir.absolutePath,
+                hasSettings = true
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "readSummaryFromFiles error: ${e.message}")
+            null
+        }
+    }
+
+    private fun readSummaryFromLegacyJson(file: File): BackupSummary? {
         return try {
             var patientName = ""
             var diabetesType = ""
@@ -231,285 +720,658 @@ object AutoBackupManager {
             BackupSummary(
                 patientName = patientName,
                 readingsCount = readingsCount,
+                treatmentsCount = 0,
                 exportedAt = exportedAt,
                 earliestTimestamp = earliest,
                 latestTimestamp = latest,
                 diabetesType = diabetesType,
-                backupFile = file
+                backupFile = file,
+                backupLocation = file.parent ?: "",
+                hasSettings = true
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to read backup summary: ${e.message}", e)
+            Log.e(TAG, "readSummaryFromLegacyJson error: ${e.message}")
             null
         }
     }
 
     /**
-     * Performs an atomic transactional backup:
-     * 1. Backup existing tirup_backup.json -> tirup_backup.json.bak
-     * 2. Write new accumulation data to tirup_backup.json.tmp
-     * 3. Rename .tmp -> tirup_backup.json
-     * 4. Verify file is valid, then remove .bak
+     * Creates a ZIP archive containing tirup_settings.json, tirup_readings.csv, and tirup_treatments.csv.
+     * The file is created in context.cacheDir/backups/ and ready to be shared via FileProvider or saved to SAF.
      */
-    suspend fun performBackup(
-        context: android.content.Context? = null,
+    suspend fun createZipBackup(
+        context: Context,
         database: AppDatabase,
         settings: UserSettings
-    ): Result<Boolean> = withContext(Dispatchers.IO) {
-        try {
-            val dir = getBackupDirectory(context)
-            if (!dir.exists()) {
-                dir.mkdirs()
+    ): File = withContext(Dispatchers.IO) {
+        val cacheDir = File(context.cacheDir, "backups")
+        if (!cacheDir.exists()) cacheDir.mkdirs()
+
+        val dateStr = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
+        val zipFile = File(cacheDir, "tirup_backup_$dateStr.zip")
+        if (zipFile.exists()) zipFile.delete()
+
+        ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
+            // 1. Settings JSON
+            zos.putNextEntry(ZipEntry(SETTINGS_FILE_NAME))
+            val sw = StringWriter()
+            JsonWriter(sw).use { jw ->
+                jw.setIndent("  ")
+                jw.beginObject()
+                jw.name("version").value(2)
+                jw.name("appName").value("TIRUp")
+                jw.name("exportedAt").value(System.currentTimeMillis())
+                jw.name("settings")
+                writeSettingsObject(jw, settings)
+                jw.endObject()
             }
+            zos.write(sw.toString().toByteArray(Charsets.UTF_8))
+            zos.closeEntry()
 
-            val mainFile = getBackupFile(context)
-            val bakFile = getBakFile(context)
-            val tmpFile = getTmpFile(context)
-
-            // Step 1: Backup current file to .bak if exists
-            if (mainFile.exists() && mainFile.length() > 0L) {
-                if (bakFile.exists()) bakFile.delete()
-                mainFile.copyTo(bakFile, overwrite = true)
+            // 2. Readings CSV
+            zos.putNextEntry(ZipEntry(READINGS_FILE_NAME))
+            val readingsBw = BufferedWriter(OutputStreamWriter(zos, Charsets.UTF_8))
+            readingsBw.write("Timestamp,DateTime,Glucose_mmol,TrendArrow,IOB,COB\n")
+            val totalReadings = database.glucoseReadingDao().getTotalCount()
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+            var offset = 0
+            while (offset < totalReadings) {
+                val page = database.glucoseReadingDao().getReadingsPaginated(limit = 5000, offset = offset)
+                if (page.isEmpty()) break
+                for (r in page) {
+                    val dt = dateFormat.format(Date(r.timestamp))
+                    readingsBw.write("${r.timestamp},$dt,${r.valueMmol},${r.trendArrow ?: ""},${r.iob ?: ""},${r.cob ?: ""}\n")
+                }
+                offset += page.size
             }
+            readingsBw.flush()
+            zos.closeEntry()
 
-            // Step 2: Query metadata without loading all entities into RAM (prevents OOM on large datasets)
-            val totalCount = database.glucoseReadingDao().getTotalCount()
-            val earliest = database.glucoseReadingDao().getEarliestTimestamp() ?: 0L
-            val latest = database.glucoseReadingDao().getLatestTimestamp() ?: 0L
-            val now = System.currentTimeMillis()
-
-            // Step 3: Stream write to tmp file
-            if (tmpFile.exists()) tmpFile.delete()
-
-            FileWriter(tmpFile).use { fw ->
-                JsonWriter(fw).use { writer ->
-                    writer.setIndent("  ")
-                    writer.beginObject()
-
-                    writer.name("version").value(1)
-                    writer.name("appName").value("TIRUp")
-                    writer.name("exportedAt").value(now)
-                    writer.name("readingsCount").value(totalCount)
-                    writer.name("earliestTimestamp").value(earliest)
-                    writer.name("latestTimestamp").value(latest)
-
-                    // User Settings
-                    writer.name("settings")
-                    writer.beginObject()
-                    writer.name("language").value(settings.language)
-                    writer.name("unit").value(settings.unit.name)
-                    writer.name("targetMode").value(settings.targetMode.name)
-                    writer.name("periodDays").value(settings.periodDays)
-                    writer.name("nightStartHour").value(settings.nightStartHour)
-                    writer.name("nightEndHour").value(settings.nightEndHour)
-                    writer.name("themeMode").value(settings.themeMode.name)
-
-                    // Target Ranges
-                    writer.name("targetRanges")
-                    writer.beginObject()
-                    writer.name("tirLowMmol").value(settings.targetRanges.tirLowMmol)
-                    writer.name("tirHighMmol").value(settings.targetRanges.tirHighMmol)
-                    writer.name("tingHighMmol").value(settings.targetRanges.tingHighMmol)
-                    writer.name("tirGoalPercent").value(settings.targetRanges.tirGoalPercent)
-                    writer.name("tingGoalPercent").value(settings.targetRanges.tingGoalPercent)
-                    writer.endObject()
-
-                    // Patient Profile
-                    val p = settings.patientProfile
-                    writer.name("patientProfile")
-                    writer.beginObject()
-                    writer.name("fullName").value(p.fullName)
-                    writer.name("gender").value(p.gender)
-                    writer.name("birthYear").value(p.birthYear)
-                    writer.name("birthMonth").value(p.birthMonth)
-                    writer.name("heightCm").value(p.heightCm)
-                    writer.name("weightKg").value(p.weightKg)
-                    writer.name("diabetesType").value(p.diabetesType)
-                    writer.name("diagnosisYear").value(p.diagnosisYear)
-                    writer.name("therapyType").value(p.therapyType)
-                    writer.endObject()
-
-                    writer.name("isAutoBackupEnabled").value(settings.isAutoBackupEnabled)
-                    writer.name("isLockscreenNotificationEnabled").value(settings.isLockscreenNotificationEnabled)
-                    writer.name("widgetBackgroundOpacity").value(settings.widgetBackgroundOpacity)
-                    writer.name("isFloatingBubbleEnabled").value(settings.isFloatingBubbleEnabled)
-                    writer.name("isFloatingBubbleAlwaysVisible").value(settings.isFloatingBubbleAlwaysVisible)
-
-                    writer.name("isDeviceRemindersEnabled").value(settings.isDeviceRemindersEnabled)
-                    writer.name("isSensorReminderEnabled").value(settings.isSensorReminderEnabled)
-                    writer.name("isPumpReminderEnabled").value(settings.isPumpReminderEnabled)
-                    writer.name("isLancetReminderEnabled").value(settings.isLancetReminderEnabled)
-
-                    writer.name("sensorStatus")
-                    writer.beginObject()
-                    writer.name("installedAt").value(settings.sensorStatus.installedAt)
-                    writer.name("durationDays").value(settings.sensorStatus.durationDays)
-                    writer.name("lastUsedDurationDays").value(settings.sensorStatus.lastUsedDurationDays)
-                    writer.endObject()
-
-                    writer.name("pumpSetStatus")
-                    writer.beginObject()
-                    writer.name("installedAt").value(settings.pumpSetStatus.installedAt)
-                    writer.name("durationDays").value(settings.pumpSetStatus.durationDays)
-                    writer.name("lastUsedDurationDays").value(settings.pumpSetStatus.lastUsedDurationDays)
-                    writer.endObject()
-
-                    writer.name("lancetStatus")
-                    writer.beginObject()
-                    writer.name("installedAt").value(settings.lancetStatus.installedAt)
-                    writer.name("durationDays").value(settings.lancetStatus.durationDays)
-                    writer.name("lastUsedDurationDays").value(settings.lancetStatus.lastUsedDurationDays)
-                    writer.endObject()
-
-                    // Alert Settings
-                    val a = settings.alertSettings
-                    writer.name("alertSettings")
-                    writer.beginObject()
-                    writer.name("isAlertsMasterEnabled").value(a.isAlertsMasterEnabled)
-                    writer.name("isPredictiveEnabled").value(a.isPredictiveEnabled)
-                    writer.name("predictiveMinutesAhead").value(a.predictiveMinutesAhead)
-                    writer.name("isPredictiveVibrate").value(a.isPredictiveVibrate)
-                    writer.name("isPredictiveFlash").value(a.isPredictiveFlash)
-                    writer.name("isMainEnabled").value(a.isMainEnabled)
-                    writer.name("mainConsecutivePoints").value(a.mainConsecutivePoints)
-                    writer.name("isMainVibrate").value(a.isMainVibrate)
-                    writer.name("isMainFlash").value(a.isMainFlash)
-                    writer.name("mainLowThresholdMmol").value(a.mainLowThresholdMmol)
-                    writer.name("mainHighThresholdMmol").value(a.mainHighThresholdMmol)
-                    writer.name("isCriticalEnabled").value(a.isCriticalEnabled)
-                    writer.name("criticalHypoMinutes").value(a.criticalHypoMinutes)
-                    writer.name("criticalHyperMinutes").value(a.criticalHyperMinutes)
-                    writer.name("isCriticalVibrate").value(a.isCriticalVibrate)
-                    writer.name("isCriticalFlash").value(a.isCriticalFlash)
-                    writer.name("criticalHypoPauseUntilTimestamp").value(a.criticalHypoPauseUntilTimestamp)
-                    writer.name("isCriticalHypoPermanentDisabled").value(a.isCriticalHypoPermanentDisabled)
-                    writer.name("isSignalLossEnabled").value(a.isSignalLossEnabled)
-                    writer.name("signalLossMinutes").value(a.signalLossMinutes)
-                    writer.name("isSignalLossVibrate").value(a.isSignalLossVibrate)
-                    writer.name("isSignalLossFlash").value(a.isSignalLossFlash)
-                    writer.name("snoozeHypoMinutes").value(a.snoozeHypoMinutes)
-                    writer.name("snoozeHyperMinutes").value(a.snoozeHyperMinutes)
-                    writer.name("isLastChanceAlertEnabled").value(a.isLastChanceAlertEnabled)
-                    writer.name("lastChanceBufferMinutes").value(a.lastChanceBufferMinutes)
-                    writer.endObject()
-
-                    writer.endObject() // end settings
-
-                    // Readings array - streamed in pages of 5000 to prevent OOM
-                    writer.name("readings")
-                    writer.beginArray()
-                    val pageSize = 5000
-                    var offset = 0
-                    while (offset < totalCount) {
-                        val page = database.glucoseReadingDao().getReadingsPaginated(limit = pageSize, offset = offset)
-                        if (page.isEmpty()) break
-                        page.forEach { r ->
-                            writer.beginObject()
-                            writer.name("t").value(r.timestamp)
-                            writer.name("v").value(r.valueMmol)
-                            if (!r.trendArrow.isNullOrEmpty()) writer.name("a").value(r.trendArrow)
-                            if (r.iob != null) writer.name("iob").value(r.iob)
-                            if (r.cob != null) writer.name("cob").value(r.cob)
-                            writer.endObject()
-                        }
-                        offset += page.size
+            // 3. Treatments CSV
+            val totalTreatments = database.treatmentDao().getTotalCount()
+            if (totalTreatments > 0) {
+                zos.putNextEntry(ZipEntry(TREATMENTS_FILE_NAME))
+                val treatBw = BufferedWriter(OutputStreamWriter(zos, Charsets.UTF_8))
+                treatBw.write("Timestamp,DateTime,InsulinUnits,CarbsGrams,Notes,Source\n")
+                var tOffset = 0
+                while (tOffset < totalTreatments) {
+                    val page = database.treatmentDao().getTreatmentsPaginated(limit = 1000, offset = tOffset)
+                    if (page.isEmpty()) break
+                    for (t in page) {
+                        val dt = dateFormat.format(Date(t.timestamp))
+                        treatBw.write("${t.timestamp},$dt,${t.insulinUnits ?: ""},${t.carbsGrams ?: ""},${escapeCsv(t.notes ?: "")},${escapeCsv(t.source)}\n")
                     }
-                    writer.endArray()
-
-                    writer.endObject() // end root
+                    tOffset += page.size
                 }
+                treatBw.flush()
+                zos.closeEntry()
             }
-
-            // Step 4: Atomic swap
-            if (mainFile.exists()) mainFile.delete()
-            val renamed = tmpFile.renameTo(mainFile)
-            if (!renamed || !mainFile.exists() || mainFile.length() == 0L) {
-                // Rollback from .bak if rename failed
-                if (bakFile.exists()) {
-                    bakFile.renameTo(mainFile)
-                }
-                throw IllegalStateException("Failed to finalize backup file")
-            }
-
-            // Step 5: Success! Delete temporary .bak
-            if (bakFile.exists()) {
-                bakFile.delete()
-            }
-
-            Log.i(TAG, "Auto-backup successfully saved $totalCount readings to ${mainFile.absolutePath}")
-            Result.success(true)
-        } catch (e: Exception) {
-            Log.e(TAG, "Auto-backup failed: ${e.message}", e)
-            Result.failure(e)
         }
-    }
-
-    private val backupMutex = Mutex()
-
-    private fun isDifferentDay(t1: Long, t2: Long): Boolean {
-        if (t1 <= 0L || t2 <= 0L) return true
-        val c1 = java.util.Calendar.getInstance().apply { timeInMillis = t1 }
-        val c2 = java.util.Calendar.getInstance().apply { timeInMillis = t2 }
-        return c1.get(java.util.Calendar.YEAR) != c2.get(java.util.Calendar.YEAR) ||
-               c1.get(java.util.Calendar.DAY_OF_YEAR) != c2.get(java.util.Calendar.DAY_OF_YEAR)
+        zipFile
     }
 
     /**
-     * Checks if auto-backup is enabled and if backup should be executed:
-     * - If forced (e.g. 23:59:59 alarm or profile update)
-     * - Or if a previous day's backup was missed (e.g. phone was off at 23:59:59)
-     * - Or if it's the very first backup
+     * Inspects a backup file chosen by user (ZIP, JSON or CSV) without full loading into database.
      */
-    suspend fun maybeTriggerAutoBackup(
-        context: android.content.Context? = null,
-        database: AppDatabase,
-        settingsRepository: SettingsRepository,
-        force: Boolean = false
-    ) = withContext(Dispatchers.IO) {
-        if (!backupMutex.tryLock()) return@withContext
-
+    suspend fun inspectBackupUri(context: Context, uri: Uri): BackupSummary? = withContext(Dispatchers.IO) {
         try {
-            val settings = settingsRepository.getSettings().first()
-            if (!settings.isAutoBackupEnabled) return@withContext
+            val inputStream = context.contentResolver.openInputStream(uri) ?: return@withContext null
+            val bufferedIn = BufferedInputStream(inputStream, 65536)
+            bufferedIn.mark(32)
+            val header = ByteArray(16)
+            val readBytes = bufferedIn.read(header, 0, 16)
+            bufferedIn.reset()
 
-            val count = database.glucoseReadingDao().getTotalCount()
-            if (count == 0L) return@withContext
+            val isZip = readBytes >= 4 &&
+                    header[0] == 0x50.toByte() &&
+                    header[1] == 0x4B.toByte() &&
+                    header[2] == 0x03.toByte() &&
+                    header[3] == 0x04.toByte()
 
-            val now = System.currentTimeMillis()
-            val isMissedDay = isDifferentDay(now, settings.lastBackupTimestamp) && settings.lastBackupTimestamp > 0L
-
-            if (force || isMissedDay || settings.lastBackupTimestamp == 0L) {
-                val res = performBackup(context, database, settings)
-                if (res.isSuccess) {
-                    settingsRepository.updateSettings(settings.copy(lastBackupTimestamp = now))
-                }
+            if (isZip) {
+                inspectZipBackup(bufferedIn)
+            } else {
+                inspectFlatBackup(bufferedIn)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "maybeTriggerAutoBackup error: ${e.message}")
-        } finally {
-            backupMutex.unlock()
+            Log.e(TAG, "inspectBackupUri error: ${e.message}", e)
+            null
+        }
+    }
+
+    private fun inspectZipBackup(inputStream: InputStream): BackupSummary? {
+        var patientName = ""
+        var diabetesType = ""
+        var readingsCount = 0
+        var treatmentsCount = 0
+        var exportedAt = 0L
+        var earliest = 0L
+        var latest = 0L
+        var hasSettings = false
+
+        ZipInputStream(inputStream).use { zis ->
+            var entry: ZipEntry? = zis.nextEntry
+            while (entry != null) {
+                val name = entry.name.substringAfterLast('/')
+                when {
+                    name.equals(SETTINGS_FILE_NAME, ignoreCase = true) -> {
+                        hasSettings = true
+                        val content = zis.readBytes().toString(Charsets.UTF_8)
+                        JsonReader(StringReader(content)).use { reader ->
+                            reader.beginObject()
+                            while (reader.hasNext()) {
+                                when (reader.nextName()) {
+                                    "exportedAt" -> exportedAt = reader.nextLong()
+                                    "settings" -> {
+                                        reader.beginObject()
+                                        while (reader.hasNext()) {
+                                            if (reader.nextName() == "patientProfile") {
+                                                reader.beginObject()
+                                                while (reader.hasNext()) {
+                                                    when (reader.nextName()) {
+                                                        "fullName" -> patientName = reader.nextString()
+                                                        "diabetesType" -> diabetesType = reader.nextString()
+                                                        else -> reader.skipValue()
+                                                    }
+                                                }
+                                                reader.endObject()
+                                            } else {
+                                                reader.skipValue()
+                                            }
+                                        }
+                                        reader.endObject()
+                                    }
+                                    else -> reader.skipValue()
+                                }
+                            }
+                            reader.endObject()
+                        }
+                    }
+                    name.equals(READINGS_FILE_NAME, ignoreCase = true) -> {
+                        val br = BufferedReader(InputStreamReader(zis, Charsets.UTF_8))
+                        br.readLine() // Header
+                        var isFirst = true
+                        while (true) {
+                            val line = br.readLine() ?: break
+                            if (line.isNotBlank()) {
+                                readingsCount++
+                                val ts = line.substringBefore(',').toLongOrNull()
+                                if (ts != null && ts > 0L) {
+                                    if (isFirst) {
+                                        earliest = ts
+                                        isFirst = false
+                                    }
+                                    latest = ts
+                                }
+                            }
+                        }
+                    }
+                    name.equals(TREATMENTS_FILE_NAME, ignoreCase = true) -> {
+                        val br = BufferedReader(InputStreamReader(zis, Charsets.UTF_8))
+                        br.readLine() // Header
+                        while (br.readLine() != null) {
+                            treatmentsCount++
+                        }
+                    }
+                }
+                zis.closeEntry()
+                entry = zis.nextEntry
+            }
+        }
+
+        return BackupSummary(
+            patientName = patientName,
+            readingsCount = readingsCount,
+            treatmentsCount = treatmentsCount,
+            exportedAt = exportedAt,
+            earliestTimestamp = earliest,
+            latestTimestamp = latest,
+            diabetesType = diabetesType,
+            backupLocation = "ZIP Archive",
+            hasSettings = hasSettings
+        )
+    }
+
+    private fun inspectFlatBackup(inputStream: InputStream): BackupSummary? {
+        val br = BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8))
+        br.mark(2048)
+        val firstChar = br.read().toChar()
+        br.reset()
+
+        if (firstChar == '{') {
+            // JSON backup
+            return try {
+                var patientName = ""
+                var diabetesType = ""
+                var readingsCount = 0
+                var exportedAt = 0L
+                var earliest = 0L
+                var latest = 0L
+                var hasSettings = false
+
+                JsonReader(br).use { reader ->
+                    reader.beginObject()
+                    while (reader.hasNext()) {
+                        when (reader.nextName()) {
+                            "exportedAt" -> exportedAt = reader.nextLong()
+                            "readingsCount" -> readingsCount = reader.nextInt()
+                            "earliestTimestamp" -> earliest = reader.nextLong()
+                            "latestTimestamp" -> latest = reader.nextLong()
+                            "settings" -> {
+                                hasSettings = true
+                                reader.beginObject()
+                                while (reader.hasNext()) {
+                                    if (reader.nextName() == "patientProfile") {
+                                        reader.beginObject()
+                                        while (reader.hasNext()) {
+                                            when (reader.nextName()) {
+                                                "fullName" -> patientName = reader.nextString()
+                                                "diabetesType" -> diabetesType = reader.nextString()
+                                                else -> reader.skipValue()
+                                            }
+                                        }
+                                        reader.endObject()
+                                    } else {
+                                        reader.skipValue()
+                                    }
+                                }
+                                reader.endObject()
+                            }
+                            "readings" -> {
+                                reader.beginArray()
+                                while (reader.hasNext()) {
+                                    readingsCount++
+                                    reader.skipValue()
+                                }
+                                reader.endArray()
+                            }
+                            else -> reader.skipValue()
+                        }
+                    }
+                    reader.endObject()
+                }
+
+                BackupSummary(
+                    patientName = patientName,
+                    readingsCount = readingsCount,
+                    treatmentsCount = 0,
+                    exportedAt = exportedAt,
+                    earliestTimestamp = earliest,
+                    latestTimestamp = latest,
+                    diabetesType = diabetesType,
+                    backupLocation = "JSON File",
+                    hasSettings = hasSettings
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "inspect JSON error: ${e.message}")
+                null
+            }
+        } else {
+            // CSV backup
+            val line = br.readLine() ?: return null
+            var count = 0
+            val isReadings = line.contains("Glucose", ignoreCase = true) || line.contains("BG", ignoreCase = true)
+            while (br.readLine() != null) {
+                count++
+            }
+            return BackupSummary(
+                readingsCount = if (isReadings) count else 0,
+                treatmentsCount = if (!isReadings) count else 0,
+                backupLocation = "CSV File",
+                hasSettings = false
+            )
         }
     }
 
     /**
-     * Restores patient settings and all glucose readings from the backup file into AppDatabase.
+     * Restores backup from a local folder or default location (for backward compatibility).
      */
     suspend fun restoreBackup(
-        context: android.content.Context? = null,
+        context: Context? = null,
         database: AppDatabase,
         settingsRepository: SettingsRepository
     ): Result<Int> = withContext(Dispatchers.IO) {
         try {
-            checkAndSelfHealBak(context)
-            var file = getBackupFile(context)
-            if (!file.exists() || file.length() == 0L) {
-                if (context != null) {
-                    file = getBackupFile(null)
+            val pubDir = getPublicBackupDirectory()
+            val intDir = getInternalBackupDirectory(context)
+            val candidateDirs = listOf(pubDir, intDir).distinctBy { it.absolutePath }
+
+            for (dir in candidateDirs) {
+                val settingsFile = File(dir, SETTINGS_FILE_NAME)
+                val readingsFile = File(dir, READINGS_FILE_NAME)
+                val treatmentsFile = File(dir, TREATMENTS_FILE_NAME)
+                val legacyFile = File(dir, LEGACY_BACKUP_FILE_NAME)
+
+                if (settingsFile.exists() || readingsFile.exists()) {
+                    var restoredCount = 0
+                    if (settingsFile.exists() && settingsFile.length() > 0L) {
+                        FileReader(settingsFile).use { fr ->
+                            JsonReader(fr).use { reader ->
+                                reader.beginObject()
+                                while (reader.hasNext()) {
+                                    if (reader.nextName() == "settings") {
+                                        val s = parseSettings(reader)
+                                        applySettings(s, settingsRepository)
+                                    } else {
+                                        reader.skipValue()
+                                    }
+                                }
+                                reader.endObject()
+                            }
+                        }
+                    }
+
+                    if (readingsFile.exists() && readingsFile.length() > 0L) {
+                        restoredCount = restoreReadingsFromCsvStream(FileInputStream(readingsFile), database)
+                    }
+
+                    if (treatmentsFile.exists() && treatmentsFile.length() > 0L) {
+                        restoreTreatmentsFromCsvStream(FileInputStream(treatmentsFile), database)
+                    }
+
+                    return@withContext Result.success(restoredCount)
+                }
+
+                if (legacyFile.exists() && legacyFile.length() > 0L) {
+                    val res = restoreLegacyJson(legacyFile, database, settingsRepository)
+                    if (res.isSuccess) return@withContext res
                 }
             }
-            if (!file.exists() || file.length() == 0L) {
-                return@withContext Result.failure(IllegalStateException("Backup file not found"))
+
+            Result.failure(IllegalStateException("No backup files found in Documents/TIRUp/Backups or app storage"))
+        } catch (e: Exception) {
+            Log.e(TAG, "restoreBackup error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Full restore from user-selected URI (ZIP, JSON or CSV).
+     */
+    suspend fun restoreFromUri(
+        context: Context,
+        uri: Uri,
+        database: AppDatabase,
+        settingsRepository: SettingsRepository
+    ): Result<BackupRestoreResult> = withContext(Dispatchers.IO) {
+        try {
+            val inputStream = context.contentResolver.openInputStream(uri)
+                ?: return@withContext Result.failure(IllegalStateException("Cannot open input stream"))
+
+            val bufferedIn = BufferedInputStream(inputStream, 65536)
+            bufferedIn.mark(32)
+            val header = ByteArray(16)
+            val readBytes = bufferedIn.read(header, 0, 16)
+            bufferedIn.reset()
+
+            val isZip = readBytes >= 4 &&
+                    header[0] == 0x50.toByte() &&
+                    header[1] == 0x4B.toByte() &&
+                    header[2] == 0x03.toByte() &&
+                    header[3] == 0x04.toByte()
+
+            var readingsRestored = 0
+            var treatmentsRestored = 0
+            var settingsRestored = false
+
+            if (isZip) {
+                ZipInputStream(bufferedIn).use { zis ->
+                    var entry = zis.nextEntry
+                    while (entry != null) {
+                        val name = entry.name.substringAfterLast('/')
+                        when {
+                            name.equals(SETTINGS_FILE_NAME, ignoreCase = true) -> {
+                                val content = zis.readBytes().toString(Charsets.UTF_8)
+                                JsonReader(StringReader(content)).use { reader ->
+                                    reader.beginObject()
+                                    while (reader.hasNext()) {
+                                        if (reader.nextName() == "settings") {
+                                            val s = parseSettings(reader)
+                                            applySettings(s, settingsRepository)
+                                            settingsRestored = true
+                                        } else {
+                                            reader.skipValue()
+                                        }
+                                    }
+                                    reader.endObject()
+                                }
+                            }
+                            name.equals(READINGS_FILE_NAME, ignoreCase = true) -> {
+                                readingsRestored += restoreReadingsFromCsvStream(zis, database, closeStream = false)
+                            }
+                            name.equals(TREATMENTS_FILE_NAME, ignoreCase = true) -> {
+                                treatmentsRestored += restoreTreatmentsFromCsvStream(zis, database, closeStream = false)
+                            }
+                        }
+                        zis.closeEntry()
+                        entry = zis.nextEntry
+                    }
+                }
+            } else {
+                val br = BufferedReader(InputStreamReader(bufferedIn, Charsets.UTF_8))
+                br.mark(1024)
+                val firstChar = br.read().toChar()
+                br.reset()
+
+                if (firstChar == '{') {
+                    // JSON format (either new or legacy)
+                    var restoredSettings: UserSettings? = null
+                    val restoredReadings = mutableListOf<GlucoseReadingEntity>()
+
+                    JsonReader(br).use { reader ->
+                        reader.beginObject()
+                        while (reader.hasNext()) {
+                            when (reader.nextName()) {
+                                "settings" -> {
+                                    restoredSettings = parseSettings(reader)
+                                }
+                                "readings" -> {
+                                    parseReadings(reader, restoredReadings)
+                                }
+                                else -> reader.skipValue()
+                            }
+                        }
+                        reader.endObject()
+                    }
+
+                    if (restoredSettings != null) {
+                        applySettings(restoredSettings!!, settingsRepository)
+                        settingsRestored = true
+                    }
+
+                    val batchSize = 1000
+                    for (i in restoredReadings.indices step batchSize) {
+                        val end = (i + batchSize).coerceAtMost(restoredReadings.size)
+                        database.glucoseReadingDao().insertBatch(restoredReadings.subList(i, end))
+                    }
+                    readingsRestored = restoredReadings.size
+                } else {
+                    // CSV format
+                    val firstLine = br.readLine() ?: ""
+                    if (firstLine.contains("Insulin", ignoreCase = true) || firstLine.contains("Carbs", ignoreCase = true)) {
+                        treatmentsRestored = restoreTreatmentsFromCsvStream(bufferedIn, database)
+                    } else {
+                        readingsRestored = restoreReadingsFromCsvStream(bufferedIn, database)
+                    }
+                }
             }
 
+            Result.success(
+                BackupRestoreResult(
+                    readingsRestored = readingsRestored,
+                    treatmentsRestored = treatmentsRestored,
+                    settingsRestored = settingsRestored
+                )
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "restoreFromUri error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun applySettings(s: UserSettings, settingsRepository: SettingsRepository) {
+        val current = settingsRepository.getSettings().first()
+        val mergedPump = if (s.pumpSetStatus.installedAt > 0L) s.pumpSetStatus else current.pumpSetStatus
+        val mergedSensor = if (s.sensorStatus.installedAt > 0L) s.sensorStatus else current.sensorStatus
+        val mergedLancet = if (s.lancetStatus.installedAt > 0L) s.lancetStatus else current.lancetStatus
+        settingsRepository.updateSettings(
+            s.copy(
+                hasSeenOnboarding = true,
+                lastBackupTimestamp = System.currentTimeMillis(),
+                pumpSetStatus = mergedPump,
+                sensorStatus = mergedSensor,
+                lancetStatus = mergedLancet
+            )
+        )
+    }
+
+    private fun restoreReadingsFromCsvStream(inputStream: InputStream, database: AppDatabase, closeStream: Boolean = true): Int {
+        var count = 0
+        try {
+            val br = BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8))
+            br.readLine() ?: return 0 // Header
+            val batch = ArrayList<GlucoseReadingEntity>(1000)
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+
+            while (true) {
+                val line = br.readLine() ?: break
+                if (line.isBlank()) continue
+                val parts = line.split(',')
+                if (parts.size >= 3) {
+                    var ts = parts[0].toLongOrNull() ?: 0L
+                    if (ts <= 0L && parts[1].isNotBlank()) {
+                        try {
+                            ts = dateFormat.parse(parts[1])?.time ?: 0L
+                        } catch (_: Exception) {}
+                    }
+                    val bg = parts[2].toDoubleOrNull() ?: 0.0
+                    if (ts > 0L && bg > 0.0) {
+                        val arrow = parts.getOrNull(3)?.takeIf { it.isNotBlank() }
+                        val iob = parts.getOrNull(4)?.toDoubleOrNull()
+                        val cob = parts.getOrNull(5)?.toDoubleOrNull()
+                        batch.add(
+                            GlucoseReadingEntity(
+                                timestamp = ts,
+                                valueMmol = bg,
+                                trendArrow = arrow,
+                                iob = iob,
+                                cob = cob
+                            )
+                        )
+                        count++
+                        if (batch.size >= 1000) {
+                            runBlockingSafe { database.glucoseReadingDao().insertBatch(batch) }
+                            batch.clear()
+                        }
+                    }
+                }
+            }
+            if (batch.isNotEmpty()) {
+                runBlockingSafe { database.glucoseReadingDao().insertBatch(batch) }
+            }
+        } finally {
+            if (closeStream) {
+                try { inputStream.close() } catch (_: Exception) {}
+            }
+        }
+        return count
+    }
+
+    private fun restoreTreatmentsFromCsvStream(inputStream: InputStream, database: AppDatabase, closeStream: Boolean = true): Int {
+        var count = 0
+        try {
+            val br = BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8))
+            br.readLine() ?: return 0 // Header
+            val batch = ArrayList<TreatmentEntity>(500)
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+
+            while (true) {
+                val line = br.readLine() ?: break
+                if (line.isBlank()) continue
+                val parts = parseCsvLine(line)
+                if (parts.size >= 2) {
+                    var ts = parts[0].toLongOrNull() ?: 0L
+                    if (ts <= 0L && parts[1].isNotBlank()) {
+                        try {
+                            ts = dateFormat.parse(parts[1])?.time ?: 0L
+                        } catch (_: Exception) {}
+                    }
+                    val insulin = parts.getOrNull(2)?.toDoubleOrNull()
+                    val carbs = parts.getOrNull(3)?.toDoubleOrNull()
+                    val notes = parts.getOrNull(4)?.takeIf { it.isNotBlank() }
+                    val source = parts.getOrNull(5)?.takeIf { it.isNotBlank() } ?: "XDRIP"
+
+                    if (ts > 0L && (insulin != null || carbs != null || notes != null)) {
+                        batch.add(
+                            TreatmentEntity(
+                                timestamp = ts,
+                                insulinUnits = insulin,
+                                carbsGrams = carbs,
+                                notes = notes,
+                                source = source
+                            )
+                        )
+                        count++
+                        if (batch.size >= 500) {
+                            runBlockingSafe { database.treatmentDao().insertBatch(batch) }
+                            batch.clear()
+                        }
+                    }
+                }
+            }
+            if (batch.isNotEmpty()) {
+                runBlockingSafe { database.treatmentDao().insertBatch(batch) }
+            }
+        } finally {
+            if (closeStream) {
+                try { inputStream.close() } catch (_: Exception) {}
+            }
+        }
+        return count
+    }
+
+    private fun parseCsvLine(line: String): List<String> {
+        val result = mutableListOf<String>()
+        val sb = StringBuilder()
+        var inQuotes = false
+        var i = 0
+        while (i < line.length) {
+            val c = line[i]
+            when {
+                c == '\"' -> {
+                    if (inQuotes && i + 1 < line.length && line[i + 1] == '\"') {
+                        sb.append('\"')
+                        i++
+                    } else {
+                        inQuotes = !inQuotes
+                    }
+                }
+                c == ',' && !inQuotes -> {
+                    result.add(sb.toString())
+                    sb.clear()
+                }
+                else -> {
+                    sb.append(c)
+                }
+            }
+            i++
+        }
+        result.add(sb.toString())
+        return result
+    }
+
+    private fun runBlockingSafe(block: suspend () -> Unit) {
+        kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+            block()
+        }
+    }
+
+    private suspend fun restoreLegacyJson(
+        file: File,
+        database: AppDatabase,
+        settingsRepository: SettingsRepository
+    ): Result<Int> {
+        return try {
             var restoredSettings: UserSettings? = null
             val restoredReadings = mutableListOf<GlucoseReadingEntity>()
 
@@ -531,35 +1393,18 @@ object AutoBackupManager {
                 }
             }
 
-            // 1. Update settings
             if (restoredSettings != null) {
-                val current = settingsRepository.getSettings().first()
-                val s = restoredSettings!!
-                val mergedPump = if (s.pumpSetStatus.installedAt > 0L) s.pumpSetStatus else current.pumpSetStatus
-                val mergedSensor = if (s.sensorStatus.installedAt > 0L) s.sensorStatus else current.sensorStatus
-                val mergedLancet = if (s.lancetStatus.installedAt > 0L) s.lancetStatus else current.lancetStatus
-                settingsRepository.updateSettings(
-                    s.copy(
-                        hasSeenOnboarding = true,
-                        lastBackupTimestamp = System.currentTimeMillis(),
-                        pumpSetStatus = mergedPump,
-                        sensorStatus = mergedSensor,
-                        lancetStatus = mergedLancet
-                    )
-                )
+                applySettings(restoredSettings!!, settingsRepository)
             }
 
-            // 2. Insert readings in batches of 1000
             val batchSize = 1000
             for (i in restoredReadings.indices step batchSize) {
                 val end = (i + batchSize).coerceAtMost(restoredReadings.size)
                 database.glucoseReadingDao().insertBatch(restoredReadings.subList(i, end))
             }
-
-            Log.i(TAG, "Restored ${restoredReadings.size} readings and patient settings from backup.")
             Result.success(restoredReadings.size)
         } catch (e: Exception) {
-            Log.e(TAG, "Restore backup failed: ${e.message}", e)
+            Log.e(TAG, "restoreLegacyJson error: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -576,19 +1421,20 @@ object AutoBackupManager {
         var profile = PatientProfile()
 
         var isAutoBackupEnabled = true
-        var isLockscreenEnabled = false
+        var isLockscreenEnabled = true
         var widgetOpacity = 85
         var isFloatingBubble = false
         var isFloatingBubbleAlwaysVisible = false
         var alertSettings = AlertSettings()
+        var bleBridgeSettings = BleBridgeSettings()
 
         var isDeviceReminders = true
         var isSensorReminder = true
         var isPumpReminder = true
         var isLancetReminder = true
-        var sensorStatus = com.tirup.app.domain.model.SensorStatus()
-        var pumpSetStatus = com.tirup.app.domain.model.PumpSetStatus()
-        var lancetStatus = com.tirup.app.domain.model.LancetStatus()
+        var sensorStatus = SensorStatus()
+        var pumpSetStatus = PumpSetStatus()
+        var lancetStatus = LancetStatus()
 
         reader.beginObject()
         while (reader.hasNext()) {
@@ -660,94 +1506,25 @@ object AutoBackupManager {
                     profile = PatientProfile(name, gender, bYear, bMonth, height, weight, diabType, diagYear, therapy)
                 }
                 "alertSettings" -> {
-                    var alertsMaster = true
-                    var predEnabled = true
-                    var predMin = 15
-                    var predVib = true
-                    var predFlash = false
-                    var mainEnabled = true
-                    var mainPoints = 5
-                    var mainVib = true
-                    var mainFlash = false
-                    var mainLow = 3.9
-                    var mainHigh = 10.0
-                    var critEnabled = true
-                    var critHypoMin = 20
-                    var critHyperMin = 90
-                    var critVib = true
-                    var critFlash = true
-                    var critPause = 0L
-                    var critPermDisabled = false
-                    var sigLossEnabled = true
-                    var sigLossMin = 20
-                    var sigLossVib = true
-                    var sigLossFlash = false
-                    var snoozeHypo = 15
-                    var snoozeHyper = 45
-                    var lastChanceEnabled = true
-                    var lastChanceBuffer = 90
-
+                    alertSettings = parseAlertSettings(reader)
+                }
+                "bleBridgeSettings" -> {
+                    var role = BleBridgeRole.DISABLED
+                    var isEnabled = true
+                    var familyPin = ""
+                    var transmitBattery = true
                     reader.beginObject()
                     while (reader.hasNext()) {
                         when (reader.nextName()) {
-                            "isAlertsMasterEnabled" -> alertsMaster = reader.nextBoolean()
-                            "isPredictiveEnabled" -> predEnabled = reader.nextBoolean()
-                            "predictiveMinutesAhead" -> predMin = reader.nextInt()
-                            "isPredictiveVibrate" -> predVib = reader.nextBoolean()
-                            "isPredictiveFlash" -> predFlash = reader.nextBoolean()
-                            "isMainEnabled" -> mainEnabled = reader.nextBoolean()
-                            "mainConsecutivePoints" -> mainPoints = reader.nextInt()
-                            "isMainVibrate" -> mainVib = reader.nextBoolean()
-                            "isMainFlash" -> mainFlash = reader.nextBoolean()
-                            "mainLowThresholdMmol" -> mainLow = reader.nextDouble()
-                            "mainHighThresholdMmol" -> mainHigh = reader.nextDouble()
-                            "isCriticalEnabled" -> critEnabled = reader.nextBoolean()
-                            "criticalHypoMinutes" -> critHypoMin = reader.nextInt()
-                            "criticalHyperMinutes" -> critHyperMin = reader.nextInt()
-                            "isCriticalVibrate" -> critVib = reader.nextBoolean()
-                            "isCriticalFlash" -> critFlash = reader.nextBoolean()
-                            "criticalHypoPauseUntilTimestamp" -> critPause = reader.nextLong()
-                            "isCriticalHypoPermanentDisabled" -> critPermDisabled = reader.nextBoolean()
-                            "isSignalLossEnabled" -> sigLossEnabled = reader.nextBoolean()
-                            "signalLossMinutes" -> sigLossMin = reader.nextInt()
-                            "isSignalLossVibrate" -> sigLossVib = reader.nextBoolean()
-                            "isSignalLossFlash" -> sigLossFlash = reader.nextBoolean()
-                            "snoozeHypoMinutes" -> snoozeHypo = reader.nextInt()
-                            "snoozeHyperMinutes" -> snoozeHyper = reader.nextInt()
-                            "isLastChanceAlertEnabled" -> lastChanceEnabled = reader.nextBoolean()
-                            "lastChanceBufferMinutes" -> lastChanceBuffer = reader.nextInt()
+                            "role" -> role = try { BleBridgeRole.valueOf(reader.nextString()) } catch (_: Exception) { BleBridgeRole.DISABLED }
+                            "isEnabled" -> isEnabled = reader.nextBoolean()
+                            "familyPin" -> familyPin = reader.nextString()
+                            "transmitBattery" -> transmitBattery = reader.nextBoolean()
                             else -> reader.skipValue()
                         }
                     }
                     reader.endObject()
-                    alertSettings = AlertSettings(
-                        isAlertsMasterEnabled = alertsMaster,
-                        isPredictiveEnabled = predEnabled,
-                        predictiveMinutesAhead = predMin,
-                        isPredictiveVibrate = predVib,
-                        isPredictiveFlash = predFlash,
-                        isMainEnabled = mainEnabled,
-                        mainConsecutivePoints = mainPoints,
-                        isMainVibrate = mainVib,
-                        isMainFlash = mainFlash,
-                        mainLowThresholdMmol = mainLow,
-                        mainHighThresholdMmol = mainHigh,
-                        isCriticalEnabled = critEnabled,
-                        criticalHypoMinutes = critHypoMin,
-                        criticalHyperMinutes = critHyperMin,
-                        isCriticalVibrate = critVib,
-                        isCriticalFlash = critFlash,
-                        criticalHypoPauseUntilTimestamp = critPause,
-                        isCriticalHypoPermanentDisabled = critPermDisabled,
-                        isSignalLossEnabled = sigLossEnabled,
-                        signalLossMinutes = sigLossMin,
-                        isSignalLossVibrate = sigLossVib,
-                        isSignalLossFlash = sigLossFlash,
-                        snoozeHypoMinutes = snoozeHypo,
-                        snoozeHyperMinutes = snoozeHyper,
-                        isLastChanceAlertEnabled = lastChanceEnabled,
-                        lastChanceBufferMinutes = lastChanceBuffer
-                    )
+                    bleBridgeSettings = BleBridgeSettings(role = role, isEnabled = isEnabled, familyPin = familyPin, transmitBattery = transmitBattery)
                 }
                 "isDeviceRemindersEnabled" -> isDeviceReminders = reader.nextBoolean()
                 "isSensorReminderEnabled" -> isSensorReminder = reader.nextBoolean()
@@ -767,7 +1544,7 @@ object AutoBackupManager {
                         }
                     }
                     reader.endObject()
-                    sensorStatus = com.tirup.app.domain.model.SensorStatus(installedAt, duration, lastUsed)
+                    sensorStatus = SensorStatus(installedAt, duration, lastUsed)
                 }
                 "pumpSetStatus" -> {
                     var installedAt = 0L
@@ -783,7 +1560,7 @@ object AutoBackupManager {
                         }
                     }
                     reader.endObject()
-                    pumpSetStatus = com.tirup.app.domain.model.PumpSetStatus(installedAt, duration, lastUsed)
+                    pumpSetStatus = PumpSetStatus(installedAt, duration, lastUsed)
                 }
                 "lancetStatus" -> {
                     var installedAt = 0L
@@ -799,7 +1576,7 @@ object AutoBackupManager {
                         }
                     }
                     reader.endObject()
-                    lancetStatus = com.tirup.app.domain.model.LancetStatus(installedAt, duration, lastUsed)
+                    lancetStatus = LancetStatus(installedAt, duration, lastUsed)
                 }
                 else -> reader.skipValue()
             }
@@ -822,6 +1599,7 @@ object AutoBackupManager {
             isFloatingBubbleEnabled = isFloatingBubble,
             isFloatingBubbleAlwaysVisible = isFloatingBubbleAlwaysVisible,
             alertSettings = alertSettings,
+            bleBridgeSettings = bleBridgeSettings,
             isDeviceRemindersEnabled = isDeviceReminders,
             isSensorReminderEnabled = isSensorReminder,
             isPumpReminderEnabled = isPumpReminder,
@@ -830,6 +1608,125 @@ object AutoBackupManager {
             pumpSetStatus = pumpSetStatus,
             lancetStatus = lancetStatus,
             hasSeenOnboarding = true
+        )
+    }
+
+    private fun parseAlertSettings(reader: JsonReader): AlertSettings {
+        var alertsMaster = true
+        var predEnabled = true
+        var predMin = 15
+        var predVib = true
+        var predFlash = false
+        var mainEnabled = true
+        var mainPoints = 5
+        var mainVib = true
+        var mainFlash = false
+        var mainLow = 3.9
+        var mainHigh = 10.0
+        var critEnabled = true
+        var critHypoMin = 20
+        var critHyperMin = 90
+        var critVib = true
+        var critFlash = true
+        var critPause = 0L
+        var critPermDisabled = false
+        var sigLossEnabled = true
+        var sigLossMin = 20
+        var sigLossVib = true
+        var sigLossFlash = false
+        var snoozeHypo = 15
+        var snoozeHyper = 45
+        var lastChanceEnabled = true
+        var lastChanceBuffer = 90
+        var emergencySmsEnabled = false
+        var emergencyContactPhone = ""
+        var emergencyContactName = ""
+        var secondaryPhone = ""
+        var secondaryName = ""
+        var emergencySmsDelay = 5
+        var includeLocation = true
+        var lastEmergencySms = 0L
+        var smsQueryReply = true
+
+        reader.beginObject()
+        while (reader.hasNext()) {
+            when (reader.nextName()) {
+                "isAlertsMasterEnabled" -> alertsMaster = reader.nextBoolean()
+                "isPredictiveEnabled" -> predEnabled = reader.nextBoolean()
+                "predictiveMinutesAhead" -> predMin = reader.nextInt()
+                "isPredictiveVibrate" -> predVib = reader.nextBoolean()
+                "isPredictiveFlash" -> predFlash = reader.nextBoolean()
+                "isMainEnabled" -> mainEnabled = reader.nextBoolean()
+                "mainConsecutivePoints" -> mainPoints = reader.nextInt()
+                "isMainVibrate" -> mainVib = reader.nextBoolean()
+                "isMainFlash" -> mainFlash = reader.nextBoolean()
+                "mainLowThresholdMmol" -> mainLow = reader.nextDouble()
+                "mainHighThresholdMmol" -> mainHigh = reader.nextDouble()
+                "isCriticalEnabled" -> critEnabled = reader.nextBoolean()
+                "criticalHypoMinutes" -> critHypoMin = reader.nextInt()
+                "criticalHyperMinutes" -> critHyperMin = reader.nextInt()
+                "isCriticalVibrate" -> critVib = reader.nextBoolean()
+                "isCriticalFlash" -> critFlash = reader.nextBoolean()
+                "criticalHypoPauseUntilTimestamp" -> critPause = reader.nextLong()
+                "isCriticalHypoPermanentDisabled" -> critPermDisabled = reader.nextBoolean()
+                "isSignalLossEnabled" -> sigLossEnabled = reader.nextBoolean()
+                "signalLossMinutes" -> sigLossMin = reader.nextInt()
+                "isSignalLossVibrate" -> sigLossVib = reader.nextBoolean()
+                "isSignalLossFlash" -> sigLossFlash = reader.nextBoolean()
+                "snoozeHypoMinutes" -> snoozeHypo = reader.nextInt()
+                "snoozeHyperMinutes" -> snoozeHyper = reader.nextInt()
+                "isLastChanceAlertEnabled" -> lastChanceEnabled = reader.nextBoolean()
+                "lastChanceBufferMinutes" -> lastChanceBuffer = reader.nextInt()
+                "isEmergencySmsEnabled" -> emergencySmsEnabled = reader.nextBoolean()
+                "emergencyContactPhone" -> emergencyContactPhone = reader.nextString()
+                "emergencyContactName" -> emergencyContactName = reader.nextString()
+                "secondaryEmergencyContactPhone" -> secondaryPhone = reader.nextString()
+                "secondaryEmergencyContactName" -> secondaryName = reader.nextString()
+                "emergencySmsDelayMinutes" -> emergencySmsDelay = reader.nextInt()
+                "includeLocationInEmergencySms" -> includeLocation = reader.nextBoolean()
+                "lastEmergencySmsTimestamp" -> lastEmergencySms = reader.nextLong()
+                "isSmsQueryReplyEnabled" -> smsQueryReply = reader.nextBoolean()
+                else -> reader.skipValue()
+            }
+        }
+        reader.endObject()
+
+        return AlertSettings(
+            isAlertsMasterEnabled = alertsMaster,
+            isPredictiveEnabled = predEnabled,
+            predictiveMinutesAhead = predMin,
+            isPredictiveVibrate = predVib,
+            isPredictiveFlash = predFlash,
+            isMainEnabled = mainEnabled,
+            mainConsecutivePoints = mainPoints,
+            isMainVibrate = mainVib,
+            isMainFlash = mainFlash,
+            mainLowThresholdMmol = mainLow,
+            mainHighThresholdMmol = mainHigh,
+            isCriticalEnabled = critEnabled,
+            criticalHypoMinutes = critHypoMin,
+            criticalHyperMinutes = critHyperMin,
+            isCriticalVibrate = critVib,
+            isCriticalFlash = critFlash,
+            criticalHypoPauseUntilTimestamp = critPause,
+            isCriticalHypoPermanentDisabled = critPermDisabled,
+            isSignalLossEnabled = sigLossEnabled,
+            signalLossMinutes = sigLossMin,
+            isSignalLossVibrate = sigLossVib,
+            isSignalLossFlash = sigLossFlash,
+            snoozeHypoMinutes = snoozeHypo,
+            snoozeHyperMinutes = snoozeHyper,
+            isLastChanceAlertEnabled = lastChanceEnabled,
+            lastChanceBufferMinutes = lastChanceBuffer,
+            isEmergencySmsEnabled = emergencySmsEnabled,
+            emergencyContactPhone = emergencyContactPhone,
+            emergencyContactName = emergencyContactName,
+            secondaryEmergencyContactPhone = secondaryPhone,
+            secondaryEmergencyContactName = secondaryName,
+            emergencySmsDelayMinutes = emergencySmsDelay,
+            includeLocationInEmergencySms = includeLocation,
+            lastEmergencySmsTimestamp = lastEmergencySms,
+            isSmsQueryReplyEnabled = smsQueryReply
         )
     }
 

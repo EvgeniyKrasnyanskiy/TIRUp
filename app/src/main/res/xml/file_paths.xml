@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <cache-path name="reports" path="reports/" />
+    <cache-path name="backups" path="backups/" />
+    <external-files-path name="backup_files" path="Backups/" />
+    <external-path name="external_documents" path="Documents/TIRUp/Backups/" />
 </paths>

@@ -40,8 +40,10 @@ import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.NotificationsActive
@@ -52,6 +54,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -59,6 +62,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
@@ -244,6 +248,22 @@ fun SettingsScreen(
         }
     }
 
+    val createBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri ->
+        if (uri != null) {
+            viewModel.exportBackupToUri(uri)
+        }
+    }
+
+    val restoreBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.prepareRestoreFromUri(uri)
+        }
+    }
+
     fun checkAndRequestBlePermissions(role: BleBridgeRole) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val needed = mutableListOf<String>()
@@ -348,6 +368,26 @@ fun SettingsScreen(
                 }
                 is SettingsEvent.Info -> {
                     snackbarHostState.showSnackbar(event.message)
+                }
+                is SettingsEvent.ShareFile -> {
+                    try {
+                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            event.file
+                        )
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = event.mimeType
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        val chooser = Intent.createChooser(shareIntent, event.title).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(chooser)
+                    } catch (e: Exception) {
+                        snackbarHostState.showSnackbar(if (isRu) "Ошибка отправки: ${e.message}" else "Share failed: ${e.message}")
+                    }
                 }
             }
         }
@@ -2458,7 +2498,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = if (isRu) "Ежедневно в 00:00 в Android/data/.../Backups" else "Daily at 00:00 in Android/data/.../Backups",
+                                text = if (isRu) "В Документы/TIRUp/Backups (2 CSV + JSON)" else "In Documents/TIRUp/Backups (2 CSV + JSON)",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -2473,20 +2513,163 @@ fun SettingsScreen(
                         )
                     }
 
-                    if (settings.isAutoBackupEnabled) {
-                        if (settings.lastBackupTimestamp > 0L) {
-                            val fmt = SimpleDateFormat("dd.MM.yyyy 'в' HH:mm", Locale.getDefault())
-                            val lastDateStr = fmt.format(Date(settings.lastBackupTimestamp))
+                    // Status and stats
+                    val summary = state.backupSummary
+                    if (summary != null && summary.readingsCount > 0) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = PrimaryEmerald.copy(alpha = 0.08f),
+                            border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.25f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                val fmt = SimpleDateFormat("dd.MM.yyyy 'в' HH:mm", Locale.getDefault())
+                                val lastDateStr = if (summary.exportedAt > 0L) fmt.format(Date(summary.exportedAt)) else "—"
+                                Text(
+                                    text = if (isRu) "📦 Сохранённая копия: $lastDateStr" else "📦 Saved backup: $lastDateStr",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = PrimaryEmerald
+                                )
+                                Text(
+                                    text = if (isRu) "🩸 ${summary.readingsCount} замеров | 💉 ${summary.treatmentsCount} меток терапии"
+                                    else "🩸 ${summary.readingsCount} readings | 💉 ${summary.treatmentsCount} treatments",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = if (isRu) "📁 Папка: Documents/TIRUp/Backups/"
+                                    else "📁 Folder: Documents/TIRUp/Backups/",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                )
+                            }
+                        }
+                    } else if (settings.isAutoBackupEnabled) {
+                        Text(
+                            text = if (isRu) "Запланирован на сегодня в 00:00" else "Scheduled for today at 00:00",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ActionBlue
+                        )
+                    }
+
+                    if (state.isBackupInProgress) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             Text(
-                                text = if (isRu) "Последний бэкап: $lastDateStr" else "Last backup: $lastDateStr",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = PrimaryEmerald
-                            )
-                        } else {
-                            Text(
-                                text = if (isRu) "Запланирован на сегодня в 00:00" else "Scheduled for today at 00:00",
+                                text = if (isRu) "Создание резервной копии..." else "Creating backup...",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ActionBlue
+                            )
+                        }
+                    }
+
+                    // Action buttons (Row 1: Create & Share)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.createBackupNow() },
+                            enabled = !state.isBackupInProgress,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isRu) "Создать" else "Backup",
+                                fontSize = 13.sp,
+                                maxLines = 1
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = { viewModel.shareBackup() },
+                            enabled = !state.isBackupInProgress,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.5f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = null,
+                                tint = ActionBlue,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isRu) "Поделиться" else "Share",
+                                fontSize = 13.sp,
+                                color = ActionBlue,
+                                maxLines = 1
+                            )
+                        }
+                    }
+
+                    // Action buttons (Row 2: Save to file & Restore)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                val dateStr = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
+                                createBackupLauncher.launch("tirup_backup_$dateStr.zip")
+                            },
+                            enabled = !state.isBackupInProgress,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isRu) "В файл" else "To file",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                restoreBackupLauncher.launch(arrayOf("application/zip", "application/json", "text/csv", "text/comma-separated-values", "*/*"))
+                            },
+                            enabled = !state.isRestoreInProgress,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.5f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FileUpload,
+                                contentDescription = null,
+                                tint = PrimaryEmerald,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isRu) "Восстановить" else "Restore",
+                                fontSize = 13.sp,
+                                color = PrimaryEmerald,
+                                maxLines = 1
                             )
                         }
                     }
@@ -2658,6 +2841,124 @@ fun SettingsScreen(
             .align(Alignment.BottomCenter)
             .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
     )
+
+    val pendingRestore = state.pendingRestoreSummary
+    if (pendingRestore != null) {
+        val summary = pendingRestore
+        AlertDialog(
+            onDismissRequest = {
+                if (!state.isRestoreInProgress) {
+                    viewModel.dismissRestoreDialog()
+                }
+            },
+            title = {
+                Text(
+                    text = if (isRu) "Восстановление данных" else "Restore Data",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = if (isRu)
+                            "Обнаружена резервная копия TIRUp со следующими данными:"
+                        else
+                            "Found TIRUp backup with the following details:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            if (summary.patientName.isNotBlank()) {
+                                Text(
+                                    text = if (isRu) "👤 Профиль: ${summary.patientName} (${summary.diabetesType})"
+                                    else "👤 Profile: ${summary.patientName} (${summary.diabetesType})",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            Text(
+                                text = if (isRu) "🩸 Замеров сахара: ${summary.readingsCount}"
+                                else "🩸 Glucose readings: ${summary.readingsCount}",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = if (isRu) "💉 Записей терапии: ${summary.treatmentsCount}"
+                                else "💉 Treatments: ${summary.treatmentsCount}",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            if (summary.hasSettings) {
+                                Text(
+                                    text = if (isRu) "⚙️ Настройки и пороги тревог включены"
+                                    else "⚙️ Settings & alerts included",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = PrimaryEmerald
+                                )
+                            }
+                            if (summary.exportedAt > 0L) {
+                                val fmt = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+                                Text(
+                                    text = if (isRu) "📅 Дата бэкапа: ${fmt.format(Date(summary.exportedAt))}"
+                                    else "📅 Backup date: ${fmt.format(Date(summary.exportedAt))}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = if (isRu)
+                            "⚠️ Существующие замеры и отметки будут объединены без дублирования. Настройки профиля и тревог будут обновлены из архива."
+                        else
+                            "⚠️ Existing readings and treatments will be merged without duplicates. Profile and alert settings will be restored.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = ActionBlue
+                    )
+
+                    if (state.isRestoreInProgress) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Text(
+                                text = if (isRu) "Идёт восстановление..." else "Restoring...",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.confirmRestore() },
+                    enabled = !state.isRestoreInProgress,
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald)
+                ) {
+                    Text(if (isRu) "Восстановить" else "Restore")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.dismissRestoreDialog() },
+                    enabled = !state.isRestoreInProgress
+                ) {
+                    Text(if (isRu) "Отмена" else "Cancel")
+                }
+            }
+        )
+    }
 
     if (showHelpDialog) {
         HelpAndDisclaimerDialog(
