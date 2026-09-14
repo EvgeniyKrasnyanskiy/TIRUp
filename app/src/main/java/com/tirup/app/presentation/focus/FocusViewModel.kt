@@ -41,6 +41,7 @@ private data class GlucoseDataTuple(
 class FocusViewModel(
     private val glucoseRepository: GlucoseRepository,
     private val settingsRepository: SettingsRepository,
+    @android.annotation.SuppressLint("StaticFieldLeak")
     private val context: Context? = null
 ) : ViewModel() {
 

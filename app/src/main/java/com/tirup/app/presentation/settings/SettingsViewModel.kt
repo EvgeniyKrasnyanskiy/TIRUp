@@ -54,6 +54,7 @@ data class SettingsUiState(
 )
 
 class SettingsViewModel(
+    @android.annotation.SuppressLint("StaticFieldLeak")
     private val context: android.content.Context,
     private val settingsRepository: SettingsRepository,
     private val glucoseRepository: GlucoseRepository,

@@ -303,11 +303,13 @@ object BleBroadcaster {
         }
     }
 
+    @android.annotation.SuppressLint("MissingPermission")
     private fun stopAdvertisingInternal(cancelHeartbeat: Boolean = true) {
         try {
             activeCallback?.let { cb ->
                 currentAdvertiser?.stopAdvertising(cb)
             }
+        } catch (_: SecurityException) {
         } catch (_: Exception) {}
         activeCallback = null
         currentAdvertiser = null
