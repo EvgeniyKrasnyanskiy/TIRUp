@@ -266,12 +266,14 @@ object BleObserverManager {
 
     suspend fun stopScanning() = stopScanningInternal()
 
+    @android.annotation.SuppressLint("MissingPermission")
     private suspend fun stopScanningInternal() = mutex.withLock {
         if (!isScanning) return@withLock
         try {
             activeCallback?.let { cb ->
                 scanner?.stopScan(cb)
             }
+        } catch (_: SecurityException) {
         } catch (_: Exception) {}
         activeCallback = null
         scanner = null

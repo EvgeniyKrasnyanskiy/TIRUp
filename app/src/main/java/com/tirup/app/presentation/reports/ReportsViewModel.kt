@@ -69,6 +69,7 @@ sealed interface ReportEvent {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReportsViewModel(
+    @android.annotation.SuppressLint("StaticFieldLeak")
     private val context: Context,
     private val glucoseRepository: GlucoseRepository,
     private val settingsRepository: SettingsRepository,
