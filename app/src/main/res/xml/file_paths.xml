@@ -4,4 +4,6 @@
     <cache-path name="backups" path="backups/" />
     <external-files-path name="backup_files" path="Backups/" />
     <external-path name="external_documents" path="Documents/TIRUp/Backups/" />
+    <external-path name="external_downloads" path="Download/" />
+    <external-path name="all_external" path="." />
 </paths>

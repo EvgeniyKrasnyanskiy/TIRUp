@@ -1543,43 +1543,87 @@ private fun GuidebookItemCard(
  * Opens system file manager to the Downloads directory or opens the saved PDF report directly.
  */
 internal fun openSavedFileFolder(context: android.content.Context, filePath: String) {
+    val file = java.io.File(filePath)
+    val isInDownloads = filePath.contains("Download", ignoreCase = true)
+
+    if (isInDownloads) {
+        try {
+            val downloadsIntent = Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(downloadsIntent)
+            return
+        } catch (_: Exception) {}
+    }
+
+    // 1. Try to open the parent folder directly via DocumentsUI
+    try {
+        val relativePath = if (filePath.contains("Documents/TIRUp/Backups", ignoreCase = true)) {
+            "Documents%2FTIRUp%2FBackups"
+        } else if (filePath.contains("Documents/TIRUp", ignoreCase = true)) {
+            "Documents%2FTIRUp"
+        } else if (filePath.contains("Documents", ignoreCase = true)) {
+            "Documents"
+        } else {
+            "Download"
+        }
+        val folderUri = android.net.Uri.parse("content://com.android.externalstorage.documents/document/primary%3A$relativePath")
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(folderUri, "vnd.android.document/directory")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+        }
+        context.startActivity(intent)
+        return
+    } catch (_: Exception) {}
+
+    // 2. Try to open the parent folder via FileProvider resource/folder
+    try {
+        val parentFolder = file.parentFile ?: file
+        val folderUri = androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            parentFolder
+        )
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(folderUri, "resource/folder")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+        }
+        context.startActivity(intent)
+        return
+    } catch (_: Exception) {}
+
+    // 3. Try to open the file directly with appropriate MIME type
+    try {
+        if (file.exists()) {
+            val fileUri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+            val mimeType = when (file.extension.lowercase()) {
+                "pdf" -> "application/pdf"
+                "csv" -> "text/comma-separated-values"
+                "zip" -> "application/zip"
+                else -> "*/*"
+            }
+            val viewFileIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(fileUri, mimeType)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+            }
+            context.startActivity(Intent.createChooser(viewFileIntent, file.name).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            })
+            return
+        }
+    } catch (_: Exception) {}
+
+    // 4. Fallback to ACTION_VIEW_DOWNLOADS
     try {
         val downloadsIntent = Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         context.startActivity(downloadsIntent)
-    } catch (e1: Exception) {
-        try {
-            val file = java.io.File(filePath)
-            val parentFolder = file.parentFile ?: android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
-            val folderUri = androidx.core.content.FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                parentFolder
-            )
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(folderUri, "resource/folder")
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
-            }
-            context.startActivity(intent)
-        } catch (e2: Exception) {
-            try {
-                val file = java.io.File(filePath)
-                if (file.exists()) {
-                    val fileUri = androidx.core.content.FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        file
-                    )
-                    val viewFileIntent = Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(fileUri, "application/pdf")
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    }
-                    context.startActivity(viewFileIntent)
-                }
-            } catch (e3: Exception) {
-                android.widget.Toast.makeText(context, filePath, android.widget.Toast.LENGTH_SHORT).show()
-            }
-        }
+    } catch (_: Exception) {
+        android.widget.Toast.makeText(context, filePath, android.widget.Toast.LENGTH_SHORT).show()
     }
 }

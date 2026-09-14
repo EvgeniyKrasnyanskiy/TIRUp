@@ -874,7 +874,7 @@ class SettingsViewModel(
 
     fun setYearEndDigestYear(year: Int) {
         val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
-        val validYear = year.coerceIn(2020, currentYear)
+        val validYear = year.coerceIn(2025, currentYear)
         loadYearEndStats(validYear)
     }
 

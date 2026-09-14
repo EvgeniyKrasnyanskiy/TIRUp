@@ -6,6 +6,8 @@ import android.content.Intent
 import android.util.Log
 import com.tirup.app.data.backup.AutoBackupManager
 import com.tirup.app.data.worker.AutoBackupWorker
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class BackupAlarmReceiver : BroadcastReceiver() {
 
@@ -14,14 +16,31 @@ class BackupAlarmReceiver : BroadcastReceiver() {
         Log.i(TAG, "BackupAlarmReceiver triggered: action=${intent?.action}")
 
         val isBoot = intent?.action == Intent.ACTION_BOOT_COMPLETED
-        if (isBoot) {
-            // Re-schedule daily alarm after reboot and check if yesterday was missed
+        val isPackageReplaced = intent?.action == Intent.ACTION_MY_PACKAGE_REPLACED
+
+        if (isBoot || isPackageReplaced) {
+            // Re-schedule daily alarm after reboot/update and check if backup was missed
             AutoBackupManager.scheduleNextDailyBackup(context)
-            com.tirup.app.data.worker.AutoBackupWorker.enqueue(context, force = false)
+            AutoBackupWorker.enqueue(context, force = false)
+
+            // Restore floating bubble service if enabled
+            val app = context.applicationContext as? com.tirup.app.TirupApplication
+            app?.let { application ->
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                    try {
+                        val settings = application.settingsRepository.getSettings().first()
+                        if (settings.isFloatingBubbleEnabled && android.provider.Settings.canDrawOverlays(context)) {
+                            com.tirup.app.presentation.overlay.FloatingBubbleService.start(context)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to restore floating bubble after boot/update: ${e.message}")
+                    }
+                }
+            }
         } else {
             // Triggered by daily 23:59:59 alarm: enqueue worker and reschedule for tomorrow
             Log.i(TAG, "Enqueuing exact daily auto-backup via WorkManager...")
-            com.tirup.app.data.worker.AutoBackupWorker.enqueue(context, force = true)
+            AutoBackupWorker.enqueue(context, force = true)
             AutoBackupManager.scheduleNextDailyBackup(context)
         }
     }

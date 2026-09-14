@@ -5385,10 +5385,10 @@ fun YearEndDigestDialog(
                     ) {
                         IconButton(
                             onClick = { onYearChange(year - 1) },
-                            enabled = year > 2020,
+                            enabled = year > 2025,
                             modifier = Modifier.size(32.dp)
                         ) {
-                            Text("◀", color = if (year > 2020) ActionBlue else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("◀", color = if (year > 2025) ActionBlue else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
                         Text(
                             text = "$year",
