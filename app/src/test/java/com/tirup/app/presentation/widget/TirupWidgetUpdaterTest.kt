@@ -106,6 +106,14 @@ class TirupWidgetUpdaterTest {
         val (mildDefText, mildDefColor) = TirupWidgetUpdater.calculateDailyTimeBalance(mildDeficitGoal, 70.0)
         assertEquals("-14м", mildDefText)
         assertEquals(0xFFF59E0B.toInt(), mildDefColor) // mild deficit <= 60m -> amber
+
+        // English localization check
+        val (enSurplusText, _) = TirupWidgetUpdater.calculateDailyTimeBalance(dummyGoal, 70.0, isRu = false)
+        assertEquals("+1h 10m", enSurplusText)
+        val (enDeficitText, _) = TirupWidgetUpdater.calculateDailyTimeBalance(mildDeficitGoal, 70.0, isRu = false)
+        assertEquals("-14m", enDeficitText)
+        assertEquals("5m", TirupWidgetUpdater.formatTimeAgoShort(5 * 60_000L, isRu = false))
+        assertEquals("2h", TirupWidgetUpdater.formatTimeAgoShort(120 * 60_000L, isRu = false))
     }
 
     @Test

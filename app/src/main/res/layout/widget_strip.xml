@@ -6,9 +6,9 @@
     android:background="@drawable/widget_background"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingStart="8dp"
+    android:paddingStart="6dp"
     android:paddingTop="4dp"
-    android:paddingEnd="8dp"
+    android:paddingEnd="6dp"
     android:paddingBottom="4dp">
 
     <!-- 1. Left: Glucose Value + Stacked [ Arrow / Delta ] -->
@@ -63,8 +63,8 @@
         android:id="@+id/widget_divider"
         android:layout_width="1dp"
         android:layout_height="26dp"
-        android:layout_marginStart="6dp"
-        android:layout_marginEnd="6dp"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="4dp"
         android:background="#26FFFFFF" />
 
     <!-- 2. Middle 1: Stacked [ TIR / Compensator ] in 2 rows + Progress Bar -->
@@ -82,9 +82,9 @@
             android:layout_height="wrap_content"
             android:background="@drawable/widget_badge_bg"
             android:includeFontPadding="false"
-            android:paddingStart="5dp"
+            android:paddingStart="4dp"
             android:paddingTop="1dp"
-            android:paddingEnd="5dp"
+            android:paddingEnd="4dp"
             android:paddingBottom="1dp"
             android:singleLine="true"
             android:text="TIR: 78%"
@@ -100,9 +100,9 @@
             android:layout_marginTop="2dp"
             android:background="@drawable/widget_badge_bg"
             android:includeFontPadding="false"
-            android:paddingStart="5dp"
+            android:paddingStart="4dp"
             android:paddingTop="1dp"
-            android:paddingEnd="5dp"
+            android:paddingEnd="4dp"
             android:paddingBottom="1dp"
             android:singleLine="true"
             android:text="+1ч 45м"
@@ -123,70 +123,70 @@
             android:progressTint="#10B981" />
     </LinearLayout>
 
-    <!-- 3. Middle 2: Daily Statistics [ Mean BG / CV ] in 2 rows -->
+    <!-- 3. Middle 2: Ranges [ TBR / TAR ] in 2 rows -->
     <LinearLayout
         android:id="@+id/widget_stats_section"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
+        android:layout_marginStart="5dp"
         android:gravity="center_vertical|start"
         android:orientation="vertical">
 
-        <!-- Line 1: Mean Glucose Today (Ср: 7.4) -->
+        <!-- Line 1: Time Below Range (TBR: 2%) -->
         <TextView
-            android:id="@+id/widget_mean_glucose"
+            android:id="@+id/widget_tbr_score"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/widget_badge_bg"
             android:includeFontPadding="false"
-            android:paddingStart="5dp"
+            android:paddingStart="4dp"
             android:paddingTop="1dp"
-            android:paddingEnd="5dp"
+            android:paddingEnd="4dp"
             android:paddingBottom="1dp"
             android:singleLine="true"
-            android:text="Ср: 7.4"
+            android:text="TBR: 2%"
             android:textColor="#10B981"
             android:textSize="10sp"
             android:textStyle="bold" />
 
-        <!-- Line 2: Glycemic Variability (CV: 28%) -->
+        <!-- Line 2: Time Above Range (TAR: 18%) -->
         <TextView
-            android:id="@+id/widget_cv_score"
+            android:id="@+id/widget_tar_score"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:background="@drawable/widget_badge_bg"
             android:includeFontPadding="false"
-            android:paddingStart="5dp"
+            android:paddingStart="4dp"
             android:paddingTop="1dp"
-            android:paddingEnd="5dp"
+            android:paddingEnd="4dp"
             android:paddingBottom="1dp"
             android:singleLine="true"
-            android:text="CV: 28%"
+            android:text="TAR: 18%"
             android:textColor="#10B981"
             android:textSize="10sp"
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- 3. Right Column 1: Stacked [ IoB / Streak ] in 2 rows -->
+    <!-- 4. Right Column 1: Stacked [ IoB / Streak / Fallback ] in 2 rows -->
     <LinearLayout
         android:id="@+id/widget_iob_streak_section"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="6dp"
+        android:layout_marginStart="4dp"
         android:gravity="center_horizontal"
         android:orientation="vertical">
 
-        <!-- Line 1: IoB -->
+        <!-- Line 1: IoB / Fallback Slot 1 -->
         <TextView
             android:id="@+id/widget_iob_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/widget_badge_bg"
             android:includeFontPadding="false"
-            android:paddingStart="5dp"
+            android:paddingStart="4dp"
             android:paddingTop="1dp"
-            android:paddingEnd="5dp"
+            android:paddingEnd="4dp"
             android:paddingBottom="1dp"
             android:singleLine="true"
             android:text="💉 1.2 U"
@@ -194,7 +194,7 @@
             android:textSize="10sp"
             android:textStyle="bold" />
 
-        <!-- Line 2: Streak -->
+        <!-- Line 2: Streak / Fallback Slot 2 -->
         <TextView
             android:id="@+id/widget_streak_badge"
             android:layout_width="wrap_content"
@@ -202,9 +202,9 @@
             android:layout_marginTop="2dp"
             android:background="@drawable/widget_badge_bg"
             android:includeFontPadding="false"
-            android:paddingStart="5dp"
+            android:paddingStart="4dp"
             android:paddingTop="1dp"
-            android:paddingEnd="5dp"
+            android:paddingEnd="4dp"
             android:paddingBottom="1dp"
             android:singleLine="true"
             android:text="🔥 5 д."
@@ -213,7 +213,7 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- 4. Right Column 2: Stacked [ Battery / Time Ago ] in 2 rows -->
+    <!-- 5. Right Column 2: Stacked [ Battery / Time Ago / Fallback ] in 2 rows -->
     <LinearLayout
         android:id="@+id/widget_battery_time_section"
         android:layout_width="wrap_content"
@@ -222,25 +222,25 @@
         android:gravity="center_horizontal"
         android:orientation="vertical">
 
-        <!-- Line 1: Battery / TAR -->
+        <!-- Line 1: Battery / Fallback Slot 3 (Mean BG) -->
         <TextView
             android:id="@+id/widget_master_battery"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/widget_badge_bg"
             android:includeFontPadding="false"
-            android:paddingStart="5dp"
+            android:paddingStart="4dp"
             android:paddingTop="1dp"
-            android:paddingEnd="5dp"
+            android:paddingEnd="4dp"
             android:paddingBottom="1dp"
             android:singleLine="true"
-            android:text="TAR: 18%"
+            android:text="Ср: 7.4"
             android:textColor="#10B981"
             android:textSize="10sp"
             android:textStyle="bold"
             android:visibility="visible" />
 
-        <!-- Line 2: Time Ago / TING -->
+        <!-- Line 2: Time Ago / Fallback Slot 4 (CV%) -->
         <TextView
             android:id="@+id/widget_time_ago"
             android:layout_width="wrap_content"
@@ -248,13 +248,13 @@
             android:layout_marginTop="2dp"
             android:background="@drawable/widget_badge_bg"
             android:includeFontPadding="false"
-            android:paddingStart="5dp"
+            android:paddingStart="4dp"
             android:paddingTop="1dp"
-            android:paddingEnd="5dp"
+            android:paddingEnd="4dp"
             android:paddingBottom="1dp"
             android:singleLine="true"
-            android:text="TING: 65%"
-            android:textColor="#38BDF8"
+            android:text="CV: 28%"
+            android:textColor="#10B981"
             android:textSize="10sp"
             android:textStyle="bold"
             android:visibility="visible" />

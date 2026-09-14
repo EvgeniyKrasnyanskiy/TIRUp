@@ -85,6 +85,7 @@ class SettingsViewModel(
             val updated = _uiState.value.userSettings.copy(language = language)
             settingsRepository.updateSettings(updated)
             _uiState.update { it.copy(userSettings = updated) }
+            com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context)
         }
     }
 
@@ -93,6 +94,7 @@ class SettingsViewModel(
             val updated = _uiState.value.userSettings.copy(unit = unit)
             settingsRepository.updateSettings(updated)
             _uiState.update { it.copy(userSettings = updated) }
+            com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context)
         }
     }
 
