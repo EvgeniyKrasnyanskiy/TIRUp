@@ -1580,7 +1580,7 @@ object GlucoseAlertManager {
             glucoseStr = lastKnownGlucose
             arrow = latestReading.trendArrow ?: ""
             hexColor = grayHex
-            timeStr = if (isRu) "${elapsedMin}м назад" else "${elapsedMin}m ago"
+            timeStr = if (isRu) "${elapsedMin}мин." else "${elapsedMin}m ago"
         } else {
             glucoseStr = lastKnownGlucose
             arrow = latestReading.trendArrow ?: ""
