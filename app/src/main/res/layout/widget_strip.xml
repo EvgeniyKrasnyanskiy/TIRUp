@@ -222,7 +222,7 @@
         android:gravity="center_horizontal"
         android:orientation="vertical">
 
-        <!-- Line 1: Battery -->
+        <!-- Line 1: Battery / TAR -->
         <TextView
             android:id="@+id/widget_master_battery"
             android:layout_width="wrap_content"
@@ -234,13 +234,13 @@
             android:paddingEnd="5dp"
             android:paddingBottom="1dp"
             android:singleLine="true"
-            android:text="🔋 85%"
+            android:text="TAR: 18%"
             android:textColor="#10B981"
             android:textSize="10sp"
             android:textStyle="bold"
-            android:visibility="gone" />
+            android:visibility="visible" />
 
-        <!-- Line 2: Time Ago -->
+        <!-- Line 2: Time Ago / TING -->
         <TextView
             android:id="@+id/widget_time_ago"
             android:layout_width="wrap_content"
@@ -251,9 +251,13 @@
             android:paddingStart="5dp"
             android:paddingTop="1dp"
             android:paddingEnd="5dp"
+            android:paddingBottom="1dp"
+            android:singleLine="true"
+            android:text="TING: 65%"
+            android:textColor="#38BDF8"
             android:textSize="10sp"
             android:textStyle="bold"
-            android:visibility="gone" />
+            android:visibility="visible" />
     </LinearLayout>
 
     <!-- 5. Sparkline Chart removed on 5x1 strip to keep 5 main columns uncompressed -->

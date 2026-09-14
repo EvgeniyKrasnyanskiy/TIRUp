@@ -21,6 +21,7 @@ import com.tirup.app.domain.calculator.GlucoseMetricsCalculator
 import com.tirup.app.domain.calculator.TargetCompensatorCalculator
 import com.tirup.app.domain.model.BleBridgeRole
 import com.tirup.app.domain.model.GlucoseReading
+import com.tirup.app.domain.model.GlucoseStatistics
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.domain.model.TargetRanges
@@ -1242,14 +1243,19 @@ object TirupWidgetUpdater {
             )
         }
 
-        // 7. Mean BG (Priority 7)
-        if (!excludeTypes.contains("mean") && todayReadings.isNotEmpty()) {
-            val stats = GlucoseMetricsCalculator.calculateStatistics(
+        var cachedStats: GlucoseStatistics? = null
+        fun getStats(): GlucoseStatistics {
+            return cachedStats ?: GlucoseMetricsCalculator.calculateStatistics(
                 readings = todayReadings,
                 targetRanges = settings.targetRanges,
                 language = settings.language,
                 unit = settings.unit
-            )
+            ).also { cachedStats = it }
+        }
+
+        // 7. Mean BG (Priority 7)
+        if (!excludeTypes.contains("mean") && todayReadings.isNotEmpty()) {
+            val stats = getStats()
             val isMmol = settings.unit == GlucoseUnit.MMOL_L
             val meanPrefix = if (isRu) "Ср: " else "Avg: "
             val meanFormatted = if (isMmol) {
@@ -1276,12 +1282,7 @@ object TirupWidgetUpdater {
 
         // 8. CV (Priority 8)
         if (!excludeTypes.contains("cv") && todayReadings.size >= 10) {
-            val stats = GlucoseMetricsCalculator.calculateStatistics(
-                readings = todayReadings,
-                targetRanges = settings.targetRanges,
-                language = settings.language,
-                unit = settings.unit
-            )
+            val stats = getStats()
             val cvPercent = stats.cvPercent.roundToInt()
             val cvColor = when {
                 isStale -> grayColor
@@ -1294,6 +1295,79 @@ object TirupWidgetUpdater {
                     type = "cv",
                     text = "CV: $cvPercent%",
                     color = cvColor
+                )
+            )
+        }
+
+        // 9. TAR (Priority 9 - Fallback when primary slots are free)
+        if (!excludeTypes.contains("tar") && todayReadings.isNotEmpty()) {
+            val stats = getStats()
+            val tarPercent = (stats.tarHighPercent + stats.tarVeryHighPercent).roundToInt()
+            val tarColor = when {
+                isStale -> grayColor
+                tarPercent <= 25 -> 0xFF10B981.toInt()
+                tarPercent <= 35 -> 0xFFF59E0B.toInt()
+                else -> 0xFFEF4444.toInt()
+            }
+            list.add(
+                WidgetBadge(
+                    type = "tar",
+                    text = "TAR: $tarPercent%",
+                    color = tarColor
+                )
+            )
+        }
+
+        // 10. TING (Priority 10 - Fallback)
+        if (!excludeTypes.contains("ting") && todayReadings.isNotEmpty()) {
+            val stats = getStats()
+            val tingPercent = stats.tingPercent.roundToInt()
+            val tingColor = when {
+                isStale -> grayColor
+                tingPercent >= settings.targetRanges.tingGoalPercent -> 0xFF10B981.toInt()
+                else -> 0xFF38BDF8.toInt()
+            }
+            list.add(
+                WidgetBadge(
+                    type = "ting",
+                    text = "TING: $tingPercent%",
+                    color = tingColor
+                )
+            )
+        }
+
+        // 11. TBR (Priority 11 - Fallback)
+        if (!excludeTypes.contains("tbr") && todayReadings.isNotEmpty()) {
+            val stats = getStats()
+            val tbrPercent = (stats.tbrLowPercent + stats.tbrVeryLowPercent).roundToInt()
+            val tbrColor = when {
+                isStale -> grayColor
+                tbrPercent <= 4 -> 0xFF10B981.toInt()
+                else -> 0xFFEF4444.toInt()
+            }
+            list.add(
+                WidgetBadge(
+                    type = "tbr",
+                    text = "TBR: $tbrPercent%",
+                    color = tbrColor
+                )
+            )
+        }
+
+        // 12. GMI (Priority 12 - Fallback)
+        if (!excludeTypes.contains("gmi") && todayReadings.isNotEmpty()) {
+            val stats = getStats()
+            val gmiColor = when {
+                isStale -> grayColor
+                stats.gmiPercent <= 7.0 -> 0xFF10B981.toInt()
+                stats.gmiPercent <= 8.0 -> 0xFFF59E0B.toInt()
+                else -> 0xFFEF4444.toInt()
+            }
+            list.add(
+                WidgetBadge(
+                    type = "gmi",
+                    text = String.format(Locale.US, "GMI: %.1f%%", stats.gmiPercent),
+                    color = gmiColor
                 )
             )
         }
