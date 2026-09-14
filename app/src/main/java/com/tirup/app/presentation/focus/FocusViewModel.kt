@@ -356,7 +356,7 @@ class FocusViewModel(
         viewModelScope.launch {
             val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
             com.tirup.app.data.ble.BleObserverManager.boostScanFor60Sec(ctx, settingsRepository, glucoseRepository)
-            val msg = if (isRu) "🔍 Активный поиск вещателя запущен (60 сек)" else "🔍 Boost scan active (60s)"
+            val msg = if (isRu) "🔍 Активный поиск запущен (60 сек)" else "🔍 Boost scan active (60s)"
             android.widget.Toast.makeText(ctx, msg, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
