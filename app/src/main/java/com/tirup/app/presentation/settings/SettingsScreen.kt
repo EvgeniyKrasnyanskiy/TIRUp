@@ -3837,7 +3837,11 @@ private fun Hba1cHistoryDialog(
                                 )
                                 if (meanGlucose90dMmol != null && tirPercent90d != null) {
                                     Text(
-                                        text = String.format(Locale.US, "ср. %.1f • TIR %.0f%%", meanGlucose90dMmol, tirPercent90d),
+                                        text = if (isRu) {
+                                            String.format(Locale.US, "ср. %.1f • TIR %d%%", meanGlucose90dMmol, tirPercent90d)
+                                        } else {
+                                            String.format(Locale.US, "mean %.1f • TIR %d%%", meanGlucose90dMmol, tirPercent90d)
+                                        },
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
