@@ -42,13 +42,18 @@ class StreamingGlucoseImporter(
 
     suspend fun importHistoricalFromUri(
         uri: Uri,
+        clearPrevious: Boolean = true,
+        seenTimestamps: MutableSet<Long>? = null,
         onProgress: (progress: Float, importedCount: Int) -> Unit = { _, _ -> }
     ): Result<Int> = withContext(Dispatchers.IO) {
         var totalImported = 0
 
         try {
-            // Clear previous historical dataset so each upload is fresh and isolated
-            database.historicalReadingDao().clearAll()
+            if (clearPrevious) {
+                // Clear previous historical dataset so each upload is fresh and isolated
+                database.historicalReadingDao().clearAll()
+                seenTimestamps?.clear()
+            }
             onProgress(0.02f, 0)
 
             val totalBytes: Long = try {
@@ -121,6 +126,7 @@ class StreamingGlucoseImporter(
                                     inputStream = countingStream,
                                     chunk = chunk,
                                     dateFormats = dateFormats,
+                                    seenTimestamps = seenTimestamps,
                                     onProgressUpdate = { inStreamCount ->
                                         val currentBytes = bytesAccumulator + countingStream.bytesRead
                                         val prog = (currentBytes.toFloat() / totalUncompressed.toFloat()).coerceIn(0.05f, 0.98f)
@@ -146,6 +152,7 @@ class StreamingGlucoseImporter(
                     inputStream = countingStream,
                     chunk = chunk,
                     dateFormats = dateFormats,
+                    seenTimestamps = seenTimestamps,
                     onProgressUpdate = { inStreamCount ->
                         val prog = (countingStream.bytesRead.toFloat() / expectedBytes.toFloat()).coerceIn(0.05f, 0.98f)
                         onProgress(prog, inStreamCount)
@@ -174,6 +181,7 @@ class StreamingGlucoseImporter(
         inputStream: InputStream,
         chunk: ArrayList<HistoricalReadingEntity>,
         dateFormats: List<SimpleDateFormat>,
+        seenTimestamps: MutableSet<Long>?,
         onProgressUpdate: (Int) -> Unit
     ): Int {
         var importedInStream = 0
@@ -296,6 +304,10 @@ class StreamingGlucoseImporter(
             }
 
             if (reading != null) {
+                if (seenTimestamps != null && !seenTimestamps.add(reading.timestamp)) {
+                    line = reader.readLine()
+                    continue
+                }
                 chunk.add(reading)
 
                 if (chunk.size >= CHUNK_SIZE) {

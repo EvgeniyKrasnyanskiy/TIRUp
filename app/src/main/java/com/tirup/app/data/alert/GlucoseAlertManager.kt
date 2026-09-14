@@ -728,7 +728,7 @@ object GlucoseAlertManager {
     /**
      * Test trigger directly from SettingsScreen buttons.
      */
-    fun sendTestAlert(context: Context, tier: AlertTier, isRu: Boolean) {
+    fun sendTestAlert(context: Context, tier: AlertTier, isRu: Boolean, volumePercent: Int = 80) {
         initChannels(context)
 
         val channelId = when (tier) {
@@ -765,7 +765,8 @@ object GlucoseAlertManager {
             text = text,
             tier = tier,
             vibrate = true,
-            flash = tier == AlertTier.CRITICAL
+            flash = tier == AlertTier.CRITICAL,
+            volumePercent = volumePercent
         )
     }
 

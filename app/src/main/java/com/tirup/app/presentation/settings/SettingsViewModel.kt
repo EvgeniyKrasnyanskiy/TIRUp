@@ -470,7 +470,8 @@ class SettingsViewModel(
 
     fun testAlert(tier: com.tirup.app.data.alert.AlertTier) {
         val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
-        com.tirup.app.data.alert.GlucoseAlertManager.sendTestAlert(context, tier, isRu)
+        val vol = _uiState.value.userSettings.alertSettings.alertVolumePercent
+        com.tirup.app.data.alert.GlucoseAlertManager.sendTestAlert(context, tier, isRu, vol)
     }
 
     fun playTestSound(volumePercent: Int) {

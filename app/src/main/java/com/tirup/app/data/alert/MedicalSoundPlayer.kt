@@ -338,7 +338,7 @@ object MedicalSoundPlayer {
             val sleepTimeMs = (data.size.toDouble() / SAMPLE_RATE * 1000.0).toLong() + 30L
             val step = 100L
             var elapsed = 0L
-            while (elapsed < sleepTimeMs && isPlayingActive && (usage != AudioAttributes.USAGE_ALARM || isCriticalActive || isSignalLossActive)) {
+            while (elapsed < sleepTimeMs && isPlayingActive) {
                 Thread.sleep(step)
                 elapsed += step
             }
