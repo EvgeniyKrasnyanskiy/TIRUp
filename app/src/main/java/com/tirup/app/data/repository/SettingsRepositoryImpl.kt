@@ -147,6 +147,7 @@ class SettingsRepositoryImpl(
             .putLong(KEY_HBA1C_SKIPPED_QUARTER_TIMESTAMP, settings.hba1cSkippedQuarterTimestamp)
             .putInt(KEY_HBA1C_REMINDERS_COUNT_IN_CYCLE, settings.hba1cRemindersCountInCycle)
             .putLong(KEY_LAST_HBA1C_REMINDER_TIMESTAMP, settings.lastHba1cReminderTimestamp)
+            .putInt(KEY_LAST_YEAR_END_DIGEST_SHOWN_YEAR, settings.lastYearEndDigestShownYear)
             .apply()
 
         try {
@@ -416,7 +417,8 @@ class SettingsRepositoryImpl(
             isHba1cReminderEnabled = prefs.getBoolean(KEY_IS_HBA1C_REMINDER_ENABLED, true),
             hba1cSkippedQuarterTimestamp = prefs.getLong(KEY_HBA1C_SKIPPED_QUARTER_TIMESTAMP, 0L),
             hba1cRemindersCountInCycle = prefs.getInt(KEY_HBA1C_REMINDERS_COUNT_IN_CYCLE, 0),
-            lastHba1cReminderTimestamp = prefs.getLong(KEY_LAST_HBA1C_REMINDER_TIMESTAMP, 0L)
+            lastHba1cReminderTimestamp = prefs.getLong(KEY_LAST_HBA1C_REMINDER_TIMESTAMP, 0L),
+            lastYearEndDigestShownYear = prefs.getInt(KEY_LAST_YEAR_END_DIGEST_SHOWN_YEAR, 0)
         )
     }
 
@@ -518,5 +520,6 @@ class SettingsRepositoryImpl(
         private const val KEY_HBA1C_SKIPPED_QUARTER_TIMESTAMP = "key_hba1c_skipped_quarter_timestamp"
         private const val KEY_HBA1C_REMINDERS_COUNT_IN_CYCLE = "key_hba1c_reminders_count_in_cycle"
         private const val KEY_LAST_HBA1C_REMINDER_TIMESTAMP = "key_last_hba1c_reminder_timestamp"
+        private const val KEY_LAST_YEAR_END_DIGEST_SHOWN_YEAR = "key_last_year_end_digest_shown_year"
     }
 }

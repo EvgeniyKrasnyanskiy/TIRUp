@@ -34,8 +34,14 @@ interface TreatmentDao {
     @Query("SELECT MAX(timestamp) FROM treatments")
     suspend fun getLatestTimestamp(): Long?
 
+    @Query("SELECT COUNT(*) FROM treatments WHERE timestamp BETWEEN :startTime AND :endTime")
+    suspend fun getCountBetween(startTime: Long, endTime: Long): Long
+
     @Query("SELECT * FROM treatments ORDER BY timestamp ASC LIMIT :limit OFFSET :offset")
     suspend fun getTreatmentsPaginated(limit: Int, offset: Int): List<TreatmentEntity>
+
+    @Query("SELECT * FROM treatments WHERE timestamp BETWEEN :startTime AND :endTime ORDER BY timestamp ASC LIMIT :limit OFFSET :offset")
+    suspend fun getTreatmentsBetweenPaginated(startTime: Long, endTime: Long, limit: Int, offset: Int): List<TreatmentEntity>
 
     @Query("SELECT * FROM treatments ORDER BY timestamp ASC")
     suspend fun getAllTreatments(): List<TreatmentEntity>

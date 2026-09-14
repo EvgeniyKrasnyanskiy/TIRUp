@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 sealed interface SettingsEvent {
@@ -47,7 +48,9 @@ data class SettingsUiState(
     val sensorGmi90d: Double? = null,
     val meanGlucose90dMmol: Double? = null,
     val tirPercent90d: Int? = null,
-    val showHba1cDialog: Boolean = false
+    val showHba1cDialog: Boolean = false,
+    val yearEndStats: YearEndStats? = null,
+    val showYearEndDialog: Boolean = false
 )
 
 class SettingsViewModel(
@@ -718,6 +721,175 @@ class SettingsViewModel(
                 isRu = isRu
             ).onSuccess { pdfFile ->
                 val fileName = "TIRUp_HbA1c_Report_${System.currentTimeMillis()}.pdf"
+                try {
+                    var savedPath = ""
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        val contentValues = android.content.ContentValues().apply {
+                            put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                            put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
+                            put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+                        }
+                        val uri = context.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                        if (uri != null) {
+                            context.contentResolver.openOutputStream(uri)?.use { out ->
+                                java.io.FileInputStream(pdfFile).use { input -> input.copyTo(out) }
+                            }
+                            savedPath = "Downloads/$fileName"
+                        }
+                    } else {
+                        val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                        val destFile = java.io.File(downloadsDir, fileName)
+                        java.io.FileInputStream(pdfFile).use { input ->
+                            java.io.FileOutputStream(destFile).use { output -> input.copyTo(output) }
+                        }
+                        savedPath = destFile.absolutePath
+                    }
+                    _events.emit(SettingsEvent.SavedToDownloads(savedPath))
+                } catch (e: Exception) {
+                    _events.emit(SettingsEvent.Info("Save failed: ${e.message}"))
+                }
+            }.onFailure { error ->
+                _events.emit(SettingsEvent.Info("Error: ${error.localizedMessage}"))
+            }
+        }
+    }
+
+    private val yearEndPdfGenerator = YearEndReportPdfGenerator(context)
+
+    fun setShowYearEndDialog(show: Boolean, year: Int? = null) {
+        _uiState.update { it.copy(showYearEndDialog = show) }
+        if (show) {
+            val targetYear = year ?: java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+            loadYearEndStats(targetYear)
+        }
+    }
+
+    fun loadYearEndStats(year: Int) {
+        viewModelScope.launch {
+            val stats = withContext(Dispatchers.IO) {
+                calculateYearEndStats(year)
+            }
+            _uiState.update { it.copy(yearEndStats = stats) }
+        }
+    }
+
+    private suspend fun calculateYearEndStats(year: Int): YearEndStats {
+        val startOfYear = java.util.Calendar.getInstance().apply {
+            set(year, java.util.Calendar.JANUARY, 1, 0, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val endOfYear = java.util.Calendar.getInstance().apply {
+            set(year, java.util.Calendar.DECEMBER, 31, 23, 59, 59)
+            set(java.util.Calendar.MILLISECOND, 999)
+        }.timeInMillis
+
+        val readings = database.glucoseReadingDao().getReadingsBetweenSync(startOfYear, endOfYear)
+        val isArchived = AutoBackupManager.getArchivedYears(context).contains(year)
+
+        if (readings.isEmpty()) {
+            return YearEndStats(
+                year = year,
+                totalReadings = 0,
+                monitoringDays = 0,
+                tirPercent = 0.0,
+                tarPercent = 0.0,
+                tbrPercent = 0.0,
+                meanGlucoseMmol = 0.0,
+                gmiPercent = 0.0,
+                bestMonthName = "",
+                bestMonthTir = 0.0,
+                bestStreakDays = _uiState.value.userSettings.bestStreakDays,
+                isArchived = isArchived
+            )
+        }
+
+        val totalCount = readings.size
+        val inRangeCount = readings.count { it.valueMmol in 3.9..10.0 }
+        val hypoCount = readings.count { it.valueMmol < 3.9 }
+        val hyperCount = readings.count { it.valueMmol > 10.0 }
+
+        val tir = (inRangeCount.toDouble() / totalCount) * 100.0
+        val tbr = (hypoCount.toDouble() / totalCount) * 100.0
+        val tar = (hyperCount.toDouble() / totalCount) * 100.0
+        val mean = readings.map { it.valueMmol }.average()
+        val gmi = 3.31 + 0.431 * mean
+
+        val dayFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        val activeDays = readings.map { dayFormat.format(java.util.Date(it.timestamp)) }.distinct().size
+
+        // Calculate best month
+        val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+        val monthCal = java.util.Calendar.getInstance()
+        val monthGroups = readings.groupBy {
+            monthCal.timeInMillis = it.timestamp
+            monthCal.get(java.util.Calendar.MONTH)
+        }
+        var bestMonthName = ""
+        var bestMonthTir = 0.0
+        for ((m, list) in monthGroups) {
+            if (list.size >= 50) {
+                val mTir = (list.count { it.valueMmol in 3.9..10.0 }.toDouble() / list.size) * 100.0
+                if (mTir > bestMonthTir) {
+                    bestMonthTir = mTir
+                    bestMonthName = when (m) {
+                        0 -> if (isRu) "Январь" else "January"
+                        1 -> if (isRu) "Февраль" else "February"
+                        2 -> if (isRu) "Март" else "March"
+                        3 -> if (isRu) "Апрель" else "April"
+                        4 -> if (isRu) "Май" else "May"
+                        5 -> if (isRu) "Июнь" else "June"
+                        6 -> if (isRu) "Июль" else "July"
+                        7 -> if (isRu) "Август" else "August"
+                        8 -> if (isRu) "Сентябрь" else "September"
+                        9 -> if (isRu) "Октябрь" else "October"
+                        10 -> if (isRu) "Ноябрь" else "November"
+                        else -> if (isRu) "Декабрь" else "December"
+                    }
+                }
+            }
+        }
+
+        return YearEndStats(
+            year = year,
+            totalReadings = totalCount,
+            monitoringDays = activeDays,
+            tirPercent = tir,
+            tarPercent = tar,
+            tbrPercent = tbr,
+            meanGlucoseMmol = mean,
+            gmiPercent = gmi,
+            bestMonthName = bestMonthName,
+            bestMonthTir = bestMonthTir,
+            bestStreakDays = _uiState.value.userSettings.bestStreakDays,
+            isArchived = isArchived
+        )
+    }
+
+    fun archiveYearArchive(year: Int) {
+        viewModelScope.launch {
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            val success = AutoBackupManager.archiveYear(year, context, database)
+            if (success) {
+                loadBackupSummary()
+                loadYearEndStats(year)
+                _events.emit(SettingsEvent.Info(if (isRu) "Архив $year года успешно создан в TIRUp/Backups" else "Annual archive for $year saved"))
+            } else {
+                _events.emit(SettingsEvent.Info(if (isRu) "Нет данных или ошибка создания архива" else "No data or archiving failed"))
+            }
+        }
+    }
+
+    fun exportYearEndReportToPdf(stats: YearEndStats) {
+        viewModelScope.launch {
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            val settings = _uiState.value.userSettings
+            yearEndPdfGenerator.generateYearEndReportPdf(
+                profile = settings.patientProfile,
+                stats = stats,
+                isRu = isRu
+            ).onSuccess { pdfFile ->
+                val fileName = "TIRUp_Year_End_${stats.year}_${System.currentTimeMillis()}.pdf"
                 try {
                     var savedPath = ""
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {

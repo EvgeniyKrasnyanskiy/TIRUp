@@ -45,6 +45,7 @@ class TirupApplication : Application() {
         com.tirup.app.data.worker.WeeklyDigestWorker.schedule(this)
         com.tirup.app.data.worker.DeviceStatusReminderWorker.schedule(this)
         com.tirup.app.data.worker.Hba1cReminderWorker.schedule(this)
+        com.tirup.app.data.worker.YearEndDigestWorker.schedule(this)
         com.tirup.app.data.ble.BleObserverManager.syncWithSettings(this, settingsRepository, glucoseRepository)
 
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO).launch {

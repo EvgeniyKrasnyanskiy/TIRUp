@@ -34,8 +34,14 @@ interface GlucoseReadingDao {
     @Query("SELECT MAX(timestamp) FROM glucose_readings")
     suspend fun getLatestTimestamp(): Long?
 
+    @Query("SELECT COUNT(*) FROM glucose_readings WHERE timestamp BETWEEN :startTime AND :endTime")
+    suspend fun getCountBetween(startTime: Long, endTime: Long): Long
+
     @Query("SELECT * FROM glucose_readings ORDER BY timestamp ASC LIMIT :limit OFFSET :offset")
     suspend fun getReadingsPaginated(limit: Int, offset: Int): List<GlucoseReadingEntity>
+
+    @Query("SELECT * FROM glucose_readings WHERE timestamp BETWEEN :startTime AND :endTime ORDER BY timestamp ASC LIMIT :limit OFFSET :offset")
+    suspend fun getReadingsBetweenPaginated(startTime: Long, endTime: Long, limit: Int, offset: Int): List<GlucoseReadingEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(reading: GlucoseReadingEntity): Long
