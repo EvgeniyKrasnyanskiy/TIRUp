@@ -68,8 +68,108 @@ data class AlertLogEntry(
     val tier: AlertTier,
     val title: String,
     val text: String,
+    val titleEn: String = "",
+    val textEn: String = "",
     val isTest: Boolean = false
-)
+) {
+    fun localizedTitle(isRu: Boolean): String {
+        if (!isRu && titleEn.isNotBlank()) return titleEn
+        if (isRu && !hasEnglishChars(title)) return title
+        return translateAlertTitle(title, isRu)
+    }
+
+    fun localizedText(isRu: Boolean): String {
+        if (!isRu && textEn.isNotBlank()) return textEn
+        if (isRu && !hasEnglishChars(text)) return text
+        return translateAlertText(text, isRu)
+    }
+
+    companion object {
+        private fun hasEnglishChars(str: String): Boolean {
+            return str.any { it in 'a'..'z' || it in 'A'..'Z' }
+        }
+
+        fun translateAlertTitle(title: String, toRu: Boolean): String {
+            return if (toRu) {
+                title
+                    .replace("🔔 Test Alert", "🔔 Тест оповещения")
+                    .replace("⚡ PREDICTIVE: IMMINENT HYPO", "⚡ УПРЕЖДЕНИЕ: СКОРАЯ ГИПОГЛИКЕМИЯ")
+                    .replace("🚨 EXTREMELY LOW GLUCOSE!", "🚨 ЭКСТРЕМАЛЬНО НИЗКИЙ САХАР!")
+                    .replace("🚨 PROLONGED HYPO", "🚨 ЗАТЯЖНАЯ ГИПОГЛИКЕМИЯ")
+                    .replace("🚨 EXTREMELY HIGH GLUCOSE!", "🚨 ЭКСТРЕМАЛЬНО ВЫСОКИЙ САХАР!")
+                    .replace("🚨 PROLONGED HYPER", "🚨 ЗАТЯЖНАЯ ГИПЕРГЛИКЕМИЯ")
+                    .replace("🔔 Glucose Below Target!", "🔔 Сахар ниже нормы!")
+                    .replace("🔔 Glucose Above Target!", "🔔 Сахар выше нормы!")
+                    .replace("⚡ Predicted Low", "⚡ Прогноз гипогликемии")
+                    .replace("⚡ Predicted High", "⚡ Прогноз гипергликемии")
+                    .replace("📡 Sensor Signal Lost", "📡 Потеря связи с сенсором")
+                    .replace(" min", " мин")
+                    .replace(" MIN", " МИН")
+            } else {
+                title
+                    .replace("🔔 Тест оповещения", "🔔 Test Alert")
+                    .replace("⚡ УПРЕЖДЕНИЕ: СКОРАЯ ГИПОГЛИКЕМИЯ", "⚡ PREDICTIVE: IMMINENT HYPO")
+                    .replace("🚨 ЭКСТРЕМАЛЬНО НИЗКИЙ САХАР!", "🚨 EXTREMELY LOW GLUCOSE!")
+                    .replace("🚨 ЗАТЯЖНАЯ ГИПОГЛИКЕМИЯ", "🚨 PROLONGED HYPO")
+                    .replace("🚨 ЭКСТРЕМАЛЬНО ВЫСОКИЙ САХАР!", "🚨 EXTREMELY HIGH GLUCOSE!")
+                    .replace("🚨 ЗАТЯЖНАЯ ГИПЕРГЛИКЕМИЯ", "🚨 PROLONGED HYPER")
+                    .replace("🔔 Сахар ниже нормы!", "🔔 Glucose Below Target!")
+                    .replace("🔔 Сахар выше нормы!", "🔔 Glucose Above Target!")
+                    .replace("⚡ Прогноз гипогликемии", "⚡ Predicted Low")
+                    .replace("⚡ Прогноз гипергликемии", "⚡ Predicted High")
+                    .replace("📡 Потеря связи с сенсором", "📡 Sensor Signal Lost")
+                    .replace(" мин", " min")
+                    .replace(" МИН", " MIN")
+            }
+        }
+
+        fun translateAlertText(text: String, toRu: Boolean): String {
+            return if (toRu) {
+                text
+                    .replace("Current glucose:", "Текущий сахар:")
+                    .replace("Take fast-acting carbs now!", "Срочно примите быстрые углеводы!")
+                    .replace("Check ketones and take correction bolus!", "Проверьте кетоны и сделайте коррекцию!")
+                    .replace("Testing sound and vibration for", "Проверка громкости и вибрации для уровня")
+                    .replace("Glucose dropping rapidly:", "Сахар стремительно падает:")
+                    .replace("Take carbs now!", "Примите углеводы!")
+                    .replace("below threshold", "ниже порога")
+                    .replace("below", "ниже")
+                    .replace("above threshold", "выше порога")
+                    .replace("above", "выше")
+                    .replace("threshold", "порога")
+                    .replace("Expected", "Ожидается")
+                    .replace(" at ", " в ")
+                    .replace("rate:", "скорость:")
+                    .replace("mmol/min", "ммоль/мин")
+                    .replace("mmol/L", "ммоль/л")
+                    .replace("No CGM readings for", "Нет данных от сенсора более")
+                    .replace("Check Bluetooth and transmitter.", "Проверьте Bluetooth и трансмиттер.")
+                    .replace(" min.", " мин.")
+                    .replace(" min", " мин")
+            } else {
+                text
+                    .replace("Текущий сахар:", "Current glucose:")
+                    .replace("Срочно примите быстрые углеводы!", "Take fast-acting carbs now!")
+                    .replace("Проверьте кетоны и сделайте коррекцию!", "Check ketones and take correction bolus!")
+                    .replace("Проверка громкости и вибрации для уровня", "Testing sound and vibration for")
+                    .replace("Сахар стремительно падает:", "Glucose dropping rapidly:")
+                    .replace("Примите углеводы!", "Take carbs now!")
+                    .replace("ниже порога", "below threshold")
+                    .replace("выше порога", "above threshold")
+                    .replace("порога", "threshold")
+                    .replace("Ожидается", "Expected")
+                    .replace(" в ", " at ")
+                    .replace("скорость:", "rate:")
+                    .replace("ммоль/мин", "mmol/min")
+                    .replace("ммоль/л", "mmol/L")
+                    .replace("Нет данных от сенсора более", "No CGM readings for")
+                    .replace("Проверьте Bluetooth и трансмиттер.", "Check Bluetooth and transmitter.")
+                    .replace(" мин.", " min.")
+                    .replace(" мин", " min")
+            }
+        }
+    }
+}
 
 object GlucoseAlertManager {
 
@@ -81,7 +181,14 @@ object GlucoseAlertManager {
     private val _dailyAlertLogs = kotlinx.coroutines.flow.MutableStateFlow<List<AlertLogEntry>>(emptyList())
     val dailyAlertLogs: kotlinx.coroutines.flow.StateFlow<List<AlertLogEntry>> = _dailyAlertLogs
 
-    fun logAlert(tier: AlertTier, title: String, text: String, isTest: Boolean = false) {
+    fun logAlert(
+        tier: AlertTier,
+        title: String,
+        text: String,
+        titleEn: String = "",
+        textEn: String = "",
+        isTest: Boolean = false
+    ) {
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
@@ -95,6 +202,8 @@ object GlucoseAlertManager {
             tier = tier,
             title = title,
             text = text,
+            titleEn = titleEn,
+            textEn = textEn,
             isTest = isTest
         )
         val current = _dailyAlertLogs.value.filter { it.timestamp >= todayStart }

@@ -2570,9 +2570,10 @@ private fun DailyAlertLogsDialog(
                                     )
                                 }
                                 val pauseBtnLabel = if (selectedMinutes >= 60) {
-                                    "${selectedMinutes / 60} ч"
+                                    val h = selectedMinutes / 60
+                                    if (isRu) "$h ч" else "${h}h"
                                 } else {
-                                    "$selectedMinutes мин"
+                                    if (isRu) "$selectedMinutes м" else "${selectedMinutes}m"
                                 }
                                 OutlinedButton(
                                     onClick = { onPauseAlerts(selectedMinutes * 60_000L) },
@@ -2595,7 +2596,12 @@ private fun DailyAlertLogsDialog(
                             ) {
                                 presets.forEach { mins ->
                                     val isSelected = mins == selectedMinutes
-                                    val label = if (mins >= 60) "${mins / 60}ч" else "${mins}м"
+                                    val label = if (mins >= 60) {
+                                        val h = mins / 60
+                                        if (isRu) "${h}ч" else "${h}h"
+                                    } else {
+                                        if (isRu) "${mins}м" else "${mins}m"
+                                    }
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
                                         color = if (isSelected) ActionBlue else MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
@@ -2707,13 +2713,13 @@ private fun DailyAlertLogsDialog(
                                     )
                                 }
                                 Text(
-                                    text = entry.title,
+                                    text = entry.localizedTitle(isRu),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = entry.text,
+                                    text = entry.localizedText(isRu),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
