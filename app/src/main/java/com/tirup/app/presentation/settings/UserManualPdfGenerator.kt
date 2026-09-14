@@ -172,96 +172,90 @@ class UserManualPdfGenerator(private val context: Context) {
                 else "Data linking, Broadcast Service API, desktop widgets & daily target compensator"
             )
 
-            // Section 1: Data Sources & Broadcast API
+            // Section 1: Data Sources & Family BLE Bridge
             y1 = drawSection(
                 canvas = canvas1,
                 startY = y1,
-                title = if (isRu) "1. Интеграция с источниками данных (xDrip+, GlucoDataHandler, Juggluco)"
-                else "1. Linking Data Sources (xDrip+, GlucoDataHandler, Juggluco)",
+                title = if (isRu) "1. Интеграция с источниками данных и Семейный BLE-мост"
+                else "1. Linking Data Sources & Family BLE Bridge",
                 items = listOf(
                     Triple(
-                        if (isRu) "Широковещательные передачи xDrip" else "Local Broadcast Toggle",
+                        if (isRu) "Широковещательные передачи (xDrip+, GDH, Juggluco)" else "Local Broadcast Toggle (xDrip+, GDH)",
                         if (isRu) "Шаг 1" else "Step 1",
-                        if (isRu) "xDrip+ ➔ Настройки xDrip+ ➔ «Межпрограммная интеграция» ➔ включите «Широковещательные передачи xDrip» и «Совместимый широковещатель». Приём работает полностью автономно без интернета при каждом замере."
-                        else "xDrip+ ➔ Settings ➔ 'Inter-app settings' ➔ enable 'Broadcast locally' and 'Compatible Broadcast'. Runs 100% offline without cloud servers."
-                    ),
-                    Triple(
-                        if (isRu) "Широковещательная служба и веб-сервер (IoB)" else "Broadcast Service & Web Server (IoB)",
-                        if (isRu) "Шаг 2" else "Step 2",
-                        if (isRu) "В «Межпрограммная интеграция» включите «Поддержка широковещательной службы», а в «Локальный веб-сервер» включите «Включить сообщения об IoB в конечной точке Web Service API...» для передачи активного инсулина (IoB)."
-                        else "In 'Inter-app settings' enable 'Broadcast service support' and under 'Local Web Server' enable 'Show IOB in Web Service API endpoints' for active insulin (IoB)."
+                        if (isRu) "В xDrip+ ➔ Настройки ➔ «Межпрограммная интеграция» включите «Широковещательные передачи xDrip» и «Поддержка широковещательной службы» (для передачи IoB/CoB). Приём работает на 100% автономно без интернета."
+                        else "In xDrip+ ➔ Settings ➔ 'Inter-app settings' enable 'Broadcast locally' and 'Broadcast service support' (for IoB/CoB). Runs 100% offline without cloud servers."
                     ),
                     Triple(
                         if (isRu) "Бесперебойная работа в фоне (Батарея)" else "Unrestricted Background Running (Battery)",
-                        if (isRu) "Шаг 3" else "Step 3",
-                        if (isRu) "В настройках Android для TIRUp и источника (xDrip+) отключите оптимизацию батареи и разрешите работу в фоне без ограничений. Это гарантирует надёжный приём данных и тревог."
-                        else "In Android settings for TIRUp and xDrip+, disable 'Battery Optimization' and allow unrestricted background execution. Guarantees uninterrupted data sync and instant alarms."
+                        if (isRu) "Шаг 2" else "Step 2",
+                        if (isRu) "В настройках Android для TIRUp и источника отключите оптимизацию батареи («Без ограничений») и закрепите TIRUp замком в недавних задачах для надёжного приёма данных и мгновенных тревог."
+                        else "In Android settings for TIRUp and source app, disable 'Battery Optimization' and allow unrestricted background execution. Lock TIRUp in recent apps to guarantee uninterrupted sync."
+                    ),
+                    Triple(
+                        if (isRu) "Семейный BLE-мост (без интернета, радиус 10–15м)" else "Family BLE Bridge (100% Offline, 10–15m Range)",
+                        if (isRu) "BLE-мост" else "BLE Bridge",
+                        if (isRu) "Прямая связь родитель–ребёнок по Bluetooth Low Energy раз в 60с без сопряжения и интернета. Режимы «Вещатель» и «Наблюдатель», защита Family PIN. Статус «RX» означает ожидание первого пакета."
+                        else "Direct parent-child link over BLE every 60s without pairing or internet. 'Broadcaster' and 'Observer' modes, protected by Family PIN. 'RX' badge indicates waiting for the first incoming packet."
                     )
                 ),
-                cardHeight = 39f
+                cardHeight = 41f
             )
 
-            // Section 2: Homescreen & Lockscreen Widgets
+            // Section 2: Homescreen, Lockscreen Widgets & Floating Bubble
             y1 = drawSection(
                 canvas = canvas1,
                 startY = y1,
-                title = if (isRu) "2. Виджеты рабочего стола и экран блокировки" else "2. Desktop & Lockscreen Widgets",
+                title = if (isRu) "2. Виджеты рабочего стола, экран блокировки и Пузырёк" else "2. Desktop, Lockscreen Widgets & Floating Bubble",
                 items = listOf(
                     Triple(
                         if (isRu) "5 форматов виджетов (5х1, 4х2, 3х2, 2х2, 1х2)" else "5 Widget Formats (5x1, 4x2, 3x2, 2x2, 1x2)",
                         if (isRu) "Рабочий стол" else "Homescreen",
-                        if (isRu) "Горизонтальная полоса (5х1), дашборд с 4-часовым графиком Canvas (4х2/3х2), квадратный фокус (2х2) и вертикальный стек (1х2). Все виджеты адаптируются под сетку лончера."
-                        else "Horizontal strip (5x1), HD 4-hour Canvas sparkline dashboard (4x2/3x2), compact square (2x2) and vertical glance (1x2). Auto-scale to launcher grid."
-                    ),
-                    Triple(
-                        if (isRu) "Цветовое кодирование гликемии" else "Glycemic Range Color Standards",
-                        if (isRu) "Цвета" else "Colors",
-                        if (isRu) "<3.9 ммоль/л — красный; 3.9..7.8 — бледно-зелёный; 7.9..10.0 — насыщенный изумрудный; 10.1..13.9 — оранжевый; >13.9 — красный."
-                        else "<3.9 mmol/L Red; 3.9..7.8 Pale Green; 7.9..10.0 Saturated Emerald; 10.1..13.9 Orange; >13.9 Red. Syncs across all widgets."
-                    ),
-                    Triple(
-                        if (isRu) "Бейджи IoB/CoB и Стрик (🔥 X д.)" else "IoB/CoB Badges & Streak (🔥)",
-                        if (isRu) "Индикаторы" else "Badges",
-                        if (isRu) "Отображают дозы активного инсулина (💉) и углеводов (🍞). Счётчик 🔥 X д. показывает серию дней в цели TIR."
-                        else "Display active insulin (💉) & carbs (🍞). Streak badge 🔥 shows consecutive days reaching TIR target."
+                        if (isRu) "Полоса (5х1), дашборд с 4-часовым HD графиком Canvas (4х2/3х2), фокус (2х2) и вертикальный стек (1х2). Цветовая шкала гликемии, индикаторы IoB (💉), CoB (🍞) и стрик дней в норме (🔥)."
+                        else "Horizontal strip (5x1), 4-hour Canvas dashboard (4x2/3x2), compact square (2x2) and vertical glance (1x2). Color-coded glucose scale, IoB (💉), CoB (🍞) and daily streak (🔥)."
                     ),
                     Triple(
                         if (isRu) "Экран блокировки и прозрачность подложки (0%..100%)" else "Lockscreen Status & Background Opacity",
                         if (isRu) "AOD & Шторка" else "AOD & Slider",
-                        if (isRu) "Постоянный статус сахара и TIR на экране блокировки/AOD. В настройках доступен плавный ползунок прозрачности 0%..100% с живым окном предпросмотра на фоне обоев."
+                        if (isRu) "Постоянный статус сахара и TIR на экране блокировки/AOD. В настройках доступен плавный ползунок прозрачности 0%..100% с живым окном предпросмотра на фоне обоев рабочего стола."
                         else "Ongoing glucose & TIR notification on Lockscreen/AOD. Features smooth 0%..100% background opacity slider with live desktop wallpaper preview."
+                    ),
+                    Triple(
+                        if (isRu) "Плавающий оверлей «Пузырёк» и Адаптивный снуз" else "Floating Glucose Bubble & Adaptive Snooze",
+                        if (isRu) "Пузырёк" else "Bubble",
+                        if (isRu) "Кружок поверх экрана (мини 50% в норме, 60dp при тревоге с «кругами на воде» при гипо). Тап глушит сирену и снузит на 15/45м, удержание (≥0.5с) открывает TIRUp."
+                        else "Circular overlay (compact 50% in target, 60dp alarm mode with pulsating ripple waves on hypo). Short tap silences alarm & snoozes for 15/45m, hold (≥0.5s) opens TIRUp."
                     )
                 ),
-                cardHeight = 40f
+                cardHeight = 41f
             )
 
-            // Section 3: Daily Compensator
+            // Section 3: Daily Compensator, Weekly & New Year Digest
             drawSection(
                 canvas = canvas1,
                 startY = y1,
-                title = if (isRu) "3. Суточная математика компенсатора цели (TIR ≥70% / TING ≥50%)"
-                else "3. Strict 24-Hour Target Compensator (TIR ≥70% / TING ≥50%)",
+                title = if (isRu) "3. Суточный компенсатор цели, Воскресный и Новогодний дайджест"
+                else "3. Daily Target Compensator, Weekly & New Year Digest",
                 items = listOf(
                     Triple(
                         if (isRu) "Принцип строгих суток (00:00:00 – 23:59:59)" else "24-Hour Daily Strict Calculus",
                         if (isRu) "Математика" else "Math Engine",
-                        if (isRu) "Компенсатор рассчитывает точное время в часах и минутах, которое необходимо провести в норме до конца суток. Виджет показывает: «Осталось 2ч 15м в норме» или «Цель 100%»."
-                        else "Calculates exact remaining hours/minutes needed in target before midnight. Formatted concisely on widgets: 'In range 2h 15m' or 'Goal reached! (100%)'."
+                        if (isRu) "Компенсатор рассчитывает точное время в часах и минутах, которое необходимо провести в норме до конца суток (TIR ≥70% / TING ≥50%). Виджет показывает: «Осталось 2ч 15м в норме» или «Цель 100%»."
+                        else "Calculates exact remaining hours/minutes needed in target before midnight (TIR ≥70% / TING ≥50%). Concisely formatted on widgets: 'In range 2h 15m' or 'Goal reached! (100%)'."
                     ),
                     Triple(
                         if (isRu) "Уведомление «Последний шанс для TIR»" else "'Last Chance TIR' Proactive Alert",
                         if (isRu) "Предупреждение" else "Warning",
-                        if (isRu) "Срабатывает за 1ч, 1.5ч или 2ч до точки невозврата, когда суммарное оставшееся время суток становится меньше времени, необходимого для достижения целевого TIR ≥70%."
-                        else "Alerts 1h, 1.5h or 2h before mathematical point of no return when remaining day time cannot mathematically rescue the daily 70% TIR target."
+                        if (isRu) "Срабатывает за 1–2ч до точки математического невозврата, когда оставшееся время суток уже не позволяет достичь суточной цели TIR ≥70% без немедленного возврата в норму."
+                        else "Alerts 1h or 2h before the mathematical point of no return when remaining day time cannot mathematically rescue the daily 70% TIR target."
                     ),
                     Triple(
-                        if (isRu) "Воскресный аналитический дайджест (20:00)" else "Sunday Compensation Digest (20:00)",
-                        if (isRu) "Дайджест недели" else "Weekly Review",
-                        if (isRu) "Каждое воскресенье формирует интерактивный отчёт: средний сахар, TIR, вариабельность и динамику к прошлой неделе (±Δ%). Сохраняется в архиве отчётов."
-                        else "Every Sunday generates an interactive review: avg glucose, TIR, variability, and week-over-week comparison (±Δ%). Saved to persistent reports archive."
+                        if (isRu) "Воскресный дайджест (20:00) и Итоги года 31 декабря" else "Sunday Digest (20:00) & Year-End Digest (Dec 31)",
+                        if (isRu) "Дайджесты" else "Digests",
+                        if (isRu) "Еженедельный разбор в воскресенье в 20:00 со сравнением динамики (±Δ%). 31 декабря в 20:00 формируется праздничный новогодний дайджест за год с экспортом открытки в PDF."
+                        else "Weekly review every Sunday at 20:00 with week-over-week dynamic delta comparison (±Δ%). On Dec 31 at 20:00 delivers an annual review modal dialog and postcard PDF."
                     )
                 ),
-                cardHeight = 40f
+                cardHeight = 41f
             )
 
             // Page 1 Footer Note
@@ -281,7 +275,7 @@ class UserManualPdfGenerator(private val context: Context) {
             document.finishPage(page1)
 
             // =========================================================================
-            // PAGE 2: Smart Alarms, Sleep Window Signal Loss, Bubble & AGP Reports
+            // PAGE 2: Smart Alarms, Clinical Analytics, HbA1c & Zero-Lag Backups
             // =========================================================================
             val pageInfo2 = PdfDocument.PageInfo.Builder(595, 842, 2).create()
             val page2 = document.startPage(pageInfo2)
@@ -292,16 +286,16 @@ class UserManualPdfGenerator(private val context: Context) {
                 pageNum = 2,
                 totalPages = 2,
                 pageTitle = if (isRu) "TIRUp • Руководство пользователя (Часть 2)" else "TIRUp • User Manual (Part 2)",
-                pageSubtitle = if (isRu) "Четырёхуровневые тревоги, умное пробуждение ночью, пузырёк сахара и клинический AGP"
-                else "4-Tier alarms, sleep-aware wake schedule, floating bubble & clinical AGP reporting"
+                pageSubtitle = if (isRu) "Система тревог, экстренные SMS, клинический AGP, журнал HbA1c и Zero-Lag архивы"
+                else "Safety alarms, emergency SMS, clinical AGP, HbA1c journal & Zero-Lag archives"
             )
 
             // Section 4: 4-Tier Safety Alarms & Signal Loss
             y2 = drawSection(
                 canvas = canvas2,
                 startY = y2,
-                title = if (isRu) "4. Четырёхуровневая система тревог и потеря сенсора (Tier 1–4)"
-                else "4. 4-Tier Safety Alarms & Sleep-Aware Signal Loss (Tier 1–4)",
+                title = if (isRu) "4. Четырёхуровневая система тревог и экстренная безопасность (Tier 1–4)"
+                else "4. 4-Tier Safety Alarms & Emergency Protocols (Tier 1–4)",
                 items = listOf(
                     Triple(
                         if (isRu) "Уровень 1: Предиктивный прогноз и тренд на графике" else "Tier 1: Predictive Forecast & Chart Trend",
@@ -318,60 +312,25 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Уровень 3: Критическая сирена («кричащая»)" else "Tier 3: Critical Siren (Extremes & Prolonged)",
                         if (isRu) "Сирена + Вспышка" else "Alarm + Strobe",
-                        if (isRu) "DND-обход, громкость ≥80%, вспышка при <3.0 / >13.9. Без реакции: гипо каждые 5м, гипер каждые 15м. Снуз: 15м (гипо) / 45–60м (гипер с IoB). Глушение тапом/кнопками."
-                        else "DND bypass, volume ≥80%, camera strobe for <3.0 / >13.9. Unanswered: hypo every 5m, hyper every 15m. Snooze: 15m (hypo) / 45-60m (hyper with IoB). Mute via tap/buttons."
+                        if (isRu) "DND-обход, громкость ≥80%, вспышка при <3.0 / >13.9. Без реакции: гипо каждые 5м, гипер каждые 15м. Снуз: 15м (гипо с защитой от комы при <2.8) / 45–60м (гипер с IoB). Глушение кнопками громкости."
+                        else "DND bypass, volume ≥80%, camera strobe for <3.0 / >13.9. Unanswered: hypo every 5m, hyper every 15m. Snooze: 15m (coma guard <2.8) / 45-60m (hyper with IoB). Mute via volume buttons."
                     ),
                     Triple(
-                        if (isRu) "Уровень 4: Потеря сигнала (20–25 мин, будильник + расписание дня/ночи)" else "Tier 4: Sleep-Aware Signal Loss Alarm (20–25 min)",
-                        if (isRu) "Будильник DND" else "Bypass DND",
-                        if (isRu) "Приравнена к будильнику (USAGE_ALARM + Bypass DND). Срабатывает через 20–25 мин (с учётом шага сенсора 5 мин). Ночью: 6x5м ➔ 6x10м ➔ 6x20м ➔ каждые 30м. Днём: 3x5м ➔ 3x20м ➔ каждый 1 час."
-                        else "Treated as alarm (USAGE_ALARM + Bypass DND). Triggers in 20-25 min (factoring 5-min cadence). Night: 6x5m ➔ 6x10m ➔ 6x20m ➔ 30m. Day: 3x5m ➔ 3x20m ➔ 60m."
-                    ),
-                    Triple(
-                        if (isRu) "Экстренное SOS SMS и Офлайн-запрос (при потере сознания / шатдауне)" else "Emergency SOS SMS & Offline SMS Query",
-                        if (isRu) "Близкие & SOS" else "SOS & Offline",
-                        if (isRu) "При тяжелой гипо (<3.0) отправляет SMS близким с координатами. При шатдауне интернета контакт запрашивает сахар по SMS («сахар»). Важно: в Android выдайте право SMS (если ответ не идёт, переключите Разрешить/Запретить)."
-                        else "Sends single-segment SMS (≤67 chars) with GPS if severe hypo (<3.0) siren is ignored for 5m. Trusted contact can query real-time glucose & TIR offline via SMS."
-                    )
-                ),
-                cardHeight = 42f
-            )
-
-            // Section 5: Floating Bubble & Adaptive Snooze
-            y2 = drawSection(
-                canvas = canvas2,
-                startY = y2,
-                title = if (isRu) "5. Плавающий оверлей «Пузырёк» и Адаптивный снуз"
-                else "5. Floating Glucose Bubble & Adaptive Snooze",
-                items = listOf(
-                    Triple(
-                        if (isRu) "Плавающий оверлей (60x60dp и мини 50%)" else "Floating Bubble (60x60dp & 50% mini)",
-                        if (isRu) "Оверлей" else "Overlay",
-                        if (isRu) "Кружок поверх экрана. В норме скрыт или (при включении постоянного режима) уменьшен в 2 раза (тап открывает TIRUp). Вне нормы — тревожный размер 60dp."
-                        else "Strictly circular overlay. In target: hidden or (if always-on enabled) compact 50% (tap opens TIRUp). Out of range: expands to 60dp alarm mode."
-                    ),
-                    Triple(
-                        if (isRu) "Умный снуз, удержание и круги на воде" else "Smart Snooze, Hold to Open & Ripple Wave",
-                        if (isRu) "Снуз & Тап" else "Tap & Hold",
-                        if (isRu) "При тревоге: короткий тап глушит звук и снузит на 15/45м, долгое нажатие (≥0.5с) открывает TIRUp. При гипо (<3.9) пульсируют «круги на воде»."
-                        else "In alarm: short tap silences sound & snoozes for 15/45m, hold (≥0.5s) opens TIRUp. Hypoglycemia (<3.9) triggers pulsating outward water ripple waves."
-                    ),
-                    Triple(
-                        if (isRu) "Клинический протокол снуза тревог" else "Clinical Snooze Safety Protocol",
-                        if (isRu) "Безопасность" else "Safety Guard",
-                        if (isRu) "При гипо — 15м снуза с защитой от комы (сброс при критически низком сахаре (<2.8) или быстром падении). При гипер — пауза 45м, а при активном инсулине (IoB ≥0.2 / ≥0.5 при >13.9) — авто-продление до 60м."
-                        else "Hypo: 15m snooze with coma guard (resets if <2.8 or drop rate ≤-0.3). Hyper: 45m pause, extended to 60m with active bolus (IoB ≥0.2 / ≥0.5 if >13.9)."
+                        if (isRu) "Уровень 4: Потеря сигнала (20–25 мин) и Экстренные SOS SMS" else "Tier 4: Sleep-Aware Signal Loss & Emergency SOS SMS",
+                        if (isRu) "Будильник & SOS" else "Alarm & SOS",
+                        if (isRu) "Сигнал будильника (USAGE_ALARM + Bypass DND) с расписанием день/ночь. При игноре сирены гипо 5м отправляет близким SOS SMS с GPS. При шатдауне интернета близкие запрашивают сахар по SMS («сахар»)."
+                        else "Treated as alarm with day/night wake schedule. Sends SMS with GPS if severe hypo siren ignored for 5m. Trusted contact can query glucose offline via SMS ('sugar')."
                     )
                 ),
                 cardHeight = 41f
             )
 
-            // Section 6: Clinical AGP, Patterns, Device Supplies & Automated Backups
-            drawSection(
+            // Section 5: Clinical AGP, Patterns & Laboratory HbA1c
+            y2 = drawSection(
                 canvas = canvas2,
                 startY = y2,
-                title = if (isRu) "6. Клиническая аналитика AGP, паттерны, расходники и Автобэкап"
-                else "6. Clinical AGP, Patterns, Supplies Trackers & Daily Auto-Backup",
+                title = if (isRu) "5. Клиническая аналитика AGP, паттерны и Журнал HbA1c"
+                else "5. Clinical AGP, Patterns & Laboratory HbA1c Journal",
                 items = listOf(
                     Triple(
                         if (isRu) "Амбулаторный гликемический профиль (AGP по стандарту ATTD/ADA)" else "Official Ambulatory Glucose Profile (AGP)",
@@ -386,19 +345,42 @@ class UserManualPdfGenerator(private val context: Context) {
                         else "Detects hidden nocturnal dips during user sleep window, dawn phenomenon, and post-meal spikes with individual per-event dismiss (✕)."
                     ),
                     Triple(
+                        if (isRu) "Журнал лабораторного HbA1c и квартальный контроль" else "Laboratory HbA1c Journal & Quarterly Tracking",
+                        if (isRu) "HbA1c & GMI" else "HbA1c & GMI",
+                        if (isRu) "Ввод анализов крови, сопоставление с 90-дневным расчетным GMI сенсора и TIR. Напоминания раз в 90 дней (защита от спама, кнопка пропуска) и экспорт 1-страничной выписки в PDF."
+                        else "Logging lab blood tests, comparison with 90-day sensor GMI and TIR. Quarterly reminders every 90 days (anti-spam guard, skip button) and 1-page PDF export."
+                    )
+                ),
+                cardHeight = 41f
+            )
+
+            // Section 6: Device Supplies, Zero-Lag Archives & Backups
+            drawSection(
+                canvas = canvas2,
+                startY = y2,
+                title = if (isRu) "6. Расходники, Zero-Lag архивы и Резервное копирование"
+                else "6. Device Supplies, Zero-Lag Archives & Backups",
+                items = listOf(
+                    Triple(
                         if (isRu) "Счётчики смены устройств и расходников (сенсор, канюля, ланцет)" else "Device & Supplies Change Trackers (Sensor, Cannula, Lancet)",
                         if (isRu) "Расходники" else "Supplies",
                         if (isRu) "Учёт срока службы сенсора CGM, канюли помпы и ланцета. Автоопределение смены из заметок («канюля»), цветовая индикация (зелёный/жёлтый/красный) и предупреждения об истечении."
                         else "Tracks remaining lifespan of CGM sensor, infusion set/cannula and lancet. Auto-detects changes from notes ('cannula'), color alerts (green/amber/red) & timely replacement reminders."
                     ),
                     Triple(
-                        if (isRu) "Ежедневный автономный автобэкап в 00:00" else "Daily Exact Auto-Backup at 00:00",
-                        if (isRu) "Автобэкап" else "Backup",
-                        if (isRu) "Автоматический бэкап в полночь: настройки и база данных сохраняются в изолированную песочницу без запроса опасных системных разрешений на доступ к файлам."
-                        else "Midnight auto-backup: settings and database are saved into app sandbox without dangerous storage permissions."
+                        if (isRu) "Zero-Lag годовая архивация данных" else "Zero-Lag Annual History Archiving",
+                        if (isRu) "Архив года" else "Year Archive",
+                        if (isRu) "Автоматическое запечатывание завершённых лет в файлы tirup_readings_YYYY.csv. База данных остаётся компактной и летает мгновенно даже при непрерывном ведении 1–5 лет."
+                        else "Automatically seals past calendar years into tirup_readings_YYYY.csv files. Database remains lightweight and snappy even across 1–5 years of continuous records."
+                    ),
+                    Triple(
+                        if (isRu) "Автобэкап в полночь и ручной экспорт в ZIP" else "Midnight Auto-Backup & Manual ZIP Export",
+                        if (isRu) "Бэкап & ZIP" else "Backup & ZIP",
+                        if (isRu) "Ежедневный ночной автобэкап в изолированную песочницу в 23:59:59 без запроса системных прав. Экспорт полного архива настроек и базы данных в ZIP в Documents/TIRUp/Backups/."
+                        else "Daily midnight auto-backup into app sandbox at 23:59:59 without storage permissions. Manual export of full database & settings ZIP into Documents/TIRUp/Backups/."
                     )
                 ),
-                cardHeight = 39f
+                cardHeight = 41f
             )
 
             // Page 2 Footer Note: Medical Disclaimer
