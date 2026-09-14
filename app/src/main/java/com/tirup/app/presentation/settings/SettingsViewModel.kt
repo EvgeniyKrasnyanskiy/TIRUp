@@ -7,6 +7,7 @@ import com.tirup.app.data.local.AppDatabase
 import com.tirup.app.domain.model.AlertSettings
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseUnit
+import com.tirup.app.domain.model.LabHba1cRecord
 import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.domain.model.TargetRanges
 import com.tirup.app.domain.model.UserSettings
@@ -42,7 +43,11 @@ data class SettingsUiState(
     val pendingRestoreSummary: BackupSummary? = null,
     val pendingRestoreUri: Uri? = null,
     val isBackupInProgress: Boolean = false,
-    val isRestoreInProgress: Boolean = false
+    val isRestoreInProgress: Boolean = false,
+    val sensorGmi90d: Double? = null,
+    val meanGlucose90dMmol: Double? = null,
+    val tirPercent90d: Int? = null,
+    val showHba1cDialog: Boolean = false
 )
 
 class SettingsViewModel(
@@ -68,6 +73,7 @@ class SettingsViewModel(
             }
         }
         loadBackupSummary()
+        load90dMetrics()
     }
 
     fun setLanguage(language: String) {
@@ -604,6 +610,117 @@ class SettingsViewModel(
             val msg = if (isRu) "Тестовое SMS успешно отправлено ($sentCount ном.)" else "Test SMS successfully sent to $sentCount number(s)"
             android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
             _uiState.update { it.copy(infoMessage = msg) }
+        }
+    }
+
+    fun load90dMetrics() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val now = System.currentTimeMillis()
+            val start = now - 90L * 24 * 3600 * 1000L
+            val readings = glucoseRepository.getReadingsBetween(start, now).firstOrNull() ?: emptyList()
+            if (readings.isNotEmpty()) {
+                val mean = readings.map { it.valueMmol }.average()
+                val gmi = 3.31 + (0.431 * mean)
+                val targetLow = _uiState.value.userSettings.targetRanges.tirLowMmol
+                val targetHigh = _uiState.value.userSettings.targetRanges.tirHighMmol
+                val tirCount = readings.count { it.valueMmol in targetLow..targetHigh }
+                val tirPct = (tirCount * 100) / readings.size
+                _uiState.update {
+                    it.copy(
+                        sensorGmi90d = gmi,
+                        meanGlucose90dMmol = mean,
+                        tirPercent90d = tirPct
+                    )
+                }
+            }
+        }
+    }
+
+    fun addHba1cRecord(valuePercent: Double, timestamp: Long = System.currentTimeMillis(), labName: String = "", notes: String = "") {
+        viewModelScope.launch {
+            val current = _uiState.value.userSettings
+            val newRec = LabHba1cRecord(
+                id = System.currentTimeMillis(),
+                timestamp = timestamp,
+                valuePercent = valuePercent,
+                labName = labName.trim(),
+                notes = notes.trim()
+            )
+            val updatedList = (current.hba1cRecords + newRec).sortedByDescending { it.timestamp }
+            val updatedSettings = current.copy(hba1cRecords = updatedList)
+            settingsRepository.updateSettings(updatedSettings)
+            _uiState.update { it.copy(userSettings = updatedSettings) }
+            val isRu = current.language.equals("RU", ignoreCase = true)
+            val msg = if (isRu) "Анализ HbA1c ${valuePercent}% сохранён" else "HbA1c test ${valuePercent}% saved"
+            _events.emit(SettingsEvent.Info(msg))
+            load90dMetrics()
+        }
+    }
+
+    fun deleteHba1cRecord(recordId: Long) {
+        viewModelScope.launch {
+            val current = _uiState.value.userSettings
+            val updatedList = current.hba1cRecords.filterNot { it.id == recordId }
+            val updatedSettings = current.copy(hba1cRecords = updatedList)
+            settingsRepository.updateSettings(updatedSettings)
+            _uiState.update { it.copy(userSettings = updatedSettings) }
+            val isRu = current.language.equals("RU", ignoreCase = true)
+            _events.emit(SettingsEvent.Info(if (isRu) "Запись анализа удалена" else "Test record deleted"))
+        }
+    }
+
+    fun toggleHba1cDialog(show: Boolean) {
+        _uiState.update { it.copy(showHba1cDialog = show) }
+        if (show) {
+            load90dMetrics()
+        }
+    }
+
+    private val hba1cPdfGenerator = Hba1cReportPdfGenerator(context)
+
+    fun exportHba1cReportToPdf() {
+        viewModelScope.launch {
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            val settings = _uiState.value.userSettings
+            hba1cPdfGenerator.generateHba1cReportPdf(
+                profile = settings.patientProfile,
+                records = settings.hba1cRecords,
+                sensorGmi = _uiState.value.sensorGmi90d,
+                meanGlucoseMmol = _uiState.value.meanGlucose90dMmol,
+                tirPercent = _uiState.value.tirPercent90d,
+                isRu = isRu
+            ).onSuccess { pdfFile ->
+                val fileName = "TIRUp_HbA1c_Report_${System.currentTimeMillis()}.pdf"
+                try {
+                    var savedPath = ""
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        val contentValues = android.content.ContentValues().apply {
+                            put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                            put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
+                            put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+                        }
+                        val uri = context.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                        if (uri != null) {
+                            context.contentResolver.openOutputStream(uri)?.use { out ->
+                                java.io.FileInputStream(pdfFile).use { input -> input.copyTo(out) }
+                            }
+                            savedPath = "Downloads/$fileName"
+                        }
+                    } else {
+                        val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                        val destFile = java.io.File(downloadsDir, fileName)
+                        java.io.FileInputStream(pdfFile).use { input ->
+                            java.io.FileOutputStream(destFile).use { output -> input.copyTo(output) }
+                        }
+                        savedPath = destFile.absolutePath
+                    }
+                    _events.emit(SettingsEvent.SavedToDownloads(savedPath))
+                } catch (e: Exception) {
+                    _events.emit(SettingsEvent.Info("Save failed: ${e.message}"))
+                }
+            }.onFailure { error ->
+                _events.emit(SettingsEvent.Info("Error: ${error.localizedMessage}"))
+            }
         }
     }
 }

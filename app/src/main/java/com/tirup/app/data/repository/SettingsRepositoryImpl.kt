@@ -121,6 +121,20 @@ class SettingsRepositoryImpl(
             .putLong(KEY_LANCET_INSTALLED_AT, settings.lancetStatus.installedAt)
             .putInt(KEY_LANCET_DURATION_DAYS, settings.lancetStatus.durationDays)
             .putInt(KEY_LANCET_LAST_USED_DURATION, settings.lancetStatus.lastUsedDurationDays)
+            .putString(KEY_HBA1C_RECORDS, run {
+                val hba1cArr = org.json.JSONArray()
+                for (rec in settings.hba1cRecords) {
+                    val obj = org.json.JSONObject()
+                    obj.put("id", rec.id)
+                    obj.put("timestamp", rec.timestamp)
+                    obj.put("valuePercent", rec.valuePercent)
+                    obj.put("labName", rec.labName)
+                    obj.put("notes", rec.notes)
+                    hba1cArr.put(obj)
+                }
+                hba1cArr.toString()
+            })
+            .putBoolean(KEY_IS_HBA1C_REMINDER_ENABLED, settings.isHba1cReminderEnabled)
             .apply()
 
         try {
@@ -361,7 +375,33 @@ class SettingsRepositoryImpl(
                     } catch (_: Exception) {}
                 }
                 com.tirup.app.domain.model.LancetStatus(installedAt, duration, lastUsed)
-            }
+            },
+            hba1cRecords = run {
+                val raw = prefs.getString(KEY_HBA1C_RECORDS, null)
+                if (raw.isNullOrBlank()) emptyList()
+                else {
+                    try {
+                        val arr = org.json.JSONArray(raw)
+                        val list = mutableListOf<com.tirup.app.domain.model.LabHba1cRecord>()
+                        for (i in 0 until arr.length()) {
+                            val obj = arr.getJSONObject(i)
+                            list.add(
+                                com.tirup.app.domain.model.LabHba1cRecord(
+                                    id = obj.optLong("id", 0L),
+                                    timestamp = obj.optLong("timestamp", 0L),
+                                    valuePercent = obj.optDouble("valuePercent", 0.0),
+                                    labName = obj.optString("labName", ""),
+                                    notes = obj.optString("notes", "")
+                                )
+                            )
+                        }
+                        list.sortedByDescending { it.timestamp }
+                    } catch (_: Exception) {
+                        emptyList()
+                    }
+                }
+            },
+            isHba1cReminderEnabled = prefs.getBoolean(KEY_IS_HBA1C_REMINDER_ENABLED, true)
         )
     }
 
@@ -458,5 +498,7 @@ class SettingsRepositoryImpl(
         private const val KEY_LANCET_INSTALLED_AT = "key_lancet_installed_at"
         private const val KEY_LANCET_DURATION_DAYS = "key_lancet_duration_days"
         private const val KEY_LANCET_LAST_USED_DURATION = "key_lancet_last_used_duration"
+        private const val KEY_HBA1C_RECORDS = "key_hba1c_records"
+        private const val KEY_IS_HBA1C_REMINDER_ENABLED = "key_is_hba1c_reminder_enabled"
     }
 }
