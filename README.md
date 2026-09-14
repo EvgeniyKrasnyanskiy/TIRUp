@@ -2,7 +2,8 @@
 
 <div align="center">
 
-![Android](https://img.shields.io/badge/Platform-Android-green.svg)
+![Version](https://img.shields.io/badge/Version-2.1.0-brightgreen.svg)
+![Platform](https://img.shields.io/badge/Platform-Android-green.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-blue.svg)
 ![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%2F%20Material%203-blueviolet.svg)
 ![Architecture](https://img.shields.io/badge/Architecture-Clean%20%2F%20MVVM-orange.svg)
@@ -96,6 +97,34 @@
 ### 13. Ежедневный автобэкап без системных разрешений
 - Точный будильник `AlarmManager.RTC_WAKEUP` сохраняет базу данных и настройки ежедневно строго в **23:59:59** в изолированную песочницу приложения.
 - Автоматическое обнаружение резервной копии и восстановление при переустановке приложения.
+
+### 14. Семейный BLE-мост (Family BLE Bridge, 100% Offline)
+- Прямая локальная трансляция гликемии, стрелки тренда, активного инсулина (IoB) и заряда батареи по **Bluetooth Low Energy (BLE)** раз в 60 секунд.
+- **Работает без интернета, мобильной связи и без сопряжения устройств** (Pairing-free) на расстоянии 10–15 метров (в квартире, школе, машине).
+- Два режима:
+  - **Вещатель (Broadcaster)**: передаёт текущий срез данных ребенка.
+  - **Наблюдатель (Observer)**: непрерывно сканирует эфир в фоне, отображает бейдж возраста пакета (статус `RX` в ожидании первого пакета, далее `<1м`, `1м`...) и выводит компактные тосты с индикатором сигнала (`🟢 BLE: 🩸7.8 →, 💉1.5, 🔋85%`).
+- Защита конфиденциальности 3-значным **Family PIN** (пакеты соседей и чужих устройств автоматически игнорируются).
+
+### 15. Журнал лабораторного HbA1c и квартальный контроль
+- Ведение истории реальных анализов венозной крови на гликированный гемоглобин (HbA1c) из лаборатории.
+- Прямое сопоставление лабораторного HbA1c с **90-дневным расчётным GMI** сенсора и показателем TIR за аналогичный период.
+- **Квартальные напоминания (раз в 90 дней)**:
+  - Интеллектуальная защита от спама: уведомление показывается не более 2 раз за цикл (с шагом 14 дней).
+  - Кнопка **«Пропустить (+90д)»** для пользователей с хорошей компенсацией, сознательно не сдающих анализ в текущем квартале.
+  - Внесение свежего анализа автоматически перезапускает 90-дневный цикл.
+- Генерация официальной **1-страничной выписки в PDF** для лечащего врача с таблицей динамики расхождений лаборатории и сенсора.
+
+### 16. Новогодний дайджест 31 декабря и Zero-Lag годовые архивы
+- **Архитектура Zero-Lag**: автоматическое запечатывание завершённых календарных лет в изолированные архивы `tirup_readings_YYYY.csv`. База данных сохраняет ультрабыстрый отклик без замедления при многолетнем непрерывном ведении (1–5+ лет).
+- **Праздничный дайджест 31 декабря в 20:00**:
+  - Пуш-уведомление в шторку с бокалом шампанского 🥂.
+  - Праздничный модальный диалог с итогами года (TIR, средний сахар, стрик, количество замеров).
+  - Экспорт памятной новогодней открытки в векторный PDF для семейного архива.
+
+### 17. Экспорт резервных копий в ZIP
+- Возможность создания полного автономного архива настроек и базы данных в ZIP-формате в один клик.
+- Сохранение в системную папку `Documents/TIRUp/Backups/` для удобного переноса на новый смартфон или архивного хранения на ПК.
 
 ---
 
@@ -201,6 +230,10 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - **Glance Desktop & Lockscreen Widgets (5 Formats)**: Horizontal 5x1 strip, 4x2/3x2 Canvas chart dashboard, 2x2 focus square, and 1x2 vertical glance with customizable background opacity slider (0%..100%).
 - **Sunday Compensation Digest**: Automated weekly review delivered every Sunday at 20:00 with week-over-week dynamic delta comparison ($\pm\Delta\%$) and clinical insights.
 - **Clinical AGP Reports**: Generates official Ambulatory Glucose Profile PDF sheets with 12 core clinical parameters (TIR, TING, TBR, TAR, CV, eA1c, GRI, GVI, PGS) matching ATTD/ADA standards.
+- **Family BLE Bridge (100% Offline)**: Local direct Bluetooth Low Energy broadcast (Broadcaster & Observer modes, 10–15m range) transmitting glucose, trend arrow, IoB, and battery every 60s without pairing or internet, guarded by 3-digit Family PIN.
+- **Laboratory HbA1c Journal & Quarterly Tracking**: Tracks venous HbA1c lab tests with direct comparison against 90-day sensor GMI and TIR, quarterly reminder alerts (anti-spam 2-push limit, skip button), and 1-page clinical PDF export.
+- **Zero-Lag Annual History Archiving & Dec 31 Digest**: Automatically seals past calendar years into `tirup_readings_YYYY.csv` keeping the Room database lightweight across 1–5+ years; delivers a festive annual summary modal and PDF postcard on Dec 31 at 20:00.
+- **Full ZIP Backup Export**: One-click manual export of database and settings into `Documents/TIRUp/Backups/`.
 - **Permissionless Daily Auto-Backup**: Exact RTC AlarmManager backs up settings and database into the app sandbox daily at 23:59:59 without dangerous external storage permissions.
 - **Dual Units & Localization**: Seamless one-tap switching between `mmol/L` and `mg/dL`, full Russian and English localization.
 
