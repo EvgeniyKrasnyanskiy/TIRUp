@@ -208,3 +208,25 @@
 - **3.4. Бамп версии приложения (`build.gradle.kts`)**:
   - Обновление: `versionCode = 12`, `versionName = "2.1.0"`.
 
+## 11. Итерация 11: [Completed] Мультифайловый импорт, быстрая 2-часовая пауза тревог и независимая громкость
+
+### Этап 1: [Completed] Мультифайловый импорт исторических данных из xDrip/файлов
+- `ReportsScreen.kt`: замена контракта пикера документов на `ActivityResultContracts.OpenMultipleDocuments()`.
+- `ReportsViewModel.kt`: метод `importHistoricalFiles(uris: List<Uri>)` для последовательной обработки нескольких выбранных файлов с отображением прогресса («Обработка файла X из Y...») и итогового суммарного числа добавленных точек.
+- Сохранение атомарности и предотвращение утечек памяти при работе со стриминговым импортером.
+
+### Этап 2: [Completed] Быстрая пауза тревог на 2 часа в Журнале тревог (Snooze All)
+- `AlertSettings.kt`: добавление поля `alertsMuteUntilTimestamp: Long = 0L`.
+- `GlucoseAlertManager.kt`: проверка активности паузы (`now < alertsMuteUntilTimestamp`) для приглушения основных, упреждающих тревог и потери связи; синхронизация с `criticalHypoPauseUntilTimestamp`.
+- `SettingsRepositoryImpl.kt` & `SettingsViewModel.kt`: методы `pauseAlertsFor(durationMs)` и `resumeAlerts()`.
+- `FocusScreen.kt`:
+  - В `DailyAlertLogsDialog` добавление верхней карточки быстрого управления:
+    - Кнопка «⏸️ Пауза на 2 часа» при активных тревогах.
+    - Баннер обратного отсчета («🔕 Пауза: осталось X мин») и кнопка «▶️ Возобновить» при активной паузе.
+  - Изменение иконки колокольчика на верхней панели FocusScreen на перечёркнутый `🔕` во время паузы.
+
+### Этап 3: [Completed] Независимый ползунок громкости для некоритических тревог
+- `AlertSettings.kt`: добавление поля `alertVolumePercent: Int = 80` (20% .. 100%).
+- `SettingsRepositoryImpl.kt` & `AutoBackupManager.kt`: сохранение/загрузка и сериализация ключа `alertVolumePercent`.
+- `MedicalSoundPlayer.kt`: масштабирование амплитуды PCM-волны синусоиды для упреждающих (`PREDICTIVE`) и основных (`MAIN`) сигналов согласно `alertVolumePercent`. Критические тревоги (`CRITICAL`, `SIGNAL_LOSS`, `LastChance`) остаются строго на 100% громкости потока `USAGE_ALARM`.
+- `SettingsScreen.kt`: слайдер «Громкость упреждающих тревог» (20%–100%) с шагом 5%, кнопкой проверки звука «Тест 🔔» и пояснением о 100% громкости для критических тревог.

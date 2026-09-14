@@ -473,6 +473,10 @@ class SettingsViewModel(
         com.tirup.app.data.alert.GlucoseAlertManager.sendTestAlert(context, tier, isRu)
     }
 
+    fun playTestSound(volumePercent: Int) {
+        com.tirup.app.data.alert.MedicalSoundPlayer.playTestSound(volumePercent)
+    }
+
     fun showClearConfirm(show: Boolean) {
         _uiState.update { it.copy(showClearDialog = show) }
     }

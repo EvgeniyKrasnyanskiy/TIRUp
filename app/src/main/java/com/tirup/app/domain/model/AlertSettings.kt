@@ -3,6 +3,8 @@ package com.tirup.app.domain.model
 data class AlertSettings(
     // Master Switch (Общий выключатель всех оповещений)
     val isAlertsMasterEnabled: Boolean = true,
+    val alertsMuteUntilTimestamp: Long = 0L,
+    val alertVolumePercent: Int = 80,
 
     // Tier 1: Predictive (Soft / Умные упреждающие)
     val isPredictiveEnabled: Boolean = true,

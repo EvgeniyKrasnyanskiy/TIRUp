@@ -39,6 +39,30 @@ class SettingsRepositoryImpl(
         updateSettings(updated)
     }
 
+    override suspend fun pauseAlertsFor(durationMs: Long) {
+        val current = _settingsFlow.value
+        val now = System.currentTimeMillis()
+        val pauseUntil = now + durationMs
+        val updated = current.copy(
+            alertSettings = current.alertSettings.copy(
+                alertsMuteUntilTimestamp = pauseUntil,
+                criticalHypoPauseUntilTimestamp = pauseUntil
+            )
+        )
+        updateSettings(updated)
+    }
+
+    override suspend fun resumeAlerts() {
+        val current = _settingsFlow.value
+        val updated = current.copy(
+            alertSettings = current.alertSettings.copy(
+                alertsMuteUntilTimestamp = 0L,
+                criticalHypoPauseUntilTimestamp = 0L
+            )
+        )
+        updateSettings(updated)
+    }
+
     override suspend fun updateSettings(settings: UserSettings) {
         prefs.edit()
             .putString(KEY_LANG, settings.language)
@@ -78,6 +102,8 @@ class SettingsRepositoryImpl(
             .putBoolean(KEY_SHOW_PREDICTION_ON_CHART, settings.showPredictionOnChart)
             // Alert Settings
             .putBoolean(KEY_ALERT_MASTER_ENABLED, settings.alertSettings.isAlertsMasterEnabled)
+            .putLong(KEY_ALERT_MUTE_UNTIL, settings.alertSettings.alertsMuteUntilTimestamp)
+            .putInt(KEY_ALERT_VOLUME_PERCENT, settings.alertSettings.alertVolumePercent)
             .putBoolean(KEY_ALERT_PREDICTIVE_ENABLED, settings.alertSettings.isPredictiveEnabled)
             .putInt(KEY_ALERT_PREDICTIVE_MINUTES, settings.alertSettings.predictiveMinutesAhead)
             .putBoolean(KEY_ALERT_PREDICTIVE_VIBRATE, settings.alertSettings.isPredictiveVibrate)
@@ -270,6 +296,8 @@ class SettingsRepositoryImpl(
             showPredictionOnChart = prefs.getBoolean(KEY_SHOW_PREDICTION_ON_CHART, true),
             alertSettings = AlertSettings(
                 isAlertsMasterEnabled = prefs.getBoolean(KEY_ALERT_MASTER_ENABLED, true),
+                alertsMuteUntilTimestamp = prefs.getLong(KEY_ALERT_MUTE_UNTIL, 0L),
+                alertVolumePercent = prefs.getInt(KEY_ALERT_VOLUME_PERCENT, 80),
                 isPredictiveEnabled = prefs.getBoolean(KEY_ALERT_PREDICTIVE_ENABLED, true),
                 predictiveMinutesAhead = prefs.getInt(KEY_ALERT_PREDICTIVE_MINUTES, 15),
                 isPredictiveVibrate = prefs.getBoolean(KEY_ALERT_PREDICTIVE_VIBRATE, true),
@@ -461,6 +489,8 @@ class SettingsRepositoryImpl(
         private const val KEY_SHOW_PREDICTION_ON_CHART = "key_show_prediction_on_chart"
 
         private const val KEY_ALERT_MASTER_ENABLED = "key_alert_master_enabled"
+        private const val KEY_ALERT_MUTE_UNTIL = "key_alert_mute_until"
+        private const val KEY_ALERT_VOLUME_PERCENT = "key_alert_volume_percent"
         private const val KEY_ALERT_PREDICTIVE_ENABLED = "key_alert_predictive_enabled"
         private const val KEY_ALERT_PREDICTIVE_MINUTES = "key_alert_predictive_minutes"
         private const val KEY_ALERT_PREDICTIVE_VIBRATE = "key_alert_predictive_vibrate"
