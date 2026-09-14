@@ -50,21 +50,49 @@ object MedicalSoundPlayer {
     }
 
     /**
-     * Plays a single test tone at the specified user volume percent.
+     * Plays a rich, clear melodic test chime (~1.0s) to allow accurate volume evaluation.
      */
     fun playTestSound(volumePercent: Int = 80) {
+        isPlayingActive = true
         audioScope.launch {
             try {
+                ensureAlarmStreamAudible()
                 val factor = (volumePercent / 100f).coerceIn(0.15f, 1.0f)
-                val note1 = generateSineWave(freq = 784.0, durationMs = 150, volume = 0.85f * factor)
-                val note2 = generateSineWave(freq = 987.77, durationMs = 200, volume = 0.90f * factor)
-                val audioData = ShortArray(note1.size + note2.size)
-                System.arraycopy(note1, 0, audioData, 0, note1.size)
-                System.arraycopy(note2, 0, audioData, note1.size, note2.size)
+                val prefix = ShortArray((SAMPLE_RATE * 0.05).toInt()) // 50ms silence for smooth DAC wake
+                val n1 = generateSineWave(freq = 587.33, durationMs = 180, volume = 0.65f * factor)
+                val n2 = generateSineWave(freq = 783.99, durationMs = 180, volume = 0.75f * factor)
+                val n3 = generateSineWave(freq = 880.00, durationMs = 200, volume = 0.85f * factor)
+                val n4 = generateSineWave(freq = 1174.66, durationMs = 350, volume = 0.95f * factor)
+
+                val totalLen = prefix.size + n1.size + n2.size + n3.size + n4.size
+                val audioData = ShortArray(totalLen)
+                var off = 0
+                System.arraycopy(prefix, 0, audioData, off, prefix.size); off += prefix.size
+                System.arraycopy(n1, 0, audioData, off, n1.size); off += n1.size
+                System.arraycopy(n2, 0, audioData, off, n2.size); off += n2.size
+                System.arraycopy(n3, 0, audioData, off, n3.size); off += n3.size
+                System.arraycopy(n4, 0, audioData, off, n4.size)
+
                 playRawPcm(audioData, usage = AudioAttributes.USAGE_ALARM)
             } catch (e: Exception) {
                 Log.w(TAG, "Test sound failed: ${e.message}")
             }
+        }
+    }
+
+    private fun ensureAlarmStreamAudible() {
+        try {
+            val context = try { com.tirup.app.TirupApplication.instance } catch (_: Exception) { null } ?: return
+            val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager ?: return
+            val maxVol = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM)
+            val currentVol = audioManager.getStreamVolume(android.media.AudioManager.STREAM_ALARM)
+            val minDesiredVol = (maxVol * 0.85).toInt().coerceAtLeast(1)
+            if (currentVol < minDesiredVol) {
+                audioManager.setStreamVolume(android.media.AudioManager.STREAM_ALARM, minDesiredVol, 0)
+                Log.i(TAG, "Ensured STREAM_ALARM volume to $minDesiredVol (was $currentVol)")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to ensure alarm volume: ${e.message}")
         }
     }
 
@@ -207,6 +235,7 @@ object MedicalSoundPlayer {
      * Tier 1: Soft melodic dual-tone chime (587 Hz -> 880 Hz).
      */
     private fun playPredictiveChime(volumePercent: Int = 80) {
+        ensureAlarmStreamAudible()
         val factor = (volumePercent / 100f).coerceIn(0.15f, 1.0f)
         val note1 = generateSineWave(freq = 587.33, durationMs = 180, volume = 0.55f * factor)
         val note2 = generateSineWave(freq = 880.00, durationMs = 260, volume = 0.65f * factor)
@@ -221,6 +250,7 @@ object MedicalSoundPlayer {
      * Tier 2: Main alert played 3 times with 1.5 second pause between each.
      */
     private fun playTripleMainBeep(volumePercent: Int = 80) {
+        ensureAlarmStreamAudible()
         val factor = (volumePercent / 100f).coerceIn(0.15f, 1.0f)
         val note1 = generateSineWave(freq = 784.0, durationMs = 140, volume = 0.85f * factor)
         val note2 = generateSineWave(freq = 987.77, durationMs = 180, volume = 0.90f * factor)

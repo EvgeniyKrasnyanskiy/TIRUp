@@ -765,7 +765,7 @@ fun SettingsScreen(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = if (isRu) "⏸️ Все тревоги на паузе (2 ч)" else "⏸️ All alarms paused (2h)",
+                                            text = if (isRu) "⏸️ Все тревоги на паузе" else "⏸️ All alarms paused",
                                             style = MaterialTheme.typography.labelMedium,
                                             fontWeight = FontWeight.Bold,
                                             color = ActionBlue

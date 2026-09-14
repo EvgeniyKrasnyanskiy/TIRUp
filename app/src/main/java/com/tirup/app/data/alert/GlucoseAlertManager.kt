@@ -1969,7 +1969,8 @@ object GlucoseAlertManager {
         val thresholdMs = alerts.signalLossMinutes * 60 * 1000L
 
         if (elapsedSinceLatest > thresholdMs) {
-            if (alerts.isSignalLossEnabled) {
+            val isMasterActive = alerts.isAlertsMasterEnabled && now >= alerts.alertsMuteUntilTimestamp
+            if (alerts.isSignalLossEnabled && isMasterActive) {
                 val isNight = isNightNow(settings)
                 val requiredIntervalMs = if (signalLossAlertCount == 0) {
                     0L

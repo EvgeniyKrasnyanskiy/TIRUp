@@ -362,7 +362,7 @@ class FocusViewModel(
         }
     }
 
-    fun pauseAlertsFor(durationMs: Long = 2 * 3600 * 1000L) {
+    fun pauseAlertsFor(durationMs: Long = 3600 * 1000L) {
         viewModelScope.launch {
             settingsRepository.pauseAlertsFor(durationMs)
         }
