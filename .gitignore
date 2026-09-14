@@ -17,3 +17,4 @@ app/build/
 *.apk
 *.jks
 *.keystore
+*.log
