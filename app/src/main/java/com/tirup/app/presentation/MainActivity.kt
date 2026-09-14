@@ -95,6 +95,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import androidx.lifecycle.lifecycleScope
 import java.util.Locale
@@ -255,6 +256,19 @@ class MainActivity : ComponentActivity() {
             intent.removeExtra(EXTRA_GOTO_YEAR_END)
         }
         GlucoseAlertManager.dismissCriticalAlarm(this, fromUser = true)
+
+        // Ensure floating bubble is active if enabled in settings
+        val app = applicationContext as? TirupApplication
+        app?.let { application ->
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    val settings = application.settingsRepository.getSettings().first()
+                    if (settings.isFloatingBubbleEnabled && android.provider.Settings.canDrawOverlays(this@MainActivity)) {
+                        com.tirup.app.presentation.overlay.FloatingBubbleService.start(applicationContext)
+                    }
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
