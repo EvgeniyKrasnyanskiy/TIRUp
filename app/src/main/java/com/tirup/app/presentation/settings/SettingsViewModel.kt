@@ -872,6 +872,12 @@ class SettingsViewModel(
         )
     }
 
+    fun setYearEndDigestYear(year: Int) {
+        val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        val validYear = year.coerceIn(2020, currentYear)
+        loadYearEndStats(validYear)
+    }
+
     fun archiveYearArchive(year: Int) {
         viewModelScope.launch {
             val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
@@ -879,7 +885,11 @@ class SettingsViewModel(
             if (success) {
                 loadBackupSummary()
                 loadYearEndStats(year)
-                _events.emit(SettingsEvent.Info(if (isRu) "Архив $year года успешно создан в TIRUp/Backups" else "Annual archive for $year saved"))
+                val archiveFile = File(AutoBackupManager.getBackupDirectory(context), "tirup_readings_$year.csv")
+                _events.emit(SettingsEvent.SavedToDownloads(
+                    filePath = archiveFile.absolutePath,
+                    message = if (isRu) "Архив $year года сохранён в TIRUp/Backups" else "Annual archive for $year saved"
+                ))
             } else {
                 _events.emit(SettingsEvent.Info(if (isRu) "Нет данных или ошибка создания архива" else "No data or archiving failed"))
             }

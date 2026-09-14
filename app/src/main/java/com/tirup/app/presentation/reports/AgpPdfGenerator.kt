@@ -103,9 +103,9 @@ class AgpPdfGenerator(private val context: Context) {
             val latestHba1c = userSettings.latestHba1cRecord
             val hba1cDateFmt = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
             val hba1cHeaderStr = if (latestHba1c != null) {
-                val labPart = if (latestHba1c.labName.isNotBlank()) " (${latestHba1c.labName})" else ""
-                if (isRu) "Лаб. HbA1c: ${String.format(Locale.US, "%.1f%%", latestHba1c.valuePercent)}$labPart"
-                else "Lab HbA1c: ${String.format(Locale.US, "%.1f%%", latestHba1c.valuePercent)}$labPart"
+                val dateStr = hba1cDateFmt.format(Date(latestHba1c.timestamp))
+                if (isRu) "Лаб. HbA1c: ${String.format(Locale.US, "%.1f%%", latestHba1c.valuePercent)} ($dateStr)"
+                else "Lab HbA1c: ${String.format(Locale.US, "%.1f%%", latestHba1c.valuePercent)} ($dateStr)"
             } else ""
 
             val patientLine = if (isRu) {
@@ -225,29 +225,11 @@ class AgpPdfGenerator(private val context: Context) {
                 String.format(Locale.US, "%d – %d", (minVal * 18.0182).toInt(), (maxVal * 18.0182).toInt())
             }
 
-            val ea1cComparisonStr = if (latestHba1c != null) {
-                val delta = latestHba1c.valuePercent - statistics.gmiPercent
-                val dateStr = hba1cDateFmt.format(Date(latestHba1c.timestamp))
-                val labPart = if (latestHba1c.labName.isNotBlank()) ", ${latestHba1c.labName}" else ""
-                String.format(Locale.US, "%.1f%% • Лаб: %.1f%% (%s%s, Δ %+.1f%%)", statistics.gmiPercent, latestHba1c.valuePercent, dateStr, labPart, delta)
-            } else {
-                String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)
-            }
-
-            val ea1cComparisonStrEn = if (latestHba1c != null) {
-                val delta = latestHba1c.valuePercent - statistics.gmiPercent
-                val dateStr = hba1cDateFmt.format(Date(latestHba1c.timestamp))
-                val labPart = if (latestHba1c.labName.isNotBlank()) ", ${latestHba1c.labName}" else ""
-                String.format(Locale.US, "%.1f%% • Lab: %.1f%% (%s%s, Δ %+.1f%%)", statistics.gmiPercent, latestHba1c.valuePercent, dateStr, labPart, delta)
-            } else {
-                String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)
-            }
-
             val statRows = if (isRu) {
                 listOf(
                     Pair("Средний сахар (Mean) • Мин/Макс:", "$meanStr • Мин/Макс: $minMaxStr"),
                     Pair("Вариабельность глюкозы (%CV):", String.format(Locale.US, "%.1f%% (Цель ≤36.0%%) • SD: %s", statistics.cvPercent, sdStr)),
-                    Pair("Расчётный eA1c (ADAG) / Лабораторный:", ea1cComparisonStr),
+                    Pair("Расчётный eA1c (ADAG):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)),
                     Pair("GRI (риск гипо / Klonoff 2022):", String.format(Locale.US, "%.1f (%s, цель ≤40.0)", statistics.gri, statistics.griLabel)),
                     Pair("Индексы GVI / PGS:", String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs)),
                     Pair("Ночной профиль (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)}):", nightStr)
@@ -256,7 +238,7 @@ class AgpPdfGenerator(private val context: Context) {
                 listOf(
                     Pair("Average Glucose (Mean) • Min/Max:", "$meanStr • Min/Max: $minMaxStr"),
                     Pair("Glucose Variability (%CV):", String.format(Locale.US, "%.1f%% (Target ≤36.0%%) • SD: %s", statistics.cvPercent, sdStr)),
-                    Pair("Estimated A1c (eA1c) / Laboratory:", ea1cComparisonStrEn),
+                    Pair("Estimated A1c (eA1c):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)),
                     Pair("Glycemia Risk Index (GRI / Hypo Risk):", String.format(Locale.US, "%.1f (%s, target ≤40.0)", statistics.gri, statistics.griLabel)),
                     Pair("Variability Indexes (GVI/PGS):", String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs)),
                     Pair("Night Sleep Profile (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)}):", nightStr)

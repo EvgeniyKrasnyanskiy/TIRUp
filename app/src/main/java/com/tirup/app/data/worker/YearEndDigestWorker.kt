@@ -36,11 +36,11 @@ class YearEndDigestWorker(
             val day = cal.get(Calendar.DAY_OF_MONTH)
             val hour = cal.get(Calendar.HOUR_OF_DAY)
 
-            // Determine if today is December 31 (evening >= 19:00) or January 1 (morning <= 12:00)
+            // Determine if today is December 31 (evening >= 19:00) or January (any day in January if previous year missed)
             val isDec31Evening = (month == Calendar.DECEMBER && day == 31 && hour >= 19)
-            val isJan1Morning = (month == Calendar.JANUARY && day == 1 && hour <= 12)
+            val isJanCatchup = (month == Calendar.JANUARY && settings.lastYearEndDigestShownYear < currentYear - 1)
 
-            val targetYear = if (isDec31Evening) currentYear else if (isJan1Morning) currentYear - 1 else null
+            val targetYear = if (isDec31Evening) currentYear else if (isJanCatchup) currentYear - 1 else null
 
             if (targetYear != null && settings.lastYearEndDigestShownYear < targetYear) {
                 // 1. Seal and archive this completed year's readings

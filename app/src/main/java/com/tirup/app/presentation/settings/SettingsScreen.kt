@@ -2627,22 +2627,24 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(
+                        OutlinedButton(
                             onClick = { viewModel.createBackupNow() },
                             enabled = !state.isBackupInProgress,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
+                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.5f))
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Refresh,
                                 contentDescription = null,
+                                tint = ActionBlue,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = if (isRu) "Создать" else "Backup",
                                 fontSize = 13.sp,
+                                color = ActionBlue,
                                 maxLines = 1
                             )
                         }
@@ -2670,7 +2672,7 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Action buttons (Row 2: Save to file & Restore)
+                    // Action buttons (Row 2: Save to zip file & Restore)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -2683,19 +2685,19 @@ fun SettingsScreen(
                             enabled = !state.isBackupInProgress,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.5f))
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Download,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurface,
+                                tint = ActionBlue,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (isRu) "В файл" else "To file",
+                                text = if (isRu) "В Zip-файл" else "To Zip file",
                                 fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                color = ActionBlue,
                                 maxLines = 1
                             )
                         }
@@ -2707,19 +2709,19 @@ fun SettingsScreen(
                             enabled = !state.isRestoreInProgress,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.5f))
+                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.5f))
                         ) {
                             Icon(
                                 imageVector = Icons.Default.FileUpload,
                                 contentDescription = null,
-                                tint = PrimaryEmerald,
+                                tint = ActionBlue,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = if (isRu) "Восстановить" else "Restore",
                                 fontSize = 13.sp,
-                                color = PrimaryEmerald,
+                                color = ActionBlue,
                                 maxLines = 1
                             )
                         }
@@ -2731,9 +2733,9 @@ fun SettingsScreen(
                         onClick = { viewModel.setShowYearEndDialog(true, activeYear) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.2.dp, PrimaryEmerald.copy(alpha = 0.7f)),
+                        border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.7f)),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = PrimaryEmerald.copy(alpha = 0.08f)
+                            containerColor = ActionBlue.copy(alpha = 0.05f)
                         )
                     ) {
                         Text(
@@ -2742,10 +2744,10 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (isRu) "Итоги года и годовой архив ($activeYear)" else "Year-End Digest & Archives ($activeYear)",
+                            text = if (isRu) "Итоги года и архив" else "Year-End Digest & Archive",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = PrimaryEmerald
+                            color = ActionBlue
                         )
                     }
                 }
@@ -2910,12 +2912,14 @@ fun SettingsScreen(
     }
     }
 
-    SnackbarHost(
-        hostState = snackbarHostState,
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
-    )
+    if (!state.showYearEndDialog && !state.showHba1cDialog) {
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
+        )
+    }
 
     val pendingRestore = state.pendingRestoreSummary
     if (pendingRestore != null) {
@@ -3526,6 +3530,7 @@ fun SettingsScreen(
             snackbarHostState = snackbarHostState,
             onExportPdf = { s -> viewModel.exportYearEndReportToPdf(s) },
             onArchiveYear = { year -> viewModel.archiveYearArchive(year) },
+            onYearChange = { year -> viewModel.setYearEndDigestYear(year) },
             onDismiss = { viewModel.setShowYearEndDialog(false) }
         )
     }
@@ -4160,15 +4165,16 @@ private fun Hba1cHistoryDialog(
                 ) {
                     OutlinedButton(
                         onClick = onExportPdf,
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, ActionBlue)
                     ) {
-                        Icon(imageVector = Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(imageVector = Icons.Default.PictureAsPdf, contentDescription = null, tint = ActionBlue, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = if (isRu) "Выписка PDF" else "PDF Report")
+                        Text(text = if (isRu) "Выписка PDF" else "PDF Report", color = ActionBlue)
                     }
 
                     TextButton(onClick = onDismiss) {
-                        Text(text = if (isRu) "Закрыть" else "Close")
+                        Text(text = if (isRu) "Закрыть" else "Close", color = ActionBlue)
                     }
                 }
             }
@@ -5334,68 +5340,138 @@ fun YearEndDigestDialog(
     snackbarHostState: SnackbarHostState? = null,
     onExportPdf: (YearEndStats) -> Unit,
     onArchiveYear: (Int) -> Unit,
+    onYearChange: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val year = stats?.year ?: java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+    val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+    val year = stats?.year ?: currentYear
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(text = "🎄", fontSize = 24.sp)
-                Column {
-                    Text(
-                        text = if (isRu) "Итоги $year года с TIRUp" else "Your $year Year with TIRUp",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = if (isRu) "Годовой дайджест и ротация архива" else "Year-end digest & archive rotation",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = PrimaryEmerald
-                    )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(text = "🎄", fontSize = 24.sp)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (isRu) "Итоги $year года с TIRUp" else "Your $year Year with TIRUp",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (isRu) "Годовой дайджест и ротация архива" else "Year-end digest & archive rotation",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = PrimaryEmerald
+                        )
+                    }
+                }
+
+                // Year selector [ ◀ 2025 | 2026 ▶ ]
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { onYearChange(year - 1) },
+                            enabled = year > 2020,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Text("◀", color = if (year > 2020) ActionBlue else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                        Text(
+                            text = "$year",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        IconButton(
+                            onClick = { onYearChange(year + 1) },
+                            enabled = year < currentYear,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Text("▶", color = if (year < currentYear) ActionBlue else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                    }
                 }
             }
         },
         text = {
-            if (stats == null) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp),
-                    contentAlignment = Alignment.Center
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Info banner about automatic archive Dec 31 20:00
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = ActionBlue.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.25f)),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    CircularProgressIndicator(color = PrimaryEmerald)
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(text = "ℹ️", fontSize = 14.sp)
+                        Text(
+                            text = if (isRu)
+                                "Итоги года и архив автоматически создаются 31 декабря в 20:00. Если смартфон был выключен, отчёт сформируется при первом включении устройства."
+                            else
+                                "Year-end digest and archive are automatically created on Dec 31 at 20:00. If the device was off, it will generate on next startup.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
-            } else if (stats.totalReadings == 0) {
-                Column(
-                    modifier = Modifier.padding(vertical = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "📅",
-                        fontSize = 32.sp
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = if (isRu) "За $year год ещё нет сохранённых измерений в базе данных."
-                               else "No saved readings found for year $year in database.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+
+                if (stats == null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = PrimaryEmerald)
+                    }
+                } else if (stats.totalReadings == 0) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "📅",
+                            fontSize = 32.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = if (isRu) "За $year год ещё нет сохранённых измерений в базе данных."
+                                   else "No saved readings found for year $year in database.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                     // Hero Card: TIR
                     Surface(
                         shape = RoundedCornerShape(14.dp),
@@ -5580,13 +5656,10 @@ fun YearEndDigestDialog(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Button(
+                            OutlinedButton(
                                 onClick = { onArchiveYear(stats.year) },
                                 shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (stats.isArchived) MaterialTheme.colorScheme.surfaceVariant else PrimaryEmerald,
-                                    contentColor = if (stats.isArchived) MaterialTheme.colorScheme.onSurface else Color.White
-                                ),
+                                border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.7f)),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                             ) {
                                 Text(
@@ -5596,15 +5669,17 @@ fun YearEndDigestDialog(
                                         if (isRu) "В архив" else "Archive"
                                     },
                                     fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = ActionBlue
                                 )
                             }
                         }
                     }
                 }
             }
-        },
-        confirmButton = {
+        }
+    },
+    confirmButton = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -5618,20 +5693,22 @@ fun YearEndDigestDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (stats != null && stats.totalReadings > 0) {
-                        Button(
+                        OutlinedButton(
                             onClick = { onExportPdf(stats) },
-                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald),
+                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.7f)),
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Download,
                                 contentDescription = null,
+                                tint = ActionBlue,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = if (isRu) "Открытка в PDF" else "Save PDF",
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                color = ActionBlue
                             )
                         }
                     } else {
@@ -5641,7 +5718,7 @@ fun YearEndDigestDialog(
                     TextButton(onClick = onDismiss) {
                         Text(
                             text = if (isRu) "Закрыть" else "Close",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = ActionBlue
                         )
                     }
                 }
