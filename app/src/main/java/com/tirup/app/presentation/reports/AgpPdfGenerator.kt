@@ -100,11 +100,20 @@ class AgpPdfGenerator(private val context: Context) {
             val pType = localizeDiabetesType(patient.diabetesType, isRu)
             val pDur = if (isRu) "${patient.calculatedDuration} лет" else "${patient.calculatedDuration} yrs"
             val pTherapy = localizeTherapyType(patient.therapyType, isRu)
+            val latestHba1c = userSettings.latestHba1cRecord
+            val hba1cDateFmt = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+            val hba1cHeaderStr = if (latestHba1c != null) {
+                val labPart = if (latestHba1c.labName.isNotBlank()) " (${latestHba1c.labName})" else ""
+                if (isRu) "Лаб. HbA1c: ${String.format(Locale.US, "%.1f%%", latestHba1c.valuePercent)}$labPart"
+                else "Lab HbA1c: ${String.format(Locale.US, "%.1f%%", latestHba1c.valuePercent)}$labPart"
+            } else ""
 
             val patientLine = if (isRu) {
-                "Пациент: $pName • Возраст: $pAge • Вес: $pWeight • Рост: $pHeight • $pType (стаж $pDur) • $pTherapy"
+                "Пациент: $pName • Возраст: $pAge • Вес: $pWeight • Рост: $pHeight • $pType (стаж $pDur) • $pTherapy" +
+                    if (hba1cHeaderStr.isNotEmpty()) " • $hba1cHeaderStr" else ""
             } else {
-                "Patient: $pName • Age: $pAge • Weight: $pWeight • Height: $pHeight • $pType (duration $pDur) • $pTherapy"
+                "Patient: $pName • Age: $pAge • Weight: $pWeight • Height: $pHeight • $pType (duration $pDur) • $pTherapy" +
+                    if (hba1cHeaderStr.isNotEmpty()) " • $hba1cHeaderStr" else ""
             }
             canvas.drawText(patientLine, margin + 12f, 55f, subTextPaint)
 
@@ -126,7 +135,6 @@ class AgpPdfGenerator(private val context: Context) {
             val panelTop = 110f
             val panelHeight = 208f
             val col1Width = contentWidth * 0.44f
-            val col2Width = contentWidth * 0.53f
             val col2Left = margin + col1Width + (contentWidth * 0.03f)
 
             // Left: Time in Ranges
@@ -158,25 +166,37 @@ class AgpPdfGenerator(private val context: Context) {
                 val (pct, colorInt) = data
                 val barPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = colorInt
-                    style = Paint.Style.FILL
+                }
+                val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(51, 65, 85)
+                    textSize = 8f
+                }
+                val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(15, 23, 42)
+                    textSize = 8.5f
+                    isFakeBoldText = true
                 }
 
-                canvas.drawText(label, margin + 12f, rowY + 9f, subTextPaint)
-                canvas.drawText(String.format(Locale.US, "%.1f%%", pct), margin + col1Width - 42f, rowY + 9f, boxTitlePaint)
+                canvas.drawText(label, margin + 12f, rowY, labelPaint)
+                canvas.drawText("${String.format(Locale.US, "%.1f", pct)}%", margin + col1Width - 36f, rowY, valuePaint)
 
-                val barWidth = (col1Width - 24f) * (pct.toFloat() / 100f).coerceIn(0.01f, 1f)
-                canvas.drawRoundRect(RectF(margin + 12f, rowY + 13f, margin + 12f + barWidth, rowY + 18f), 2.5f, 2.5f, barPaint)
+                // Small progress track
+                val barWidth = (col1Width - 24f) * (pct.toFloat() / 100f).coerceIn(0f, 1f)
+                canvas.drawRoundRect(RectF(margin + 12f, rowY + 4f, margin + 12f + (col1Width - 24f), rowY + 9f), 2.5f, 2.5f, borderPaint)
+                if (barWidth > 0) {
+                    canvas.drawRoundRect(RectF(margin + 12f, rowY + 4f, margin + 12f + barWidth, rowY + 9f), 2.5f, 2.5f, barPaint)
+                }
 
                 rowY += 27f
             }
 
-            // Right: Summary Statistics Box (Without duplicated Active Time)
-            val summaryBox = RectF(col2Left, panelTop, col2Left + col2Width, panelTop + panelHeight)
-            canvas.drawRoundRect(summaryBox, 8f, 8f, headerBgPaint)
-            canvas.drawRoundRect(summaryBox, 8f, 8f, borderPaint)
+            // Right: Core Clinical Metrics
+            val metricsBox = RectF(col2Left, panelTop, 595f - margin, panelTop + panelHeight)
+            canvas.drawRoundRect(metricsBox, 8f, 8f, headerBgPaint)
+            canvas.drawRoundRect(metricsBox, 8f, 8f, borderPaint)
 
-            val summaryTitle = if (isRu) "СТАТИСТИКА ГЛЮКОЗЫ И ЦЕЛИ" else "GLUCOSE STATISTICS & TARGETS"
-            canvas.drawText(summaryTitle, col2Left + 12f, panelTop + 18f, boxTitlePaint)
+            val metricsTitle = if (isRu) "ОСНОВНЫЕ ПОКАЗАТЕЛИ (ATTD / ADA СТАНДАРТ)" else "CORE CGM METRICS (ATTD / ADA STANDARD)"
+            canvas.drawText(metricsTitle, col2Left + 12f, panelTop + 18f, boxTitlePaint)
 
             val nightStr = if (statistics.nightStability.isStable) {
                 if (isRu) "Стабильный (TIR ${String.format(Locale.US, "%.1f", statistics.nightStability.tirPercent)}%)"
@@ -205,11 +225,29 @@ class AgpPdfGenerator(private val context: Context) {
                 String.format(Locale.US, "%d – %d", (minVal * 18.0182).toInt(), (maxVal * 18.0182).toInt())
             }
 
+            val ea1cComparisonStr = if (latestHba1c != null) {
+                val delta = latestHba1c.valuePercent - statistics.gmiPercent
+                val dateStr = hba1cDateFmt.format(Date(latestHba1c.timestamp))
+                val labPart = if (latestHba1c.labName.isNotBlank()) ", ${latestHba1c.labName}" else ""
+                String.format(Locale.US, "%.1f%% • Лаб: %.1f%% (%s%s, Δ %+.1f%%)", statistics.gmiPercent, latestHba1c.valuePercent, dateStr, labPart, delta)
+            } else {
+                String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)
+            }
+
+            val ea1cComparisonStrEn = if (latestHba1c != null) {
+                val delta = latestHba1c.valuePercent - statistics.gmiPercent
+                val dateStr = hba1cDateFmt.format(Date(latestHba1c.timestamp))
+                val labPart = if (latestHba1c.labName.isNotBlank()) ", ${latestHba1c.labName}" else ""
+                String.format(Locale.US, "%.1f%% • Lab: %.1f%% (%s%s, Δ %+.1f%%)", statistics.gmiPercent, latestHba1c.valuePercent, dateStr, labPart, delta)
+            } else {
+                String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)
+            }
+
             val statRows = if (isRu) {
                 listOf(
                     Pair("Средний сахар (Mean) • Мин/Макс:", "$meanStr • Мин/Макс: $minMaxStr"),
                     Pair("Вариабельность глюкозы (%CV):", String.format(Locale.US, "%.1f%% (Цель ≤36.0%%) • SD: %s", statistics.cvPercent, sdStr)),
-                    Pair("Расчётный eA1c (ADAG):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)),
+                    Pair("Расчётный eA1c (ADAG) / Лабораторный:", ea1cComparisonStr),
                     Pair("GRI (риск гипо / Klonoff 2022):", String.format(Locale.US, "%.1f (%s, цель ≤40.0)", statistics.gri, statistics.griLabel)),
                     Pair("Индексы GVI / PGS:", String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs)),
                     Pair("Ночной профиль (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)}):", nightStr)
@@ -218,7 +256,7 @@ class AgpPdfGenerator(private val context: Context) {
                 listOf(
                     Pair("Average Glucose (Mean) • Min/Max:", "$meanStr • Min/Max: $minMaxStr"),
                     Pair("Glucose Variability (%CV):", String.format(Locale.US, "%.1f%% (Target ≤36.0%%) • SD: %s", statistics.cvPercent, sdStr)),
-                    Pair("Estimated A1c (eA1c):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)),
+                    Pair("Estimated A1c (eA1c) / Laboratory:", ea1cComparisonStrEn),
                     Pair("Glycemia Risk Index (GRI / Hypo Risk):", String.format(Locale.US, "%.1f (%s, target ≤40.0)", statistics.gri, statistics.griLabel)),
                     Pair("Variability Indexes (GVI/PGS):", String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs)),
                     Pair("Night Sleep Profile (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)}):", nightStr)

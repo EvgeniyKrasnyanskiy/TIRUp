@@ -2396,14 +2396,14 @@ fun SettingsScreen(
                         }
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = ActionBlue.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.4f))
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                         ) {
                             Text(
                                 text = "${settings.widgetBackgroundOpacity}%",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = ActionBlue,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                             )
                         }
@@ -3684,8 +3684,8 @@ private fun PatientProfileSummaryCard(
 
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.2.dp, Color(0xFFEF4444)),
-                            color = Color(0xFFEF4444).copy(alpha = 0.08f),
+                            border = BorderStroke(1.2.dp, ActionBlue),
+                            color = ActionBlue.copy(alpha = 0.08f),
                             modifier = Modifier.clickable { onHba1cClick() }
                         ) {
                             Text(
@@ -3698,7 +3698,7 @@ private fun PatientProfileSummaryCard(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 11.sp
                                 ),
-                                color = Color(0xFFEF4444),
+                                color = ActionBlue,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp)
                             )
                         }
@@ -5566,9 +5566,9 @@ fun YearEndDigestDialog(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = if (stats.isArchived) {
-                                        if (isRu) "✓ Год запечатан в архив" else "✓ Year sealed in archive"
+                                        if (isRu) "✓ Год сохранён в архиве" else "✓ Year saved in archive"
                                     } else {
-                                        if (isRu) "Годовой архив не создан" else "Archive not sealed yet"
+                                        if (isRu) "Годовой архив ещё не создан" else "Annual archive not created yet"
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.SemiBold,
@@ -5580,18 +5580,24 @@ fun YearEndDigestDialog(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            if (!stats.isArchived) {
-                                Button(
-                                    onClick = { onArchiveYear(stats.year) },
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                                ) {
-                                    Text(
-                                        text = if (isRu) "Запечатать" else "Seal",
-                                        fontSize = 11.sp
-                                    )
-                                }
+                            Button(
+                                onClick = { onArchiveYear(stats.year) },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (stats.isArchived) MaterialTheme.colorScheme.surfaceVariant else PrimaryEmerald,
+                                    contentColor = if (stats.isArchived) MaterialTheme.colorScheme.onSurface else Color.White
+                                ),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (stats.isArchived) {
+                                        if (isRu) "Обновить" else "Update"
+                                    } else {
+                                        if (isRu) "В архив" else "Archive"
+                                    },
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
                         }
                     }
@@ -5600,40 +5606,48 @@ fun YearEndDigestDialog(
         },
         confirmButton = {
             Column(
-                horizontalAlignment = Alignment.End,
+                modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (snackbarHostState != null) {
                     SnackbarHost(hostState = snackbarHostState)
                 }
-                if (stats != null && stats.totalReadings > 0) {
-                    Button(
-                        onClick = { onExportPdf(stats) },
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Download,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (stats != null && stats.totalReadings > 0) {
+                        Button(
+                            onClick = { onExportPdf(stats) },
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isRu) "Открытка в PDF" else "Save PDF",
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.width(1.dp))
+                    }
+
+                    TextButton(onClick = onDismiss) {
                         Text(
-                            text = if (isRu) "Открытка в PDF" else "Save PDF",
-                            fontWeight = FontWeight.Bold
+                            text = if (isRu) "Закрыть" else "Close",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(
-                    text = if (isRu) "Закрыть" else "Close",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+        dismissButton = null
     )
 }
 
