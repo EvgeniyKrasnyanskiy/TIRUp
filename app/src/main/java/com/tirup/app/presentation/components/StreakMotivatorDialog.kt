@@ -76,18 +76,7 @@ fun StreakMotivatorDialog(
         label = "flameScale"
     )
 
-    val daysWord = if (isRu) {
-        val rem10 = streakDays % 10
-        val rem100 = streakDays % 100
-        when {
-            rem100 in 11..19 -> "$streakDays дней"
-            rem10 == 1 -> "$streakDays день"
-            rem10 in 2..4 -> "$streakDays дня"
-            else -> "$streakDays дней"
-        }
-    } else {
-        if (streakDays == 1) "1 day" else "$streakDays days"
-    }
+    val daysWord = com.tirup.app.domain.util.PluralUtils.formatDays(streakDays, isRu)
 
     var showFlameEasterEgg by remember { mutableStateOf(false) }
 
@@ -171,18 +160,7 @@ fun StreakMotivatorDialog(
                     }
 
                     if (bestStreakDays > 0) {
-                        val bestWord = if (isRu) {
-                            val rem10 = bestStreakDays % 10
-                            val rem100 = bestStreakDays % 100
-                            when {
-                                rem100 in 11..19 -> "$bestStreakDays дней"
-                                rem10 == 1 -> "$bestStreakDays день"
-                                rem10 in 2..4 -> "$bestStreakDays дня"
-                                else -> "$bestStreakDays дней"
-                            }
-                        } else {
-                            if (bestStreakDays == 1) "1 day" else "$bestStreakDays days"
-                        }
+                        val bestWord = com.tirup.app.domain.util.PluralUtils.formatDays(bestStreakDays, isRu)
                         Text(
                             text = if (isRu) "Лучшая серия: $bestWord" else "Best streak: $bestWord",
                             style = MaterialTheme.typography.bodySmall,

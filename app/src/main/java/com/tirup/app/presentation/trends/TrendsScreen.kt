@@ -268,7 +268,7 @@ fun TrendsScreen(
                             }
 
                             Text(
-                                text = "${visiblePatterns.size} ${if (isRu) "событий" else "events"}",
+                                text = com.tirup.app.domain.util.PluralUtils.formatEvents(visiblePatterns.size, isRu),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = onSurfaceVariant
                             )

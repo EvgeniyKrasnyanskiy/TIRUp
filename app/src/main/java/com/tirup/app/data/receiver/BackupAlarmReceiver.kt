@@ -26,6 +26,7 @@ class BackupAlarmReceiver : BroadcastReceiver() {
             // Restore floating bubble service if enabled
             val app = context.applicationContext as? com.tirup.app.TirupApplication
             app?.let { application ->
+                val pendingResult = goAsync()
                 kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                     try {
                         val settings = application.settingsRepository.getSettings().first()
@@ -34,6 +35,8 @@ class BackupAlarmReceiver : BroadcastReceiver() {
                         }
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to restore floating bubble after boot/update: ${e.message}")
+                    } finally {
+                        pendingResult.finish()
                     }
                 }
             }
