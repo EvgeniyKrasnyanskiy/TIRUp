@@ -657,6 +657,16 @@ fun DailyGlucoseChart(
                         }
                     }
                 }
+            }
+
+            val axisTextPaint = remember(onSurfaceVariant) {
+                android.graphics.Paint().apply {
+                    color = onSurfaceVariant.toArgb()
+                    textSize = 24f
+                    isAntiAlias = true
+                    typeface = android.graphics.Typeface.DEFAULT
+                }
+            }
 
             // Interactive Chart Canvas with Pinch-to-Zoom and Horizontal Drag
             Box(
@@ -814,12 +824,7 @@ fun DailyGlucoseChart(
                     )
 
                     // 2. Vertical Time Grid & Bottom Labels
-                    val textPaint = Paint().apply {
-                        color = onSurfaceVariant.toArgb()
-                        textSize = 24f
-                        isAntiAlias = true
-                        typeface = Typeface.DEFAULT
-                    }
+                    val textPaint = axisTextPaint
 
                     val stepMinutes = when {
                         visibleMinutes <= 240f -> 60  // Every hour
