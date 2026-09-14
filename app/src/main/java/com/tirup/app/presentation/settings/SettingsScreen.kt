@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.HorizontalDivider
@@ -198,6 +199,9 @@ fun SettingsScreen(
             highlightBle = false
         } else if (target == "hba1c") {
             viewModel.toggleHba1cDialog(true)
+        }
+        if (target == "year_end") {
+            viewModel.setShowYearEndDialog(true)
         }
     }
 
@@ -2725,6 +2729,30 @@ fun SettingsScreen(
                             )
                         }
                     }
+
+                    // Row 3: Year-End Digest & Annual Archives
+                    val activeYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+                    OutlinedButton(
+                        onClick = { viewModel.setShowYearEndDialog(true, activeYear) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.2.dp, PrimaryEmerald.copy(alpha = 0.7f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = PrimaryEmerald.copy(alpha = 0.08f)
+                        )
+                    ) {
+                        Text(
+                            text = "🎄",
+                            fontSize = 16.sp
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isRu) "Итоги года и годовой архив ($activeYear)" else "Year-End Digest & Archives ($activeYear)",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PrimaryEmerald
+                        )
+                    }
                 }
             }
 
@@ -3491,6 +3519,17 @@ fun SettingsScreen(
                 viewModel.exportHba1cReportToPdf()
             },
             onDismiss = { viewModel.toggleHba1cDialog(false) }
+        )
+    }
+
+    if (state.showYearEndDialog) {
+        val stats = state.yearEndStats
+        YearEndDigestDialog(
+            stats = stats,
+            isRu = isRu,
+            onExportPdf = { s -> viewModel.exportYearEndReportToPdf(s) },
+            onArchiveYear = { year -> viewModel.archiveYearArchive(year) },
+            onDismiss = { viewModel.setShowYearEndDialog(false) }
         )
     }
 
@@ -5273,6 +5312,307 @@ private fun BleFamilyPinDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text(if (isRu) "Отмена" else "Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    )
+}
+
+@Composable
+fun YearEndDigestDialog(
+    stats: YearEndStats?,
+    isRu: Boolean,
+    onExportPdf: (YearEndStats) -> Unit,
+    onArchiveYear: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val year = stats?.year ?: java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(text = "🎄", fontSize = 24.sp)
+                Column {
+                    Text(
+                        text = if (isRu) "Итоги $year года с TIRUp" else "Your $year Year with TIRUp",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = if (isRu) "Годовой дайджест и ротация архива" else "Year-end digest & archive rotation",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = PrimaryEmerald
+                    )
+                }
+            }
+        },
+        text = {
+            if (stats == null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = PrimaryEmerald)
+                }
+            } else if (stats.totalReadings == 0) {
+                Column(
+                    modifier = Modifier.padding(vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "📅",
+                        fontSize = 32.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = if (isRu) "За $year год ещё нет сохранённых измерений в базе данных."
+                               else "No saved readings found for year $year in database.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Hero Card: TIR
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = PrimaryEmerald.copy(alpha = 0.12f),
+                        border = BorderStroke(1.2.dp, PrimaryEmerald.copy(alpha = 0.45f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = String.format(Locale.US, "%.1f%%", stats.tirPercent),
+                                style = TextStyle(
+                                    fontSize = 36.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PrimaryEmerald
+                                )
+                            )
+                            Text(
+                                text = if (isRu) "Время в норме (3.9 — 10.0 ммоль/л)" else "Time in Range (3.9 — 10.0 mmol/L)",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = if (stats.tirPercent >= 70.0) {
+                                    if (isRu) "🎯 Международная цель ADA (≥70%) достигнута!" else "🎯 Target ADA goal (≥70%) achieved!"
+                                } else {
+                                    if (isRu) "Целевой клинический ориентир: ≥70%" else "Clinical target benchmark: ≥70%"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (stats.tirPercent >= 70.0) PrimaryEmerald else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // Key Glycemic Metrics Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = String.format(Locale.US, "%.1f", stats.meanGlucoseMmol),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isRu) "Ср. сахар" else "Mean BG",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = String.format(Locale.US, "%.1f%%", stats.gmiPercent),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ActionBlue
+                                )
+                                Text(
+                                    text = if (isRu) "GMI (HbA1c)" else "GMI (HbA1c)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = String.format(Locale.US, "%.1f%%", stats.tbrPercent),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (stats.tbrPercent <= 4.0) PrimaryEmerald else Color(0xFFEF4444)
+                                )
+                                Text(
+                                    text = if (isRu) "Гипо (<3.9)" else "Low (<3.9)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // Achievements List
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            val coveragePct = (stats.monitoringDays.toDouble() / 365.0 * 100.0).coerceAtMost(100.0)
+                            Text(
+                                text = "📅 ${if (isRu) "Мониторинг:" else "Active CGM:"} ${stats.monitoringDays} / 365 ${if (isRu) "дней" else "days"} (${String.format(Locale.US, "%.1f%%", coveragePct)})",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "📈 ${if (isRu) "Всего замеров:" else "Total readings:"} ${stats.totalReadings} ${if (isRu) "точек" else "points"}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (stats.bestMonthName.isNotBlank()) {
+                                Text(
+                                    text = "🏆 ${if (isRu) "Лучший месяц:" else "Best month:"} ${stats.bestMonthName} (${String.format(Locale.US, "%.1f%%", stats.bestMonthTir)} TIR)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = PrimaryEmerald
+                                )
+                            }
+                            if (stats.bestStreakDays > 0) {
+                                Text(
+                                    text = "🔥 ${if (isRu) "Рекордная серия:" else "Longest streak:"} ${stats.bestStreakDays} ${if (isRu) "дн. без выраженной гипо" else "days without severe low"}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+
+                    // Archive Status & Action
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (stats.isArchived) PrimaryEmerald.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        border = BorderStroke(1.dp, if (stats.isArchived) PrimaryEmerald.copy(alpha = 0.3f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (stats.isArchived) {
+                                        if (isRu) "✓ Год запечатан в архив" else "✓ Year sealed in archive"
+                                    } else {
+                                        if (isRu) "Годовой архив не создан" else "Archive not sealed yet"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (stats.isArchived) PrimaryEmerald else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "tirup_readings_${stats.year}.csv",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (!stats.isArchived) {
+                                Button(
+                                    onClick = { onArchiveYear(stats.year) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = if (isRu) "Запечатать" else "Seal",
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (stats != null && stats.totalReadings > 0) {
+                Button(
+                    onClick = { onExportPdf(stats) },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isRu) "Открытка в PDF" else "Save PDF",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = if (isRu) "Закрыть" else "Close",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     )

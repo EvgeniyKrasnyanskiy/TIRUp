@@ -245,11 +245,140 @@ object AutoBackupManager {
     }
 
     /**
+     * Checks all completed years prior to current calendar year.
+     * If there are readings in database for that year and annual archive tirup_readings_YYYY.csv
+     * does not yet exist or is empty, seals that year into an immutable archive file.
+     */
+    suspend fun archiveCompletedYears(
+        context: Context? = null,
+        database: AppDatabase
+    ): List<Int> = withContext(Dispatchers.IO) {
+        val archivedYears = mutableListOf<Int>()
+        try {
+            val pubDir = getPublicBackupDirectory()
+            val internalDir = getInternalBackupDirectory(context)
+            val primaryDir = if (pubDir.exists() && pubDir.canWrite()) pubDir else internalDir
+
+            val earliest = database.glucoseReadingDao().getEarliestTimestamp() ?: return@withContext emptyList()
+            val cal = java.util.Calendar.getInstance()
+            val currentYear = cal.get(java.util.Calendar.YEAR)
+
+            val earliestCal = java.util.Calendar.getInstance().apply { timeInMillis = earliest }
+            val earliestYear = earliestCal.get(java.util.Calendar.YEAR)
+
+            for (year in earliestYear until currentYear) {
+                val yearReadingsFile = File(primaryDir, "tirup_readings_$year.csv")
+                val yearTreatmentsFile = File(primaryDir, "tirup_treatments_$year.csv")
+
+                val startOfYear = java.util.Calendar.getInstance().apply {
+                    set(year, java.util.Calendar.JANUARY, 1, 0, 0, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                }.timeInMillis
+
+                val endOfYear = java.util.Calendar.getInstance().apply {
+                    set(year, java.util.Calendar.DECEMBER, 31, 23, 59, 59)
+                    set(java.util.Calendar.MILLISECOND, 999)
+                }.timeInMillis
+
+                val count = database.glucoseReadingDao().getCountBetween(startOfYear, endOfYear)
+                if (count > 0 && (!yearReadingsFile.exists() || yearReadingsFile.length() == 0L)) {
+                    writeReadingsCsvFile(yearReadingsFile, database, count, startOfYear, endOfYear)
+                    val tCount = database.treatmentDao().getCountBetween(startOfYear, endOfYear)
+                    if (tCount > 0) {
+                        writeTreatmentsCsvFile(yearTreatmentsFile, database, tCount, startOfYear, endOfYear)
+                    }
+
+                    if (primaryDir.absolutePath != internalDir.absolutePath && internalDir.exists()) {
+                        try {
+                            if (yearReadingsFile.exists()) yearReadingsFile.copyTo(File(internalDir, yearReadingsFile.name), overwrite = true)
+                            if (yearTreatmentsFile.exists()) yearTreatmentsFile.copyTo(File(internalDir, yearTreatmentsFile.name), overwrite = true)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error mirroring year archive $year: ${e.message}")
+                        }
+                    }
+
+                    archivedYears.add(year)
+                    Log.i(TAG, "Successfully sealed annual archive for year $year with $count readings")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "archiveCompletedYears error: ${e.message}", e)
+        }
+        archivedYears
+    }
+
+    /**
+     * Manually seals a specific year's data into tirup_readings_YYYY.csv.
+     */
+    suspend fun archiveYear(
+        year: Int,
+        context: Context? = null,
+        database: AppDatabase
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val pubDir = getPublicBackupDirectory()
+            val internalDir = getInternalBackupDirectory(context)
+            val primaryDir = if (pubDir.exists() && pubDir.canWrite()) pubDir else internalDir
+
+            val yearReadingsFile = File(primaryDir, "tirup_readings_$year.csv")
+            val yearTreatmentsFile = File(primaryDir, "tirup_treatments_$year.csv")
+
+            val startOfYear = java.util.Calendar.getInstance().apply {
+                set(year, java.util.Calendar.JANUARY, 1, 0, 0, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }.timeInMillis
+
+            val endOfYear = java.util.Calendar.getInstance().apply {
+                set(year, java.util.Calendar.DECEMBER, 31, 23, 59, 59)
+                set(java.util.Calendar.MILLISECOND, 999)
+            }.timeInMillis
+
+            val count = database.glucoseReadingDao().getCountBetween(startOfYear, endOfYear)
+            if (count > 0) {
+                writeReadingsCsvFile(yearReadingsFile, database, count, startOfYear, endOfYear)
+                val tCount = database.treatmentDao().getCountBetween(startOfYear, endOfYear)
+                if (tCount > 0) {
+                    writeTreatmentsCsvFile(yearTreatmentsFile, database, tCount, startOfYear, endOfYear)
+                }
+
+                if (primaryDir.absolutePath != internalDir.absolutePath && internalDir.exists()) {
+                    try {
+                        if (yearReadingsFile.exists()) yearReadingsFile.copyTo(File(internalDir, yearReadingsFile.name), overwrite = true)
+                        if (yearTreatmentsFile.exists()) yearTreatmentsFile.copyTo(File(internalDir, yearTreatmentsFile.name), overwrite = true)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error mirroring year archive $year: ${e.message}")
+                    }
+                }
+                return@withContext true
+            }
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "archiveYear $year failed: ${e.message}", e)
+            false
+        }
+    }
+
+    /**
+     * Returns list of years for which archived CSV files exist in backup directory.
+     */
+    fun getArchivedYears(context: Context? = null): List<Int> {
+        val dir = getBackupDirectory(context)
+        val files = dir.listFiles { _, name ->
+            name.matches(Regex("tirup_readings_\\d{4}\\.csv"))
+        } ?: return emptyList()
+
+        return files.mapNotNull { f ->
+            f.name.removePrefix("tirup_readings_").removeSuffix(".csv").toIntOrNull()
+        }.sorted()
+    }
+
+    /**
      * Performs a complete backup:
-     * 1. Writes tirup_settings.json
-     * 2. Writes tirup_readings.csv
-     * 3. Writes tirup_treatments.csv
-     * 4. Writes legacy tirup_backup.json for backward compatibility
+     * 1. Seals past completed calendar years into immutable tirup_readings_YYYY.csv.
+     * 2. Writes tirup_settings.json.
+     * 3. Writes active readings into tirup_readings.csv (active calendar year or all if 1 year).
+     * 4. Writes active treatments into tirup_treatments.csv.
+     * 5. Writes legacy tirup_backup.json for backward compatibility.
      * Replicates to both Documents/TIRUp/Backups/ and Android/data/.../Backups/.
      */
     suspend fun performBackup(
@@ -262,19 +391,39 @@ object AutoBackupManager {
             val internalDir = getInternalBackupDirectory(context)
             val primaryDir = if (pubDir.exists() && pubDir.canWrite()) pubDir else internalDir
 
+            // Step 0: Ensure past completed years are archived
+            archiveCompletedYears(context, database)
+
             val totalReadings = database.glucoseReadingDao().getTotalCount()
             val totalTreatments = database.treatmentDao().getTotalCount()
             val earliest = database.glucoseReadingDao().getEarliestTimestamp() ?: 0L
             val latest = database.glucoseReadingDao().getLatestTimestamp() ?: 0L
             val now = System.currentTimeMillis()
 
+            val currentYearStart = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.DAY_OF_YEAR, 1)
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }.timeInMillis
+
+            val isMultiYear = earliest > 0L && earliest < currentYearStart
+            val activeReadingsCount = if (isMultiYear) {
+                database.glucoseReadingDao().getCountBetween(currentYearStart, now)
+            } else {
+                totalReadings
+            }
+            val activeStartTime = if (isMultiYear) currentYearStart else null
+            val activeEndTime = if (isMultiYear) now else null
+
             // 1. Write Settings JSON
             val settingsFile = File(primaryDir, SETTINGS_FILE_NAME)
             writeSettingsJsonFile(settingsFile, settings, now)
 
-            // 2. Write Readings CSV
+            // 2. Write Readings CSV (active period for Zero-Lag)
             val readingsFile = File(primaryDir, READINGS_FILE_NAME)
-            writeReadingsCsvFile(readingsFile, database, totalReadings)
+            writeReadingsCsvFile(readingsFile, database, activeReadingsCount, activeStartTime, activeEndTime)
 
             // 3. Write Treatments CSV
             val treatmentsFile = File(primaryDir, TREATMENTS_FILE_NAME)
@@ -282,7 +431,17 @@ object AutoBackupManager {
 
             // 4. Write Legacy Backup JSON (for full backward compatibility)
             val legacyFile = File(primaryDir, LEGACY_BACKUP_FILE_NAME)
-            writeLegacyBackupJsonFile(legacyFile, database, settings, totalReadings, earliest, latest, now)
+            writeLegacyBackupJsonFile(
+                legacyFile,
+                database,
+                settings,
+                activeReadingsCount,
+                if (isMultiYear) currentYearStart else earliest,
+                latest,
+                now,
+                activeStartTime,
+                activeEndTime
+            )
 
             // 5. Mirror to internalDir if primaryDir is public
             if (primaryDir.absolutePath != internalDir.absolutePath && internalDir.exists()) {
@@ -296,7 +455,7 @@ object AutoBackupManager {
                 }
             }
 
-            Log.i(TAG, "Backup successfully completed: $totalReadings readings, $totalTreatments treatments in ${primaryDir.absolutePath}")
+            Log.i(TAG, "Backup successfully completed: $activeReadingsCount active readings ($totalReadings total across all years), $totalTreatments treatments in ${primaryDir.absolutePath}")
             Result.success(true)
         } catch (e: Exception) {
             Log.e(TAG, "Backup failed: ${e.message}", e)
@@ -445,6 +604,7 @@ object AutoBackupManager {
         writer.name("hba1cSkippedQuarterTimestamp").value(settings.hba1cSkippedQuarterTimestamp)
         writer.name("hba1cRemindersCountInCycle").value(settings.hba1cRemindersCountInCycle)
         writer.name("lastHba1cReminderTimestamp").value(settings.lastHba1cReminderTimestamp)
+        writer.name("lastYearEndDigestShownYear").value(settings.lastYearEndDigestShownYear)
         writer.name("hba1cRecords")
         writer.beginArray()
         for (rec in settings.hba1cRecords) {
@@ -461,7 +621,13 @@ object AutoBackupManager {
         writer.endObject()
     }
 
-    private suspend fun writeReadingsCsvFile(file: File, database: AppDatabase, totalCount: Long) {
+    private suspend fun writeReadingsCsvFile(
+        file: File,
+        database: AppDatabase,
+        totalCount: Long,
+        startTime: Long? = null,
+        endTime: Long? = null
+    ) {
         val tmp = File(file.parentFile, file.name + ".tmp")
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
         val pageSize = 5000
@@ -471,7 +637,11 @@ object AutoBackupManager {
             val bw = BufferedWriter(fw, 32768)
             bw.write("Timestamp,DateTime,Glucose_mmol,TrendArrow,IOB,COB\n")
             while (offset < totalCount) {
-                val page = database.glucoseReadingDao().getReadingsPaginated(limit = pageSize, offset = offset)
+                val page = if (startTime != null && endTime != null) {
+                    database.glucoseReadingDao().getReadingsBetweenPaginated(startTime, endTime, pageSize, offset)
+                } else {
+                    database.glucoseReadingDao().getReadingsPaginated(limit = pageSize, offset = offset)
+                }
                 if (page.isEmpty()) break
                 for (r in page) {
                     val dt = dateFormat.format(Date(r.timestamp))
@@ -488,7 +658,13 @@ object AutoBackupManager {
         tmp.renameTo(file)
     }
 
-    private suspend fun writeTreatmentsCsvFile(file: File, database: AppDatabase, totalCount: Long) {
+    private suspend fun writeTreatmentsCsvFile(
+        file: File,
+        database: AppDatabase,
+        totalCount: Long,
+        startTime: Long? = null,
+        endTime: Long? = null
+    ) {
         val tmp = File(file.parentFile, file.name + ".tmp")
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
         val pageSize = 1000
@@ -498,7 +674,11 @@ object AutoBackupManager {
             val bw = BufferedWriter(fw, 16384)
             bw.write("Timestamp,DateTime,InsulinUnits,CarbsGrams,Notes,Source\n")
             while (offset < totalCount) {
-                val page = database.treatmentDao().getTreatmentsPaginated(limit = pageSize, offset = offset)
+                val page = if (startTime != null && endTime != null) {
+                    database.treatmentDao().getTreatmentsBetweenPaginated(startTime, endTime, pageSize, offset)
+                } else {
+                    database.treatmentDao().getTreatmentsPaginated(limit = pageSize, offset = offset)
+                }
                 if (page.isEmpty()) break
                 for (t in page) {
                     val dt = dateFormat.format(Date(t.timestamp))
@@ -523,7 +703,9 @@ object AutoBackupManager {
         totalCount: Long,
         earliest: Long,
         latest: Long,
-        now: Long
+        now: Long,
+        startTime: Long? = null,
+        endTime: Long? = null
     ) {
         val tmp = File(file.parentFile, file.name + ".tmp")
         FileWriter(tmp).use { fw ->
@@ -545,7 +727,11 @@ object AutoBackupManager {
                 val pageSize = 5000
                 var offset = 0
                 while (offset < totalCount) {
-                    val page = database.glucoseReadingDao().getReadingsPaginated(limit = pageSize, offset = offset)
+                    val page = if (startTime != null && endTime != null) {
+                        database.glucoseReadingDao().getReadingsBetweenPaginated(startTime, endTime, pageSize, offset)
+                    } else {
+                        database.glucoseReadingDao().getReadingsPaginated(limit = pageSize, offset = offset)
+                    }
                     if (page.isEmpty()) break
                     page.forEach { r ->
                         writer.beginObject()
@@ -1458,6 +1644,7 @@ object AutoBackupManager {
         var hba1cSkippedQuarterTimestamp = 0L
         var hba1cRemindersCountInCycle = 0
         var lastHba1cReminderTimestamp = 0L
+        var lastYearEndDigestShownYear = 0
 
         reader.beginObject()
         while (reader.hasNext()) {
@@ -1605,6 +1792,7 @@ object AutoBackupManager {
                 "hba1cSkippedQuarterTimestamp" -> hba1cSkippedQuarterTimestamp = reader.nextLong()
                 "hba1cRemindersCountInCycle" -> hba1cRemindersCountInCycle = reader.nextInt()
                 "lastHba1cReminderTimestamp" -> lastHba1cReminderTimestamp = reader.nextLong()
+                "lastYearEndDigestShownYear" -> lastYearEndDigestShownYear = reader.nextInt()
                 "hba1cRecords" -> {
                     val list = mutableListOf<com.tirup.app.domain.model.LabHba1cRecord>()
                     reader.beginArray()
@@ -1665,6 +1853,7 @@ object AutoBackupManager {
             hba1cSkippedQuarterTimestamp = hba1cSkippedQuarterTimestamp,
             hba1cRemindersCountInCycle = hba1cRemindersCountInCycle,
             lastHba1cReminderTimestamp = lastHba1cReminderTimestamp,
+            lastYearEndDigestShownYear = lastYearEndDigestShownYear,
             hasSeenOnboarding = true
         )
     }

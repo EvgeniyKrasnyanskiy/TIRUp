@@ -182,7 +182,8 @@ data class UserSettings(
     val isHba1cReminderEnabled: Boolean = true,
     val hba1cSkippedQuarterTimestamp: Long = 0L,
     val hba1cRemindersCountInCycle: Int = 0,
-    val lastHba1cReminderTimestamp: Long = 0L
+    val lastHba1cReminderTimestamp: Long = 0L,
+    val lastYearEndDigestShownYear: Int = 0
 ) {
     val latestHba1cRecord: LabHba1cRecord?
         get() = hba1cRecords.maxByOrNull { it.timestamp }

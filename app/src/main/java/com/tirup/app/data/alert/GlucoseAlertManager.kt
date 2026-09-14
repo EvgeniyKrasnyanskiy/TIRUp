@@ -119,6 +119,7 @@ object GlucoseAlertManager {
     const val CHANNEL_WEEKLY_DIGEST = "tirup_weekly_digest_v1"
     const val CHANNEL_DEVICE_REMINDER = "tirup_device_reminder_v1"
     const val CHANNEL_HBA1C_REMINDER = "tirup_hba1c_reminder_v1"
+    const val CHANNEL_YEAR_END_DIGEST = "tirup_year_end_v1"
 
     const val NOTIFICATION_ID_LOCKSCREEN = 1000
     const val NOTIFICATION_ID_PREDICTIVE = 1001
@@ -131,9 +132,12 @@ object GlucoseAlertManager {
     const val NOTIFICATION_ID_PUMP_REMINDER = 9202
     const val NOTIFICATION_ID_LANCET_REMINDER = 9203
     const val NOTIFICATION_ID_HBA1C_REMINDER = 9204
+    const val NOTIFICATION_ID_YEAR_END_DIGEST = 9205
 
     const val EXTRA_GOTO_WEEKLY_DIGEST = "com.tirup.app.GOTO_WEEKLY_DIGEST"
     const val EXTRA_GOTO_HBA1C = "com.tirup.app.GOTO_HBA1C"
+    const val EXTRA_GOTO_YEAR_END = "com.tirup.app.GOTO_YEAR_END"
+    const val EXTRA_YEAR = "com.tirup.app.EXTRA_YEAR"
 
     // Timestamps for Smart Snooze / Anti-spam
     @Volatile
@@ -281,6 +285,16 @@ object GlucoseAlertManager {
             description = "Quarterly HbA1c checkup reminders and sensor GMI correlation"
             enableLights(true)
             lightColor = Color.RED
+        }.also { nm.createNotificationChannel(it) }
+
+        NotificationChannel(
+            CHANNEL_YEAR_END_DIGEST,
+            "Итоги года",
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Праздничный годовой отчёт и статистика компенсации диабета 31 декабря"
+            enableLights(true)
+            lightColor = Color.parseColor("#10B981")
         }.also { nm.createNotificationChannel(it) }
     }
 
@@ -519,6 +533,72 @@ object GlucoseAlertManager {
     fun cancelHba1cReminderNotification(context: Context) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         nm?.cancel(NOTIFICATION_ID_HBA1C_REMINDER)
+    }
+
+    fun showYearEndDigestNotification(
+        context: Context,
+        year: Int,
+        tirPercent: Double,
+        meanMmol: Double,
+        gmi: Double,
+        isRu: Boolean
+    ) {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        initChannels(context)
+
+        val appIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(EXTRA_GOTO_YEAR_END, true)
+            putExtra(EXTRA_YEAR, year)
+        }
+        val contentPendingIntent = PendingIntent.getActivity(
+            context,
+            NOTIFICATION_ID_YEAR_END_DIGEST,
+            appIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val title = if (isRu) "🎄 Итоги $year года с TIRUp!" else "🎄 Your $year Year with TIRUp!"
+        val shortText = if (isRu) {
+            "TIR за год: ${String.format(Locale.US, "%.1f%%", tirPercent)} • Ср. сахар: ${String.format(Locale.US, "%.1f", meanMmol)} ммоль/л"
+        } else {
+            "Yearly TIR: ${String.format(Locale.US, "%.1f%%", tirPercent)} • Avg: ${String.format(Locale.US, "%.1f", meanMmol)} mmol/L"
+        }
+
+        val bigText = buildString {
+            if (isRu) {
+                append("Поздравляем с наступающим Новым годом!\n\n")
+                append("🎯 Время в целевом диапазоне (TIR): ${String.format(Locale.US, "%.1f%%", tirPercent)}\n")
+                append("🩸 Средний сахар: ${String.format(Locale.US, "%.1f", meanMmol)} ммоль/л (GMI: ${String.format(Locale.US, "%.1f%%", gmi)})\n\n")
+                append("Нажмите, чтобы открыть подробный годовой отчёт, лучшие месяцы и скачать праздничную открытку!")
+            } else {
+                append("Happy New Year from TIRUp!\n\n")
+                append("🎯 Time in Range (TIR): ${String.format(Locale.US, "%.1f%%", tirPercent)}\n")
+                append("🩸 Average Glucose: ${String.format(Locale.US, "%.1f", meanMmol)} mmol/L (GMI: ${String.format(Locale.US, "%.1f%%", gmi)})\n\n")
+                append("Tap to view full annual report, best streaks and export holiday summary!")
+            }
+        }
+
+        val actionTitle = if (isRu) "Открыть итоги года" else "Open Year Report"
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_YEAR_END_DIGEST)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setColor(Color.parseColor("#10B981"))
+            .setSubText(if (isRu) "Итоги года" else "Year-End Digest")
+            .setContentTitle(title)
+            .setContentText(shortText)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
+            .setContentIntent(contentPendingIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .addAction(0, actionTitle, contentPendingIntent)
+
+        nm.notify(NOTIFICATION_ID_YEAR_END_DIGEST, builder.build())
+    }
+
+    fun cancelYearEndDigestNotification(context: Context) {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        nm?.cancel(NOTIFICATION_ID_YEAR_END_DIGEST)
     }
 
     /**
