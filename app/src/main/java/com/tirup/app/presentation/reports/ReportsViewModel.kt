@@ -139,7 +139,7 @@ class ReportsViewModel(
         viewModelScope.launch {
             combine(
                 database.historicalReadingDao().getAllReadings().map { entities ->
-                    entities.map { it.toDomain() }
+                    entities.map { it.toDomain() }.distinctBy { it.timestamp }
                 },
                 settingsRepository.getSettings()
             ) { readings, settings ->
@@ -192,23 +192,28 @@ class ReportsViewModel(
                 importProgress = 0.02f,
                 importedPointsCount = 0,
                 importMessage = if (totalFiles > 1) {
-                    if (isRu) "Подготовка к импорту $totalFiles файлов..." else "Preparing to import $totalFiles files..."
+                    if (isRu) "Подготовка к объединению $totalFiles файлов..." else "Preparing to merge $totalFiles files..."
                 } else null
             )
 
             var cumulativePoints = 0
             var successfulFiles = 0
             val errors = mutableListOf<String>()
+            val seenTimestamps = HashSet<Long>()
 
             for ((idx, uri) in uris.withIndex()) {
                 val fileNum = idx + 1
                 if (totalFiles > 1) {
                     _uiState.value = _uiState.value.copy(
-                        importMessage = if (isRu) "Обработка файла $fileNum из $totalFiles..." else "Processing file $fileNum of $totalFiles..."
+                        importMessage = if (isRu) "Склейка: обработка файла $fileNum из $totalFiles..." else "Merging: processing file $fileNum of $totalFiles..."
                     )
                 }
 
-                val result = streamingImporter.importHistoricalFromUri(uri) { subProgress, count ->
+                val result = streamingImporter.importHistoricalFromUri(
+                    uri = uri,
+                    clearPrevious = (idx == 0),
+                    seenTimestamps = seenTimestamps
+                ) { subProgress, count ->
                     val overallProgress = ((idx.toFloat() + subProgress) / totalFiles.toFloat()).coerceIn(0.01f, 0.99f)
                     _uiState.value = _uiState.value.copy(
                         importProgress = overallProgress,
@@ -228,8 +233,8 @@ class ReportsViewModel(
             val finalMessage = if (errors.isEmpty()) {
                 if (cumulativePoints > 0) {
                     if (totalFiles > 1) {
-                        if (isRu) "Успешно импортировано $cumulativePoints измерений из $totalFiles файлов."
-                        else "Successfully imported $cumulativePoints points from $totalFiles files."
+                        if (isRu) "Успешно склеено $cumulativePoints измерений из $totalFiles файлов."
+                        else "Successfully merged $cumulativePoints points from $totalFiles files."
                     } else {
                         if (isRu) "Импортировано $cumulativePoints измерений в исторический отчёт."
                         else "Imported $cumulativePoints points to historical report."
@@ -241,8 +246,8 @@ class ReportsViewModel(
             } else {
                 if (successfulFiles > 0) {
                     val partErr = errors.joinToString("; ")
-                    if (isRu) "Импортировано $cumulativePoints измерений ($successfulFiles из $totalFiles файлов). Ошибки: $partErr"
-                    else "Imported $cumulativePoints points ($successfulFiles of $totalFiles files). Errors: $partErr"
+                    if (isRu) "Склеено $cumulativePoints измерений ($successfulFiles из $totalFiles файлов). Ошибки: $partErr"
+                    else "Merged $cumulativePoints points ($successfulFiles of $totalFiles files). Errors: $partErr"
                 } else {
                     val prefix = if (isRu) "Ошибка импорта: " else "Import error: "
                     val allErr = errors.joinToString("; ")
