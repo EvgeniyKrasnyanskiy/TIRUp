@@ -179,7 +179,10 @@ data class UserSettings(
     val pumpSetStatus: PumpSetStatus = PumpSetStatus(),
     val lancetStatus: LancetStatus = LancetStatus(),
     val hba1cRecords: List<LabHba1cRecord> = emptyList(),
-    val isHba1cReminderEnabled: Boolean = true
+    val isHba1cReminderEnabled: Boolean = true,
+    val hba1cSkippedQuarterTimestamp: Long = 0L,
+    val hba1cRemindersCountInCycle: Int = 0,
+    val lastHba1cReminderTimestamp: Long = 0L
 ) {
     val latestHba1cRecord: LabHba1cRecord?
         get() = hba1cRecords.maxByOrNull { it.timestamp }

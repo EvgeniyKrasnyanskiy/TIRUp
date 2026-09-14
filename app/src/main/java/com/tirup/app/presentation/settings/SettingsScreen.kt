@@ -196,6 +196,8 @@ fun SettingsScreen(
             highlightBle = true
             delay(2800L)
             highlightBle = false
+        } else if (target == "hba1c") {
+            viewModel.toggleHba1cDialog(true)
         }
     }
 
@@ -2096,6 +2098,45 @@ fun SettingsScreen(
                         }
                     }
                 }
+
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+
+                // HbA1c 90-day Checkup Reminder Switch
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (isRu) "Контроль HbA1c (раз в 90 дней)" else "HbA1c Checkup (every 90 days)",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (isRu) "Напоминание о сдаче крови на гликированный гемоглобин и сверка с 90-дневным GMI"
+                                   else "Quarterly reminder to test lab HbA1c and correlate with 90-day sensor GMI",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 16.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Switch(
+                        checked = settings.isHba1cReminderEnabled,
+                        onCheckedChange = { isChecked ->
+                            viewModel.setHba1cReminderEnabled(isChecked)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = ActionBlue
+                        )
+                    )
+                }
             }
         }
 
@@ -3435,12 +3476,16 @@ fun SettingsScreen(
             sensorGmi90d = state.sensorGmi90d,
             meanGlucose90dMmol = state.meanGlucose90dMmol,
             tirPercent90d = state.tirPercent90d,
+            skippedQuarterTimestamp = settings.hba1cSkippedQuarterTimestamp,
             isRu = isRu,
-            onAddRecord = { value, lab, notes ->
-                viewModel.addHba1cRecord(valuePercent = value, labName = lab, notes = notes)
+            onAddRecord = { value, timestamp, lab, notes ->
+                viewModel.addHba1cRecord(valuePercent = value, timestamp = timestamp, labName = lab, notes = notes)
             },
             onDeleteRecord = { id ->
                 viewModel.deleteHba1cRecord(id)
+            },
+            onSkipQuarter = {
+                viewModel.skipHba1cQuarter()
             },
             onExportPdf = {
                 viewModel.exportHba1cReportToPdf()
@@ -3659,13 +3704,16 @@ private fun Hba1cHistoryDialog(
     sensorGmi90d: Double?,
     meanGlucose90dMmol: Double?,
     tirPercent90d: Int?,
+    skippedQuarterTimestamp: Long,
     isRu: Boolean,
-    onAddRecord: (value: Double, lab: String, notes: String) -> Unit,
+    onAddRecord: (value: Double, timestamp: Long, lab: String, notes: String) -> Unit,
     onDeleteRecord: (id: Long) -> Unit,
+    onSkipQuarter: () -> Unit,
     onExportPdf: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var valueText by remember { mutableStateOf("") }
+    var dateText by remember { mutableStateOf(SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date())) }
     var labText by remember { mutableStateOf("") }
     var notesText by remember { mutableStateOf("") }
     var inputError by remember { mutableStateOf<String?>(null) }
@@ -3674,6 +3722,11 @@ private fun Hba1cHistoryDialog(
     val sortedRecords = remember(records) { records.sortedByDescending { it.timestamp } }
     val latestRecord = sortedRecords.firstOrNull()
     val scrollState = rememberScrollState()
+
+    val latestRecordTime = records.maxOfOrNull { it.timestamp } ?: 0L
+    val baseTime = maxOf(latestRecordTime, skippedQuarterTimestamp)
+    val now = System.currentTimeMillis()
+    val elapsedDays = if (baseTime > 0L) ((now - baseTime) / 86_400_000L).toInt() else null
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -3812,6 +3865,45 @@ private fun Hba1cHistoryDialog(
                                 )
                             }
                         }
+
+                        if (elapsedDays != null) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isRu) "Квартальный рубеж: прошло $elapsedDays дн. из 90"
+                                               else "Quarterly milestone: $elapsedDays of 90 days",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (elapsedDays >= 90) Color(0xFFF59E0B) else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    if (elapsedDays >= 90) {
+                                        Text(
+                                            text = if (isRu) "Не планируете сдавать сейчас?"
+                                                   else "Not taking a test now?",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                if (elapsedDays >= 90) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    OutlinedButton(
+                                        onClick = onSkipQuarter,
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isRu) "Пропустить (+90д)" else "Skip (+90d)",
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -3827,7 +3919,7 @@ private fun Hba1cHistoryDialog(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Text(
-                            text = if (isRu) "Внести новый анализ" else "Add New Test Result",
+                            text = if (isRu) "Внести новый или исторический анализ" else "Add New or Historical Test",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -3851,14 +3943,26 @@ private fun Hba1cHistoryDialog(
                             )
 
                             OutlinedTextField(
-                                value = labText,
-                                onValueChange = { labText = it },
-                                label = { Text(if (isRu) "Лаборатория" else "Laboratory") },
-                                placeholder = { Text(if (isRu) "Инвитро" else "Lab name") },
+                                value = dateText,
+                                onValueChange = {
+                                    dateText = it
+                                    inputError = null
+                                },
+                                label = { Text(if (isRu) "Дата" else "Date") },
+                                placeholder = { Text("14.09.2026") },
                                 singleLine = true,
                                 modifier = Modifier.weight(1.3f)
                             )
                         }
+
+                        OutlinedTextField(
+                            value = labText,
+                            onValueChange = { labText = it },
+                            label = { Text(if (isRu) "Лаборатория" else "Laboratory") },
+                            placeholder = { Text(if (isRu) "Инвитро, Гемотест..." else "Lab name") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
 
                         OutlinedTextField(
                             value = notesText,
@@ -3879,16 +3983,30 @@ private fun Hba1cHistoryDialog(
 
                         Button(
                             onClick = {
-                                val parsed = valueText.trim().replace(',', '.').toDoubleOrNull()
-                                if (parsed == null || parsed < 3.0 || parsed > 20.0) {
+                                val parsedVal = valueText.trim().replace(',', '.').toDoubleOrNull()
+                                if (parsedVal == null || parsedVal < 3.0 || parsedVal > 20.0) {
                                     inputError = if (isRu) "Введите значение от 3.0 до 20.0%" else "Enter value between 3.0 and 20.0%"
-                                } else {
-                                    onAddRecord(parsed, labText.trim(), notesText.trim())
-                                    valueText = ""
-                                    labText = ""
-                                    notesText = ""
-                                    inputError = null
+                                    return@Button
                                 }
+                                val parsedDate = try {
+                                    SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).parse(dateText.trim())?.time
+                                        ?: SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(dateText.trim())?.time
+                                        ?: SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(dateText.trim())?.time
+                                        ?: SimpleDateFormat("dd.MM.yy", Locale.getDefault()).parse(dateText.trim())?.time
+                                } catch (_: Exception) {
+                                    null
+                                }
+                                if (parsedDate == null) {
+                                    inputError = if (isRu) "Укажите корректную дату (например, 14.09.2026)" else "Enter a valid date (e.g., 14.09.2026)"
+                                    return@Button
+                                }
+
+                                onAddRecord(parsedVal, parsedDate, labText.trim(), notesText.trim())
+                                valueText = ""
+                                dateText = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date())
+                                labText = ""
+                                notesText = ""
+                                inputError = null
                             },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = ActionBlue),

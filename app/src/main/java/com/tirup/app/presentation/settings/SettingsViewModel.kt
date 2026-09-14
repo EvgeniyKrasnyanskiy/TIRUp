@@ -647,7 +647,11 @@ class SettingsViewModel(
                 notes = notes.trim()
             )
             val updatedList = (current.hba1cRecords + newRec).sortedByDescending { it.timestamp }
-            val updatedSettings = current.copy(hba1cRecords = updatedList)
+            val updatedSettings = current.copy(
+                hba1cRecords = updatedList,
+                hba1cRemindersCountInCycle = 0,
+                lastHba1cReminderTimestamp = 0L
+            )
             settingsRepository.updateSettings(updatedSettings)
             _uiState.update { it.copy(userSettings = updatedSettings) }
             val isRu = current.language.equals("RU", ignoreCase = true)
@@ -666,6 +670,29 @@ class SettingsViewModel(
             _uiState.update { it.copy(userSettings = updatedSettings) }
             val isRu = current.language.equals("RU", ignoreCase = true)
             _events.emit(SettingsEvent.Info(if (isRu) "Запись анализа удалена" else "Test record deleted"))
+        }
+    }
+
+    fun setHba1cReminderEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = _uiState.value.userSettings
+            val updated = current.copy(isHba1cReminderEnabled = enabled)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+        }
+    }
+
+    fun skipHba1cQuarter() {
+        viewModelScope.launch {
+            settingsRepository.skipHba1cQuarter()
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            val current = _uiState.value.userSettings
+            val updated = current.copy(
+                hba1cSkippedQuarterTimestamp = System.currentTimeMillis(),
+                hba1cRemindersCountInCycle = 0
+            )
+            _uiState.update { it.copy(userSettings = updated) }
+            _events.emit(SettingsEvent.Info(if (isRu) "Квартальный контроль отложен на 90 дней" else "Quarterly checkup postponed for 90 days"))
         }
     }
 

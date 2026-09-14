@@ -442,6 +442,9 @@ object AutoBackupManager {
 
         // HbA1c Lab Records
         writer.name("isHba1cReminderEnabled").value(settings.isHba1cReminderEnabled)
+        writer.name("hba1cSkippedQuarterTimestamp").value(settings.hba1cSkippedQuarterTimestamp)
+        writer.name("hba1cRemindersCountInCycle").value(settings.hba1cRemindersCountInCycle)
+        writer.name("lastHba1cReminderTimestamp").value(settings.lastHba1cReminderTimestamp)
         writer.name("hba1cRecords")
         writer.beginArray()
         for (rec in settings.hba1cRecords) {
@@ -1452,6 +1455,9 @@ object AutoBackupManager {
         var lancetStatus = LancetStatus()
         var hba1cRecords = emptyList<com.tirup.app.domain.model.LabHba1cRecord>()
         var isHba1cReminder = true
+        var hba1cSkippedQuarterTimestamp = 0L
+        var hba1cRemindersCountInCycle = 0
+        var lastHba1cReminderTimestamp = 0L
 
         reader.beginObject()
         while (reader.hasNext()) {
@@ -1596,6 +1602,9 @@ object AutoBackupManager {
                     lancetStatus = LancetStatus(installedAt, duration, lastUsed)
                 }
                 "isHba1cReminderEnabled" -> isHba1cReminder = reader.nextBoolean()
+                "hba1cSkippedQuarterTimestamp" -> hba1cSkippedQuarterTimestamp = reader.nextLong()
+                "hba1cRemindersCountInCycle" -> hba1cRemindersCountInCycle = reader.nextInt()
+                "lastHba1cReminderTimestamp" -> lastHba1cReminderTimestamp = reader.nextLong()
                 "hba1cRecords" -> {
                     val list = mutableListOf<com.tirup.app.domain.model.LabHba1cRecord>()
                     reader.beginArray()
@@ -1653,6 +1662,9 @@ object AutoBackupManager {
             lancetStatus = lancetStatus,
             hba1cRecords = hba1cRecords,
             isHba1cReminderEnabled = isHba1cReminder,
+            hba1cSkippedQuarterTimestamp = hba1cSkippedQuarterTimestamp,
+            hba1cRemindersCountInCycle = hba1cRemindersCountInCycle,
+            lastHba1cReminderTimestamp = lastHba1cReminderTimestamp,
             hasSeenOnboarding = true
         )
     }

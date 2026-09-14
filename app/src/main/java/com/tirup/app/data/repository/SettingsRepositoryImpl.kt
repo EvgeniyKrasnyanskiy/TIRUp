@@ -30,6 +30,15 @@ class SettingsRepositoryImpl(
 
     override fun getSettings(): Flow<UserSettings> = _settingsFlow.asStateFlow()
 
+    override suspend fun skipHba1cQuarter() {
+        val current = _settingsFlow.value
+        val updated = current.copy(
+            hba1cSkippedQuarterTimestamp = System.currentTimeMillis(),
+            hba1cRemindersCountInCycle = 0
+        )
+        updateSettings(updated)
+    }
+
     override suspend fun updateSettings(settings: UserSettings) {
         prefs.edit()
             .putString(KEY_LANG, settings.language)
@@ -135,6 +144,9 @@ class SettingsRepositoryImpl(
                 hba1cArr.toString()
             })
             .putBoolean(KEY_IS_HBA1C_REMINDER_ENABLED, settings.isHba1cReminderEnabled)
+            .putLong(KEY_HBA1C_SKIPPED_QUARTER_TIMESTAMP, settings.hba1cSkippedQuarterTimestamp)
+            .putInt(KEY_HBA1C_REMINDERS_COUNT_IN_CYCLE, settings.hba1cRemindersCountInCycle)
+            .putLong(KEY_LAST_HBA1C_REMINDER_TIMESTAMP, settings.lastHba1cReminderTimestamp)
             .apply()
 
         try {
@@ -401,7 +413,10 @@ class SettingsRepositoryImpl(
                     }
                 }
             },
-            isHba1cReminderEnabled = prefs.getBoolean(KEY_IS_HBA1C_REMINDER_ENABLED, true)
+            isHba1cReminderEnabled = prefs.getBoolean(KEY_IS_HBA1C_REMINDER_ENABLED, true),
+            hba1cSkippedQuarterTimestamp = prefs.getLong(KEY_HBA1C_SKIPPED_QUARTER_TIMESTAMP, 0L),
+            hba1cRemindersCountInCycle = prefs.getInt(KEY_HBA1C_REMINDERS_COUNT_IN_CYCLE, 0),
+            lastHba1cReminderTimestamp = prefs.getLong(KEY_LAST_HBA1C_REMINDER_TIMESTAMP, 0L)
         )
     }
 
@@ -500,5 +515,8 @@ class SettingsRepositoryImpl(
         private const val KEY_LANCET_LAST_USED_DURATION = "key_lancet_last_used_duration"
         private const val KEY_HBA1C_RECORDS = "key_hba1c_records"
         private const val KEY_IS_HBA1C_REMINDER_ENABLED = "key_is_hba1c_reminder_enabled"
+        private const val KEY_HBA1C_SKIPPED_QUARTER_TIMESTAMP = "key_hba1c_skipped_quarter_timestamp"
+        private const val KEY_HBA1C_REMINDERS_COUNT_IN_CYCLE = "key_hba1c_reminders_count_in_cycle"
+        private const val KEY_LAST_HBA1C_REMINDER_TIMESTAMP = "key_last_hba1c_reminder_timestamp"
     }
 }
