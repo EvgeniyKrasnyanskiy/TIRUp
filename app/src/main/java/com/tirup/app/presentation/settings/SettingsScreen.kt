@@ -28,17 +28,22 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandLess
@@ -49,10 +54,12 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Restaurant
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Science
+import kotlin.math.abs
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Tune
@@ -130,7 +137,9 @@ import com.tirup.app.domain.calculator.CarbRecommendationCalculator
 import com.tirup.app.domain.model.BleBridgeRole
 import com.tirup.app.domain.model.BmiCategory
 import com.tirup.app.domain.model.GlucoseUnit
+import com.tirup.app.domain.model.LabHba1cRecord
 import com.tirup.app.domain.model.PatientProfile
+import androidx.compose.ui.text.style.TextOverflow
 import com.tirup.app.domain.model.TargetRanges
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.domain.model.localizeDiabetesType
@@ -454,8 +463,10 @@ fun SettingsScreen(
         item {
             PatientProfileSummaryCard(
                 profile = profile,
+                latestHba1c = settings.latestHba1cRecord,
                 isRu = isRu,
-                onClick = { showProfileDialog = true }
+                onEditClick = { showProfileDialog = true },
+                onHba1cClick = { viewModel.toggleHba1cDialog(true) }
             )
         }
 
@@ -3418,6 +3429,26 @@ fun SettingsScreen(
         )
     }
 
+    if (state.showHba1cDialog) {
+        Hba1cHistoryDialog(
+            records = settings.hba1cRecords,
+            sensorGmi90d = state.sensorGmi90d,
+            meanGlucose90dMmol = state.meanGlucose90dMmol,
+            tirPercent90d = state.tirPercent90d,
+            isRu = isRu,
+            onAddRecord = { value, lab, notes ->
+                viewModel.addHba1cRecord(valuePercent = value, labName = lab, notes = notes)
+            },
+            onDeleteRecord = { id ->
+                viewModel.deleteHba1cRecord(id)
+            },
+            onExportPdf = {
+                viewModel.exportHba1cReportToPdf()
+            },
+            onDismiss = { viewModel.toggleHba1cDialog(false) }
+        )
+    }
+
     if (showBleHelpModal) {
         BleBridgeHelpDialog(
             isRu = isRu,
@@ -3480,13 +3511,15 @@ fun SettingsScreen(
 @Composable
 private fun PatientProfileSummaryCard(
     profile: PatientProfile,
+    latestHba1c: LabHba1cRecord?,
     isRu: Boolean,
-    onClick: () -> Unit
+    onEditClick: () -> Unit,
+    onHba1cClick: () -> Unit
 ) {
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val hasName = profile.fullName.isNotBlank()
-    val displayName = if (hasName) profile.fullName else (if (isRu) "Мой профиль" else "My Profile")
+    val displayName = if (hasName) profile.shortName else (if (isRu) "Мой профиль" else "My Profile")
 
     val ageStr = if (profile.birthYear > 1900) "${profile.calculatedAge} ${if (isRu) "лет" else "y.o."}" else ""
     val diagStr = if (profile.diabetesType.isNotBlank()) localizeDiabetesType(profile.diabetesType, isRu) else ""
@@ -3516,7 +3549,7 @@ private fun PatientProfileSummaryCard(
 
     BentoCard(
         modifier = Modifier.fillMaxWidth(),
-        onClick = onClick
+        onClick = onEditClick
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -3554,17 +3587,48 @@ private fun PatientProfileSummaryCard(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = displayName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = onSurface
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = displayName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.2.dp, Color(0xFFEF4444)),
+                            color = Color(0xFFEF4444).copy(alpha = 0.08f),
+                            modifier = Modifier.clickable { onHba1cClick() }
+                        ) {
+                            Text(
+                                text = if (latestHba1c != null) {
+                                    String.format(Locale.US, "HbA1c: %.1f%%", latestHba1c.valuePercent)
+                                } else {
+                                    "HbA1c: +"
+                                },
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                ),
+                                color = Color(0xFFEF4444),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp)
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (hasName) onSurfaceVariant else ActionBlue
+                        color = if (hasName) onSurfaceVariant else ActionBlue,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -3586,6 +3650,389 @@ private fun PatientProfileSummaryCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun Hba1cHistoryDialog(
+    records: List<LabHba1cRecord>,
+    sensorGmi90d: Double?,
+    meanGlucose90dMmol: Double?,
+    tirPercent90d: Int?,
+    isRu: Boolean,
+    onAddRecord: (value: Double, lab: String, notes: String) -> Unit,
+    onDeleteRecord: (id: Long) -> Unit,
+    onExportPdf: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var valueText by remember { mutableStateOf("") }
+    var labText by remember { mutableStateOf("") }
+    var notesText by remember { mutableStateOf("") }
+    var inputError by remember { mutableStateOf<String?>(null) }
+    var showDeleteConfirmId by remember { mutableStateOf<Long?>(null) }
+
+    val sortedRecords = remember(records) { records.sortedByDescending { it.timestamp } }
+    val latestRecord = sortedRecords.firstOrNull()
+    val scrollState = rememberScrollState()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Science,
+                        contentDescription = null,
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isRu) "Журнал HbA1c" else "HbA1c Journal",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close", modifier = Modifier.size(20.dp))
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // 1. Clinical Comparison Card (90 days)
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = if (isRu) "Клинический рубеж (90 дней)" else "Clinical Horizon (90 days)",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isRu) "Сенсорный GMI" else "Sensor GMI",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = if (sensorGmi90d != null) String.format(Locale.US, "%.1f%%", sensorGmi90d) else "—",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                if (meanGlucose90dMmol != null && tirPercent90d != null) {
+                                    Text(
+                                        text = String.format(Locale.US, "ср. %.1f • TIR %.0f%%", meanGlucose90dMmol, tirPercent90d),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = if (isRu) "Лаб. HbA1c" else "Lab HbA1c",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = if (latestRecord != null) String.format(Locale.US, "%.1f%%", latestRecord.valuePercent) else "—",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFEF4444)
+                                )
+                                if (latestRecord != null) {
+                                    val dateStr = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(latestRecord.timestamp))
+                                    Text(
+                                        text = dateStr,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        if (sensorGmi90d != null && latestRecord != null) {
+                            val delta = latestRecord.valuePercent - sensorGmi90d
+                            val deltaSign = if (delta > 0) "+" else ""
+                            val absDelta = abs(delta)
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (absDelta <= 0.4) PrimaryEmerald.copy(alpha = 0.15f) else ColorHigh.copy(alpha = 0.15f),
+                                    border = BorderStroke(1.dp, if (absDelta <= 0.4) PrimaryEmerald else ColorHigh)
+                                ) {
+                                    Text(
+                                        text = "Δ ${deltaSign}${String.format(Locale.US, "%.1f%%", delta)}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (absDelta <= 0.4) PrimaryEmerald else ColorHigh,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+
+                                Text(
+                                    text = when {
+                                        absDelta <= 0.4 -> if (isRu) "Отличная сходимость сенсора и лаборатории" else "Excellent correlation between sensor and lab"
+                                        delta > 0.4 -> if (isRu) "Лаб. выше GMI (возможны постпрандиальные пики)" else "Lab higher than GMI (check postprandials)"
+                                        else -> if (isRu) "GMI выше лаб. (проверьте калибровку сенсора)" else "GMI higher than lab (check sensor calibration)"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 14.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // 2. Add New Record Card
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = if (isRu) "Внести новый анализ" else "Add New Test Result",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = valueText,
+                                onValueChange = {
+                                    valueText = it
+                                    inputError = null
+                                },
+                                label = { Text("HbA1c %") },
+                                placeholder = { Text("6.4") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            OutlinedTextField(
+                                value = labText,
+                                onValueChange = { labText = it },
+                                label = { Text(if (isRu) "Лаборатория" else "Laboratory") },
+                                placeholder = { Text(if (isRu) "Инвитро" else "Lab name") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1.3f)
+                            )
+                        }
+
+                        OutlinedTextField(
+                            value = notesText,
+                            onValueChange = { notesText = it },
+                            label = { Text(if (isRu) "Заметка (необязательно)" else "Note (optional)") },
+                            placeholder = { Text(if (isRu) "Натощак / плановый контроль" else "Routine check") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        if (inputError != null) {
+                            Text(
+                                text = inputError!!,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                val parsed = valueText.trim().replace(',', '.').toDoubleOrNull()
+                                if (parsed == null || parsed < 3.0 || parsed > 20.0) {
+                                    inputError = if (isRu) "Введите значение от 3.0 до 20.0%" else "Enter value between 3.0 and 20.0%"
+                                } else {
+                                    onAddRecord(parsed, labText.trim(), notesText.trim())
+                                    valueText = ""
+                                    labText = ""
+                                    notesText = ""
+                                    inputError = null
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = ActionBlue),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = if (isRu) "Сохранить анализ" else "Save Result")
+                        }
+                    }
+                }
+
+                // 3. History Section
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = if (isRu) "История анализов (${records.size})" else "Test History (${records.size})",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    if (sortedRecords.isEmpty()) {
+                        Text(
+                            text = if (isRu) "Нет сохранённых анализов. Внесите данные выше." else "No records saved. Enter data above.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        sortedRecords.forEach { record ->
+                            val recordDate = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(record.timestamp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                                            color = Color(0xFFEF4444).copy(alpha = 0.1f)
+                                        ) {
+                                            Text(
+                                                text = String.format(Locale.US, "%.1f%%", record.valuePercent),
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFEF4444),
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
+
+                                        Column {
+                                            Text(
+                                                text = recordDate + if (record.labName.isNotBlank()) " • ${record.labName}" else "",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            if (record.notes.isNotBlank()) {
+                                                Text(
+                                                    text = record.notes,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    IconButton(
+                                        onClick = { showDeleteConfirmId = record.id },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Delete",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = onExportPdf,
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = if (isRu) "Выписка PDF" else "PDF Report")
+                }
+
+                TextButton(onClick = onDismiss) {
+                    Text(text = if (isRu) "Закрыть" else "Close")
+                }
+            }
+        },
+        dismissButton = null
+    )
+
+    if (showDeleteConfirmId != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmId = null },
+            title = { Text(if (isRu) "Удалить анализ?" else "Delete Record?") },
+            text = { Text(if (isRu) "Вы уверены, что хотите удалить эту запись из журнала?" else "Are you sure you want to delete this record?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val id = showDeleteConfirmId
+                        if (id != null) {
+                            onDeleteRecord(id)
+                        }
+                        showDeleteConfirmId = null
+                    }
+                ) {
+                    Text(text = if (isRu) "Удалить" else "Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmId = null }) {
+                    Text(text = if (isRu) "Отмена" else "Cancel")
+                }
+            }
+        )
     }
 }
 

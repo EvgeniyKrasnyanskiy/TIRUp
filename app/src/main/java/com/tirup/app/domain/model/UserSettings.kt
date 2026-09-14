@@ -100,6 +100,16 @@ data class PatientProfile(
             }
         }
 
+    val shortName: String
+        get() {
+            val parts = fullName.trim().split("\\s+".toRegex()).filter { it.isNotBlank() }
+            return when {
+                parts.isEmpty() -> ""
+                parts.size == 1 -> parts[0]
+                else -> "${parts[0]} ${parts[1]}"
+            }
+        }
+
     val calculatedAge: Int
         get() {
             val currentYear = Calendar.getInstance().get(Calendar.YEAR)
@@ -119,6 +129,14 @@ data class PatientProfile(
             return if (hM != null && wKg != null && hM > 0.5) wKg / (hM * hM) else null
         }
 }
+
+data class LabHba1cRecord(
+    val id: Long = System.currentTimeMillis(),
+    val timestamp: Long = System.currentTimeMillis(),
+    val valuePercent: Double = 0.0,
+    val labName: String = "",
+    val notes: String = ""
+)
 
 val DEFAULT_METRICS_ORDER: List<String> = listOf(
     "mean", "ea1c", "sd", "cv",
@@ -159,8 +177,13 @@ data class UserSettings(
     val isLancetReminderEnabled: Boolean = true,
     val sensorStatus: SensorStatus = SensorStatus(),
     val pumpSetStatus: PumpSetStatus = PumpSetStatus(),
-    val lancetStatus: LancetStatus = LancetStatus()
-)
+    val lancetStatus: LancetStatus = LancetStatus(),
+    val hba1cRecords: List<LabHba1cRecord> = emptyList(),
+    val isHba1cReminderEnabled: Boolean = true
+) {
+    val latestHba1cRecord: LabHba1cRecord?
+        get() = hba1cRecords.maxByOrNull { it.timestamp }
+}
 
 fun isPumpTherapy(therapyType: String): Boolean {
     val normalized = therapyType.trim()

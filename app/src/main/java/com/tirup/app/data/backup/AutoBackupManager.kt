@@ -440,6 +440,21 @@ object AutoBackupManager {
         writer.name("transmitBattery").value(ble.transmitBattery)
         writer.endObject()
 
+        // HbA1c Lab Records
+        writer.name("isHba1cReminderEnabled").value(settings.isHba1cReminderEnabled)
+        writer.name("hba1cRecords")
+        writer.beginArray()
+        for (rec in settings.hba1cRecords) {
+            writer.beginObject()
+            writer.name("id").value(rec.id)
+            writer.name("timestamp").value(rec.timestamp)
+            writer.name("valuePercent").value(rec.valuePercent)
+            writer.name("labName").value(rec.labName)
+            writer.name("notes").value(rec.notes)
+            writer.endObject()
+        }
+        writer.endArray()
+
         writer.endObject()
     }
 
@@ -1435,6 +1450,8 @@ object AutoBackupManager {
         var sensorStatus = SensorStatus()
         var pumpSetStatus = PumpSetStatus()
         var lancetStatus = LancetStatus()
+        var hba1cRecords = emptyList<com.tirup.app.domain.model.LabHba1cRecord>()
+        var isHba1cReminder = true
 
         reader.beginObject()
         while (reader.hasNext()) {
@@ -1578,6 +1595,33 @@ object AutoBackupManager {
                     reader.endObject()
                     lancetStatus = LancetStatus(installedAt, duration, lastUsed)
                 }
+                "isHba1cReminderEnabled" -> isHba1cReminder = reader.nextBoolean()
+                "hba1cRecords" -> {
+                    val list = mutableListOf<com.tirup.app.domain.model.LabHba1cRecord>()
+                    reader.beginArray()
+                    while (reader.hasNext()) {
+                        var id = 0L
+                        var timestamp = 0L
+                        var valuePercent = 0.0
+                        var labName = ""
+                        var notes = ""
+                        reader.beginObject()
+                        while (reader.hasNext()) {
+                            when (reader.nextName()) {
+                                "id" -> id = reader.nextLong()
+                                "timestamp" -> timestamp = reader.nextLong()
+                                "valuePercent" -> valuePercent = reader.nextDouble()
+                                "labName" -> labName = reader.nextString()
+                                "notes" -> notes = reader.nextString()
+                                else -> reader.skipValue()
+                            }
+                        }
+                        reader.endObject()
+                        list.add(com.tirup.app.domain.model.LabHba1cRecord(id, timestamp, valuePercent, labName, notes))
+                    }
+                    reader.endArray()
+                    hba1cRecords = list
+                }
                 else -> reader.skipValue()
             }
         }
@@ -1607,6 +1651,8 @@ object AutoBackupManager {
             sensorStatus = sensorStatus,
             pumpSetStatus = pumpSetStatus,
             lancetStatus = lancetStatus,
+            hba1cRecords = hba1cRecords,
+            isHba1cReminderEnabled = isHba1cReminder,
             hasSeenOnboarding = true
         )
     }
