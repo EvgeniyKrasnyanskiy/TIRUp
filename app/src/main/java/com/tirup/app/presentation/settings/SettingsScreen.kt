@@ -4376,8 +4376,9 @@ private fun PatientProfileEditDialog(
                     }
                     val scaleNote = if (isChild) {
                         val sexStr = if (localProfile.gender == "F") (if (isRu) "девочек" else "girls") else (if (isRu) "мальчиков" else "boys")
-                        if (isRu) "Педиатрическая шкала ВОЗ: перцентили для $sexStr $age лет"
-                        else "WHO Pediatric scale: percentiles for $sexStr age $age"
+                        val ageStr = com.tirup.app.domain.util.PluralUtils.formatYears(age, isRu)
+                        if (isRu) "Педиатрическая шкала ВОЗ: перцентили ($sexStr, $ageStr)"
+                        else "WHO Pediatric scale: percentiles ($sexStr, $ageStr)"
                     } else {
                         if (isRu) "Шкала ВОЗ для взрослых (норма 18.5–24.9 кг/м²)"
                         else "WHO Adult scale (normal 18.5–24.9 kg/m²)"
