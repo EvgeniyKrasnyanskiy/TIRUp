@@ -65,6 +65,29 @@ class AlertActionReceiver : BroadcastReceiver() {
                     } catch (_: Exception) {}
                 }
             }
+            ACTION_SKIP_HBA1C_QUARTER -> {
+                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                nm?.cancel(GlucoseAlertManager.NOTIFICATION_ID_HBA1C_REMINDER)
+                val pendingResult = goAsync()
+                scope.launch {
+                    try {
+                        val settingsRepo = com.tirup.app.data.repository.SettingsRepositoryImpl(context)
+                        settingsRepo.skipHba1cQuarter()
+                        kotlinx.coroutines.withContext(Dispatchers.Main) {
+                            val isRu = java.util.Locale.getDefault().language.lowercase() in listOf("ru", "be", "kk", "uk")
+                            android.widget.Toast.makeText(
+                                context,
+                                if (isRu) "Квартальный контроль HbA1c отложен на 90 дней" else "Quarterly HbA1c checkup postponed for 90 days",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed skipHba1cQuarter: ${e.message}", e)
+                    } finally {
+                        pendingResult.finish()
+                    }
+                }
+            }
         }
     }
 
@@ -73,5 +96,6 @@ class AlertActionReceiver : BroadcastReceiver() {
         const val ACTION_DISMISS_CRITICAL = "com.tirup.app.ACTION_DISMISS_CRITICAL"
         const val ACTION_LAUNCH_DIANIGHT = "com.tirup.app.ACTION_LAUNCH_DIANIGHT"
         const val ACTION_CHECK_SIGNAL_LOSS = "com.tirup.app.ACTION_CHECK_SIGNAL_LOSS"
+        const val ACTION_SKIP_HBA1C_QUARTER = "com.tirup.app.ACTION_SKIP_HBA1C_QUARTER"
     }
 }

@@ -211,8 +211,10 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_GOTO_FOCUS = "com.tirup.app.GOTO_FOCUS"
         const val EXTRA_GOTO_WEEKLY_DIGEST = "com.tirup.app.GOTO_WEEKLY_DIGEST"
+        const val EXTRA_GOTO_HBA1C = "com.tirup.app.GOTO_HBA1C"
         val navigateToFocusEvent = kotlinx.coroutines.flow.MutableSharedFlow<Long>(extraBufferCapacity = 1)
         val navigateToDigestEvent = kotlinx.coroutines.flow.MutableSharedFlow<Long>(extraBufferCapacity = 1)
+        val navigateToHba1cEvent = kotlinx.coroutines.flow.MutableSharedFlow<Long>(extraBufferCapacity = 1)
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -223,6 +225,9 @@ class MainActivity : ComponentActivity() {
         }
         if (intent?.getBooleanExtra(EXTRA_GOTO_WEEKLY_DIGEST, false) == true) {
             navigateToDigestEvent.tryEmit(System.currentTimeMillis())
+        }
+        if (intent?.getBooleanExtra(EXTRA_GOTO_HBA1C, false) == true) {
+            navigateToHba1cEvent.tryEmit(System.currentTimeMillis())
         }
     }
 
@@ -235,6 +240,10 @@ class MainActivity : ComponentActivity() {
         if (intent?.getBooleanExtra(EXTRA_GOTO_WEEKLY_DIGEST, false) == true) {
             navigateToDigestEvent.tryEmit(System.currentTimeMillis())
             intent.removeExtra(EXTRA_GOTO_WEEKLY_DIGEST)
+        }
+        if (intent?.getBooleanExtra(EXTRA_GOTO_HBA1C, false) == true) {
+            navigateToHba1cEvent.tryEmit(System.currentTimeMillis())
+            intent.removeExtra(EXTRA_GOTO_HBA1C)
         }
         GlucoseAlertManager.dismissCriticalAlarm(this, fromUser = true)
     }
@@ -418,6 +427,12 @@ fun AppNavigationRoot(
                 settingsViewModel.setHasSeenOnboarding(true)
             }
         )
+    }
+
+    LaunchedEffect(Unit) {
+        MainActivity.navigateToHba1cEvent.collect {
+            navController.navigate("settings?target=hba1c")
+        }
     }
 
     NavHost(

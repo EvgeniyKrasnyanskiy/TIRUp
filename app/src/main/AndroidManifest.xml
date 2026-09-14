@@ -101,6 +101,7 @@
                 <action android:name="com.tirup.app.ACTION_DISMISS_CRITICAL" />
                 <action android:name="com.tirup.app.ACTION_LAUNCH_DIANIGHT" />
                 <action android:name="com.tirup.app.ACTION_CHECK_SIGNAL_LOSS" />
+                <action android:name="com.tirup.app.ACTION_SKIP_HBA1C_QUARTER" />
             </intent-filter>
         </receiver>
 

@@ -118,6 +118,7 @@ object GlucoseAlertManager {
     const val CHANNEL_LOCKSCREEN = "tirup_lockscreen_status_v1"
     const val CHANNEL_WEEKLY_DIGEST = "tirup_weekly_digest_v1"
     const val CHANNEL_DEVICE_REMINDER = "tirup_device_reminder_v1"
+    const val CHANNEL_HBA1C_REMINDER = "tirup_hba1c_reminder_v1"
 
     const val NOTIFICATION_ID_LOCKSCREEN = 1000
     const val NOTIFICATION_ID_PREDICTIVE = 1001
@@ -129,8 +130,10 @@ object GlucoseAlertManager {
     const val NOTIFICATION_ID_SENSOR_REMINDER = 9201
     const val NOTIFICATION_ID_PUMP_REMINDER = 9202
     const val NOTIFICATION_ID_LANCET_REMINDER = 9203
+    const val NOTIFICATION_ID_HBA1C_REMINDER = 9204
 
     const val EXTRA_GOTO_WEEKLY_DIGEST = "com.tirup.app.GOTO_WEEKLY_DIGEST"
+    const val EXTRA_GOTO_HBA1C = "com.tirup.app.GOTO_HBA1C"
 
     // Timestamps for Smart Snooze / Anti-spam
     @Volatile
@@ -268,6 +271,16 @@ object GlucoseAlertManager {
             description = "CGM sensor and infusion set replacement reminders"
             enableLights(true)
             lightColor = Color.CYAN
+        }.also { nm.createNotificationChannel(it) }
+
+        NotificationChannel(
+            CHANNEL_HBA1C_REMINDER,
+            "HbA1c Lab Reminders",
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Quarterly HbA1c checkup reminders and sensor GMI correlation"
+            enableLights(true)
+            lightColor = Color.RED
         }.also { nm.createNotificationChannel(it) }
     }
 
@@ -418,6 +431,94 @@ object GlucoseAlertManager {
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
 
         nm.notify(NOTIFICATION_ID_WEEKLY_DIGEST, builder.build())
+    }
+
+    fun showHba1cReminderNotification(
+        context: Context,
+        elapsedDays: Int,
+        gmi: Double?,
+        meanMmol: Double?,
+        isRepeat: Boolean,
+        isRu: Boolean
+    ) {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        initChannels(context)
+
+        val appIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(EXTRA_GOTO_HBA1C, true)
+        }
+        val contentPendingIntent = PendingIntent.getActivity(
+            context,
+            NOTIFICATION_ID_HBA1C_REMINDER,
+            appIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val skipIntent = Intent(context, AlertActionReceiver::class.java).apply {
+            action = AlertActionReceiver.ACTION_SKIP_HBA1C_QUARTER
+        }
+        val skipPendingIntent = PendingIntent.getBroadcast(
+            context,
+            NOTIFICATION_ID_HBA1C_REMINDER,
+            skipIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val title = if (!isRepeat) {
+            if (isRu) "🩺 Квартальный рубеж: контроль HbA1c" else "🩺 Quarterly Milestone: HbA1c Checkup"
+        } else {
+            if (isRu) "🩺 Повторное напоминание: контроль HbA1c" else "🩺 Reminder: HbA1c Checkup"
+        }
+
+        val shortText = if (gmi != null) {
+            if (isRu) "Прошло $elapsedDays дн. Сенсорный GMI: ${String.format(Locale.US, "%.1f%%", gmi)}"
+            else "$elapsedDays days passed. Sensor GMI: ${String.format(Locale.US, "%.1f%%", gmi)}"
+        } else {
+            if (isRu) "Прошло $elapsedDays дн. Рекомендуется сдать кровь на HbA1c"
+            else "$elapsedDays days passed. HbA1c blood test recommended"
+        }
+
+        val bigText = buildString {
+            if (isRu) {
+                append("Прошло $elapsedDays дней с момента предыдущего анализа (или начала мониторинга).\n\n")
+                if (gmi != null && meanMmol != null) {
+                    append("📊 Сенсорный GMI за 90 дней: ${String.format(Locale.US, "%.1f%%", gmi)} (ср. ${String.format(Locale.US, "%.1f", meanMmol)} ммоль/л).\n\n")
+                }
+                append("Лабораторный анализ крови остаётся золотым стандартом для оценки гликирования и верификации сенсора.\n")
+                append("Если вы сдавали анализ — внесите результат в Журнал. Если сейчас сдавать не планируете — нажмите «Пропустить».")
+            } else {
+                append("$elapsedDays days have passed since your last lab test (or start of monitoring).\n\n")
+                if (gmi != null && meanMmol != null) {
+                    append("📊 90-day Sensor GMI: ${String.format(Locale.US, "%.1f%%", gmi)} (avg ${String.format(Locale.US, "%.1f", meanMmol)} mmol/L).\n\n")
+                }
+                append("Lab blood test remains the gold standard for clinical glycemic assessment.\n")
+                append("Tap to record your results or tap 'Skip' to postpone for 90 days.")
+            }
+        }
+
+        val openActionTitle = if (isRu) "Журнал HbA1c" else "Open Journal"
+        val skipActionTitle = if (isRu) "Пропустить" else "Skip"
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_HBA1C_REMINDER)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setColor(Color.parseColor("#EF4444"))
+            .setSubText(if (isRu) "Контроль HbA1c" else "HbA1c Milestone")
+            .setContentTitle(title)
+            .setContentText(shortText)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
+            .setContentIntent(contentPendingIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .addAction(0, openActionTitle, contentPendingIntent)
+            .addAction(0, skipActionTitle, skipPendingIntent)
+
+        nm.notify(NOTIFICATION_ID_HBA1C_REMINDER, builder.build())
+    }
+
+    fun cancelHba1cReminderNotification(context: Context) {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        nm?.cancel(NOTIFICATION_ID_HBA1C_REMINDER)
     }
 
     /**
