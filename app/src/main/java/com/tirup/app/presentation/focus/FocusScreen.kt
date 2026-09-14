@@ -34,6 +34,7 @@ import androidx.core.content.ContextCompat
 import com.tirup.app.data.ble.BleObserverManager
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -50,6 +51,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -365,7 +367,9 @@ fun FocusScreen(
                 dailyAlertsCount = dailyAlertLogs.size,
                 areAlertsMuted = run {
                     val a = userSettings.alertSettings
-                    !a.isAlertsMasterEnabled || (!a.isPredictiveEnabled && !a.isMainEnabled && !a.isSignalLossEnabled && !a.isLastChanceAlertEnabled)
+                    val now = System.currentTimeMillis()
+                    val isPaused = now < a.alertsMuteUntilTimestamp
+                    isPaused || !a.isAlertsMasterEnabled || (!a.isPredictiveEnabled && !a.isMainEnabled && !a.isSignalLossEnabled && !a.isLastChanceAlertEnabled)
                 },
                 onAlertHistoryClick = { showDailyAlertLogsDialog = true },
                 onBatteryClick = {
@@ -1165,10 +1169,17 @@ fun FocusScreen(
     // Daily Alert Logs Dialog
     if (showDailyAlertLogsDialog) {
         val a = userSettings.alertSettings
-        val areAlertsMuted = !a.isAlertsMasterEnabled || (!a.isPredictiveEnabled && !a.isMainEnabled && !a.isSignalLossEnabled && !a.isLastChanceAlertEnabled)
+        val now = System.currentTimeMillis()
+        val isAlertsPaused = now < a.alertsMuteUntilTimestamp
+        val pauseRemainingMs = if (isAlertsPaused) (a.alertsMuteUntilTimestamp - now) else 0L
+        val areAlertsMuted = isAlertsPaused || !a.isAlertsMasterEnabled || (!a.isPredictiveEnabled && !a.isMainEnabled && !a.isSignalLossEnabled && !a.isLastChanceAlertEnabled)
         DailyAlertLogsDialog(
             logs = dailyAlertLogs,
             areAlertsMuted = areAlertsMuted,
+            isAlertsPaused = isAlertsPaused,
+            pauseRemainingMs = pauseRemainingMs,
+            onPause2Hours = { viewModel.pauseAlertsFor(2 * 3600 * 1000L) },
+            onResumeAlerts = { viewModel.resumeAlerts() },
             isRu = isRu,
             onDismiss = { showDailyAlertLogsDialog = false }
         )
@@ -2438,6 +2449,10 @@ private fun TargetCompensatorCard(
 private fun DailyAlertLogsDialog(
     logs: List<AlertLogEntry>,
     areAlertsMuted: Boolean = false,
+    isAlertsPaused: Boolean = false,
+    pauseRemainingMs: Long = 0L,
+    onPause2Hours: () -> Unit,
+    onResumeAlerts: () -> Unit,
     isRu: Boolean,
     onDismiss: () -> Unit
 ) {
@@ -2448,7 +2463,7 @@ private fun DailyAlertLogsDialog(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(text = if (areAlertsMuted) "🔕" else "🔔", fontSize = 20.sp)
+                Text(text = if (areAlertsMuted || isAlertsPaused) "🔕" else "🔔", fontSize = 20.sp)
                 Text(
                     text = if (isRu) "Журнал тревог" else "Alert Log",
                     style = MaterialTheme.typography.titleMedium,
@@ -2459,7 +2474,112 @@ private fun DailyAlertLogsDialog(
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
-                if (areAlertsMuted) {
+                if (isAlertsPaused) {
+                    val remMins = (pauseRemainingMs / 60000L).coerceAtLeast(1L)
+                    val remStr = if (remMins >= 60L) {
+                        val h = remMins / 60L
+                        val m = remMins % 60L
+                        if (isRu) "${h}ч ${m}м" else "${h}h ${m}m"
+                    } else {
+                        if (isRu) "${remMins}м" else "${remMins}m"
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = ActionBlue.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.4f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("⏸️", fontSize = 16.sp)
+                                Column {
+                                    Text(
+                                        text = if (isRu) "Пауза тревог активна" else "Alerts pause active",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ActionBlue
+                                    )
+                                    Text(
+                                        text = if (isRu) "Осталось: $remStr" else "Remaining: $remStr",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            OutlinedButton(
+                                onClick = onResumeAlerts,
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, ActionBlue),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Text(
+                                    text = if (isRu) "Возобновить" else "Resume",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ActionBlue
+                                )
+                            }
+                        }
+                    }
+                } else if (!areAlertsMuted) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("🔔", fontSize = 16.sp)
+                                Text(
+                                    text = if (isRu) "Оповещения активны" else "Alerts active",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = onPause2Hours,
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, ActionBlue),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Text(
+                                    text = if (isRu) "Пауза 2 ч ⏸️" else "Pause 2h ⏸️",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ActionBlue
+                                )
+                            }
+                        }
+                    }
+                } else {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = ColorHigh.copy(alpha = 0.12f),

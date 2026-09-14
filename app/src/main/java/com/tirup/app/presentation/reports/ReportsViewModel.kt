@@ -179,43 +179,83 @@ class ReportsViewModel(
     }
 
     fun importHistoricalFile(uri: Uri) {
+        importHistoricalFiles(listOf(uri))
+    }
+
+    fun importHistoricalFiles(uris: List<Uri>) {
+        if (uris.isEmpty()) return
         viewModelScope.launch {
+            val totalFiles = uris.size
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
             _uiState.value = _uiState.value.copy(
                 isImporting = true,
-                importProgress = 0.03f,
+                importProgress = 0.02f,
                 importedPointsCount = 0,
-                importMessage = null
+                importMessage = if (totalFiles > 1) {
+                    if (isRu) "Подготовка к импорту $totalFiles файлов..." else "Preparing to import $totalFiles files..."
+                } else null
             )
-            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
 
-            val result = streamingImporter.importHistoricalFromUri(uri) { progress, count ->
-                _uiState.value = _uiState.value.copy(
-                    importProgress = progress,
-                    importedPointsCount = count
-                )
-            }
-            result.onSuccess { total ->
-                val msg = if (total > 0) {
-                    if (isRu) "Импортировано $total измерений в исторический отчёт." else "Imported $total points to historical report."
-                } else {
-                    if (isRu) "❌ В файле не обнаружены данные измерений глюкозы." else "❌ No glucose points found in file."
+            var cumulativePoints = 0
+            var successfulFiles = 0
+            val errors = mutableListOf<String>()
+
+            for ((idx, uri) in uris.withIndex()) {
+                val fileNum = idx + 1
+                if (totalFiles > 1) {
+                    _uiState.value = _uiState.value.copy(
+                        importMessage = if (isRu) "Обработка файла $fileNum из $totalFiles..." else "Processing file $fileNum of $totalFiles..."
+                    )
                 }
-                _uiState.value = _uiState.value.copy(
-                    isImporting = false,
-                    importProgress = 1f,
-                    importedPointsCount = total,
-                    importMessage = msg
-                )
-            }.onFailure { err ->
-                val prefix = if (isRu) "Ошибка импорта: " else "Import error: "
-                val detail = err.message?.takeIf { it.isNotBlank() }
-                    ?: if (isRu) "файл имеет неподдерживаемый или некорректный формат" else "the file is invalid or has an unsupported format"
-                _uiState.value = _uiState.value.copy(
-                    isImporting = false,
-                    importProgress = 0f,
-                    importMessage = prefix + detail
-                )
+
+                val result = streamingImporter.importHistoricalFromUri(uri) { subProgress, count ->
+                    val overallProgress = ((idx.toFloat() + subProgress) / totalFiles.toFloat()).coerceIn(0.01f, 0.99f)
+                    _uiState.value = _uiState.value.copy(
+                        importProgress = overallProgress,
+                        importedPointsCount = cumulativePoints + count
+                    )
+                }
+
+                result.onSuccess { count ->
+                    cumulativePoints += count
+                    successfulFiles++
+                }.onFailure { err ->
+                    val detail = err.message?.takeIf { it.isNotBlank() } ?: "Error"
+                    errors.add("№$fileNum: $detail")
+                }
             }
+
+            val finalMessage = if (errors.isEmpty()) {
+                if (cumulativePoints > 0) {
+                    if (totalFiles > 1) {
+                        if (isRu) "Успешно импортировано $cumulativePoints измерений из $totalFiles файлов."
+                        else "Successfully imported $cumulativePoints points from $totalFiles files."
+                    } else {
+                        if (isRu) "Импортировано $cumulativePoints измерений в исторический отчёт."
+                        else "Imported $cumulativePoints points to historical report."
+                    }
+                } else {
+                    if (isRu) "❌ В выбранных файлах не обнаружены данные измерений глюкозы."
+                    else "❌ No glucose points found in selected files."
+                }
+            } else {
+                if (successfulFiles > 0) {
+                    val partErr = errors.joinToString("; ")
+                    if (isRu) "Импортировано $cumulativePoints измерений ($successfulFiles из $totalFiles файлов). Ошибки: $partErr"
+                    else "Imported $cumulativePoints points ($successfulFiles of $totalFiles files). Errors: $partErr"
+                } else {
+                    val prefix = if (isRu) "Ошибка импорта: " else "Import error: "
+                    val allErr = errors.joinToString("; ")
+                    prefix + allErr
+                }
+            }
+
+            _uiState.value = _uiState.value.copy(
+                isImporting = false,
+                importProgress = if (successfulFiles > 0) 1f else 0f,
+                importedPointsCount = cumulativePoints,
+                importMessage = finalMessage
+            )
         }
     }
 

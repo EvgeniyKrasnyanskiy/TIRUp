@@ -853,7 +853,8 @@ object GlucoseAlertManager {
         settings: UserSettings
     ) {
         val alerts = settings.alertSettings
-        if (!alerts.isAlertsMasterEnabled || !alerts.isLastChanceAlertEnabled) return
+        val now = System.currentTimeMillis()
+        if (!alerts.isAlertsMasterEnabled || !alerts.isLastChanceAlertEnabled || now < alerts.alertsMuteUntilTimestamp) return
 
         val calendar = Calendar.getInstance()
         val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
@@ -950,11 +951,12 @@ object GlucoseAlertManager {
         if (recentReadings.isEmpty()) return
         val alerts = settings.alertSettings
         val now = System.currentTimeMillis()
-        val isHypoProtectionActive = alerts.isCriticalEnabled ||
+        val isHypoProtectionActive = alerts.isCriticalEnabled &&
                 (!alerts.isCriticalHypoPermanentDisabled && now >= alerts.criticalHypoPauseUntilTimestamp)
 
-        // If master is disabled and hypo protection is also inactive/paused, return early
-        if (!alerts.isAlertsMasterEnabled && !isHypoProtectionActive) return
+        val isMasterActive = alerts.isAlertsMasterEnabled && now >= alerts.alertsMuteUntilTimestamp
+        // If master is disabled (or on pause) and hypo protection is also inactive/paused, return early
+        if (!isMasterActive && !isHypoProtectionActive) return
 
         // Auto-dismiss if phone is actively used
         if (isCriticalAlarmActive && isPhoneInActiveUse(context)) {
@@ -1052,8 +1054,8 @@ object GlucoseAlertManager {
             }
         }
 
-        // If master alerts switch is disabled, skip remaining tiers (Hyper, Main, Predictive, Signal loss)
-        if (!alerts.isAlertsMasterEnabled) return
+        // If master alerts switch is disabled or currently on pause, skip remaining tiers (Hyper, Main, Predictive, Signal loss)
+        if (!isMasterActive) return
 
         if (alerts.isCriticalEnabled) {
             // Extreme High (> 13.9) or Prolonged High (> tirHigh for >= criticalHyperMinutes)
@@ -1141,7 +1143,7 @@ object GlucoseAlertManager {
                     latest.valueMmol,
                     mainLow
                 )
-                sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash)
+                sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash, alerts.alertVolumePercent)
                 return
             } else if (isHighConfirmed) {
                 val isExtremeHigh = latest.valueMmol > targetRanges.veryHighThresholdMmol
@@ -1183,7 +1185,7 @@ object GlucoseAlertManager {
                         latest.valueMmol,
                         mainHigh
                     )
-                    sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash)
+                    sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash, alerts.alertVolumePercent)
                     return
                 }
             }
@@ -1230,7 +1232,7 @@ object GlucoseAlertManager {
                     iobNotice,
                     kotlin.math.abs(prediction.rateOfChangeMmolPerMin)
                 )
-                sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash)
+                sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash, alerts.alertVolumePercent)
             } else if (prediction.event == PredictedEvent.PREDICTED_HIGH && now - lastPredictiveAlertTimestamp >= 30 * 60000L) {
                 lastPredictiveAlertTimestamp = now
                 val eventTime = now + (prediction.minutesUntilCrossing ?: 15) * 60000L
@@ -1251,7 +1253,7 @@ object GlucoseAlertManager {
                     arrow,
                     prediction.rateOfChangeMmolPerMin
                 )
-                sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash)
+                sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash, alerts.alertVolumePercent)
             }
         }
     }
@@ -1306,7 +1308,8 @@ object GlucoseAlertManager {
         text: String,
         tier: AlertTier,
         vibrate: Boolean,
-        flash: Boolean
+        flash: Boolean,
+        volumePercent: Int = 80
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
@@ -1391,7 +1394,7 @@ object GlucoseAlertManager {
         if (notificationId == NOTIFICATION_ID_LAST_CHANCE) {
             MedicalSoundPlayer.playLastChanceAlertTone()
         } else {
-            MedicalSoundPlayer.playSound(tier)
+            MedicalSoundPlayer.playSound(tier, volumePercent)
         }
 
         _activeAlertBanner.value = ActiveAlertBanner(

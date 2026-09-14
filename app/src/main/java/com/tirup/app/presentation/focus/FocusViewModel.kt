@@ -361,4 +361,16 @@ class FocusViewModel(
             android.widget.Toast.makeText(ctx, msg, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
+
+    fun pauseAlertsFor(durationMs: Long = 2 * 3600 * 1000L) {
+        viewModelScope.launch {
+            settingsRepository.pauseAlertsFor(durationMs)
+        }
+    }
+
+    fun resumeAlerts() {
+        viewModelScope.launch {
+            settingsRepository.resumeAlerts()
+        }
+    }
 }

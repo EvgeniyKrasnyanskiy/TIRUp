@@ -107,10 +107,10 @@ fun ReportsScreen(
     }
 
     val filePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            viewModel.importHistoricalFile(uri)
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (!uris.isNullOrEmpty()) {
+            viewModel.importHistoricalFiles(uris)
         }
     }
 
@@ -715,8 +715,9 @@ private fun HistoricalReportCard(
                         val ptsStr = if (state.importedPointsCount > 0) {
                             if (isRu) " (${state.importedPointsCount} измерений)" else " (${state.importedPointsCount} pts)"
                         } else ""
+                        val defaultMsg = if (isRu) "Обработка и расчёт$ptsStr..." else "Processing and calculating$ptsStr..."
                         Text(
-                            text = if (isRu) "Обработка и расчёт файла$ptsStr..." else "Processing and calculating$ptsStr...",
+                            text = if (state.importMessage != null && !state.importMessage.startsWith("❌")) state.importMessage else defaultMsg,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.Medium
@@ -778,7 +779,7 @@ private fun HistoricalReportCard(
                     ) {
                         Icon(imageVector = Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp), tint = ActionBlue)
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = if (isRu) "Загрузить другой файл (CSV / ZIP)" else "Import Another File (CSV / ZIP)", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Text(text = if (isRu) "Загрузить другие файлы (CSV / ZIP)" else "Import Other Files (CSV / ZIP)", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     }
 
                     Row(
@@ -843,7 +844,7 @@ private fun HistoricalReportCard(
                         Spacer(modifier = Modifier.width(8.dp))
                     }
                     Text(
-                        text = if (isRu) "Загрузить файл" else "Import File",
+                        text = if (isRu) "Загрузить файлы (CSV / ZIP)" else "Import Files (CSV / ZIP)",
                         color = ActionBlue,
                         fontWeight = FontWeight.Medium
                     )

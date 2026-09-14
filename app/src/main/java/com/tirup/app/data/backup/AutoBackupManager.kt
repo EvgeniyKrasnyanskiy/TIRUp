@@ -553,6 +553,8 @@ object AutoBackupManager {
         writer.name("alertSettings")
         writer.beginObject()
         writer.name("isAlertsMasterEnabled").value(a.isAlertsMasterEnabled)
+        writer.name("alertsMuteUntilTimestamp").value(a.alertsMuteUntilTimestamp)
+        writer.name("alertVolumePercent").value(a.alertVolumePercent)
         writer.name("isPredictiveEnabled").value(a.isPredictiveEnabled)
         writer.name("predictiveMinutesAhead").value(a.predictiveMinutesAhead)
         writer.name("isPredictiveVibrate").value(a.isPredictiveVibrate)
@@ -1860,6 +1862,8 @@ object AutoBackupManager {
 
     private fun parseAlertSettings(reader: JsonReader): AlertSettings {
         var alertsMaster = true
+        var alertsMuteUntil = 0L
+        var alertVolume = 80
         var predEnabled = true
         var predMin = 15
         var predVib = true
@@ -1899,6 +1903,8 @@ object AutoBackupManager {
         while (reader.hasNext()) {
             when (reader.nextName()) {
                 "isAlertsMasterEnabled" -> alertsMaster = reader.nextBoolean()
+                "alertsMuteUntilTimestamp" -> alertsMuteUntil = reader.nextLong()
+                "alertVolumePercent" -> alertVolume = reader.nextInt()
                 "isPredictiveEnabled" -> predEnabled = reader.nextBoolean()
                 "predictiveMinutesAhead" -> predMin = reader.nextInt()
                 "isPredictiveVibrate" -> predVib = reader.nextBoolean()
@@ -1940,6 +1946,8 @@ object AutoBackupManager {
 
         return AlertSettings(
             isAlertsMasterEnabled = alertsMaster,
+            alertsMuteUntilTimestamp = alertsMuteUntil,
+            alertVolumePercent = alertVolume,
             isPredictiveEnabled = predEnabled,
             predictiveMinutesAhead = predMin,
             isPredictiveVibrate = predVib,

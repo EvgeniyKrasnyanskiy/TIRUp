@@ -27,13 +27,13 @@ object MedicalSoundPlayer {
 
     private var currentAudioTrack: AudioTrack? = null
 
-    fun playSound(tier: AlertTier) {
+    fun playSound(tier: AlertTier, volumePercent: Int = 80) {
         isPlayingActive = true
         audioScope.launch {
             try {
                 when (tier) {
-                    AlertTier.PREDICTIVE -> playPredictiveChime()
-                    AlertTier.MAIN -> playTripleMainBeep()
+                    AlertTier.PREDICTIVE -> playPredictiveChime(volumePercent)
+                    AlertTier.MAIN -> playTripleMainBeep(volumePercent)
                     AlertTier.CRITICAL -> {
                         boostAlarmVolumeIfNeeded()
                         playCriticalAlarmSeries()
@@ -45,6 +45,25 @@ object MedicalSoundPlayer {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to play synthesized medical sound for tier=$tier: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Plays a single test tone at the specified user volume percent.
+     */
+    fun playTestSound(volumePercent: Int = 80) {
+        audioScope.launch {
+            try {
+                val factor = (volumePercent / 100f).coerceIn(0.15f, 1.0f)
+                val note1 = generateSineWave(freq = 784.0, durationMs = 150, volume = 0.85f * factor)
+                val note2 = generateSineWave(freq = 987.77, durationMs = 200, volume = 0.90f * factor)
+                val audioData = ShortArray(note1.size + note2.size)
+                System.arraycopy(note1, 0, audioData, 0, note1.size)
+                System.arraycopy(note2, 0, audioData, note1.size, note2.size)
+                playRawPcm(audioData, usage = AudioAttributes.USAGE_ALARM)
+            } catch (e: Exception) {
+                Log.w(TAG, "Test sound failed: ${e.message}")
             }
         }
     }
@@ -187,22 +206,24 @@ object MedicalSoundPlayer {
     /**
      * Tier 1: Soft melodic dual-tone chime (587 Hz -> 880 Hz).
      */
-    private fun playPredictiveChime() {
-        val note1 = generateSineWave(freq = 587.33, durationMs = 180, volume = 0.55f)
-        val note2 = generateSineWave(freq = 880.00, durationMs = 260, volume = 0.65f)
+    private fun playPredictiveChime(volumePercent: Int = 80) {
+        val factor = (volumePercent / 100f).coerceIn(0.15f, 1.0f)
+        val note1 = generateSineWave(freq = 587.33, durationMs = 180, volume = 0.55f * factor)
+        val note2 = generateSineWave(freq = 880.00, durationMs = 260, volume = 0.65f * factor)
         val audioData = ShortArray(note1.size + note2.size)
         System.arraycopy(note1, 0, audioData, 0, note1.size)
         System.arraycopy(note2, 0, audioData, note1.size, note2.size)
 
-        playRawPcm(audioData, usage = AudioAttributes.USAGE_NOTIFICATION)
+        playRawPcm(audioData, usage = AudioAttributes.USAGE_ALARM)
     }
 
     /**
      * Tier 2: Main alert played 3 times with 1.5 second pause between each.
      */
-    private fun playTripleMainBeep() {
-        val note1 = generateSineWave(freq = 784.0, durationMs = 140, volume = 0.85f)
-        val note2 = generateSineWave(freq = 987.77, durationMs = 180, volume = 0.90f)
+    private fun playTripleMainBeep(volumePercent: Int = 80) {
+        val factor = (volumePercent / 100f).coerceIn(0.15f, 1.0f)
+        val note1 = generateSineWave(freq = 784.0, durationMs = 140, volume = 0.85f * factor)
+        val note2 = generateSineWave(freq = 987.77, durationMs = 180, volume = 0.90f * factor)
         val singleBeep = ShortArray(note1.size + note2.size)
         System.arraycopy(note1, 0, singleBeep, 0, note1.size)
         System.arraycopy(note2, 0, singleBeep, note1.size, note2.size)
@@ -224,7 +245,7 @@ object MedicalSoundPlayer {
         // 3rd play
         System.arraycopy(singleBeep, 0, audioData, offset, singleBeep.size)
 
-        playRawPcm(audioData, usage = AudioAttributes.USAGE_NOTIFICATION)
+        playRawPcm(audioData, usage = AudioAttributes.USAGE_ALARM)
     }
 
     /**

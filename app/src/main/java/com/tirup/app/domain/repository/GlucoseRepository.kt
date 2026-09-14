@@ -28,4 +28,6 @@ interface SettingsRepository {
     fun getSettings(): Flow<UserSettings>
     suspend fun updateSettings(settings: UserSettings)
     suspend fun skipHba1cQuarter()
+    suspend fun pauseAlertsFor(durationMs: Long)
+    suspend fun resumeAlerts()
 }

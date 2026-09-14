@@ -735,15 +735,155 @@ fun SettingsScreen(
 
                         val isMaster = alerts.isAlertsMasterEnabled
                         val nowMs = System.currentTimeMillis()
-                        val isCriticalPaused = alerts.criticalHypoPauseUntilTimestamp > nowMs
-                        val remSec = if (isCriticalPaused) ((alerts.criticalHypoPauseUntilTimestamp - nowMs) / 1000L).coerceAtLeast(0) else 0L
+                        val isAlertsPaused = alerts.alertsMuteUntilTimestamp > nowMs
+                        val isCriticalPaused = alerts.criticalHypoPauseUntilTimestamp > nowMs || isAlertsPaused
+                        val pauseTargetMs = maxOf(alerts.criticalHypoPauseUntilTimestamp, alerts.alertsMuteUntilTimestamp)
+                        val remSec = if (isCriticalPaused) {
+                            ((pauseTargetMs - nowMs) / 1000L).coerceAtLeast(0)
+                        } else 0L
                         val remHours = remSec / 3600
                         val remMin = ((remSec % 3600) / 60).coerceAtLeast(1)
-                        val resumeTime = if (isCriticalPaused) SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(alerts.criticalHypoPauseUntilTimestamp)) else ""
+                        val resumeTime = if (isCriticalPaused) {
+                            SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(pauseTargetMs))
+                        } else ""
 
                         val criticalBadge = if (isCriticalPaused) {
                             if (remHours > 0) "⏳ ${remHours}ч ${remMin}м" else "⏳ ${remMin}м"
                         } else null
+
+                        if (isAlertsPaused) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = ActionBlue.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.35f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = if (isRu) "⏸️ Все тревоги на паузе (2 ч)" else "⏸️ All alarms paused (2h)",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = ActionBlue
+                                        )
+                                        Text(
+                                            text = if (remHours > 0) {
+                                                if (isRu) "Осталось: ${remHours}ч ${remMin}м (до $resumeTime)" else "Remaining: ${remHours}h ${remMin}m (until $resumeTime)"
+                                            } else {
+                                                if (isRu) "Осталось: ${remMin}м (до $resumeTime)" else "Remaining: ${remMin}m (until $resumeTime)"
+                                            },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    TextButton(
+                                        onClick = {
+                                            viewModel.updateAlertSettings(
+                                                alerts.copy(
+                                                    alertsMuteUntilTimestamp = 0L,
+                                                    criticalHypoPauseUntilTimestamp = 0L
+                                                )
+                                            )
+                                        }
+                                    ) {
+                                        Text(
+                                            text = if (isRu) "Возобновить" else "Resume",
+                                            fontWeight = FontWeight.Bold,
+                                            color = ActionBlue
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                        }
+
+                        // Independent Volume Control for Tiers 1-2
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = if (isRu) "Громкость упреждающих тревог" else "Alert Volume (Tiers 1–2)",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = if (isRu) "Независима от звука уведомлений телефона" else "Independent of phone ringtone volume",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    OutlinedButton(
+                                        onClick = {
+                                            viewModel.playTestSound(alerts.alertVolumePercent)
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isRu) "Тест 🔔" else "Test 🔔",
+                                            style = MaterialTheme.typography.labelMedium
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Slider(
+                                        value = alerts.alertVolumePercent.toFloat(),
+                                        onValueChange = { newVal ->
+                                            val stepped = (kotlin.math.round(newVal / 5f) * 5f).toInt().coerceIn(20, 100)
+                                            if (stepped != alerts.alertVolumePercent) {
+                                                viewModel.updateAlertSettings(alerts.copy(alertVolumePercent = stepped))
+                                            }
+                                        },
+                                        valueRange = 20f..100f,
+                                        steps = 15,
+                                        modifier = Modifier.weight(1f),
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = ActionBlue,
+                                            activeTrackColor = ActionBlue
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = "${alerts.alertVolumePercent}%",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ActionBlue,
+                                        modifier = Modifier.width(44.dp)
+                                    )
+                                }
+
+                                Text(
+                                    text = if (isRu) "ℹ️ Критические тревоги (затяжная гипогликемия, потеря связи) всегда звучат на максимальной громкости (100%)."
+                                           else "ℹ️ Critical alarms (prolonged hypo, signal loss) always sound at maximum volume (100%).",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         // Tier 1: Predictive (Soft)
                         AlertTierConfigRow(
