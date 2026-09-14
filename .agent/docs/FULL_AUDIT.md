@@ -10,10 +10,10 @@
   - Устранены 4 блокирующие ошибки Android Lint (сборка `lintDebug` завершена со статусом `BUILD SUCCESSFUL`, 0 errors).
   - Выявлены и подготовлены к устранению ключевые предупреждения безопасности и утечек памяти (StaticFieldLeak, UnprotectedSMSBroadcastReceiver).
 
-- [ ] **Блок 2: Слой данных и хранилище (Data Layer & Storage)**
-  - Room Entities: индексы по `timestamp`, `year`, `date`, транзакции в DAO.
-  - Потоки DataStore / SharedPreferences и репозитории (`SettingsRepository`, `GlucoseReadingRepository`).
-  - Механизмы бэкапа и экспорта (`AutoBackupManager`, работа с CSV/JSON/ZIP, закрытие I/O потоков).
+- [x] **Блок 2: Слой данных и хранилище (Data Layer & Storage)**
+  - Аудит Room: индексы по `timestamp`, миграции 1->6, защита от OOM через пагинацию в DAO.
+  - Утечки потоков в импортере устранены (гарантированное закрытие ZipFile и удаление tempZipFile в `finally`).
+  - Потокобезопасность `SettingsRepositoryImpl` и мгновенная реактивность через StateFlow.
 
 - [ ] **Блок 3: Доменная логика и медицинские расчеты (Domain & Clinical Math)**
   - Валидация формул (TIR, TAR, TBR, CV, SD, eA1c ADAG, GMI, AGP процентили 5/10/25/50/75/90/95).
@@ -59,4 +59,25 @@
 4. **[Выявлено в манифесте] Разрешения точных будильников (`SCHEDULE_EXACT_ALARM`)**:
    * Предупреждения в `AutoBackupManager.kt` и `GlucoseAlertManager.kt` на вызовы `setExactAndAllowWhileIdle`.
    * **Оценка**: Корректно для медицинского приложения мониторинга диабета и ночного архивирования. Соответствует политике Google Play (Use Cases: Alarms & Timers / Medical monitoring).
+
+### Блок 2: Слой данных и хранилище (Data Layer & Storage)
+
+1. **[Проверено] Индексация и производительность Room БД**:
+   * Таблица `glucose_readings`: уникальный индекс по `timestamp` гарантирует мгновенные выборки и O(log N) поиск диапазонов, а также автоматическое отсечение дубликатов с одинаковым timestamp.
+   * Таблица `treatments`: индекс по `timestamp` обеспечивает быстрый маппинг болюсов и углеводов на графиках.
+   * Таблица `daily_summaries`: уникальный индекс и PrimaryKey по `date_timestamp` (00:00).
+   * Исключение Out-Of-Memory: в `GlucoseReadingDao` и `TreatmentDao` реализованы пагинированные методы выборки (`getReadingsPaginated`, `getReadingsBetweenPaginated` по 5000 и 1000 записей).
+
+2. **[Проверено] Миграции схемы базы данных**:
+   * Реализована строгая цепочка миграций `MIGRATION_1_2` -> `MIGRATION_2_3` -> `MIGRATION_3_4` -> `MIGRATION_4_5` -> `MIGRATION_5_6`.
+   * Конфигурация защищена `fallbackToDestructiveMigrationOnDowngrade()`, предотвращающая крах при установке более ранних сборок.
+
+3. **[Исправлено] Утечка ресурсов в StreamingGlucoseImporter**:
+   * При импорте архивов распаковка `ZipFile` и создание `tempZipFile` теперь обёрнуты в блок `try-finally`.
+   * Гарантировано закрытие файлового дескриптора архива и удаление временного файла из `cacheDir` даже при ошибках чтения или прерывании процесса.
+
+4. **[Проверено] Резервное копирование и потоки I/O**:
+   * `AutoBackupManager` использует `ZipOutputStream(FileOutputStream(zipFile)).use { ... }`, что гарантирует корректное завершение потоков сжатия.
+   * Буферизованные потоки `readingsBw` и `treatBw` корректно сбрасываются методом `flush()` перед переходом к следующей записи архива `closeEntry()`.
+
 
