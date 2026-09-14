@@ -101,41 +101,43 @@ class StreamingGlucoseImporter(
                 }
 
                 val zipFile = java.util.zip.ZipFile(tempZipFile)
-                val entries = zipFile.entries().asSequence().filter { !it.isDirectory }.toList()
-                val csvEntries = entries.filter {
-                    val n = it.name.lowercase()
-                    (n.endsWith(".csv") || n.endsWith(".tsv") || n.endsWith(".txt")) &&
-                            !n.contains("treatment") && !n.contains("calibrat")
-                }
-
-                val totalUncompressed = csvEntries.sumOf { it.size }.coerceAtLeast(1L)
-                var bytesAccumulator = 0L
-
-                if (csvEntries.isNotEmpty()) {
-                    for (entry in csvEntries) {
-                        Log.d(TAG, "Processing CSV entry: ${entry.name} (size: ${entry.size})")
-                        zipFile.getInputStream(entry).use { entryStream ->
-                            val countingStream = CountingInputStream(entryStream)
-                            val count = processCsvStream(
-                                inputStream = countingStream,
-                                chunk = chunk,
-                                dateFormats = dateFormats,
-                                onProgressUpdate = { inStreamCount ->
-                                    val currentBytes = bytesAccumulator + countingStream.bytesRead
-                                    val prog = (currentBytes.toFloat() / totalUncompressed.toFloat()).coerceIn(0.05f, 0.98f)
-                                    onProgress(prog, totalImported + inStreamCount)
-                                }
-                            )
-                            bytesAccumulator += entry.size
-                            totalImported += count
-                        }
+                try {
+                    val entries = zipFile.entries().asSequence().filter { !it.isDirectory }.toList()
+                    val csvEntries = entries.filter {
+                        val n = it.name.lowercase()
+                        (n.endsWith(".csv") || n.endsWith(".tsv") || n.endsWith(".txt")) &&
+                                !n.contains("treatment") && !n.contains("calibrat")
                     }
-                } else {
-                    Log.w(TAG, "No valid CSV found in ZIP archive.")
-                }
 
-                zipFile.close()
-                tempZipFile.delete()
+                    val totalUncompressed = csvEntries.sumOf { it.size }.coerceAtLeast(1L)
+                    var bytesAccumulator = 0L
+
+                    if (csvEntries.isNotEmpty()) {
+                        for (entry in csvEntries) {
+                            Log.d(TAG, "Processing CSV entry: ${entry.name} (size: ${entry.size})")
+                            zipFile.getInputStream(entry).use { entryStream ->
+                                val countingStream = CountingInputStream(entryStream)
+                                val count = processCsvStream(
+                                    inputStream = countingStream,
+                                    chunk = chunk,
+                                    dateFormats = dateFormats,
+                                    onProgressUpdate = { inStreamCount ->
+                                        val currentBytes = bytesAccumulator + countingStream.bytesRead
+                                        val prog = (currentBytes.toFloat() / totalUncompressed.toFloat()).coerceIn(0.05f, 0.98f)
+                                        onProgress(prog, totalImported + inStreamCount)
+                                    }
+                                )
+                                bytesAccumulator += entry.size
+                                totalImported += count
+                            }
+                        }
+                    } else {
+                        Log.w(TAG, "No valid CSV found in ZIP archive.")
+                    }
+                } finally {
+                    try { zipFile.close() } catch (_: Exception) {}
+                    try { tempZipFile.delete() } catch (_: Exception) {}
+                }
             } else {
                 Log.d(TAG, "Processing CSV/Text stream...")
                 val countingStream = CountingInputStream(bufferedIn)
