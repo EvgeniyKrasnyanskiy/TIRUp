@@ -48,6 +48,9 @@
 - **Уровень 2 (Подтверждённый выход за границы)**: фиксация 5 замеров подряд вне персональных порогов; отчётливый тройной медицинский тон с паузой 1.5 сек.
 - **Уровень 3 (Критическая сирена «кричащая»)**: серия громкой сирены ~12 сек на аудиопотоке будильника (`USAGE_ALARM`), обход DND, авто-буст громкости $\ge 80\%$, стробоскоп вспышки камеры. Мгновенное глушение сирены любой физической кнопкой (громкость, питание) или тапом по пузырьку.
 - **Уровень 4 (Потеря сигнала сенсора >20 мин)**: мягкий сигнал потери связи с прогрессивным расписанием день/ночь (в окне сна: серия будильников для надёжного пробуждения; днём: щадящие интервалы).
+- **Независимый слайдер громкости тревог (20% – 100%)**: отдельный регулятор уровня звука тревог в настройках с кнопкой «Тест 🔔», воспроизводящей реалистичную мелодию оповещения.
+- **Быстрая пауза всех тревог (Snooze All)**: возможность отложить все тревоги на экране «Фокус» с удобным выбором пресетов (`10м`, `30м`, `1ч` по умолчанию, `2ч`, `4ч`, `8ч`) с автоматическим глушением сигналов потери связи.
+- **Двуязычный журнал тревог (Alert Log)**: на лету переводит все записи событий и таймеры пауз при переключении языка приложения (RU/EN).
 - **Клинический адаптивный Снуз (Smart Snooze)**:
   - *При гипогликемии*: пауза 15 минут с защитой от комы (мгновенный повтор сирены при сахаре < 2.8 ммоль/л).
   - *При гипергликемии*: пауза 30–45 минут на разворачивание инсулина с повторной тревогой, если сахар не снижается.
@@ -71,10 +74,11 @@
 
 ### 9. Виджеты рабочего стола Glance (5 форматов)
 - **5 форматов виджетов под любую сетку лончера**:
-  - **5х1**: компактная горизонтальная полоса (сахар, тренд, дельта, TIR, IoB/CoB, стрик).
+  - **5х1 (Информационная полоса)**: непрерывное отображение клинического AGP-ядра: `TIR`, `TBR` (гипо, цель < 4%) и `TAR` (гипер) в постоянных блоках, плюс динамические слоты под активный инсулин (💉 IoB), батарею мастера (🔋), стрик (🔥), время (⏱) и суточную статистику (`Ср` / `CV` / `TING` / `GMI`). Оптимизированная геометрия исключает обрезание текста.
   - **4х2 / 3х2**: информативный дашборд с 4-часовым HD Canvas sparkline-графиком с сегментной раскраской точек.
   - **2х2**: эргономичный квадратный виджет-фокус.
   - **1х2**: вертикальный информационный стек.
+- **Мгновенная локализация виджетов**: перерисовка языка (RU/EN) и единиц измерения (ммоль/мг) на рабочем столе происходит немедленно при изменении в настройках.
 - **Индикаторы**: бейджи активного инсулина (💉) и углеводов (🍞), стрик дней в цели (🔥 X д.).
 - **Настройка прозрачности (0%..100%)**: плавный ползунок прозрачности подложки виджетов с живым окном предпросмотра на фоне обоев.
 
@@ -125,6 +129,11 @@
 ### 17. Экспорт резервных копий в ZIP
 - Возможность создания полного автономного архива настроек и базы данных в ZIP-формате в один клик.
 - Сохранение в системную папку `Documents/TIRUp/Backups/` для удобного переноса на новый смартфон или архивного хранения на ПК.
+
+### 18. Мультифайловый пакетный импорт (CSV / ZIP)
+- Поддержка единовременного выбора неограниченного количества файлов и архивов (экспорты xDrip+, Dexcom Clarity, резервные копии CSV/ZIP).
+- Потоковый парсинг без перегрузки оперативной памяти, автоматическое определение диалектов разделителей и формата дат.
+- Фоновая дедупликация и объединение сотен тысяч и миллионов точек в базу данных Room с интерактивным прогресс-баром и отчётом об импорте.
 
 ---
 
@@ -222,12 +231,13 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ### Core Features:
 - **Direct Offline Broadcast**: Intercepts readings locally via `com.eveningoutpost.dexdrip.BgEstimate` from xDrip+, GlucoDataHandler, and Juggluco without internet or third-party servers.
 - **Treatments Overlay**: Visualizes bolus insulin doses (💉) and meal carbs (🍽️) on the 24-hour Canvas sparkline with interactive inspect tooltips.
-- **Smart 4-Tier Alarms**: Tier 1 predictive trend alert with exact departure timestamp (*"at 16:42"*), Tier 2 confirmed tone, Tier 3 loud critical siren (~12s on `USAGE_ALARM` with instant physical button muting), and Tier 4 sleep-aware signal loss alarm (>20 min).
+- **Smart 4-Tier Alarms & Controls**: Tier 1 predictive trend alert (*"at 16:42"*), Tier 2 confirmed tone, Tier 3 loud critical siren (~12s on `USAGE_ALARM` with instant physical button muting), Tier 4 signal loss alarm, independent alert volume slider (20%–100%) with test melody, configurable alert pause ('Snooze All' 10m..8h), and bilingual alert log.
 - **Emergency Safety SMS & Offline Queries**:
   - Automatically dispatches an ultra-compact single-segment SMS ($\le 67$ chars) with optional GPS coordinates to a trusted contact when severe hypo (< 3.0 mmol/L) sirens remain unacknowledged for 5 minutes.
   - Whitelisted offline SMS query: trusted contacts can text `sugar`, `?`, `bg`, or `tir` to receive real-time glucose and TIR without internet access during network shutdowns.
 - **Floating Glucose Bubble (60x60dp)**: Automatically emerges only when glucose exits the target range (< 3.9 or > 10.0 mmol/L) with hypo water ripple wave effect and 5-min tap snooze.
-- **Glance Desktop & Lockscreen Widgets (5 Formats)**: Horizontal 5x1 strip, 4x2/3x2 Canvas chart dashboard, 2x2 focus square, and 1x2 vertical glance with customizable background opacity slider (0%..100%).
+- **Glance Desktop Widgets (5 Formats)**: 5x1 horizontal strip displaying core AGP ranges (TIR, TBR < 4%, TAR) side by side plus dynamic IoB/Battery/Streak/Avg/CV slots, 4x2/3x2 Canvas chart dashboard, 2x2 focus square, and 1x2 vertical glance with opacity control (0%..100%) and instant locale/unit synchronization.
+- **Multi-File Batch Historical Import (CSV / ZIP)**: Seamless concurrent upload and deduplication of unlimited xDrip+ / Dexcom Clarity CSV and ZIP files without memory pressure.
 - **Sunday Compensation Digest**: Automated weekly review delivered every Sunday at 20:00 with week-over-week dynamic delta comparison ($\pm\Delta\%$) and clinical insights.
 - **Clinical AGP Reports**: Generates official Ambulatory Glucose Profile PDF sheets with 12 core clinical parameters (TIR, TING, TBR, TAR, CV, eA1c, GRI, GVI, PGS) matching ATTD/ADA standards.
 - **Family BLE Bridge (100% Offline)**: Local direct Bluetooth Low Energy broadcast (Broadcaster & Observer modes, 10–15m range) transmitting glucose, trend arrow, IoB, and battery every 60s without pairing or internet, guarded by 3-digit Family PIN.
