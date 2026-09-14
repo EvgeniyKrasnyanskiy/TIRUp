@@ -128,7 +128,7 @@ class Hba1cReportPdfGenerator(private val context: Context) {
 
             val pY = y + 16f
             val patientDisplayName = if (profile.fullName.isNotBlank()) profile.fullName else (if (isRu) "Пациент не указан" else "Patient not specified")
-            val pAge = if (profile.birthYear > 1900) "${profile.calculatedAge} ${if (isRu) "лет" else "y.o."}" else "—"
+            val pAge = if (profile.birthYear > 1900) com.tirup.app.domain.util.PluralUtils.formatYears(profile.calculatedAge, isRu) else "—"
             val pDiab = if (profile.diabetesType.isNotBlank()) localizeDiabetesType(profile.diabetesType, isRu) else "—"
             val pTherapy = if (profile.therapyType.isNotBlank()) localizeTherapyType(profile.therapyType, isRu) else "—"
 

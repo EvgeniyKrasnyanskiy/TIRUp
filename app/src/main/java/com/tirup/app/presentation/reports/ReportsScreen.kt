@@ -1602,7 +1602,7 @@ internal fun openSavedFileFolder(context: android.content.Context, filePath: Str
             )
             val mimeType = when (file.extension.lowercase()) {
                 "pdf" -> "application/pdf"
-                "csv" -> "text/comma-separated-values"
+                "csv" -> "text/csv"
                 "zip" -> "application/zip"
                 else -> "*/*"
             }

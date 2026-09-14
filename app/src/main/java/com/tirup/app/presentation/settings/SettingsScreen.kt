@@ -3607,7 +3607,7 @@ private fun PatientProfileSummaryCard(
     val hasName = profile.fullName.isNotBlank()
     val displayName = if (hasName) profile.shortName else (if (isRu) "Мой профиль" else "My Profile")
 
-    val ageStr = if (profile.birthYear > 1900) "${profile.calculatedAge} ${if (isRu) "лет" else "y.o."}" else ""
+    val ageStr = if (profile.birthYear > 1900) com.tirup.app.domain.util.PluralUtils.formatYears(profile.calculatedAge, isRu) else ""
     val diagStr = if (profile.diabetesType.isNotBlank()) localizeDiabetesType(profile.diabetesType, isRu) else ""
     val durStr = if (profile.calculatedDuration > 0) "${if (isRu) "стаж" else "duration"} ${profile.calculatedDuration} ${if (isRu) "л." else "y."}" else ""
     val bmi = profile.calculatedBmi
@@ -4331,7 +4331,7 @@ private fun PatientProfileEditDialog(
                                 verticalArrangement = Arrangement.Center
                             ) {
                                 Text(if (isRu) "Возраст" else "Age", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("${localProfile.calculatedAge} ${if (isRu) "лет" else "y.o."}", style = MaterialTheme.typography.bodyMedium, color = ActionBlue, fontWeight = FontWeight.Bold)
+                                Text(com.tirup.app.domain.util.PluralUtils.formatYears(localProfile.calculatedAge, isRu), style = MaterialTheme.typography.bodyMedium, color = ActionBlue, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

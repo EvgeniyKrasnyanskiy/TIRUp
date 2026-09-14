@@ -347,7 +347,7 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Журнал лабораторного HbA1c и квартальный контроль" else "Laboratory HbA1c Journal & Quarterly Tracking",
                         if (isRu) "HbA1c & GMI" else "HbA1c & GMI",
-                        if (isRu) "Ввод анализов крови, сопоставление с 90-дневным расчетным GMI сенсора и TIR. Напоминания раз в 90 дней (защита от спама, кнопка пропуска) и экспорт 1-страничной выписки в PDF."
+                        if (isRu) "Ввод анализов крови, сопоставление с 90-дневным расчётным GMI сенсора и TIR. Напоминания раз в 90 дней (защита от спама, кнопка пропуска) и экспорт 1-страничной выписки в PDF."
                         else "Logging lab blood tests, comparison with 90-day sensor GMI and TIR. Quarterly reminders every 90 days (anti-spam guard, skip button) and 1-page PDF export."
                     )
                 ),
@@ -370,7 +370,7 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Zero-Lag годовая архивация данных" else "Zero-Lag Annual History Archiving",
                         if (isRu) "Архив года" else "Year Archive",
-                        if (isRu) "Автоматическое запечатывание завершённых лет в файлы tirup_readings_YYYY.csv. База данных остаётся компактной и летает мгновенно даже при непрерывном ведении 1–5 лет."
+                        if (isRu) "Автоматическое сохранение завершённых лет в архивы tirup_readings_YYYY.csv. База данных остаётся компактной и летает мгновенно даже при непрерывном ведении 1–5 лет."
                         else "Automatically seals past calendar years into tirup_readings_YYYY.csv files. Database remains lightweight and snappy even across 1–5 years of continuous records."
                     ),
                     Triple(

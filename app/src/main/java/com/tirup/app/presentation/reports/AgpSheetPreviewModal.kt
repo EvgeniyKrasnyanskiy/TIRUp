@@ -137,11 +137,11 @@ fun AgpSheetPreviewModal(
                                 )
 
                                 val pName = if (patient.fullName.isNotBlank()) patient.fullName else "___________________________________"
-                                val pAge = if (patient.fullName.isNotBlank() || patient.birthYear != 1990) "${patient.calculatedAge} ${if (isRu) "лет" else "y.o."}" else "_______"
+                                val pAge = if (patient.fullName.isNotBlank() || patient.birthYear != 1990) com.tirup.app.domain.util.PluralUtils.formatYears(patient.calculatedAge, isRu) else "_______"
                                 val pWeight = if (patient.weightKg.isNotBlank()) "${patient.weightKg} ${if (isRu) "кг" else "kg"}" else "_______"
                                 val pHeight = if (patient.heightCm.isNotBlank()) "${patient.heightCm} ${if (isRu) "см" else "cm"}" else "_______"
                                 val pType = localizeDiabetesType(patient.diabetesType, isRu)
-                                val pDur = "${patient.calculatedDuration} ${if (isRu) "лет" else "yrs"}"
+                                val pDur = com.tirup.app.domain.util.PluralUtils.formatYears(patient.calculatedDuration, isRu)
                                 val pTherapy = localizeTherapyType(patient.therapyType, isRu)
 
                                 val patientLine = if (isRu) {

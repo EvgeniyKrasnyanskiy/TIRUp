@@ -94,11 +94,11 @@ class AgpPdfGenerator(private val context: Context) {
 
             // Patient details line
             val pName = if (patient.fullName.isNotBlank()) patient.fullName else "___________________________________"
-            val pAge = if (patient.fullName.isNotBlank() || patient.birthYear != 1990) (if (isRu) "${patient.calculatedAge} лет" else "${patient.calculatedAge} y.o.") else "_______"
+            val pAge = if (patient.fullName.isNotBlank() || patient.birthYear != 1990) com.tirup.app.domain.util.PluralUtils.formatYears(patient.calculatedAge, isRu) else "_______"
             val pWeight = if (patient.weightKg.isNotBlank()) (if (isRu) "${patient.weightKg} кг" else "${patient.weightKg} kg") else "_______"
             val pHeight = if (patient.heightCm.isNotBlank()) (if (isRu) "${patient.heightCm} см" else "${patient.heightCm} cm") else "_______"
             val pType = localizeDiabetesType(patient.diabetesType, isRu)
-            val pDur = if (isRu) "${patient.calculatedDuration} лет" else "${patient.calculatedDuration} yrs"
+            val pDur = com.tirup.app.domain.util.PluralUtils.formatYears(patient.calculatedDuration, isRu)
             val pTherapy = localizeTherapyType(patient.therapyType, isRu)
             val latestHba1c = userSettings.latestHba1cRecord
             val hba1cDateFmt = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
@@ -125,7 +125,7 @@ class AgpPdfGenerator(private val context: Context) {
             canvas.drawText(metaLine, margin + 12f, 70f, subTextPaint)
 
             val metaLine2 = if (isRu) {
-                "Сформировано: ${SimpleDateFormat("dd MMMM yyyy HH:mm", Locale("ru")).format(Date())} • Локальный оффлайн-Приложение TIRUp"
+                "Сформировано: ${SimpleDateFormat("dd MMMM yyyy HH:mm", Locale("ru")).format(Date())} • Локальное офлайн-приложение TIRUp"
             } else {
                 "Generated: ${SimpleDateFormat("dd MMM yyyy HH:mm", Locale.US).format(Date())} • TIRUp Offline App"
             }

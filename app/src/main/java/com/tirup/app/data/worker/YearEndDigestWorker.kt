@@ -74,11 +74,12 @@ class YearEndDigestWorker(
                         isRu = isRu
                     )
 
-                    settingsRepo.updateSettings(
-                        settings.copy(lastYearEndDigestShownYear = targetYear)
-                    )
                     Log.i(TAG, "Delivered Year-End Digest notification for year $targetYear: TIR=%.1f%%, GMI=%.1f%%".format(tirPercent, gmi))
                 }
+
+                settingsRepo.updateSettings(
+                    settings.copy(lastYearEndDigestShownYear = targetYear)
+                )
             }
 
             // Always ensure the next December 31 20:00 exact trigger is scheduled
