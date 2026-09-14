@@ -657,7 +657,6 @@ fun DailyGlucoseChart(
                         }
                     }
                 }
-            }
 
             val axisTextPaint = remember(onSurfaceVariant) {
                 android.graphics.Paint().apply {

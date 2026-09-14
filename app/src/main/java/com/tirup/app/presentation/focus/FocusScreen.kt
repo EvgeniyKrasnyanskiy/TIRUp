@@ -374,14 +374,23 @@ fun FocusScreen(
                         (System.currentTimeMillis() - heroBleSettings.lastPacketTimestamp) / 60000L
                     } else null
                     val dataReceivedStr = if (ageMins != null) {
-                        val value = when {
-                            ageMins < 60L -> ageMins to if (isRu) "мин." else "min"
-                            ageMins < 1440L -> (ageMins / 60L) to if (isRu) "ч" else "h"
-                            ageMins < 365L * 1440L -> (ageMins / 1440L) to if (isRu) "дн." else "d"
-                            else -> (ageMins / (365L * 1440L)) to if (isRu) "лет" else "y"
+                        when {
+                            ageMins < 60L -> if (isRu) "Данные получены $ageMins мин. назад." else "Data received $ageMins min ago."
+                            ageMins < 1440L -> {
+                                val h = ageMins / 60L
+                                if (isRu) "Данные получены $h ч назад." else "Data received ${h}h ago."
+                            }
+                            ageMins < 365L * 1440L -> {
+                                val d = (ageMins / 1440L).toInt()
+                                if (isRu) "Данные получены ${com.tirup.app.domain.util.PluralUtils.formatDays(d, true)} назад."
+                                else "Data received $d d ago."
+                            }
+                            else -> {
+                                val y = (ageMins / (365L * 1440L)).toInt()
+                                if (isRu) "Данные получены ${com.tirup.app.domain.util.PluralUtils.formatYears(y, true)} назад."
+                                else "Data received ${com.tirup.app.domain.util.PluralUtils.formatYears(y, false)} ago."
+                            }
                         }
-                        if (isRu) "Данные получены ${value.first} ${value.second} назад."
-                        else "Data received ${value.first} ${value.second} ago."
                     } else ""
                     val disableBridgeStr = if (isRu) {
                         "Отключить или перенастроить BLE-мост можно кликом по иконке Bluetooth."
