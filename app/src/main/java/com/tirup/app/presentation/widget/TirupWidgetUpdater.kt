@@ -301,10 +301,10 @@ object TirupWidgetUpdater {
             views.setTextViewText(R.id.widget_compensator_text, "--")
             views.setTextColor(R.id.widget_compensator_text, Color.parseColor("#94A3B8"))
             views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
-            views.setTextViewText(R.id.widget_mean_glucose, if (settings.language.equals("RU", ignoreCase = true)) "Ср: --" else "Avg: --")
-            views.setTextColor(R.id.widget_mean_glucose, Color.parseColor("#94A3B8"))
-            views.setTextViewText(R.id.widget_cv_score, "CV: --")
-            views.setTextColor(R.id.widget_cv_score, Color.parseColor("#94A3B8"))
+            views.setTextViewText(R.id.widget_tbr_score, "TBR: --")
+            views.setTextColor(R.id.widget_tbr_score, Color.parseColor("#94A3B8"))
+            views.setTextViewText(R.id.widget_tar_score, "TAR: --")
+            views.setTextColor(R.id.widget_tar_score, Color.parseColor("#94A3B8"))
             views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
             views.setViewVisibility(R.id.widget_master_battery, View.GONE)
             views.setViewVisibility(R.id.widget_iob_cob_layout, View.GONE)
@@ -317,14 +317,11 @@ object TirupWidgetUpdater {
         bindCommonMetrics(views, latest, recent, settings)
         bindCompensator(views, latest, todayReadings, settings, isStrip = true)
 
-        val isRu = settings.language.equals("RU", ignoreCase = true)
         val diffMin = ((System.currentTimeMillis() - latest.timestamp).coerceAtLeast(0L) / 60_000L).toInt()
         val isStale = diffMin > 5
         val grayColor = Color.parseColor("#94A3B8")
 
-        // Daily Statistics (Mean BG & CV)
-        val isMmol = settings.unit == GlucoseUnit.MMOL_L
-        val meanPrefix = if (isRu) "Ср: " else "Avg: "
+        // Ranges in Column 3: TBR (safety hypo) & TAR (hyper)
         if (todayReadings.isNotEmpty()) {
             val stats = GlucoseMetricsCalculator.calculateStatistics(
                 readings = todayReadings,
@@ -332,47 +329,39 @@ object TirupWidgetUpdater {
                 language = settings.language,
                 unit = settings.unit
             )
-            val meanFormatted = if (isMmol) {
-                String.format(Locale.US, "%.1f", stats.meanMmol)
-            } else {
-                "${(stats.meanMmol * 18.0182).roundToInt()}"
-            }
-            views.setTextViewText(R.id.widget_mean_glucose, "$meanPrefix$meanFormatted")
-
-            val meanColor = when {
+            val tbrPercent = (stats.tbrLowPercent + stats.tbrVeryLowPercent).roundToInt()
+            views.setTextViewText(R.id.widget_tbr_score, "TBR: $tbrPercent%")
+            val tbrColor = when {
                 isStale -> grayColor
-                stats.meanMmol < 3.9 -> Color.parseColor("#EF4444")
-                stats.meanMmol <= 7.8 -> Color.parseColor("#4ADE80")
-                stats.meanMmol <= settings.targetRanges.tirHighMmol -> Color.parseColor("#10B981")
-                stats.meanMmol <= 13.9 -> Color.parseColor("#F59E0B")
+                tbrPercent <= 4 -> Color.parseColor("#10B981")
                 else -> Color.parseColor("#EF4444")
             }
-            views.setTextColor(R.id.widget_mean_glucose, meanColor)
+            views.setTextColor(R.id.widget_tbr_score, tbrColor)
 
-            val cvPercent = stats.cvPercent.roundToInt()
-            views.setTextViewText(R.id.widget_cv_score, "CV: $cvPercent%")
-            val cvColor = when {
+            val tarPercent = (stats.tarHighPercent + stats.tarVeryHighPercent).roundToInt()
+            views.setTextViewText(R.id.widget_tar_score, "TAR: $tarPercent%")
+            val tarColor = when {
                 isStale -> grayColor
-                cvPercent <= 36 -> Color.parseColor("#10B981")
-                cvPercent <= 45 -> Color.parseColor("#F59E0B")
+                tarPercent <= 25 -> Color.parseColor("#10B981")
+                tarPercent <= 35 -> Color.parseColor("#F59E0B")
                 else -> Color.parseColor("#EF4444")
             }
-            views.setTextColor(R.id.widget_cv_score, cvColor)
+            views.setTextColor(R.id.widget_tar_score, tarColor)
         } else {
-            views.setTextViewText(R.id.widget_mean_glucose, "$meanPrefix--")
-            views.setTextColor(R.id.widget_mean_glucose, grayColor)
-            views.setTextViewText(R.id.widget_cv_score, "CV: --")
-            views.setTextColor(R.id.widget_cv_score, grayColor)
+            views.setTextViewText(R.id.widget_tbr_score, "TBR: --")
+            views.setTextColor(R.id.widget_tbr_score, grayColor)
+            views.setTextViewText(R.id.widget_tar_score, "TAR: --")
+            views.setTextColor(R.id.widget_tar_score, grayColor)
         }
 
-        // Dynamic badges in right section
+        // Dynamic badges in columns 4 and 5 (Mean, CV, TING, GMI fallback when IoB/Battery/Streak absent)
         val badges = getPrioritizedBadges(
             latest = latest,
             recent = recent,
             todayReadings = todayReadings,
             settings = settings,
             streakDays = streakDays,
-            excludeTypes = setOf("delta", "compensator", "mean", "cv")
+            excludeTypes = setOf("delta", "compensator", "tbr", "tar")
         )
         fillBadgeSlots(
             views = views,
@@ -579,12 +568,13 @@ object TirupWidgetUpdater {
         views.setTextColor(R.id.widget_trend_arrow, glucoseColor)
         views.setTextViewText(R.id.widget_trend_arrow, formatCompactTrendArrow(latest.trendArrow))
 
+        val isRu = settings.language.equals("RU", ignoreCase = true)
         // Time ago (hidden if fresh <= 1m)
         if (diffMin <= 1) {
             views.setViewVisibility(R.id.widget_time_ago, View.GONE)
         } else {
             views.setViewVisibility(R.id.widget_time_ago, View.VISIBLE)
-            views.setTextViewText(R.id.widget_time_ago, formatTimeAgoShort(now - latest.timestamp))
+            views.setTextViewText(R.id.widget_time_ago, formatTimeAgoShort(now - latest.timestamp, isRu = isRu))
             views.setTextColor(R.id.widget_time_ago, grayColor)
         }
 
@@ -615,7 +605,7 @@ object TirupWidgetUpdater {
         if (diffMin <= 1) {
             views.setTextViewText(R.id.widget_tir_score, "$targetName $currentPercent%")
         } else {
-            val timeAgoStr = formatTimeAgoShort(now - latest.timestamp)
+            val timeAgoStr = formatTimeAgoShort(now - latest.timestamp, isRu = isRu)
             views.setTextViewText(R.id.widget_tir_score, "$currentPercent% • $timeAgoStr")
         }
         views.setTextColor(R.id.widget_tir_score, tirColor)
@@ -983,12 +973,13 @@ object TirupWidgetUpdater {
         }
 
         // 4. Time Ago (hidden if <= 1m, compact "2м", "59м", "1ч", "23ч", "4д" without "назад")
+        val isRu = settings.language.equals("RU", ignoreCase = true)
         if (diffMin <= 1) {
             views.setViewVisibility(R.id.widget_time_ago, View.GONE)
             views.setTextViewText(R.id.widget_time_ago, "")
         } else {
             views.setViewVisibility(R.id.widget_time_ago, View.VISIBLE)
-            val timeAgoStr = formatTimeAgoShort(diffMs)
+            val timeAgoStr = formatTimeAgoShort(diffMs, isRu = isRu)
             views.setTextViewText(R.id.widget_time_ago, timeAgoStr)
             views.setTextColor(R.id.widget_time_ago, grayColor)
         }
@@ -1042,7 +1033,7 @@ object TirupWidgetUpdater {
         views.setProgressBar(R.id.widget_tir_progress, 100, currentPercent.coerceIn(0, 100), false)
 
         if (isStrip) {
-            val (balanceText, balanceColor) = calculateDailyTimeBalance(compensator, targetPercent)
+            val (balanceText, balanceColor) = calculateDailyTimeBalance(compensator, targetPercent, isRu = isRu)
             views.setTextViewText(R.id.widget_compensator_text, balanceText)
             views.setTextColor(R.id.widget_compensator_text, if (isStale) grayColor else balanceColor)
             views.setViewVisibility(R.id.widget_compensator_text, View.VISIBLE)
@@ -1056,10 +1047,13 @@ object TirupWidgetUpdater {
 
     fun calculateDailyTimeBalance(
         compensator: com.tirup.app.domain.model.CompensatorGoal,
-        targetPercent: Double
+        targetPercent: Double,
+        isRu: Boolean = true
     ): Pair<String, Int> {
+        val minUnit = if (isRu) "м" else "m"
+        val hourUnit = if (isRu) "ч" else "h"
         if (compensator.observedPointsCount < 2) {
-            return Pair("0м", 0xFF10B981.toInt())
+            return Pair("0$minUnit", 0xFF10B981.toInt())
         }
         val expectedMinutes = (compensator.activeMonitoringMinutes * (targetPercent / 100.0)).roundToInt()
         val balanceMinutes = compensator.inRangeMinutes - expectedMinutes
@@ -1067,12 +1061,12 @@ object TirupWidgetUpdater {
         val text = if (balanceMinutes >= 0) {
             val h = balanceMinutes / 60
             val m = balanceMinutes % 60
-            if (h > 0) "+${h}ч ${m}м" else "+${m}м"
+            if (h > 0) "+${h}${hourUnit} ${m}${minUnit}" else "+${m}${minUnit}"
         } else {
             val absMin = abs(balanceMinutes)
             val h = absMin / 60
             val m = absMin % 60
-            if (h > 0) "-${h}ч ${m}м" else "-${m}м"
+            if (h > 0) "-${h}${hourUnit} ${m}${minUnit}" else "-${m}${minUnit}"
         }
 
         val color = when {
@@ -1201,7 +1195,7 @@ object TirupWidgetUpdater {
                 targetRanges = settings.targetRanges,
                 language = settings.language
             )
-            val (balanceText, balanceColor) = calculateDailyTimeBalance(compensator, targetPercent)
+            val (balanceText, balanceColor) = calculateDailyTimeBalance(compensator, targetPercent, isRu = isRu)
             list.add(
                 WidgetBadge(
                     type = "compensator",
@@ -1237,7 +1231,7 @@ object TirupWidgetUpdater {
             list.add(
                 WidgetBadge(
                     type = "time_ago",
-                    text = "⏱ " + formatTimeAgoShort(diffMs),
+                    text = "⏱ " + formatTimeAgoShort(diffMs, isRu = isRu),
                     color = grayColor
                 )
             )
@@ -1299,26 +1293,7 @@ object TirupWidgetUpdater {
             )
         }
 
-        // 9. TAR (Priority 9 - Fallback when primary slots are free)
-        if (!excludeTypes.contains("tar") && todayReadings.isNotEmpty()) {
-            val stats = getStats()
-            val tarPercent = (stats.tarHighPercent + stats.tarVeryHighPercent).roundToInt()
-            val tarColor = when {
-                isStale -> grayColor
-                tarPercent <= 25 -> 0xFF10B981.toInt()
-                tarPercent <= 35 -> 0xFFF59E0B.toInt()
-                else -> 0xFFEF4444.toInt()
-            }
-            list.add(
-                WidgetBadge(
-                    type = "tar",
-                    text = "TAR: $tarPercent%",
-                    color = tarColor
-                )
-            )
-        }
-
-        // 10. TING (Priority 10 - Fallback)
+        // 9. TING (Priority 9 - Fallback)
         if (!excludeTypes.contains("ting") && todayReadings.isNotEmpty()) {
             val stats = getStats()
             val tingPercent = stats.tingPercent.roundToInt()
@@ -1336,7 +1311,25 @@ object TirupWidgetUpdater {
             )
         }
 
-        // 11. TBR (Priority 11 - Fallback)
+        // 10. GMI (Priority 10 - Fallback)
+        if (!excludeTypes.contains("gmi") && todayReadings.isNotEmpty()) {
+            val stats = getStats()
+            val gmiColor = when {
+                isStale -> grayColor
+                stats.gmiPercent <= 7.0 -> 0xFF10B981.toInt()
+                stats.gmiPercent <= 8.0 -> 0xFFF59E0B.toInt()
+                else -> 0xFFEF4444.toInt()
+            }
+            list.add(
+                WidgetBadge(
+                    type = "gmi",
+                    text = String.format(Locale.US, "GMI: %.1f%%", stats.gmiPercent),
+                    color = gmiColor
+                )
+            )
+        }
+
+        // 11. TBR (Priority 11 - Fallback, safety first)
         if (!excludeTypes.contains("tbr") && todayReadings.isNotEmpty()) {
             val stats = getStats()
             val tbrPercent = (stats.tbrLowPercent + stats.tbrVeryLowPercent).roundToInt()
@@ -1354,20 +1347,21 @@ object TirupWidgetUpdater {
             )
         }
 
-        // 12. GMI (Priority 12 - Fallback)
-        if (!excludeTypes.contains("gmi") && todayReadings.isNotEmpty()) {
+        // 12. TAR (Priority 12 - Fallback)
+        if (!excludeTypes.contains("tar") && todayReadings.isNotEmpty()) {
             val stats = getStats()
-            val gmiColor = when {
+            val tarPercent = (stats.tarHighPercent + stats.tarVeryHighPercent).roundToInt()
+            val tarColor = when {
                 isStale -> grayColor
-                stats.gmiPercent <= 7.0 -> 0xFF10B981.toInt()
-                stats.gmiPercent <= 8.0 -> 0xFFF59E0B.toInt()
+                tarPercent <= 25 -> 0xFF10B981.toInt()
+                tarPercent <= 35 -> 0xFFF59E0B.toInt()
                 else -> 0xFFEF4444.toInt()
             }
             list.add(
                 WidgetBadge(
-                    type = "gmi",
-                    text = String.format(Locale.US, "GMI: %.1f%%", stats.gmiPercent),
-                    color = gmiColor
+                    type = "tar",
+                    text = "TAR: $tarPercent%",
+                    color = tarColor
                 )
             )
         }
