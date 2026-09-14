@@ -1178,7 +1178,7 @@ fun FocusScreen(
             areAlertsMuted = areAlertsMuted,
             isAlertsPaused = isAlertsPaused,
             pauseRemainingMs = pauseRemainingMs,
-            onPause2Hours = { viewModel.pauseAlertsFor(2 * 3600 * 1000L) },
+            onPauseAlerts = { durationMs -> viewModel.pauseAlertsFor(durationMs) },
             onResumeAlerts = { viewModel.resumeAlerts() },
             isRu = isRu,
             onDismiss = { showDailyAlertLogsDialog = false }
@@ -2451,11 +2451,14 @@ private fun DailyAlertLogsDialog(
     areAlertsMuted: Boolean = false,
     isAlertsPaused: Boolean = false,
     pauseRemainingMs: Long = 0L,
-    onPause2Hours: () -> Unit,
+    onPauseAlerts: (Long) -> Unit,
     onResumeAlerts: () -> Unit,
     isRu: Boolean,
     onDismiss: () -> Unit
 ) {
+    var selectedMinutes by remember { mutableStateOf(60) }
+    val presets = listOf(10, 30, 60, 120, 240, 480)
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -2543,39 +2546,80 @@ private fun DailyAlertLogsDialog(
                             .fillMaxWidth()
                             .padding(bottom = 12.dp)
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Row(
+                                modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.weight(1f)
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("🔔", fontSize = 16.sp)
-                                Text(
-                                    text = if (isRu) "Оповещения активны" else "Alerts active",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text("🔔", fontSize = 16.sp)
+                                    Text(
+                                        text = if (isRu) "Оповещения активны" else "Alerts active",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                val pauseBtnLabel = if (selectedMinutes >= 60) {
+                                    "${selectedMinutes / 60} ч"
+                                } else {
+                                    "$selectedMinutes мин"
+                                }
+                                OutlinedButton(
+                                    onClick = { onPauseAlerts(selectedMinutes * 60_000L) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, ActionBlue),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text(
+                                        text = if (isRu) "Пауза $pauseBtnLabel ⏸️" else "Pause $pauseBtnLabel ⏸️",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ActionBlue
+                                    )
+                                }
                             }
-                            OutlinedButton(
-                                onClick = onPause2Hours,
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, ActionBlue),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                modifier = Modifier.height(32.dp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text(
-                                    text = if (isRu) "Пауза 2 ч ⏸️" else "Pause 2h ⏸️",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = ActionBlue
-                                )
+                                presets.forEach { mins ->
+                                    val isSelected = mins == selectedMinutes
+                                    val label = if (mins >= 60) "${mins / 60}ч" else "${mins}м"
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = if (isSelected) ActionBlue else MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                                        border = BorderStroke(
+                                            0.8.dp,
+                                            if (isSelected) ActionBlue else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                        ),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { selectedMinutes = mins }
+                                    ) {
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier.padding(vertical = 4.dp)
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

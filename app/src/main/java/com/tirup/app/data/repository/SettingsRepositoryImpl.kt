@@ -42,7 +42,8 @@ class SettingsRepositoryImpl(
     override suspend fun pauseAlertsFor(durationMs: Long) {
         val current = _settingsFlow.value
         val now = System.currentTimeMillis()
-        val pauseUntil = now + durationMs
+        val clampedDuration = durationMs.coerceIn(10 * 60 * 1000L, 8 * 3600 * 1000L)
+        val pauseUntil = now + clampedDuration
         val updated = current.copy(
             alertSettings = current.alertSettings.copy(
                 alertsMuteUntilTimestamp = pauseUntil,
