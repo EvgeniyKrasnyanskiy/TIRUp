@@ -220,7 +220,7 @@ fun HelpAndDisclaimerDialog(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isRu) "Сохранить руководство" else "Save User Manual",
+                        text = if (isRu) "Сохранить руководство PDF" else "Save User Manual PDF",
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
                         color = ActionBlue

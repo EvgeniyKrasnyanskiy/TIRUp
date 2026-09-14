@@ -31,7 +31,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 sealed interface SettingsEvent {
-    data class SavedToDownloads(val filePath: String) : SettingsEvent
+    data class SavedToDownloads(val filePath: String, val message: String? = null) : SettingsEvent
     data class Info(val message: String) : SettingsEvent
     data class ShareFile(val file: File, val mimeType: String, val title: String) : SettingsEvent
 }
@@ -425,7 +425,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
             com.tirup.app.data.ble.BleObserverManager.boostScanFor60Sec(context, settingsRepository, glucoseRepository)
-            val msg = if (isRu) "🔍 Активный поиск вещателя запущен (60 сек)" else "🔍 Boost scan active (60s)"
+            val msg = if (isRu) "🔍 Активный поиск запущен (60 сек)" else "🔍 Boost scan active (60s)"
             _uiState.update { it.copy(infoMessage = msg) }
         }
     }
@@ -544,7 +544,10 @@ class SettingsViewModel(
                         }
                         savedPath = destFile.absolutePath
                     }
-                    _events.emit(SettingsEvent.SavedToDownloads(savedPath))
+                    _events.emit(SettingsEvent.SavedToDownloads(
+                        filePath = savedPath,
+                        message = if (isRu) "Руководство сохранено в Загрузки" else "Manual saved to Downloads"
+                    ))
                 } catch (e: Exception) {
                     _events.emit(SettingsEvent.Info("Save failed: ${e.message}"))
                 }
@@ -744,7 +747,10 @@ class SettingsViewModel(
                         }
                         savedPath = destFile.absolutePath
                     }
-                    _events.emit(SettingsEvent.SavedToDownloads(savedPath))
+                    _events.emit(SettingsEvent.SavedToDownloads(
+                        filePath = savedPath,
+                        message = if (isRu) "Выписка HbA1c сохранена в Загрузки" else "HbA1c summary saved to Downloads"
+                    ))
                 } catch (e: Exception) {
                     _events.emit(SettingsEvent.Info("Save failed: ${e.message}"))
                 }
@@ -913,7 +919,10 @@ class SettingsViewModel(
                         }
                         savedPath = destFile.absolutePath
                     }
-                    _events.emit(SettingsEvent.SavedToDownloads(savedPath))
+                    _events.emit(SettingsEvent.SavedToDownloads(
+                        filePath = savedPath,
+                        message = if (isRu) "Итоги года сохранены в Загрузки" else "Year-end report saved to Downloads"
+                    ))
                 } catch (e: Exception) {
                     _events.emit(SettingsEvent.Info("Save failed: ${e.message}"))
                 }

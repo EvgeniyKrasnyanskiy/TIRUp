@@ -532,7 +532,7 @@ private fun LiveReportCard(
                 ) {
                     Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp), tint = ActionBlue)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = if (isRu) "Сохранить" else "Save PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(text = if (isRu) "Сохранить PDF" else "Save PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
 
                 OutlinedButton(
@@ -798,7 +798,7 @@ private fun HistoricalReportCard(
                         ) {
                             Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp), tint = ActionBlue)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = if (isRu) "Сохранить" else "Save PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(text = if (isRu) "Сохранить PDF" else "Save PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
 
                         OutlinedButton(
@@ -1417,7 +1417,7 @@ private fun ParametersGuidebookModal(
                             Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (isRu) "Сохранить" else "Save PDF",
+                                text = if (isRu) "Сохранить PDF" else "Save PDF",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )

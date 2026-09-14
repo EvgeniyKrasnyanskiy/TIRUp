@@ -370,7 +370,7 @@ fun SettingsScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is SettingsEvent.SavedToDownloads -> {
-                    val msg = if (isRu) "Руководство сохранено в Загрузки" else "Manual saved to Downloads"
+                    val msg = event.message ?: if (isRu) "Файл сохранён в Загрузки" else "File saved to Downloads"
                     val actionLabel = if (isRu) "Открыть" else "Open"
                     val result = snackbarHostState.showSnackbar(
                         message = msg,
@@ -3506,6 +3506,7 @@ fun SettingsScreen(
             tirPercent90d = state.tirPercent90d,
             skippedQuarterTimestamp = settings.hba1cSkippedQuarterTimestamp,
             isRu = isRu,
+            snackbarHostState = snackbarHostState,
             onAddRecord = { value, timestamp, lab, notes ->
                 viewModel.addHba1cRecord(valuePercent = value, timestamp = timestamp, labName = lab, notes = notes)
             },
@@ -3527,6 +3528,7 @@ fun SettingsScreen(
         YearEndDigestDialog(
             stats = stats,
             isRu = isRu,
+            snackbarHostState = snackbarHostState,
             onExportPdf = { s -> viewModel.exportYearEndReportToPdf(s) },
             onArchiveYear = { year -> viewModel.archiveYearArchive(year) },
             onDismiss = { viewModel.setShowYearEndDialog(false) }
@@ -3745,6 +3747,7 @@ private fun Hba1cHistoryDialog(
     tirPercent90d: Int?,
     skippedQuarterTimestamp: Long,
     isRu: Boolean,
+    snackbarHostState: SnackbarHostState? = null,
     onAddRecord: (value: Double, timestamp: Long, lab: String, notes: String) -> Unit,
     onDeleteRecord: (id: Long) -> Unit,
     onSkipQuarter: () -> Unit,
@@ -4001,7 +4004,7 @@ private fun Hba1cHistoryDialog(
                         OutlinedTextField(
                             value = labText,
                             onValueChange = { labText = it },
-                            label = { Text(if (isRu) "Лаборатория" else "Laboratory") },
+                            label = { Text(if (isRu) "Лаборатория (необязательно)" else "Laboratory (optional)") },
                             placeholder = { Text(if (isRu) "Инвитро, Гемотест..." else "Lab name") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
@@ -4148,22 +4151,30 @@ private fun Hba1cHistoryDialog(
             }
         },
         confirmButton = {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(
-                    onClick = onExportPdf,
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(imageVector = Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = if (isRu) "Выписка PDF" else "PDF Report")
+                if (snackbarHostState != null) {
+                    SnackbarHost(hostState = snackbarHostState)
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = onExportPdf,
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = if (isRu) "Выписка PDF" else "PDF Report")
+                    }
 
-                TextButton(onClick = onDismiss) {
-                    Text(text = if (isRu) "Закрыть" else "Close")
+                    TextButton(onClick = onDismiss) {
+                        Text(text = if (isRu) "Закрыть" else "Close")
+                    }
                 }
             }
         },
@@ -5325,6 +5336,7 @@ private fun BleFamilyPinDialog(
 fun YearEndDigestDialog(
     stats: YearEndStats?,
     isRu: Boolean,
+    snackbarHostState: SnackbarHostState? = null,
     onExportPdf: (YearEndStats) -> Unit,
     onArchiveYear: (Int) -> Unit,
     onDismiss: () -> Unit
@@ -5592,22 +5604,30 @@ fun YearEndDigestDialog(
             }
         },
         confirmButton = {
-            if (stats != null && stats.totalReadings > 0) {
-                Button(
-                    onClick = { onExportPdf(stats) },
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Download,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (isRu) "Открытка в PDF" else "Save PDF",
-                        fontWeight = FontWeight.Bold
-                    )
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (snackbarHostState != null) {
+                    SnackbarHost(hostState = snackbarHostState)
+                }
+                if (stats != null && stats.totalReadings > 0) {
+                    Button(
+                        onClick = { onExportPdf(stats) },
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isRu) "Открытка в PDF" else "Save PDF",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         },
