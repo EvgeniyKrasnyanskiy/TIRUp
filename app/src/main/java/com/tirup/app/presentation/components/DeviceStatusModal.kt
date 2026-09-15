@@ -243,8 +243,8 @@ fun DeviceStatusModal(
             onDismissRequest = { showSensorInfo = false },
             title = { Text(if (isRu) "Срок службы сенсора" else "Sensor Lifespan") },
             text = { 
-                Text(if (isRu) "Не рекомендуется носить сенсор дольше заявленного срока (обычно 14 дней), так как точность измерений может снизиться, а клей вызвать раздражение кожи." 
-                     else "It is not recommended to wear the sensor longer than its specified lifespan (usually 14 days), as accuracy may degrade and adhesive may cause skin irritation.")
+                Text(if (isRu) "Не рекомендуется носить сенсор дольше заявленного срока (обычно 14 дней), так как точность измерений может снизиться, а клей вызвать раздражение кожи.\n\n💡 Автосинхронизация: TIRUp автоматически обновляет дату установки сенсора, когда находит в xDrip+ запись с заметкой «сенсор», «sensor», «датчик» или «libre»." 
+                     else "It is not recommended to wear the sensor longer than its specified lifespan (usually 14 days), as accuracy may degrade and adhesive may cause skin irritation.\n\n💡 Auto-sync: TIRUp automatically updates sensor installation date when it detects an xDrip+ treatment with note 'sensor', 'сенсор' or 'libre'.")
             },
             confirmButton = {
                 TextButton(onClick = { showSensorInfo = false }) {

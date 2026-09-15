@@ -639,6 +639,8 @@ object TirupWidgetUpdater {
             views.setViewVisibility(R.id.widget_iob_text, View.GONE)
             views.setViewVisibility(R.id.widget_streak_badge, View.GONE)
             views.setViewVisibility(R.id.widget_master_battery, View.GONE)
+            views.setViewVisibility(R.id.widget_avg_glucose, View.GONE)
+            views.setViewVisibility(R.id.widget_ting_score, View.GONE)
             views.setProgressBar(R.id.widget_tir_progress, 100, 0, false)
             return views
         }
@@ -660,7 +662,9 @@ object TirupWidgetUpdater {
             slotIds = listOf(
                 R.id.widget_iob_text,
                 R.id.widget_streak_badge,
-                R.id.widget_master_battery
+                R.id.widget_master_battery,
+                R.id.widget_avg_glucose,
+                R.id.widget_ting_score
             ),
             badges = badges
         )

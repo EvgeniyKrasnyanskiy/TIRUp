@@ -74,19 +74,21 @@ data class AlertLogEntry(
 ) {
     fun localizedTitle(isRu: Boolean): String {
         if (!isRu && titleEn.isNotBlank()) return titleEn
-        if (isRu && !hasEnglishChars(title)) return title
+        if (isRu && hasCyrillicChars(title)) return title
+        if (!isRu && !hasCyrillicChars(title)) return title
         return translateAlertTitle(title, isRu)
     }
 
     fun localizedText(isRu: Boolean): String {
         if (!isRu && textEn.isNotBlank()) return textEn
-        if (isRu && !hasEnglishChars(text)) return text
+        if (isRu && hasCyrillicChars(text)) return text
+        if (!isRu && !hasCyrillicChars(text)) return text
         return translateAlertText(text, isRu)
     }
 
     companion object {
-        private fun hasEnglishChars(str: String): Boolean {
-            return str.any { it in 'a'..'z' || it in 'A'..'Z' }
+        private fun hasCyrillicChars(str: String): Boolean {
+            return str.any { it in '\u0400'..'\u04FF' }
         }
 
         fun translateAlertTitle(title: String, toRu: Boolean): String {
@@ -102,6 +104,10 @@ data class AlertLogEntry(
                     .replace("🔔 Glucose Above Target!", "🔔 Сахар выше нормы!")
                     .replace("⚡ Predicted Low", "⚡ Прогноз гипогликемии")
                     .replace("⚡ Predicted High", "⚡ Прогноз гипергликемии")
+                    .replace("🔻 Low Glucose", "🔻 Низкий сахар")
+                    .replace("🔺 High Glucose", "🔺 Высокий сахар")
+                    .replace("Predict: LOW ~ at", "Прогноз: ГИПО ~ в")
+                    .replace("Predict: HIGH ~ at", "Прогноз: ГИПЕР ~ в")
                     .replace("📡 Sensor Signal Lost", "📡 Потеря связи с сенсором")
                     .replace(" min", " мин")
                     .replace(" MIN", " МИН")
@@ -117,6 +123,10 @@ data class AlertLogEntry(
                     .replace("🔔 Сахар выше нормы!", "🔔 Glucose Above Target!")
                     .replace("⚡ Прогноз гипогликемии", "⚡ Predicted Low")
                     .replace("⚡ Прогноз гипергликемии", "⚡ Predicted High")
+                    .replace("🔻 Низкий сахар", "🔻 Low Glucose")
+                    .replace("🔺 Высокий сахар", "🔺 High Glucose")
+                    .replace("Прогноз: ГИПО ~ в", "Predict: LOW ~ at")
+                    .replace("Прогноз: ГИПЕР ~ в", "Predict: HIGH ~ at")
                     .replace("📡 Потеря связи с сенсором", "📡 Sensor Signal Lost")
                     .replace(" мин", " min")
                     .replace(" МИН", " MIN")
@@ -129,17 +139,24 @@ data class AlertLogEntry(
                     .replace("Current glucose:", "Текущий сахар:")
                     .replace("Take fast-acting carbs now!", "Срочно примите быстрые углеводы!")
                     .replace("Check ketones and take correction bolus!", "Проверьте кетоны и сделайте коррекцию!")
+                    .replace("Check insulin delivery and ketones.", "Проверьте помпу/подколку и кетоны.")
                     .replace("Testing sound and vibration for", "Проверка громкости и вибрации для уровня")
                     .replace("Glucose dropping rapidly:", "Сахар стремительно падает:")
                     .replace("Take carbs now!", "Примите углеводы!")
+                    .replace("Glucose:", "Глюкоза:")
+                    .replace("Glucose", "Сахар")
                     .replace("below threshold", "ниже порога")
                     .replace("below", "ниже")
                     .replace("above threshold", "выше порога")
                     .replace("above", "выше")
                     .replace("threshold", "порога")
+                    .replace("dropping at", "падает со скоростью")
+                    .replace("rising at", "растёт со скоростью")
                     .replace("Expected", "Ожидается")
                     .replace(" at ", " в ")
                     .replace("rate:", "скорость:")
+                    .replace("mmol/L/min.", "ммоль/л/мин.")
+                    .replace("mmol/L/min", "ммоль/л/мин")
                     .replace("mmol/min", "ммоль/мин")
                     .replace("mmol/L", "ммоль/л")
                     .replace("No CGM readings for", "Нет данных от сенсора более")
@@ -151,15 +168,22 @@ data class AlertLogEntry(
                     .replace("Текущий сахар:", "Current glucose:")
                     .replace("Срочно примите быстрые углеводы!", "Take fast-acting carbs now!")
                     .replace("Проверьте кетоны и сделайте коррекцию!", "Check ketones and take correction bolus!")
+                    .replace("Проверьте помпу/подколку и кетоны.", "Check insulin delivery and ketones.")
                     .replace("Проверка громкости и вибрации для уровня", "Testing sound and vibration for")
                     .replace("Сахар стремительно падает:", "Glucose dropping rapidly:")
                     .replace("Примите углеводы!", "Take carbs now!")
+                    .replace("Глюкоза:", "Glucose:")
+                    .replace("Сахар", "Glucose")
                     .replace("ниже порога", "below threshold")
                     .replace("выше порога", "above threshold")
                     .replace("порога", "threshold")
+                    .replace("падает со скоростью", "dropping at")
+                    .replace("растёт со скоростью", "rising at")
                     .replace("Ожидается", "Expected")
                     .replace(" в ", " at ")
                     .replace("скорость:", "rate:")
+                    .replace("ммоль/л/мин.", "mmol/L/min.")
+                    .replace("ммоль/л/мин", "mmol/L/min")
                     .replace("ммоль/мин", "mmol/min")
                     .replace("ммоль/л", "mmol/L")
                     .replace("Нет данных от сенсора более", "No CGM readings for")

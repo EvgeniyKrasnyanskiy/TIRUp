@@ -88,7 +88,8 @@ import java.util.Locale
 @Composable
 fun ReportsScreen(
     viewModel: ReportsViewModel,
-    onOpenSettings: () -> Unit = {}
+    onOpenSettings: () -> Unit = {},
+    onOpenHba1c: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -141,7 +142,7 @@ fun ReportsScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-        // Fixed Top Header with Menu
+        // Fixed Top Header with Menu and HbA1c Chip
         Surface(
             color = MaterialTheme.colorScheme.background,
             modifier = Modifier.fillMaxWidth()
@@ -160,7 +161,7 @@ fun ReportsScreen(
                     )
                 }
                 Spacer(modifier = Modifier.width(4.dp))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.reports_title),
                         style = MaterialTheme.typography.headlineMedium,
@@ -171,6 +172,31 @@ fun ReportsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+                val latestHba1c = state.userSettings.latestHba1cRecord
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFFEF4444).copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f)),
+                    modifier = Modifier.clickable { onOpenHba1c() }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text("🩸", fontSize = 13.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (latestHba1c != null) {
+                                String.format(Locale.US, "HbA1c: %.1f%%", latestHba1c.valuePercent)
+                            } else {
+                                "HbA1c: +"
+                            },
+                            color = Color(0xFFEF4444),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
         }

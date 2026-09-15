@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -263,32 +264,65 @@ private fun GitHubTirContributionGrid(
     isRu: Boolean
 ) {
     var selectedDetail by remember { mutableStateOf<String?>(null) }
+    var selectedDayTimestamp by remember { mutableStateOf<Long?>(null) }
 
-    // Prepare 28 days list (4 weeks of 7 days) ending today
+    // 28 days aligned to Monday..Sunday ending this current week
     val daysData = remember(dailySummaries, todayTirPercent) {
         val list = mutableListOf<DayCellData>()
         val cal = Calendar.getInstance()
+        val now = cal.timeInMillis
+
+        val currentDayOfWeek = (cal.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7 // 0=Mon..6=Sun
         cal.set(Calendar.HOUR_OF_DAY, 0)
         cal.set(Calendar.MINUTE, 0)
         cal.set(Calendar.SECOND, 0)
         cal.set(Calendar.MILLISECOND, 0)
         val todayStart = cal.timeInMillis
 
+        // Monday of current week
+        val currentWeekMonStart = todayStart - currentDayOfWeek * 86400000L
+        // Grid starts on Monday 3 weeks prior (28 days total: 4 full weeks)
+        val gridStartMon = currentWeekMonStart - 3 * 7 * 86400000L
+
         val dateFormat = SimpleDateFormat("d MMM", if (isRu) Locale("ru") else Locale.US)
 
-        for (i in 27 downTo 0) {
-            val dayStart = todayStart - i * 86400000L
-            val isToday = i == 0
+        // Mathematical guaranteed check for today
+        val millisPassedToday = (now - todayStart).coerceIn(0L, 86400000L)
+        val hoursPassed = millisPassedToday / 3600000.0
+        val hoursRemaining = 24.0 - hoursPassed
+        val effectiveTodayTir = todayTirPercent.coerceIn(0.0, 100.0)
+        val inRangeHoursSoFar = hoursPassed * (effectiveTodayTir / 100.0)
+        val minPossibleFinalTir = (inRangeHoursSoFar / 24.0) * 100.0
+        val maxPossibleFinalTir = ((inRangeHoursSoFar + hoursRemaining) / 24.0) * 100.0
+
+        val isGuaranteedWin = hoursPassed >= 4.0 && minPossibleFinalTir >= 70.0
+        val isGuaranteedLoss = maxPossibleFinalTir < 70.0
+
+        for (i in 0 until 28) {
+            val dayStart = gridStartMon + i * 86400000L
+            val isToday = abs(dayStart - todayStart) < 3600000L
+            val isFuture = dayStart > todayStart + 3600000L
+
             val matchingSummary = dailySummaries.find { abs(it.dateTimestamp - dayStart) < 43200000L }
 
-            val tir: Double? = if (isToday) {
-                if (todayTirPercent > 0.0) todayTirPercent else matchingSummary?.tirPercent
-            } else {
-                matchingSummary?.takeIf { it.readingsCount >= 10 }?.tirPercent
+            val tir: Double? = when {
+                isFuture -> null
+                isToday -> if (effectiveTodayTir > 0.0) effectiveTodayTir else matchingSummary?.tirPercent
+                else -> matchingSummary?.takeIf { it.readingsCount >= 10 }?.tirPercent
             }
 
             val dateLabel = dateFormat.format(Date(dayStart))
-            list.add(DayCellData(dayStart, dateLabel, tir, isToday))
+            list.add(
+                DayCellData(
+                    timestamp = dayStart,
+                    dateLabel = dateLabel,
+                    tir = tir,
+                    isToday = isToday,
+                    isFuture = isFuture,
+                    isGuaranteedWin = isToday && isGuaranteedWin,
+                    isGuaranteedLoss = isToday && isGuaranteedLoss
+                )
+            )
         }
         list
     }
@@ -359,34 +393,82 @@ private fun GitHubTirContributionGrid(
                             val index = week * 7 + dayInWeek
                             val cell = daysData.getOrNull(index)
                             if (cell != null) {
-                                val cellColor = when {
-                                    cell.tir == null -> Color(0xFF263238) // no data (dark slate)
-                                    cell.tir < 70.0 -> Color(0xFFEF4444)   // below target (red)
-                                    cell.tir < 85.0 -> Color(0xFF10B981)   // target reached (emerald)
-                                    else -> Color(0xFF059669)              // exceptional target (dark emerald)
-                                }
+                                val isSelected = selectedDayTimestamp == cell.timestamp
 
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
                                         .aspectRatio(1f)
                                         .clip(RoundedCornerShape(5.dp))
-                                        .background(cellColor)
                                         .then(
-                                            if (cell.isToday) Modifier.border(1.5.dp, Color.White, RoundedCornerShape(5.dp))
-                                            else Modifier
+                                            when {
+                                                cell.isFuture -> Modifier
+                                                    .background(Color(0xFF1E293B).copy(alpha = 0.35f))
+                                                    .border(0.8.dp, Color(0xFF334155).copy(alpha = 0.4f), RoundedCornerShape(5.dp))
+                                                cell.isToday -> Modifier
+                                                    .background(Color(0xFF1E293B))
+                                                    .border(
+                                                        width = if (isSelected) 2.dp else 1.5.dp,
+                                                        color = if (isSelected) ActionBlue else Color.White,
+                                                        shape = RoundedCornerShape(5.dp)
+                                                    )
+                                                else -> {
+                                                    val solidColor = when {
+                                                        cell.tir == null -> Color(0xFF263238)
+                                                        cell.tir < 70.0 -> Color(0xFFEF4444)
+                                                        cell.tir < 85.0 -> Color(0xFF10B981)
+                                                        else -> Color(0xFF059669)
+                                                    }
+                                                    Modifier
+                                                        .background(solidColor)
+                                                        .then(
+                                                            if (isSelected) Modifier.border(2.dp, ActionBlue, RoundedCornerShape(5.dp))
+                                                            else Modifier
+                                                        )
+                                                }
+                                            }
                                         )
                                         .clickable {
-                                            val tirText = if (cell.tir != null) "${cell.tir.toInt()}%" else (if (isRu) "нет данных" else "no data")
-                                            val statusText = when {
-                                                cell.tir == null -> ""
-                                                cell.tir >= 85.0 -> if (isRu) " (Отлично ⭐)" else " (Superb ⭐)"
-                                                cell.tir >= 70.0 -> if (isRu) " (В норме ✓)" else " (In target ✓)"
-                                                else -> if (isRu) " (Ниже цели)" else " (Below target)"
+                                            selectedDayTimestamp = cell.timestamp
+                                            if (cell.isFuture) {
+                                                selectedDetail = "${cell.dateLabel}: " + if (isRu) "впереди" else "upcoming"
+                                            } else if (cell.isToday) {
+                                                val tirVal = cell.tir?.toInt() ?: 0
+                                                val winLossStatus = when {
+                                                    cell.isGuaranteedWin -> if (isRu) " (Цель выполнена! ✓)" else " (Target reached! ✓)"
+                                                    cell.isGuaranteedLoss -> if (isRu) " (Ниже цели)" else " (Below target)"
+                                                    else -> if (isRu) " (В процессе, цель ≥70%)" else " (In progress, target ≥70%)"
+                                                }
+                                                val dayPrefix = if (isRu) "Сегодня (${cell.dateLabel})" else "Today (${cell.dateLabel})"
+                                                selectedDetail = "$dayPrefix: TIR $tirVal%$winLossStatus"
+                                            } else {
+                                                val tirText = if (cell.tir != null) "${cell.tir.toInt()}%" else (if (isRu) "нет данных" else "no data")
+                                                val statusText = when {
+                                                    cell.tir == null -> ""
+                                                    cell.tir >= 85.0 -> if (isRu) " (Отлично ⭐)" else " (Superb ⭐)"
+                                                    cell.tir >= 70.0 -> if (isRu) " (В норме ✓)" else " (In target ✓)"
+                                                    else -> if (isRu) " (Ниже цели)" else " (Below target)"
+                                                }
+                                                selectedDetail = "${cell.dateLabel}: TIR $tirText$statusText"
                                             }
-                                            selectedDetail = "${cell.dateLabel}: TIR $tirText$statusText"
+                                        },
+                                    contentAlignment = Alignment.BottomCenter
+                                ) {
+                                    // Two-tone vertical progress fill for today
+                                    if (cell.isToday && cell.tir != null) {
+                                        val fillFraction = (cell.tir / 100.0).toFloat().coerceIn(0f, 1f)
+                                        val fillColor = when {
+                                            cell.isGuaranteedWin || cell.tir >= 70.0 -> Color(0xFF10B981)
+                                            else -> Color(0xFFEF4444)
                                         }
-                                )
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .fillMaxHeight(fillFraction)
+                                                .background(fillColor)
+                                        )
+                                    }
+                                }
                             } else {
                                 Spacer(modifier = Modifier.weight(1f))
                             }
@@ -451,5 +533,8 @@ private data class DayCellData(
     val timestamp: Long,
     val dateLabel: String,
     val tir: Double?,
-    val isToday: Boolean
+    val isToday: Boolean,
+    val isFuture: Boolean = false,
+    val isGuaranteedWin: Boolean = false,
+    val isGuaranteedLoss: Boolean = false
 )

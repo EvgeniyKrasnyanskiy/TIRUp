@@ -632,7 +632,11 @@ fun MainPagerScaffold(
                 when (page) {
                     0 -> FocusScreen(viewModel = focusViewModel, onOpenSettings = onOpenSettings)
                     1 -> TrendsScreen(viewModel = trendsViewModel, onOpenSettings = { onOpenSettings(null) })
-                    2 -> ReportsScreen(viewModel = reportsViewModel, onOpenSettings = { onOpenSettings(null) })
+                    2 -> ReportsScreen(
+                        viewModel = reportsViewModel,
+                        onOpenSettings = { onOpenSettings(null) },
+                        onOpenHba1c = { onOpenSettings("hba1c") }
+                    )
                 }
             }
         }

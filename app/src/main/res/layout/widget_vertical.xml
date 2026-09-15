@@ -161,6 +161,44 @@
         android:textStyle="bold"
         android:visibility="gone" />
 
+    <!-- 7. Avg Glucose (Ср: 6.4) -->
+    <TextView
+        android:id="@+id/widget_avg_glucose"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/widget_badge_bg"
+        android:includeFontPadding="false"
+        android:paddingStart="5dp"
+        android:paddingTop="1dp"
+        android:paddingEnd="5dp"
+        android:paddingBottom="1dp"
+        android:singleLine="true"
+        android:text="Ср: 6.4"
+        android:textColor="#10B981"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- 8. TING / TITR (TING: 68%) -->
+    <TextView
+        android:id="@+id/widget_ting_score"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/widget_badge_bg"
+        android:includeFontPadding="false"
+        android:paddingStart="5dp"
+        android:paddingTop="1dp"
+        android:paddingEnd="5dp"
+        android:paddingBottom="1dp"
+        android:singleLine="true"
+        android:text="TING: 68%"
+        android:textColor="#38BDF8"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
     <!-- Flexible Bottom Spacer -->
     <FrameLayout
         android:layout_width="1dp"
