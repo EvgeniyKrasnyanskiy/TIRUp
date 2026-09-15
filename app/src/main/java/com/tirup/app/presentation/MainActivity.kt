@@ -132,7 +132,7 @@ class MainActivity : ComponentActivity() {
             object : androidx.lifecycle.ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                    return FocusViewModel(glucoseRepo, settingsRepo, applicationContext) as T
+                    return FocusViewModel(application, glucoseRepo, settingsRepo) as T
                 }
             }
         )[FocusViewModel::class.java]
@@ -162,7 +162,7 @@ class MainActivity : ComponentActivity() {
             object : androidx.lifecycle.ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                    return SettingsViewModel(applicationContext, settingsRepo, glucoseRepo, database) as T
+                    return SettingsViewModel(application, settingsRepo, glucoseRepo, database) as T
                 }
             }
         )[SettingsViewModel::class.java]

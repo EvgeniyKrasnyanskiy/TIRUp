@@ -1,6 +1,7 @@
 package com.tirup.app.presentation.settings
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tirup.app.data.backup.AutoBackupManager
 import com.tirup.app.data.local.AppDatabase
@@ -54,12 +55,13 @@ data class SettingsUiState(
 )
 
 class SettingsViewModel(
-    @android.annotation.SuppressLint("StaticFieldLeak")
-    private val context: android.content.Context,
+    application: Application,
     private val settingsRepository: SettingsRepository,
     private val glucoseRepository: GlucoseRepository,
     private val database: AppDatabase
-) : ViewModel() {
+) : AndroidViewModel(application) {
+
+    private val context: android.content.Context get() = getApplication<Application>()
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -157,11 +159,13 @@ class SettingsViewModel(
                     set(java.util.Calendar.SECOND, 0)
                     set(java.util.Calendar.MILLISECOND, 0)
                 }
-                val todayEntities = database.glucoseReadingDao().getReadingsBetweenSync(
-                    calendar.timeInMillis,
-                    System.currentTimeMillis() + 60_000L
-                )
-                val todayDomain = todayEntities.map { it.toDomain() }
+                val todayDomain = withContext(Dispatchers.IO) {
+                    val todayEntities = database.glucoseReadingDao().getReadingsBetweenSync(
+                        calendar.timeInMillis,
+                        System.currentTimeMillis() + 60_000L
+                    )
+                    todayEntities.map { it.toDomain() }
+                }
                 com.tirup.app.data.alert.GlucoseAlertManager.updateLockscreenNotification(
                     context = context,
                     latestReading = latest,
