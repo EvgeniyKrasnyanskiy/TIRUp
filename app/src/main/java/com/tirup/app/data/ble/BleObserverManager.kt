@@ -63,6 +63,9 @@ object BleObserverManager {
     @Volatile
     private var lastHandledTimestamp: Long = 0L
 
+    @Volatile
+    var isServiceRunning: Boolean = false
+
     /**
      * Synchronizes the scanner state with the user settings.
      * Starts scanning if role == OBSERVER, stops otherwise.
@@ -77,21 +80,50 @@ object BleObserverManager {
             val ble = userSettings.bleBridgeSettings
 
             if (ble.isEnabled && ble.role == BleBridgeRole.OBSERVER) {
-                try {
-                    val serviceIntent = Intent(context, BleObserverService::class.java)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        context.startForegroundService(serviceIntent)
-                    } else {
-                        context.startService(serviceIntent)
+                if (!isServiceRunning) {
+                    try {
+                        val serviceIntent = Intent(context, BleObserverService::class.java)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            context.startForegroundService(serviceIntent)
+                        } else {
+                            context.startService(serviceIntent)
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to start BleObserverService: ${e.message}")
                     }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to start BleObserverService: ${e.message}")
                 }
+                startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = isBoostActive)
+            } else {
+                if (isServiceRunning) {
+                    try {
+                        context.stopService(Intent(context, BleObserverService::class.java))
+                    } catch (_: Exception) {}
+                    isServiceRunning = false
+                }
+                stopScanningInternal()
+            }
+        }
+    }
+
+    /**
+     * Called directly by BleObserverService onStartCommand to ensure scanning is active
+     * without triggering startForegroundService recursion.
+     */
+    fun startScanningFromService(
+        context: Context,
+        settingsRepository: SettingsRepository,
+        glucoseRepository: GlucoseRepository
+    ) {
+        scope.launch {
+            val userSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
+            val ble = userSettings.bleBridgeSettings
+            if (ble.isEnabled && ble.role == BleBridgeRole.OBSERVER) {
                 startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = isBoostActive)
             } else {
                 try {
                     context.stopService(Intent(context, BleObserverService::class.java))
                 } catch (_: Exception) {}
+                isServiceRunning = false
                 stopScanningInternal()
             }
         }

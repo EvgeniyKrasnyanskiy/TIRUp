@@ -1,4 +1,4 @@
-﻿package com.tirup.app.data.ble
+package com.tirup.app.data.ble
 
 import android.app.Service
 import android.content.Intent
@@ -16,11 +16,13 @@ class BleObserverService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        BleObserverManager.isServiceRunning = true
         Log.i(TAG, "BleObserverService created")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "BleObserverService onStartCommand")
+        BleObserverManager.isServiceRunning = true
         val app = applicationContext as? TirupApplication
         val settingsRepo = app?.settingsRepository
         val glucoseRepo = app?.glucoseRepository
@@ -59,13 +61,14 @@ class BleObserverService : Service() {
             Log.w(TAG, "Failed to acquire observer WakeLock: ")
         }
 
-        BleObserverManager.syncWithSettings(applicationContext, settingsRepo, glucoseRepo)
+        BleObserverManager.startScanningFromService(applicationContext, settingsRepo, glucoseRepo)
 
         return START_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        BleObserverManager.isServiceRunning = false
         Log.i(TAG, "BleObserverService onDestroy")
         try {
             if (wakeLock?.isHeld == true) {
