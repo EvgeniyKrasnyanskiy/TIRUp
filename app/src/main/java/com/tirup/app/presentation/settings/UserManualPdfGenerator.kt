@@ -194,8 +194,8 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Семейный BLE-мост (без интернета, радиус 10–15м)" else "Family BLE Bridge (100% Offline, 10–15m Range)",
                         if (isRu) "BLE-мост" else "BLE Bridge",
-                        if (isRu) "Прямая связь родитель–ребёнок по BLE (импульс 12–15с) без сопряжения и интернета с защитой Family PIN. Для 100% стабильности в фоне держите включённым «Постоянный статус» (Foreground Service)."
-                        else "Direct parent-child link over BLE (12-15s bursts) without pairing or internet, secured by Family PIN. For 24/7 background stability keep ongoing 'Lockscreen Status' notification enabled."
+                        if (isRu) "Прямая связь родитель–ребёнок по BLE (импульс 12–15с) без сопряжения и интернета с защитой Family PIN. Для 100% стабильности в фоне держите включённым «Уведомление на экране блокировки» (Foreground Service)."
+                        else "Direct parent-child link over BLE (12-15s bursts) without pairing or internet, secured by Family PIN. For 24/7 background stability keep 'Lockscreen Notification' enabled."
                     )
                 ),
                 cardHeight = 41f
