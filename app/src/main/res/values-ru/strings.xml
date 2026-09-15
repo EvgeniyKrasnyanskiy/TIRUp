@@ -53,7 +53,7 @@
     <string name="range_very_high">Очень высокий (≥14.0)</string>
 
     <!-- Reports -->
-    <string name="reports_title">Отчёт</string>
+    <string name="reports_title">Мед. отчёты</string>
     <string name="reports_subtitle">Стандартизированный отчёт</string>
     <string name="report_live_title">Текущий отчёт (Трансляция)</string>
     <string name="report_historical_title">Отчёт из файла xDrip+</string>
