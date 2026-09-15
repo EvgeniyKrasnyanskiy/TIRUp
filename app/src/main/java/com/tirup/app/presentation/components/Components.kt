@@ -1,12 +1,14 @@
 package com.tirup.app.presentation.components
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -161,35 +164,54 @@ fun StreakBadge(
 
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = PrimaryEmerald.copy(alpha = 0.15f),
-        border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.4f)),
+        color = if (streakDays > 0) PrimaryEmerald.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(
+            1.dp,
+            if (streakDays > 0) PrimaryEmerald.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+        ),
         modifier = if (onClick != null) Modifier.clickable { onClick() } else Modifier
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
-                .animateContentSize()
-                .padding(horizontal = 8.dp, vertical = 5.dp)
+                .widthIn(min = 34.dp)
+                .height(28.dp)
+                .padding(horizontal = 8.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.LocalFireDepartment,
-                contentDescription = null,
-                tint = if (streakDays > 0) Color(0xFFF97316) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                modifier = Modifier.size(16.dp)
-            )
-            AnimatedVisibility(
-                visible = showNumber && streakDays > 0,
-                enter = fadeIn(tween(350)) + expandHorizontally(tween(350)),
-                exit = fadeOut(tween(350)) + shrinkHorizontally(tween(350))
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(modifier = Modifier.width(2.dp))
-                    Text(
-                        text = "$streakDays",
-                        color = PrimaryEmerald,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
+            if (streakDays == 0) {
+                Icon(
+                    imageVector = Icons.Default.LocalFireDepartment,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.size(16.dp)
+                )
+            } else {
+                AnimatedContent(
+                    targetState = showNumber,
+                    transitionSpec = {
+                        (slideInVertically(animationSpec = tween(380)) { height -> height } + fadeIn(animationSpec = tween(380)))
+                            .togetherWith(
+                                slideOutVertically(animationSpec = tween(380)) { height -> -height } + fadeOut(animationSpec = tween(380))
+                            )
+                    },
+                    label = "streakBadgeSlideUpAnim"
+                ) { isNumber ->
+                    if (isNumber) {
+                        Text(
+                            text = "$streakDays",
+                            color = PrimaryEmerald,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.LocalFireDepartment,
+                            contentDescription = null,
+                            tint = Color(0xFFF97316),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
         }

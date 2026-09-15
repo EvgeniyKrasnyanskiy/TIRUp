@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -3869,12 +3870,38 @@ private fun Hba1cHistoryDialog(
     onExportPdf: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     var valueText by remember { mutableStateOf("") }
     var dateText by remember { mutableStateOf(SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date())) }
     var labText by remember { mutableStateOf("") }
     var notesText by remember { mutableStateOf("") }
     var inputError by remember { mutableStateOf<String?>(null) }
     var showDeleteConfirmId by remember { mutableStateOf<Long?>(null) }
+
+    val openDatePicker = {
+        val calendar = Calendar.getInstance()
+        val currentParsed = try {
+            SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).parse(dateText.trim())
+                ?: SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(dateText.trim())
+        } catch (_: Exception) { null }
+        if (currentParsed != null) {
+            calendar.time = currentParsed
+        }
+        val year = calendar.get(Calendar.YEAR)
+        val month = calendar.get(Calendar.MONTH)
+        val day = calendar.get(Calendar.DAY_OF_MONTH)
+
+        android.app.DatePickerDialog(
+            context,
+            { _, y, m, d ->
+                dateText = String.format(Locale.getDefault(), "%02d.%02d.%04d", d, m + 1, y)
+                inputError = null
+            },
+            year,
+            month,
+            day
+        ).show()
+    }
 
     val sortedRecords = remember(records) { records.sortedByDescending { it.timestamp } }
     val latestRecord = sortedRecords.firstOrNull()
@@ -4086,6 +4113,8 @@ private fun Hba1cHistoryDialog(
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
+                        val placeholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -4097,30 +4126,45 @@ private fun Hba1cHistoryDialog(
                                     inputError = null
                                 },
                                 label = { Text("HbA1c %") },
-                                placeholder = { Text("6.4") },
+                                placeholder = { Text("6.4", color = placeholderColor) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 singleLine = true,
                                 modifier = Modifier.weight(1f)
                             )
 
-                            OutlinedTextField(
-                                value = dateText,
-                                onValueChange = {
-                                    dateText = it
-                                    inputError = null
-                                },
-                                label = { Text(if (isRu) "Дата" else "Date") },
-                                placeholder = { Text("14.09.2026") },
-                                singleLine = true,
-                                modifier = Modifier.weight(1.3f)
-                            )
+                            Box(modifier = Modifier.weight(1.3f)) {
+                                OutlinedTextField(
+                                    value = dateText,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text(if (isRu) "Дата" else "Date") },
+                                    placeholder = { Text("14.09.2026", color = placeholderColor) },
+                                    trailingIcon = {
+                                        IconButton(onClick = openDatePicker) {
+                                            Icon(
+                                                imageVector = Icons.Default.CalendarToday,
+                                                contentDescription = if (isRu) "Выбрать дату" else "Pick date",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .matchParentSize()
+                                        .clickable(onClick = openDatePicker)
+                                )
+                            }
                         }
 
                         OutlinedTextField(
                             value = labText,
                             onValueChange = { labText = it },
                             label = { Text(if (isRu) "Лаборатория (необязательно)" else "Laboratory (optional)") },
-                            placeholder = { Text(if (isRu) "Инвитро, Гемотест..." else "Lab name") },
+                            placeholder = { Text(if (isRu) "Инвитро, Гемотест..." else "Lab name", color = placeholderColor) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -4129,7 +4173,7 @@ private fun Hba1cHistoryDialog(
                             value = notesText,
                             onValueChange = { notesText = it },
                             label = { Text(if (isRu) "Заметка (необязательно)" else "Note (optional)") },
-                            placeholder = { Text(if (isRu) "Натощак / плановый контроль" else "Routine check") },
+                            placeholder = { Text(if (isRu) "Натощак / плановый контроль" else "Routine check", color = placeholderColor) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )

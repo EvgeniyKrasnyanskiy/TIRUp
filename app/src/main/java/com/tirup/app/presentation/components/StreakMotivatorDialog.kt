@@ -404,12 +404,16 @@ private fun GitHubTirContributionGrid(
                                             when {
                                                 cell.isFuture -> Modifier
                                                     .background(Color(0xFF1E293B).copy(alpha = 0.35f))
-                                                    .border(0.8.dp, Color(0xFF334155).copy(alpha = 0.4f), RoundedCornerShape(5.dp))
+                                                    .border(
+                                                        width = if (isSelected) 2.5.dp else 0.8.dp,
+                                                        color = if (isSelected) Color(0xFFFF7A00) else Color(0xFF334155).copy(alpha = 0.4f),
+                                                        shape = RoundedCornerShape(5.dp)
+                                                    )
                                                 cell.isToday -> Modifier
                                                     .background(Color(0xFF1E293B))
                                                     .border(
-                                                        width = if (isSelected) 2.dp else 1.5.dp,
-                                                        color = if (isSelected) ActionBlue else Color.White,
+                                                        width = if (isSelected) 2.5.dp else 1.5.dp,
+                                                        color = if (isSelected) Color(0xFFFF7A00) else Color.White,
                                                         shape = RoundedCornerShape(5.dp)
                                                     )
                                                 else -> {
@@ -422,7 +426,7 @@ private fun GitHubTirContributionGrid(
                                                     Modifier
                                                         .background(solidColor)
                                                         .then(
-                                                            if (isSelected) Modifier.border(2.dp, ActionBlue, RoundedCornerShape(5.dp))
+                                                            if (isSelected) Modifier.border(2.5.dp, Color(0xFFFF7A00), RoundedCornerShape(5.dp))
                                                             else Modifier
                                                         )
                                                 }

@@ -967,10 +967,36 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         }
 
                         // Auto-recover CGM sensor installation timestamp if user logged "сенсор" / "sensor" in xDrip
+                        // Explicitly filters out warnings, expiration notices, alarms, and error alerts
                         val sensorTreatment = treatments
                             .filter { t ->
-                                val n = t.notes?.lowercase() ?: ""
-                                n.contains("сенсор") || n.contains("sensor") || n.contains("датчик") || n.contains("libre") || n.contains("dexcom")
+                                val n = t.notes?.lowercase()?.trim() ?: ""
+                                if (n.isBlank()) return@filter false
+
+                                // 1. Exclude warnings, alerts, alarms, countdowns and expiration notices
+                                val isWarningOrNotice = n.contains("warning") ||
+                                        n.contains("alert") ||
+                                        n.contains("alarm") ||
+                                        n.contains("закончится") ||
+                                        n.contains("истек") ||
+                                        n.contains("истечёт") ||
+                                        n.contains("осталось") ||
+                                        n.contains("через") ||
+                                        n.contains("error") ||
+                                        n.contains("ошибка")
+
+                                if (isWarningOrNotice) return@filter false
+
+                                // 2. Match sensor change/start keywords or exact tags
+                                val hasSensorWord = n.contains("сенсор") || n.contains("sensor") || n.contains("датчик") ||
+                                        n.contains("libre") || n.contains("либр") || n.contains("dexcom") || n.contains("декс")
+
+                                val hasActionWord = n.contains("старт") || n.contains("пуск") || n.contains("start") ||
+                                        n.contains("новый") || n.contains("new") || n.contains("замена") || n.contains("change") ||
+                                        n.contains("установ") || n.contains("install") || n.contains("смена")
+
+                                (hasSensorWord && hasActionWord) ||
+                                        n in listOf("сенсор", "sensor", "датчик", "новый сенсор", "sensor start", "sensor change", "замена сенсора", "смена сенсора")
                             }
                             .maxByOrNull { it.timestamp }
 
