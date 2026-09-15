@@ -306,6 +306,41 @@ fun DailyGlucoseChart(
 
     val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
 
+    val visibleMaxMmol = remember(todayReadings, windowStartMinute, visibleMinutes) {
+        todayReadings.filter { r ->
+            val m = (r.timestamp - startOfDay) / 60000f
+            m in (windowStartMinute - 10f)..(windowStartMinute + visibleMinutes + 10f)
+        }.maxOfOrNull { it.valueMmol } ?: 10.0
+    }
+
+    val visibleReadings = remember(todayReadings, windowStartMinute, visibleMinutes) {
+        todayReadings.filter { r ->
+            val m = (r.timestamp - startOfDay) / 60000f
+            m in (windowStartMinute - 20f)..(windowStartMinute + visibleMinutes + 20f)
+        }
+    }
+
+    val visibleInsulinClusters = remember(insulinClusters, windowStartMinute, visibleMinutes) {
+        insulinClusters.filter { cl ->
+            val m = (cl.timestamp - startOfDay) / 60000f
+            m in (windowStartMinute - 15f)..(windowStartMinute + visibleMinutes + 15f)
+        }
+    }
+
+    val visibleCarbsClusters = remember(carbsClusters, windowStartMinute, visibleMinutes) {
+        carbsClusters.filter { cl ->
+            val m = (cl.timestamp - startOfDay) / 60000f
+            m in (windowStartMinute - 15f)..(windowStartMinute + visibleMinutes + 15f)
+        }
+    }
+
+    val visibleNotesClusters = remember(notesClusters, windowStartMinute, visibleMinutes) {
+        notesClusters.filter { cl ->
+            val m = (cl.timestamp - startOfDay) / 60000f
+            m in (windowStartMinute - 15f)..(windowStartMinute + visibleMinutes + 15f)
+        }
+    }
+
     BentoCard(
         modifier = modifier.fillMaxWidth(),
         padding = 12.dp
@@ -737,6 +772,62 @@ fun DailyGlucoseChart(
                 }
             }
 
+            val gapPaint = remember(onSurfaceVariant) {
+                android.graphics.Paint().apply {
+                    color = onSurfaceVariant.copy(alpha = 0.7f).toArgb()
+                    textSize = 20f
+                    isAntiAlias = true
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            }
+
+            val insulinPaint = remember {
+                android.graphics.Paint().apply {
+                    color = android.graphics.Color.WHITE
+                    textSize = 20f
+                    isAntiAlias = true
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            }
+
+            val carbsPaint = remember {
+                android.graphics.Paint().apply {
+                    color = android.graphics.Color.WHITE
+                    textSize = 20f
+                    isAntiAlias = true
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            }
+
+            val notePaint = remember {
+                android.graphics.Paint().apply {
+                    color = android.graphics.Color.WHITE
+                    textSize = 20f
+                    isAntiAlias = true
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            }
+
+            val yLabelPaint = remember(onSurfaceVariant) {
+                android.graphics.Paint().apply {
+                    color = onSurfaceVariant.copy(alpha = 0.8f).toArgb()
+                    textSize = 22f
+                    isAntiAlias = true
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                }
+            }
+
+            val dash6_6 = remember { androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f) }
+            val dash4_8 = remember { androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4f, 8f), 0f) }
+            val dash8_4 = remember { androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(8f, 4f), 0f) }
+            val dash6_4 = remember { androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f) }
+
+            val solidPath = remember { androidx.compose.ui.graphics.Path() }
+            val forecastPath = remember { androidx.compose.ui.graphics.Path() }
+
             // Interactive Chart Canvas with Pinch-to-Zoom and Horizontal Drag
             Box(
                 modifier = Modifier
@@ -845,10 +936,6 @@ fun DailyGlucoseChart(
                     if (chartRight <= 0 || chartHeight <= 0) return@Canvas
 
                     // Y scale: max glucose value on screen (minimum 15.0 mmol/L)
-                    val visibleMaxMmol = todayReadings.filter { r ->
-                        val m = (r.timestamp - startOfDay) / 60000f
-                        m in (windowStartMinute - 10f)..(windowStartMinute + visibleMinutes + 10f)
-                    }.maxOfOrNull { it.valueMmol } ?: 10.0
                     val maxMmol = max(16.0, visibleMaxMmol + 1.5).toFloat()
 
                     fun yForMmol(mmol: Double): Float {
@@ -869,22 +956,20 @@ fun DailyGlucoseChart(
                         size = Size(chartRight, (yTirLow - yTirHigh).coerceAtLeast(0f))
                     )
 
-                    val dashEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f)
-
                     // Target range threshold lines
                     drawLine(
                         color = ColorLow.copy(alpha = 0.45f),
                         start = Offset(0f, yTirLow),
                         end = Offset(chartRight, yTirLow),
                         strokeWidth = 1.5f,
-                        pathEffect = dashEffect
+                        pathEffect = dash6_6
                     )
                     drawLine(
                         color = ColorHigh.copy(alpha = 0.45f),
                         start = Offset(0f, yTirHigh),
                         end = Offset(chartRight, yTirHigh),
                         strokeWidth = 1.5f,
-                        pathEffect = dashEffect
+                        pathEffect = dash6_6
                     )
 
                     // 7.8 Tight range line (if visible)
@@ -894,7 +979,7 @@ fun DailyGlucoseChart(
                         start = Offset(0f, yTing),
                         end = Offset(chartRight, yTing),
                         strokeWidth = 1.0f,
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 8f), 0f)
+                        pathEffect = dash4_8
                     )
 
                     // 2. Vertical Time Grid & Bottom Labels
@@ -943,7 +1028,7 @@ fun DailyGlucoseChart(
                             start = Offset(xNow, chartTop),
                             end = Offset(xNow, chartBottom),
                             strokeWidth = 2.0f,
-                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 4f), 0f)
+                            pathEffect = dash8_4
                         )
                         drawCircle(
                             color = PrimaryEmerald,
@@ -953,14 +1038,9 @@ fun DailyGlucoseChart(
                     }
 
                     // 4. Draw Glucose Trend Line & Points
-                    val visibleReadings = todayReadings.filter { r ->
-                        val m = (r.timestamp - startOfDay) / 60000f
-                        m in (windowStartMinute - 20f)..(windowStartMinute + visibleMinutes + 20f)
-                    }
-
                     if (visibleReadings.isNotEmpty()) {
                         // Draw continuous segments and dashed gap connections (>20 min)
-                        val solidPath = Path()
+                        solidPath.reset()
                         var solidStarted = false
                         var prevReading: GlucoseReading? = null
 
@@ -993,7 +1073,7 @@ fun DailyGlucoseChart(
                                         start = Offset(prevX, prevY),
                                         end = Offset(x, y),
                                         strokeWidth = 2.0f,
-                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f)
+                                        pathEffect = dash6_6
                                     )
 
                                     // If gap is wide enough on screen, draw subtle badge in middle
@@ -1006,12 +1086,6 @@ fun DailyGlucoseChart(
                                             val minPart = durMin % 60
                                             if (minPart > 0) "${h}ч ${minPart}м" else "${h}ч"
                                         } else "${durMin}м"
-                                        val gapPaint = Paint().apply {
-                                            color = onSurfaceVariant.copy(alpha = 0.7f).toArgb()
-                                            textSize = 20f
-                                            isAntiAlias = true
-                                            textAlign = Paint.Align.CENTER
-                                        }
                                         drawContext.canvas.nativeCanvas.drawText(
                                             "❓ $gapLabel",
                                             midX,
@@ -1086,7 +1160,7 @@ fun DailyGlucoseChart(
                             val latestY = yForMmol(latestActual.valueMmol)
 
                             val forecastColor = Color(0xFFA855F7) // Purple
-                            val forecastPath = Path()
+                            forecastPath.reset()
                             forecastPath.moveTo(latestX, latestY)
 
                             forecastPoints.forEach { fp ->
@@ -1102,7 +1176,7 @@ fun DailyGlucoseChart(
                                 color = forecastColor.copy(alpha = 0.75f),
                                 style = androidx.compose.ui.graphics.drawscope.Stroke(
                                     width = 2.0f,
-                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f)
+                                    pathEffect = dash6_6
                                 )
                             )
 
@@ -1135,27 +1209,8 @@ fun DailyGlucoseChart(
                     }
 
                     // 4.1. Draw Treatments Overlay (Insulin 💉 and Carbs 🍽️)
-                    val insulinPaint = Paint().apply {
-                        color = android.graphics.Color.WHITE
-                        textSize = 20f
-                        isAntiAlias = true
-                        typeface = Typeface.DEFAULT_BOLD
-                        textAlign = Paint.Align.CENTER
-                    }
-                    val carbsPaint = Paint().apply {
-                        color = android.graphics.Color.WHITE
-                        textSize = 20f
-                        isAntiAlias = true
-                        typeface = Typeface.DEFAULT_BOLD
-                        textAlign = Paint.Align.CENTER
-                    }
 
                     // 4.1.1. Draw Insulin Clusters (Top Area with Staggering)
-                    val visibleInsulinClusters = insulinClusters.filter { cl ->
-                        val m = (cl.timestamp - startOfDay) / 60000f
-                        m in (windowStartMinute - 15f)..(windowStartMinute + visibleMinutes + 15f)
-                    }
-
                     var lastInsulinRight0 = -Float.MAX_VALUE
                     var lastInsulinRight1 = -Float.MAX_VALUE
 
@@ -1193,7 +1248,7 @@ fun DailyGlucoseChart(
                                     start = Offset(x, chartTop),
                                     end = Offset(x, badgeTop),
                                     strokeWidth = if (isSelected) 2.5f else 1.5f,
-                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
+                                    pathEffect = dash6_4
                                 )
                             }
                             drawLine(
@@ -1201,7 +1256,7 @@ fun DailyGlucoseChart(
                                 start = Offset(x, badgeTop + badgeH),
                                 end = Offset(x, chartBottom),
                                 strokeWidth = if (isSelected) 2.5f else 1.5f,
-                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
+                                pathEffect = dash6_4
                             )
 
                             // Glow if selected
@@ -1233,11 +1288,6 @@ fun DailyGlucoseChart(
                     }
 
                     // 4.1.2. Draw Carbs Clusters (Bottom Area with Staggering)
-                    val visibleCarbsClusters = carbsClusters.filter { cl ->
-                        val m = (cl.timestamp - startOfDay) / 60000f
-                        m in (windowStartMinute - 15f)..(windowStartMinute + visibleMinutes + 15f)
-                    }
-
                     var lastCarbsRight0 = -Float.MAX_VALUE
                     var lastCarbsRight1 = -Float.MAX_VALUE
 
@@ -1280,7 +1330,7 @@ fun DailyGlucoseChart(
                                     start = Offset(x, chartTop + 10f),
                                     end = Offset(x, badgeTop),
                                     strokeWidth = if (isSelected) 2.5f else 1.5f,
-                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
+                                    pathEffect = dash6_4
                                 )
                                 if (level > 0) {
                                     drawLine(
@@ -1288,7 +1338,7 @@ fun DailyGlucoseChart(
                                         start = Offset(x, badgeTop + badgeH),
                                         end = Offset(x, chartBottom),
                                         strokeWidth = if (isSelected) 2.5f else 1.5f,
-                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
+                                        pathEffect = dash6_4
                                     )
                                 }
                             }
@@ -1322,19 +1372,6 @@ fun DailyGlucoseChart(
                     }
 
                     // 4.1.3. Draw Note Clusters (Top Area with Staggering)
-                    val visibleNotesClusters = notesClusters.filter { cl ->
-                        val m = (cl.timestamp - startOfDay) / 60000f
-                        m in (windowStartMinute - 15f)..(windowStartMinute + visibleMinutes + 15f)
-                    }
-
-                    val notePaint = Paint().apply {
-                        color = android.graphics.Color.WHITE
-                        textSize = 20f
-                        isAntiAlias = true
-                        typeface = Typeface.DEFAULT_BOLD
-                        textAlign = Paint.Align.CENTER
-                    }
-
                     var lastNoteRight0 = -Float.MAX_VALUE
                     var lastNoteRight1 = -Float.MAX_VALUE
 
@@ -1378,7 +1415,7 @@ fun DailyGlucoseChart(
                                     start = Offset(x, chartTop),
                                     end = Offset(x, badgeTop),
                                     strokeWidth = if (isSelected) 2.5f else 1.5f,
-                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
+                                    pathEffect = dash6_4
                                 )
                             }
                             drawLine(
@@ -1386,7 +1423,7 @@ fun DailyGlucoseChart(
                                 start = Offset(x, badgeTop + badgeH),
                                 end = Offset(x, chartBottom),
                                 strokeWidth = if (isSelected) 2.5f else 1.5f,
-                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
+                                pathEffect = dash6_4
                             )
 
                             // Glow if selected
@@ -1418,12 +1455,6 @@ fun DailyGlucoseChart(
                     }
 
                     // 5. Y-Axis Value Labels on the right side
-                    val yLabelPaint = Paint().apply {
-                        color = onSurfaceVariant.copy(alpha = 0.8f).toArgb()
-                        textSize = 22f
-                        isAntiAlias = true
-                        typeface = Typeface.DEFAULT_BOLD
-                    }
 
                     val targetsToDraw = listOf(
                         Pair(targetRanges.tirLowMmol, ColorLow),

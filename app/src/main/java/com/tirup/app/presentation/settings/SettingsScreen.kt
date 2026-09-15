@@ -317,14 +317,6 @@ fun SettingsScreen(
     val boostRemaining by viewModel.bleBoostRemaining.collectAsState()
     val latestReading by viewModel.latestReading.collectAsState()
 
-    var currentTimeMs by remember { mutableStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(1000L)
-            currentTimeMs = System.currentTimeMillis()
-        }
-    }
-
     var testSmsCooldownSec by remember { mutableStateOf(0) }
     LaunchedEffect(testSmsCooldownSec) {
         if (testSmsCooldownSec > 0) {
@@ -1532,22 +1524,9 @@ fun SettingsScreen(
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = MaterialTheme.colorScheme.onSurface
                                             )
-                                            val nextTimerStr = if (latestReading != null) {
-                                                val nextDueMs = latestReading!!.timestamp + 5 * 60 * 1000L
-                                                val diffSec = ((nextDueMs - currentTimeMs) / 1000L).coerceAtLeast(0L)
-                                                if (diffSec > 0) {
-                                                    String.format(java.util.Locale.US, "%d:%02d", diffSec / 60, diffSec % 60)
-                                                } else {
-                                                    if (isRu) "с минуты на минуту" else "any moment"
-                                                }
-                                            } else {
-                                                if (isRu) "ожидание замера" else "awaiting reading"
-                                            }
-                                            Text(
-                                                text = if (isRu) "Следующий импульс через ~$nextTimerStr (при замере)"
-                                                       else "Next pulse in ~$nextTimerStr (upon reading)",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            BleCountdownText(
+                                                latestReadingTimestamp = latestReading?.timestamp,
+                                                isRu = isRu
                                             )
                                         }
                                     }
@@ -5925,6 +5904,37 @@ private fun getAppVersionName(context: android.content.Context): String {
     } catch (_: Exception) {
         "2.0.5"
     }
+}
+
+@Composable
+private fun BleCountdownText(
+    latestReadingTimestamp: Long?,
+    isRu: Boolean
+) {
+    val nextTimerStr = if (latestReadingTimestamp != null) {
+        val nextDueMs = latestReadingTimestamp + 5 * 60 * 1000L
+        var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
+        LaunchedEffect(latestReadingTimestamp) {
+            while (true) {
+                delay(1000L)
+                nowMs = System.currentTimeMillis()
+            }
+        }
+        val diffSec = ((nextDueMs - nowMs) / 1000L).coerceAtLeast(0L)
+        if (diffSec > 0) {
+            String.format(java.util.Locale.US, "%d:%02d", diffSec / 60, diffSec % 60)
+        } else {
+            if (isRu) "с минуты на минуту" else "any moment"
+        }
+    } else {
+        if (isRu) "ожидание замера" else "awaiting reading"
+    }
+    Text(
+        text = if (isRu) "Следующий импульс через ~$nextTimerStr (при замере)"
+               else "Next pulse in ~$nextTimerStr (upon reading)",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
 
 
