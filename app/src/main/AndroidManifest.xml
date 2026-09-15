@@ -80,6 +80,10 @@
                 <action android:name="com.eveningoutpost.dexdrip.watch.wearintegration.BROADCAST_SERVICE_SENDER" />
                 <action android:name="info.nightscout.androidaps.status" />
                 <action android:name="com.eveningoutpost.dexdrip.TREATMENT" />
+                <action android:name="com.eveningoutpost.dexdrip.NEW_TREATMENT" />
+                <action android:name="com.eveningoutpost.dexdrip.ACTION_NEW_TREATMENT" />
+                <action android:name="info.nightscout.client.NEW_TREATMENT" />
+                <action android:name="info.nightscout.android.NEW_TREATMENT" />
                 <action android:name="info.nightscout.androidaps.TREATMENT" />
                 <action android:name="info.nightscout.androidaps.treatment" />
             </intent-filter>
