@@ -1,7 +1,8 @@
 package com.tirup.app.presentation.focus
 
+import android.app.Application
 import android.content.Context
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tirup.app.data.alert.ActiveAlertBanner
 import com.tirup.app.data.alert.AlertTier
@@ -39,11 +40,12 @@ private data class GlucoseDataTuple(
 )
 
 class FocusViewModel(
+    application: Application,
     private val glucoseRepository: GlucoseRepository,
-    private val settingsRepository: SettingsRepository,
-    @android.annotation.SuppressLint("StaticFieldLeak")
-    private val context: Context? = null
-) : ViewModel() {
+    private val settingsRepository: SettingsRepository
+) : AndroidViewModel(application) {
+
+    private val context: Context get() = getApplication<Application>()
 
     private val _uiState = MutableStateFlow(FocusUiState(isLoading = true))
     val uiState: StateFlow<FocusUiState> = _uiState.asStateFlow()
@@ -210,7 +212,7 @@ class FocusViewModel(
                     settingsRepository.updateSettings(updatedBest)
                 }
 
-                if (context != null && latest != null && newState.userSettings.isLockscreenNotificationEnabled) {
+                if (latest != null && newState.userSettings.isLockscreenNotificationEnabled) {
                     GlucoseAlertManager.updateLockscreenNotification(
                         context = context,
                         latestReading = latest,
@@ -325,9 +327,7 @@ class FocusViewModel(
             if (!newEnabled) {
                 com.tirup.app.data.ble.BleBroadcaster.stopAdvertising()
             }
-            if (context != null) {
-                com.tirup.app.data.ble.BleObserverManager.syncWithSettings(context, settingsRepository, glucoseRepository)
-            }
+            com.tirup.app.data.ble.BleObserverManager.syncWithSettings(context, settingsRepository, glucoseRepository)
         }
     }
 
