@@ -55,6 +55,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
@@ -479,8 +480,12 @@ fun FocusScreen(
                 val filtered = state.recentReadings.filter { it.timestamp >= startOfDay }
                 if (filtered.isNotEmpty()) filtered else state.recentReadings
             }
-            val minVal = if (todayOnlyReadings.isNotEmpty()) todayOnlyReadings.minOf { it.valueMmol } else 0.0
-            val maxVal = if (todayOnlyReadings.isNotEmpty()) todayOnlyReadings.maxOf { it.valueMmol } else 0.0
+            val minVal = remember(todayOnlyReadings) {
+                if (todayOnlyReadings.isNotEmpty()) todayOnlyReadings.minOf { it.valueMmol } else 0.0
+            }
+            val maxVal = remember(todayOnlyReadings) {
+                if (todayOnlyReadings.isNotEmpty()) todayOnlyReadings.maxOf { it.valueMmol } else 0.0
+            }
 
             val meanValStr = if (state.statistics.meanMmol > 0.0) {
                 if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.1f", state.statistics.meanMmol)
@@ -2663,15 +2668,15 @@ private fun DailyAlertLogsDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(logs.size) { idx ->
-                        val entry = logs[idx]
-                        val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(entry.timestamp))
+                    val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(items = logs, key = { it.id }) { entry ->
+                            val timeStr = timeFormat.format(Date(entry.timestamp))
                         val (tierLabel, tierColor) = when (entry.tier) {
                             AlertTier.CRITICAL -> Pair(if (isRu) "🚨 КРИТИЧЕСКИЙ" else "🚨 CRITICAL", ColorVeryLow)
                             AlertTier.MAIN -> Pair(if (isRu) "🔔 ОСНОВНОЙ" else "🔔 MAIN", ColorHigh)

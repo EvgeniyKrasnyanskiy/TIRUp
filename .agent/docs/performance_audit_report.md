@@ -7,16 +7,16 @@
 
 ## Сводная таблица проблем
 
-| # | Критичность | Категория | Файл | Краткое описание |
-|---|---|---|---|---|
-| 1 | 🔴 **Critical** | UI Jank + GC Pressure | [DailyGlucoseChart.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/focus/DailyGlucoseChart.kt#L848-L1450) | Аллокации `Paint()`, `Path()`, `PathEffect`, `floatArrayOf`, фильтрация коллекций **внутри Canvas DrawScope** на каждый кадр (60–120 FPS) |
-| 2 | 🔴 **Critical** | Battery Drain | [SettingsScreen.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/settings/SettingsScreen.kt#L320-L326) | Бесконечный `while(true) { delay(1000) }` в корне экрана → полная рекомпозиция ~6000 строк каждую секунду |
-| 3 | 🟠 **High** | Memory Leak | [FocusViewModel.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/focus/FocusViewModel.kt#L41-L46), [SettingsViewModel.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/settings/SettingsViewModel.kt#L56-L62) | Удержание `Context` (Activity) в ViewModel с подавлением `@SuppressLint("StaticFieldLeak")` |
-| 4 | 🟠 **High** | ANR / Main Thread IO | [SettingsViewModel.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/settings/SettingsViewModel.kt#L147-L175) | Синхронный Room DAO `getReadingsBetweenSync` на `Dispatchers.Main` |
-| 5 | 🟠 **High** | UI Jank | [ReportsScreen.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/reports/ReportsScreen.kt#L258-L263), [FocusScreen.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/focus/FocusScreen.kt#L482-L483) | `minOfOrNull`/`maxOfOrNull` по тысячам точек + создание `SimpleDateFormat` без `remember` |
-| 6 | 🟡 **Medium** | UI Jank | [FocusScreen.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/focus/FocusScreen.kt#L2672-L2673) | `items(logs.size)` без `key` в LazyColumn |
-| 7 | 🟡 **Medium** | Stale UI | [FocusScreen.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/focus/FocusScreen.kt#L196-L203), [FocusScreen.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/focus/FocusScreen.kt#L1865-L1870) | Неполные ключи `remember` (пропущены `unit`, `durationDays`) |
-| 8 | 🟡 **Medium** | IPC Overhead | [FocusViewModel.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/focus/FocusViewModel.kt#L213-L221) | `NotificationManager.notify()` при любом изменении настроек, даже без обновления сахара |
+| # | Статус | Критичность | Категория | Файл | Краткое описание |
+|---|---|---|---|---|---|
+| 1 | ✅ | 🔴 **Critical** | UI Jank + GC Pressure | DailyGlucoseChart.kt | Paint/Path/PathEffect/filter вынесены из Canvas в `remember` |
+| 2 | ✅ | 🔴 **Critical** | Battery Drain | SettingsScreen.kt | Таймер изолирован в `BleCountdownText` composable |
+| 3 | ✅ | 🟠 **High** | Memory Leak | FocusViewModel.kt, SettingsViewModel.kt | Миграция на `AndroidViewModel`, убран `@SuppressLint` |
+| 4 | ✅ | 🟠 **High** | ANR / Main Thread IO | SettingsViewModel.kt | `getReadingsBetweenSync` обёрнут в `withContext(Dispatchers.IO)` |
+| 5 | ✅ | 🟠 **High** | UI Jank | ReportsScreen.kt, FocusScreen.kt | `minOf`/`maxOf` и `SimpleDateFormat` обёрнуты в `remember` |
+| 6 | ✅ | 🟡 **Medium** | UI Jank | FocusScreen.kt | Стабильные ключи `key = { it.id }` в LazyColumn логов |
+| 7 | ⬜ | 🟡 **Medium** | Stale UI | FocusScreen.kt | Неполные ключи `remember` (пропущены `unit`, `durationDays`) |
+| 8 | ⬜ | 🟡 **Medium** | IPC Overhead | FocusViewModel.kt | `NotificationManager.notify()` при любом изменении настроек, даже без обновления сахара |
 
 ---
 

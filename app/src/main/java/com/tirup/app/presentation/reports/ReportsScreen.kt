@@ -256,10 +256,12 @@ fun ReportsScreen(
 
     // Live Report AGP Sheet Preview Modal
     if (state.showLiveDetailDialog) {
-        val minTs = state.liveReadings.minOfOrNull { it.timestamp } ?: System.currentTimeMillis()
-        val maxTs = state.liveReadings.maxOfOrNull { it.timestamp } ?: System.currentTimeMillis()
-        val fmt = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
-        val dateRangeStr = "${fmt.format(Date(minTs))} — ${fmt.format(Date(maxTs))}"
+        val dateRangeStr = remember(state.liveReadings) {
+            val minTs = state.liveReadings.minOfOrNull { it.timestamp } ?: System.currentTimeMillis()
+            val maxTs = state.liveReadings.maxOfOrNull { it.timestamp } ?: System.currentTimeMillis()
+            val fmt = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+            "${fmt.format(Date(minTs))} — ${fmt.format(Date(maxTs))}"
+        }
         val periodName = when (state.livePeriod) {
             TrendPeriod.PERIOD_7D -> if (isRu) "7 дней" else "7 Days"
             TrendPeriod.PERIOD_14D -> if (isRu) "14 дней (AGP)" else "14 Days (AGP)"
