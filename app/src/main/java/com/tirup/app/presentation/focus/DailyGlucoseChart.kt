@@ -218,16 +218,16 @@ fun DailyGlucoseChart(
     metricsContent: (@Composable () -> Unit)? = null
 ) {
     val now = System.currentTimeMillis()
-    val calendar = remember(now) {
+    val latestTimestamp = readings.lastOrNull()?.timestamp ?: now
+    val startOfDay = remember(readings) {
         Calendar.getInstance().apply {
-            timeInMillis = now
+            timeInMillis = latestTimestamp
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
-        }
+        }.timeInMillis
     }
-    val startOfDay = calendar.timeInMillis
     val currentMinuteOfDay = ((now - startOfDay) / 60000f).coerceIn(0f, 1440f)
 
     val todayReadings = remember(readings, startOfDay) {
@@ -287,9 +287,9 @@ fun DailyGlucoseChart(
     }
 
     val totalGapMinutes = remember(dataGaps) { dataGaps.sumOf { it.durationMinutes } }
-    val monitoredMinutes = remember(todayReadings, now) {
+    val monitoredMinutes = remember(todayReadings) {
         if (todayReadings.isEmpty()) 0
-        else ((now - todayReadings.first().timestamp) / 60000L).toInt().coerceIn(1, 1440)
+        else ((System.currentTimeMillis() - todayReadings.first().timestamp) / 60000L).toInt().coerceIn(1, 1440)
     }
     val sensorActivePercent = remember(monitoredMinutes, totalGapMinutes) {
         if (monitoredMinutes <= 0) 100
