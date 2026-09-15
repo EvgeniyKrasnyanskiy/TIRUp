@@ -194,13 +194,13 @@ fun FocusScreen(
     val sensorStatus = state.sensorStatus
     val pumpSetStatus = state.pumpSetStatus
     val lancetStatus = state.lancetStatus
-    val showExpiredSensorDialog = remember(sensorStatus.installedAt, userSettings.isSensorReminderEnabled) { userSettings.isSensorReminderEnabled && sensorStatus.isExpired }
+    val showExpiredSensorDialog = remember(sensorStatus.installedAt, sensorStatus.durationDays, userSettings.isSensorReminderEnabled) { userSettings.isSensorReminderEnabled && sensorStatus.isExpired }
     var sensorExpiredDismissed by rememberSaveable { mutableStateOf(false) }
 
-    val showExpiredPumpDialog = remember(pumpSetStatus.installedAt, userSettings.isPumpReminderEnabled) { userSettings.isPumpReminderEnabled && pumpSetStatus.isExpired }
+    val showExpiredPumpDialog = remember(pumpSetStatus.installedAt, pumpSetStatus.durationDays, userSettings.isPumpReminderEnabled) { userSettings.isPumpReminderEnabled && pumpSetStatus.isExpired }
     var pumpExpiredDismissed by rememberSaveable { mutableStateOf(false) }
 
-    val showExpiredLancetDialog = remember(lancetStatus.installedAt, userSettings.isLancetReminderEnabled) { userSettings.isLancetReminderEnabled && lancetStatus.isExpired }
+    val showExpiredLancetDialog = remember(lancetStatus.installedAt, lancetStatus.durationDays, userSettings.isLancetReminderEnabled) { userSettings.isLancetReminderEnabled && lancetStatus.isExpired }
     var lancetExpiredDismissed by rememberSaveable { mutableStateOf(false) }
 
     val shouldCelebrateStreak = state.streakDays >= 2 && state.streakDays > userSettings.lastStreakCelebratedDays
@@ -1867,7 +1867,7 @@ private fun HeroGlucoseCard(
     }
 
     // Operational clinical status notification
-    val statusInfo: Pair<String, Color>? = remember(latestReading, sorted, delta5Min, isRu) {
+    val statusInfo: Pair<String, Color>? = remember(latestReading, sorted, delta5Min, unit, isRu) {
         if (latestReading == null) null
         else {
             val v = latestReading.valueMmol

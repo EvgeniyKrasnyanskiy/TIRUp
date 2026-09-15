@@ -55,6 +55,9 @@ class FocusViewModel(
     val blePacketReceivedAt: StateFlow<Long> = _blePacketReceivedAt.asStateFlow()
 
     private var lastPebbleSyncTime = 0L
+    private var lastNotifiedReadingTimestamp = -1L
+    private var lastNotifiedUnit: com.tirup.app.domain.model.GlucoseUnit? = null
+    private var lastNotifiedLockscreenEnabled: Boolean? = null
 
     init {
         observeData()
@@ -213,13 +216,24 @@ class FocusViewModel(
                 }
 
                 if (latest != null && newState.userSettings.isLockscreenNotificationEnabled) {
-                    GlucoseAlertManager.updateLockscreenNotification(
-                        context = context,
-                        latestReading = latest,
-                        todayReadings = newState.recentReadings,
-                        settings = newState.userSettings,
-                        streakDays = newState.streakDays
-                    )
+                    val isNewReading = latest.timestamp != lastNotifiedReadingTimestamp
+                    val isUnitChanged = newState.userSettings.unit != lastNotifiedUnit
+                    val isLockscreenToggled = newState.userSettings.isLockscreenNotificationEnabled != lastNotifiedLockscreenEnabled
+                    if (isNewReading || isUnitChanged || isLockscreenToggled) {
+                        lastNotifiedReadingTimestamp = latest.timestamp
+                        lastNotifiedUnit = newState.userSettings.unit
+                        lastNotifiedLockscreenEnabled = newState.userSettings.isLockscreenNotificationEnabled
+                        GlucoseAlertManager.updateLockscreenNotification(
+                            context = context,
+                            latestReading = latest,
+                            todayReadings = newState.recentReadings,
+                            settings = newState.userSettings,
+                            streakDays = newState.streakDays
+                        )
+                    }
+                } else if (!newState.userSettings.isLockscreenNotificationEnabled && lastNotifiedLockscreenEnabled == true) {
+                    lastNotifiedLockscreenEnabled = false
+                    GlucoseAlertManager.dismissLockscreenNotification(context)
                 }
             }
         }

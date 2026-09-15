@@ -15,8 +15,8 @@
 | 4 | ✅ | 🟠 **High** | ANR / Main Thread IO | SettingsViewModel.kt | `getReadingsBetweenSync` обёрнут в `withContext(Dispatchers.IO)` |
 | 5 | ✅ | 🟠 **High** | UI Jank | ReportsScreen.kt, FocusScreen.kt | `minOf`/`maxOf` и `SimpleDateFormat` обёрнуты в `remember` |
 | 6 | ✅ | 🟡 **Medium** | UI Jank | FocusScreen.kt | Стабильные ключи `key = { it.id }` в LazyColumn логов |
-| 7 | ⬜ | 🟡 **Medium** | Stale UI | FocusScreen.kt | Неполные ключи `remember` (пропущены `unit`, `durationDays`) |
-| 8 | ⬜ | 🟡 **Medium** | IPC Overhead | FocusViewModel.kt | `NotificationManager.notify()` при любом изменении настроек, даже без обновления сахара |
+| 7 | ✅ | 🟡 **Medium** | Stale UI | FocusScreen.kt | Добавлены пропущенные ключи `unit` и `durationDays` в `remember` |
+| 8 | ✅ | 🟡 **Medium** | IPC Overhead | FocusViewModel.kt | Кэширование `lastNotifiedReadingTimestamp` для устранения избыточных IPC-вызовов |
 
 ---
 
