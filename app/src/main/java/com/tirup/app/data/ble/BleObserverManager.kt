@@ -9,6 +9,7 @@ import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
@@ -39,6 +40,7 @@ import kotlinx.coroutines.sync.withLock
 object BleObserverManager {
 
     private const val TAG = "BleObserverManager"
+    private const val WATCHDOG_INTERVAL_MS = 15 * 60 * 1000L // 15 minutes anti-throttling refresh
     private val scope = CoroutineScope(Dispatchers.IO)
     private val mutex = Mutex()
 
@@ -47,6 +49,7 @@ object BleObserverManager {
     private var isScanning = false
     private var isBoostActive = false
     private var boostJob: Job? = null
+    private var watchdogJob: Job? = null
 
     private val _isScanningFlow = MutableStateFlow(false)
     val isScanningFlow: StateFlow<Boolean> = _isScanningFlow.asStateFlow()
@@ -74,8 +77,21 @@ object BleObserverManager {
             val ble = userSettings.bleBridgeSettings
 
             if (ble.isEnabled && ble.role == BleBridgeRole.OBSERVER) {
+                try {
+                    val serviceIntent = Intent(context, BleObserverService::class.java)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(serviceIntent)
+                    } else {
+                        context.startService(serviceIntent)
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to start BleObserverService: ${e.message}")
+                }
                 startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = isBoostActive)
             } else {
+                try {
+                    context.stopService(Intent(context, BleObserverService::class.java))
+                } catch (_: Exception) {}
                 stopScanningInternal()
             }
         }
@@ -198,6 +214,7 @@ object BleObserverManager {
             isScanning = true
             _isScanningFlow.value = true
             Log.i(TAG, "BLE Observer started scanning (boost=$boost)")
+            startWatchdog()
         } catch (e: SecurityException) {
             Log.w(TAG, "SecurityException starting scan: ${e.message}")
             _isScanningFlow.value = false
@@ -275,11 +292,58 @@ object BleObserverManager {
             }
         } catch (_: SecurityException) {
         } catch (_: Exception) {}
+        watchdogJob?.cancel()
+        watchdogJob = null
         activeCallback = null
         scanner = null
         isScanning = false
         _isScanningFlow.value = false
         Log.i(TAG, "BLE Observer stopped scanning")
+    }
+
+    private fun startWatchdog() {
+        watchdogJob?.cancel()
+        watchdogJob = scope.launch {
+            while (isScanning) {
+                delay(WATCHDOG_INTERVAL_MS)
+                if (!isScanning || isBoostActive) continue
+                Log.i(TAG, "Watchdog: refreshing BLE scan to prevent 30-min opportunistic throttling")
+                mutex.withLock {
+                    if (isScanning && !isBoostActive) {
+                        try {
+                            activeCallback?.let { cb -> scanner?.stopScan(cb) }
+                        } catch (_: Exception) {}
+                        delay(150L)
+                        try {
+                            val scanFilter = ScanFilter.Builder()
+                                .setManufacturerData(
+                                    BlePacketCodec.MANUFACTURER_ID,
+                                    byteArrayOf(0x54, 0x55),
+                                    byteArrayOf(0xFF.toByte(), 0xFF.toByte())
+                                )
+                                .build()
+                            val scanSettings = ScanSettings.Builder()
+                                .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
+                                .setReportDelay(0L)
+                                .apply {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                        setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
+                                        setNumOfMatches(ScanSettings.MATCH_NUM_ONE_ADVERTISEMENT)
+                                        setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+                                    }
+                                }
+                                .build()
+                            activeCallback?.let { cb ->
+                                scanner?.startScan(listOf(scanFilter), scanSettings, cb)
+                                Log.i(TAG, "Watchdog: BLE scan refreshed successfully")
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Watchdog refresh error: ${e.message}")
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fun isBluetoothEnabled(context: Context): Boolean {

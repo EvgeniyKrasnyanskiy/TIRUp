@@ -13,6 +13,8 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <!-- Bluetooth Low Energy (BLE Bridge) -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
@@ -134,6 +136,13 @@
         <service
             android:name=".presentation.overlay.FloatingBubbleService"
             android:exported="false" />
+
+        <!-- BLE Observer Background Monitoring Foreground Service -->
+        <service
+            android:name=".data.ble.BleObserverService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice"
+            tools:targetApi="upside_down_cake" />
 
         <!-- FileProvider for secure offline sharing of generated PDF medical reports -->
         <provider
