@@ -966,6 +966,30 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                             }
                         }
 
+                        // Auto-recover CGM sensor installation timestamp if user logged "сенсор" / "sensor" in xDrip
+                        val sensorTreatment = treatments
+                            .filter { t ->
+                                val n = t.notes?.lowercase() ?: ""
+                                n.contains("сенсор") || n.contains("sensor") || n.contains("датчик") || n.contains("libre") || n.contains("dexcom")
+                            }
+                            .maxByOrNull { it.timestamp }
+
+                        if (sensorTreatment != null) {
+                            val currentSettings = app.settingsRepository.getSettings().first()
+                            if (currentSettings.sensorStatus.installedAt == 0L ||
+                                sensorTreatment.timestamp > currentSettings.sensorStatus.installedAt
+                            ) {
+                                Log.i(TAG, "Auto-recovering CGM sensor installation timestamp from xDrip note: ${sensorTreatment.timestamp}")
+                                app.settingsRepository.updateSettings(
+                                    currentSettings.copy(
+                                        sensorStatus = currentSettings.sensorStatus.copy(
+                                            installedAt = sensorTreatment.timestamp
+                                        )
+                                    )
+                                )
+                            }
+                        }
+
                         // Calculate active CoB
                         computedCob = calculateActiveCob(treatments, now)
                     }

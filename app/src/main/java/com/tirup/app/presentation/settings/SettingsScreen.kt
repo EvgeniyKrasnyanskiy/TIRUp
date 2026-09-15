@@ -464,10 +464,8 @@ fun SettingsScreen(
         item {
             PatientProfileSummaryCard(
                 profile = profile,
-                latestHba1c = settings.latestHba1cRecord,
                 isRu = isRu,
-                onEditClick = { showProfileDialog = true },
-                onHba1cClick = { viewModel.toggleHba1cDialog(true) }
+                onEditClick = { showProfileDialog = true }
             )
         }
 
@@ -3737,10 +3735,8 @@ fun SettingsScreen(
 @Composable
 private fun PatientProfileSummaryCard(
     profile: PatientProfile,
-    latestHba1c: LabHba1cRecord?,
     isRu: Boolean,
-    onEditClick: () -> Unit,
-    onHba1cClick: () -> Unit
+    onEditClick: () -> Unit
 ) {
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
@@ -3826,27 +3822,6 @@ private fun PatientProfileSummaryCard(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
                         )
-
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.2.dp, ActionBlue),
-                            color = ActionBlue.copy(alpha = 0.08f),
-                            modifier = Modifier.clickable { onHba1cClick() }
-                        ) {
-                            Text(
-                                text = if (latestHba1c != null) {
-                                    String.format(Locale.US, "HbA1c: %.1f%%", latestHba1c.valuePercent)
-                                } else {
-                                    "HbA1c: +"
-                                },
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                ),
-                                color = ActionBlue,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp)
-                            )
-                        }
                     }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(

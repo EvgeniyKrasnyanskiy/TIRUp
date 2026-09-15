@@ -1,6 +1,18 @@
 package com.tirup.app.presentation.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -134,6 +146,19 @@ fun StreakBadge(
     streakDays: Int,
     onClick: (() -> Unit)? = null
 ) {
+    var showNumber by remember { mutableStateOf(false) }
+
+    LaunchedEffect(streakDays) {
+        if (streakDays > 0) {
+            while (true) {
+                delay(3500L)
+                showNumber = !showNumber
+            }
+        } else {
+            showNumber = false
+        }
+    }
+
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = PrimaryEmerald.copy(alpha = 0.15f),
@@ -142,21 +167,31 @@ fun StreakBadge(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+            modifier = Modifier
+                .animateContentSize()
+                .padding(horizontal = 8.dp, vertical = 5.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.LocalFireDepartment,
                 contentDescription = null,
-                tint = Color(0xFFF97316),
+                tint = if (streakDays > 0) Color(0xFFF97316) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                 modifier = Modifier.size(16.dp)
             )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = stringResource(R.string.streak_days, streakDays),
-                color = PrimaryEmerald,
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp
-            )
+            AnimatedVisibility(
+                visible = showNumber && streakDays > 0,
+                enter = fadeIn(tween(350)) + expandHorizontally(tween(350)),
+                exit = fadeOut(tween(350)) + shrinkHorizontally(tween(350))
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text(
+                        text = "$streakDays",
+                        color = PrimaryEmerald,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+            }
         }
     }
 }

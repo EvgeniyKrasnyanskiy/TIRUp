@@ -2,7 +2,7 @@
     <string name="app_name">TIRUp</string>
     <string name="nav_focus">Главная</string>
     <string name="nav_trends">Тренды</string>
-    <string name="nav_reports">Отчёт</string>
+    <string name="nav_reports">Мед. отчёты</string>
     <string name="nav_settings">Настройки</string>
 
     <!-- Focus Screen -->
