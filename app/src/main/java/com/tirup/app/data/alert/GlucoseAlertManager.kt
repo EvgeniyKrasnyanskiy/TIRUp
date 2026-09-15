@@ -1948,10 +1948,47 @@ object GlucoseAlertManager {
             .setWhen(latestReading.timestamp)
             .build()
 
+        cachedLockscreenNotification = notification
         nm.notify(NOTIFICATION_ID_LOCKSCREEN, notification)
     }
 
+    @Volatile
+    private var cachedLockscreenNotification: android.app.Notification? = null
+
+    fun getOrCreateLockscreenNotification(context: Context): android.app.Notification {
+        cachedLockscreenNotification?.let { return it }
+        initChannels(context)
+
+        val appIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(MainActivity.EXTRA_GOTO_FOCUS, true)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            NOTIFICATION_ID_LOCKSCREEN,
+            appIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val fallback = NotificationCompat.Builder(context, CHANNEL_LOCKSCREEN)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("TIRUp")
+            .setContentText("Мост BLE активен • Ожидание данных")
+            .setOngoing(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setSound(null)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setContentIntent(pendingIntent)
+            .build()
+        cachedLockscreenNotification = fallback
+        return fallback
+    }
+
     fun dismissLockscreenNotification(context: Context) {
+        cachedLockscreenNotification = null
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         nm?.cancel(NOTIFICATION_ID_LOCKSCREEN)
     }

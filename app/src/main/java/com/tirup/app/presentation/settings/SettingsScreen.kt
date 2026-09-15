@@ -1646,6 +1646,32 @@ fun SettingsScreen(
                                 }
                             }
 
+                            // Background stability recommendation tip
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("💡", fontSize = 16.sp)
+                                    Text(
+                                        text = if (isRu) {
+                                            "Для непрерывного приёма данных при заблокированном экране рекомендуется держать включённым постоянное уведомление сахара в настройках."
+                                        } else {
+                                            "For uninterrupted background tracking when the screen is locked, keep the permanent glucose notification enabled."
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        lineHeight = 15.sp
+                                    )
+                                }
+                            }
+
                             // Follower Boost Scan Button
                             Button(
                                 onClick = {

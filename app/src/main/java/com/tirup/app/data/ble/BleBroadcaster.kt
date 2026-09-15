@@ -32,9 +32,9 @@ import com.tirup.app.TirupApplication
 object BleBroadcaster {
 
     private const val TAG = "BleBroadcaster"
-    const val BURST_1MIN_MS = 5_000L   // 5 seconds for 1-minute CGM sensors (Libre 3, Dexcom G7)
-    const val BURST_5MIN_MS = 10_000L  // 10 seconds for 5-minute CGM sensors (Libre 1/2, Dexcom G6)
-    const val HEARTBEAT_BURST_MS = 12_000L // 12 seconds for 5-minute fallback heartbeat timer for max reliability
+    const val BURST_1MIN_MS = 12_000L  // 12 seconds for 1-minute CGM sensors (Libre 3, Dexcom G7)
+    const val BURST_5MIN_MS = 15_000L  // 15 seconds for 5-minute CGM sensors (Libre 1/2, Dexcom G6)
+    const val HEARTBEAT_BURST_MS = 15_000L // 15 seconds for 5-minute fallback heartbeat timer for max reliability
     const val TEST_PING_BURST_MS = 30_000L // 30 seconds for manual diagnostic test ping
 
     private val scope = CoroutineScope(Dispatchers.IO)
