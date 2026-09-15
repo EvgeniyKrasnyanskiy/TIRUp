@@ -1,4 +1,4 @@
-﻿package com.tirup.app.domain.model
+package com.tirup.app.domain.model
 
 data class Treatment(
     val id: Long = 0L,
@@ -11,4 +11,6 @@ data class Treatment(
     val hasInsulin: Boolean get() = insulinUnits != null && insulinUnits > 0.0
     val hasCarbs: Boolean get() = carbsGrams != null && carbsGrams > 0.0
     val isCombo: Boolean get() = hasInsulin && hasCarbs
+    val hasNotes: Boolean get() = !notes.isNullOrBlank()
+    val isNoteOnly: Boolean get() = !hasInsulin && !hasCarbs && hasNotes
 }

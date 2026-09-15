@@ -126,4 +126,20 @@ class TreatmentClusterTest {
         assertEquals("40g", carbsClusters.first().displayText)
         assertEquals("Pizza", carbsClusters.first().notes)
     }
+
+    @Test
+    fun testNoteOnlyTreatmentHandling() {
+        val baseTime = 1000000L
+        val noteTreatment = Treatment(id = 2L, timestamp = baseTime, notes = "тест")
+        assertTrue(noteTreatment.isNoteOnly)
+        assertFalse(noteTreatment.hasInsulin)
+        assertFalse(noteTreatment.hasCarbs)
+
+        val noteClusters = clusterNoteTreatments(listOf(noteTreatment))
+        assertEquals(1, noteClusters.size)
+        val cluster = noteClusters.first()
+        assertTrue(cluster.isNoteOnly)
+        assertEquals("💬 тест", cluster.displayText)
+        assertEquals("тест", cluster.notes)
+    }
 }

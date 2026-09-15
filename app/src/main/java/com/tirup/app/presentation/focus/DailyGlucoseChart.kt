@@ -80,7 +80,8 @@ data class DataGap(
 
 data class TreatmentCluster(
     val treatments: List<Treatment>,
-    val isInsulin: Boolean
+    val isInsulin: Boolean,
+    val isNoteOnly: Boolean = false
 ) {
     val id: Long get() = treatments.first().id
     val timestamp: Long get() = treatments.first().timestamp
@@ -91,6 +92,10 @@ data class TreatmentCluster(
     val notes: String? get() = treatments.mapNotNull { it.notes?.trim()?.takeIf { n -> n.isNotEmpty() } }.joinToString("; ").takeIf { it.isNotEmpty() }
 
     val displayText: String get() {
+        if (isNoteOnly) {
+            val n = notes ?: ""
+            return if (n.length <= 8) "💬 $n" else "💬 " + n.take(7) + "…"
+        }
         return if (isInsulin) {
             val doses = treatments.mapNotNull { it.insulinUnits }
             if (doses.size <= 1) {
@@ -155,6 +160,36 @@ internal fun clusterTreatments(
     return clusters
 }
 
+internal fun clusterNoteTreatments(
+    treatments: List<Treatment>,
+    thresholdMs: Long = 5 * 60 * 1000L
+): List<TreatmentCluster> {
+    val items = treatments.filter { it.isNoteOnly }
+        .sortedBy { it.timestamp }
+    if (items.isEmpty()) return emptyList()
+
+    val clusters = mutableListOf<TreatmentCluster>()
+    var currentGroup = mutableListOf<Treatment>()
+
+    for (tr in items) {
+        if (currentGroup.isEmpty()) {
+            currentGroup.add(tr)
+        } else {
+            val first = currentGroup.first()
+            if (tr.timestamp - first.timestamp <= thresholdMs) {
+                currentGroup.add(tr)
+            } else {
+                clusters.add(TreatmentCluster(currentGroup.toList(), isInsulin = false, isNoteOnly = true))
+                currentGroup = mutableListOf(tr)
+            }
+        }
+    }
+    if (currentGroup.isNotEmpty()) {
+        clusters.add(TreatmentCluster(currentGroup.toList(), isInsulin = false, isNoteOnly = true))
+    }
+    return clusters
+}
+
 /**
  * Interactive 24-hour daily glucose chart for the Focus screen.
  * Supports:
@@ -214,6 +249,10 @@ fun DailyGlucoseChart(
 
     val carbsClusters = remember(todayTreatments) {
         clusterTreatments(todayTreatments, isInsulin = false)
+    }
+
+    val notesClusters = remember(todayTreatments) {
+        clusterNoteTreatments(todayTreatments)
     }
 
     var visibleMinutes by remember { mutableFloatStateOf(360f) }
@@ -372,9 +411,12 @@ fun DailyGlucoseChart(
                 if (selectedTreatmentCluster != null) {
                     val cluster = selectedTreatmentCluster!!
                     val trTime = timeFormatter.format(Date(cluster.timestamp))
-                    val bannerColor = if (cluster.isCombo) Color(0xFF8B5CF6)
-                    else if (cluster.isInsulin) ActionBlue
-                    else Color(0xFFF59E0B)
+                    val bannerColor = when {
+                        cluster.isNoteOnly -> Color(0xFF8B5CF6)
+                        cluster.isCombo -> Color(0xFF8B5CF6)
+                        cluster.isInsulin -> ActionBlue
+                        else -> Color(0xFFF59E0B)
+                    }
 
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -401,7 +443,16 @@ fun DailyGlucoseChart(
                                     color = onSurface
                                 )
 
-                                if (cluster.isInsulin) {
+                                if (cluster.isNoteOnly) {
+                                    Text(
+                                        text = "💬 ${cluster.notes ?: ""}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF8B5CF6),
+                                        maxLines = 2,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                } else if (cluster.isInsulin) {
                                     val totalIns = cluster.totalInsulin
                                     val totalStr = if (totalIns == totalIns.toInt().toDouble()) "${totalIns.toInt()}" else String.format(Locale.US, "%.1f", totalIns)
                                     val insDetail = if (cluster.isSingle) {
@@ -615,7 +666,10 @@ fun DailyGlucoseChart(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f, fill = false)
+                            ) {
                                 Text(
                                     text = "⏱ $selTime",
                                     style = MaterialTheme.typography.bodySmall,
@@ -629,6 +683,22 @@ fun DailyGlucoseChart(
                                     fontWeight = FontWeight.Bold,
                                     color = selColor
                                 )
+
+                                val nearbyNote = todayTreatments.filter {
+                                    abs(it.timestamp - sel.timestamp) <= 15 * 60_000L && !it.notes.isNullOrBlank()
+                                }.minByOrNull { abs(it.timestamp - sel.timestamp) }
+
+                                if (nearbyNote != null && !nearbyNote.notes.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "💬 ${nearbyNote.notes}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF8B5CF6),
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                }
                             }
 
                             if ((sel.iob != null && sel.iob > 0.0) || (sel.cob != null && sel.cob > 0.0)) {
@@ -674,25 +744,30 @@ fun DailyGlucoseChart(
                     .height(200.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .background(surfaceBg.copy(alpha = 0.5f))
-                    .pointerInput(todayReadings, dataGaps, todayTreatments, insulinClusters, carbsClusters) {
+                    .pointerInput(todayReadings, dataGaps, todayTreatments, insulinClusters, carbsClusters, notesClusters) {
                         detectTapGestures { tapOffset ->
                             // Find reading, treatment cluster, or gap closest to tap
                             val chartWidth = size.width - 70f // right margin for labels
-                            if (chartWidth > 0 && (todayReadings.isNotEmpty() || insulinClusters.isNotEmpty() || carbsClusters.isNotEmpty())) {
+                            if (chartWidth > 0 && (todayReadings.isNotEmpty() || insulinClusters.isNotEmpty() || carbsClusters.isNotEmpty() || notesClusters.isNotEmpty())) {
                                 val tapMinute = windowStartMinute + (tapOffset.x / chartWidth) * visibleMinutes
                                 val toleranceMin = (visibleMinutes / 30f).coerceIn(6f, 30f)
 
-                                val candidateClusters = (insulinClusters + carbsClusters).filter { cl ->
+                                val candidateClusters = (insulinClusters + carbsClusters + notesClusters).filter { cl ->
                                     val clMinute = (cl.timestamp - startOfDay) / 60000f
                                     abs(clMinute - tapMinute) <= toleranceMin
                                 }
 
                                 val tappedCluster = if (candidateClusters.isNotEmpty()) {
-                                    val prefersInsulin = tapOffset.y < (size.height * 0.5f)
+                                    val prefersInsulin = tapOffset.y < (size.height * 0.4f)
+                                    val prefersCarbs = tapOffset.y > (size.height * 0.6f)
                                     candidateClusters.minByOrNull { cl ->
                                         val clMinute = (cl.timestamp - startOfDay) / 60000f
                                         val timeDiff = abs(clMinute - tapMinute)
-                                        val yPenalty = if (cl.isInsulin == prefersInsulin) 0f else 15f
+                                        val yPenalty = when {
+                                            cl.isInsulin -> if (prefersInsulin) 0f else 15f
+                                            cl.isNoteOnly -> 4f
+                                            else -> if (prefersCarbs) 0f else 15f
+                                        }
                                         timeDiff + yPenalty
                                     }
                                 } else null
@@ -1242,6 +1317,102 @@ fun DailyGlucoseChart(
                                 badgeLeft + badgeW / 2f,
                                 badgeTop + 16.5f,
                                 carbsPaint
+                            )
+                        }
+                    }
+
+                    // 4.1.3. Draw Note Clusters (Top Area with Staggering)
+                    val visibleNotesClusters = notesClusters.filter { cl ->
+                        val m = (cl.timestamp - startOfDay) / 60000f
+                        m in (windowStartMinute - 15f)..(windowStartMinute + visibleMinutes + 15f)
+                    }
+
+                    val notePaint = Paint().apply {
+                        color = android.graphics.Color.WHITE
+                        textSize = 20f
+                        isAntiAlias = true
+                        typeface = Typeface.DEFAULT_BOLD
+                        textAlign = Paint.Align.CENTER
+                    }
+
+                    var lastNoteRight0 = -Float.MAX_VALUE
+                    var lastNoteRight1 = -Float.MAX_VALUE
+
+                    visibleNotesClusters.forEach { cluster ->
+                        val m = (cluster.timestamp - startOfDay) / 60000f
+                        val x = xForMinute(m)
+
+                        if (x in -20f..(chartRight + 20f)) {
+                            val isSelected = (selectedTreatmentCluster == cluster)
+                            val noteText = cluster.displayText
+                            val textW = notePaint.measureText(noteText)
+                            val badgeW = textW + 16f
+                            val badgeH = 22f
+                            val badgeLeft = (x - badgeW / 2f).coerceIn(2f, chartRight - badgeW - 2f)
+
+                            val hasInsulinNearby = visibleInsulinClusters.any {
+                                val insM = (it.timestamp - startOfDay) / 60000f
+                                abs(xForMinute(insM) - x) < 30f
+                            }
+
+                            val margin = 4f
+                            val level = when {
+                                hasInsulinNearby -> 1
+                                badgeLeft >= lastNoteRight0 + margin -> 0
+                                badgeLeft >= lastNoteRight1 + margin -> 1
+                                else -> if (lastNoteRight0 <= lastNoteRight1) 0 else 1
+                            }
+
+                            if (level == 0) {
+                                lastNoteRight0 = badgeLeft + badgeW
+                            } else {
+                                lastNoteRight1 = badgeLeft + badgeW
+                            }
+
+                            val badgeTop = chartTop + 6f + (level * 24f)
+
+                            // Vertical dashed guideline connecting down to chart bottom
+                            if (level > 0) {
+                                drawLine(
+                                    color = Color(0xFF8B5CF6).copy(alpha = if (isSelected) 0.85f else 0.4f),
+                                    start = Offset(x, chartTop),
+                                    end = Offset(x, badgeTop),
+                                    strokeWidth = if (isSelected) 2.5f else 1.5f,
+                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
+                                )
+                            }
+                            drawLine(
+                                color = Color(0xFF8B5CF6).copy(alpha = if (isSelected) 0.85f else 0.4f),
+                                start = Offset(x, badgeTop + badgeH),
+                                end = Offset(x, chartBottom),
+                                strokeWidth = if (isSelected) 2.5f else 1.5f,
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
+                            )
+
+                            // Glow if selected
+                            if (isSelected) {
+                                drawRoundRect(
+                                    color = Color(0xFF8B5CF6).copy(alpha = 0.35f),
+                                    topLeft = Offset(badgeLeft - 3f, badgeTop - 3f),
+                                    size = Size(badgeW + 6f, badgeH + 6f),
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f)
+                                )
+                            }
+
+                            // Note Badge Background
+                            drawRoundRect(
+                                color = Color(0xFF8B5CF6),
+                                topLeft = Offset(badgeLeft, badgeTop),
+                                size = Size(badgeW, badgeH),
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f)
+                            )
+
+                            // Note Text
+                            drawContext.canvas.nativeCanvas.drawText(
+                                noteText,
+                                badgeLeft + badgeW / 2f,
+                                badgeTop + 16.5f,
+                                notePaint
                             )
                         }
                     }
