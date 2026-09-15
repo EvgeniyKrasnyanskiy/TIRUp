@@ -77,9 +77,7 @@ class FocusViewModel(
         val now = System.currentTimeMillis()
         if (now - lastPebbleSyncTime < 30_000L) return
         lastPebbleSyncTime = now
-        if (context != null) {
-            com.tirup.app.data.receiver.DexdripBroadcastReceiver.syncIobCobFromPebble(context)
-        }
+        com.tirup.app.data.receiver.DexdripBroadcastReceiver.syncIobCobFromPebble(context)
     }
 
     private fun observeData() {
@@ -346,7 +344,7 @@ class FocusViewModel(
     }
 
     fun sendBleTestPing(overrideContext: Context? = null) {
-        val ctx = overrideContext ?: context ?: return
+        val ctx = overrideContext ?: context
         viewModelScope.launch {
             val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
             val ble = _uiState.value.userSettings.bleBridgeSettings
@@ -367,7 +365,7 @@ class FocusViewModel(
     }
 
     fun boostBleObserverScan(overrideContext: Context? = null) {
-        val ctx = overrideContext ?: context ?: return
+        val ctx = overrideContext ?: context
         viewModelScope.launch {
             val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
             com.tirup.app.data.ble.BleObserverManager.boostScanFor60Sec(ctx, settingsRepository, glucoseRepository)
