@@ -4,6 +4,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,8 +14,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Remove
+import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -58,7 +61,10 @@ fun DeviceStatusModal(
     onDismiss: () -> Unit,
     onNewSensor: (durationDays: Int, installedAt: Long) -> Unit,
     onNewPumpSet: (durationDays: Int, installedAt: Long) -> Unit,
-    onNewLancet: (durationDays: Int, installedAt: Long) -> Unit
+    onNewLancet: (durationDays: Int, installedAt: Long) -> Unit,
+    onUpdateSensorDuration: ((Int) -> Unit)? = null,
+    onUpdatePumpDuration: ((Int) -> Unit)? = null,
+    onUpdateLancetDuration: ((Int) -> Unit)? = null
 ) {
     // Sensor confirmation state
     var showSensorConfirm by remember { mutableStateOf(false) }
@@ -122,7 +128,10 @@ fun DeviceStatusModal(
                         pickerMin = 1,
                         pickerMax = 90,
                         isRu = isRu,
-                        onPickerChange = { sensorPickerDays = it },
+                        onPickerChange = {
+                            sensorPickerDays = it
+                            onUpdateSensorDuration?.invoke(it)
+                        },
                         onNewClick = {
                             pendingSensorDays = sensorPickerDays
                             showSensorConfirm = true
@@ -146,7 +155,10 @@ fun DeviceStatusModal(
                         pickerMin = 2,
                         pickerMax = 7,
                         isRu = isRu,
-                        onPickerChange = { pumpPickerDays = it },
+                        onPickerChange = {
+                            pumpPickerDays = it
+                            onUpdatePumpDuration?.invoke(it)
+                        },
                         onNewClick = {
                             pendingPumpDays = pumpPickerDays
                             showPumpConfirm = true
@@ -170,7 +182,10 @@ fun DeviceStatusModal(
                         pickerMin = 1,
                         pickerMax = 7,
                         isRu = isRu,
-                        onPickerChange = { lancetPickerDays = it },
+                        onPickerChange = {
+                            lancetPickerDays = it
+                            onUpdateLancetDuration?.invoke(it)
+                        },
                         onNewClick = {
                             pendingLancetDays = lancetPickerDays
                             showLancetConfirm = true
@@ -430,6 +445,8 @@ private fun DurationPickerCompact(
     onChange: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isEditing by remember { mutableStateOf(false) }
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -441,28 +458,70 @@ private fun DurationPickerCompact(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 12.sp
         )
-        IconButton(
-            onClick = { if (value > min) onChange(value - 1) },
-            modifier = Modifier.size(28.dp)
-        ) {
-            Icon(Icons.Default.Remove, contentDescription = "Decrease", modifier = Modifier.size(16.dp))
-        }
-        Surface(
-            shape = RoundedCornerShape(6.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant
-        ) {
-            Text(
-                text = value.toString(),
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp
-            )
-        }
-        IconButton(
-            onClick = { if (value < max) onChange(value + 1) },
-            modifier = Modifier.size(28.dp)
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Increase", modifier = Modifier.size(16.dp))
+
+        if (!isEditing) {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+                modifier = Modifier.clickable { isEditing = true }
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "$value",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Tap to edit duration",
+                        tint = ActionBlue,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
+            }
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                IconButton(
+                    onClick = { if (value > min) onChange(value - 1) },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(Icons.Default.Remove, contentDescription = "Decrease", modifier = Modifier.size(16.dp))
+                }
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = ActionBlue.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.35f))
+                ) {
+                    Text(
+                        text = value.toString(),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = ActionBlue
+                    )
+                }
+                IconButton(
+                    onClick = { if (value < max) onChange(value + 1) },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Increase", modifier = Modifier.size(16.dp))
+                }
+                IconButton(
+                    onClick = { isEditing = false },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = "Done", tint = ActionBlue, modifier = Modifier.size(16.dp))
+                }
+            }
         }
     }
 }
@@ -511,10 +570,17 @@ fun CountdownConfirmDialog(
                 nowCal.get(Calendar.DAY_OF_YEAR) == selCal.get(Calendar.DAY_OF_YEAR)
     }
 
-    val displayTimeStr = if (isToday) {
-        "${if (isRu) "Сегодня" else "Today"}, ${timeFormat.format(Date(selectedTimestamp))}"
-    } else {
-        dateFormat.format(Date(selectedTimestamp))
+    val isYesterday = remember(selectedTimestamp) {
+        val yestCal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
+        val selCal = Calendar.getInstance().apply { timeInMillis = selectedTimestamp }
+        yestCal.get(Calendar.YEAR) == selCal.get(Calendar.YEAR) &&
+                yestCal.get(Calendar.DAY_OF_YEAR) == selCal.get(Calendar.DAY_OF_YEAR)
+    }
+
+    val displayTimeStr = when {
+        isToday -> "${if (isRu) "Сегодня" else "Today"}, ${timeFormat.format(Date(selectedTimestamp))}"
+        isYesterday -> "${if (isRu) "Вчера" else "Yesterday"}, ${timeFormat.format(Date(selectedTimestamp))}"
+        else -> dateFormat.format(Date(selectedTimestamp))
     }
 
     AlertDialog(
@@ -550,39 +616,75 @@ fun CountdownConfirmDialog(
                                 text = displayTimeStr,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f, fill = false)
                             )
 
-                            Button(
-                                onClick = {
-                                    isTimeEdited = true
-                                    val currentCal = Calendar.getInstance().apply { timeInMillis = selectedTimestamp }
-                                    TimePickerDialog(
-                                        context,
-                                        { _, hourOfDay, minute ->
-                                            val newCal = Calendar.getInstance().apply {
-                                                timeInMillis = selectedTimestamp
-                                                set(Calendar.HOUR_OF_DAY, hourOfDay)
-                                                set(Calendar.MINUTE, minute)
-                                                set(Calendar.SECOND, 0)
-                                                set(Calendar.MILLISECOND, 0)
-                                            }
-                                            selectedTimestamp = newCal.timeInMillis
-                                        },
-                                        currentCal.get(Calendar.HOUR_OF_DAY),
-                                        currentCal.get(Calendar.MINUTE),
-                                        true
-                                    ).show()
-                                },
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = ActionBlue.copy(alpha = 0.15f),
-                                    contentColor = ActionBlue
-                                )
-                            ) {
-                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(15.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(if (isRu) "Изменить" else "Change", style = MaterialTheme.typography.bodySmall)
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Button(
+                                    onClick = {
+                                        isTimeEdited = true
+                                        val currentCal = Calendar.getInstance().apply { timeInMillis = selectedTimestamp }
+                                        DatePickerDialog(
+                                            context,
+                                            { _, year, month, dayOfMonth ->
+                                                val newCal = Calendar.getInstance().apply {
+                                                    timeInMillis = selectedTimestamp
+                                                    set(Calendar.YEAR, year)
+                                                    set(Calendar.MONTH, month)
+                                                    set(Calendar.DAY_OF_MONTH, dayOfMonth)
+                                                }
+                                                selectedTimestamp = newCal.timeInMillis
+                                            },
+                                            currentCal.get(Calendar.YEAR),
+                                            currentCal.get(Calendar.MONTH),
+                                            currentCal.get(Calendar.DAY_OF_MONTH)
+                                        ).apply {
+                                            datePicker.maxDate = System.currentTimeMillis()
+                                        }.show()
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = ActionBlue.copy(alpha = 0.15f),
+                                        contentColor = ActionBlue
+                                    )
+                                ) {
+                                    Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(if (isRu) "Дата" else "Date", style = MaterialTheme.typography.bodySmall)
+                                }
+
+                                Button(
+                                    onClick = {
+                                        isTimeEdited = true
+                                        val currentCal = Calendar.getInstance().apply { timeInMillis = selectedTimestamp }
+                                        TimePickerDialog(
+                                            context,
+                                            { _, hourOfDay, minute ->
+                                                val newCal = Calendar.getInstance().apply {
+                                                    timeInMillis = selectedTimestamp
+                                                    set(Calendar.HOUR_OF_DAY, hourOfDay)
+                                                    set(Calendar.MINUTE, minute)
+                                                    set(Calendar.SECOND, 0)
+                                                    set(Calendar.MILLISECOND, 0)
+                                                }
+                                                selectedTimestamp = newCal.timeInMillis
+                                            },
+                                            currentCal.get(Calendar.HOUR_OF_DAY),
+                                            currentCal.get(Calendar.MINUTE),
+                                            true
+                                        ).show()
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = ActionBlue.copy(alpha = 0.15f),
+                                        contentColor = ActionBlue
+                                    )
+                                ) {
+                                    Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(if (isRu) "Время" else "Time", style = MaterialTheme.typography.bodySmall)
+                                }
                             }
                         }
 

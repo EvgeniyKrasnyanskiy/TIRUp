@@ -56,11 +56,11 @@
     <string name="reports_title">Мед. отчёты</string>
     <string name="reports_subtitle">Стандартизированный отчёт</string>
     <string name="report_live_title">Текущий отчёт (Трансляция)</string>
-    <string name="report_historical_title">Отчёт из файла xDrip+</string>
+    <string name="report_historical_title">Отчёт из файла</string>
     <string name="report_period_title">Период для отчёта</string>
     <string name="generate_pdf">Поделиться / Отправить PDF</string>
     <string name="save_pdf_downloads">Сохранить в Загрузки</string>
-    <string name="import_and_report">Загрузить CSV / ZIP из xDrip</string>
+    <string name="import_and_report">Загрузить CSV / ZIP из xDrip+</string>
     <string name="clear_historical">Удалить исторический отчёт</string>
     <string name="pdf_saved_toast">Отчёт сохранён: %s</string>
     <string name="export_success">Медицинский отчёт успешно создан</string>

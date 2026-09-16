@@ -1148,7 +1148,7 @@ object TirupWidgetUpdater {
             )
         }
 
-        // 2. Master Battery (Priority 2)
+        // 2. Master Battery (Priority 2): Only display if real, non-stale battery data is present
         val ble = settings.bleBridgeSettings
         val isObserver = ble.role == BleBridgeRole.OBSERVER
         val battery = ble.lastMasterBattery
@@ -1156,9 +1156,9 @@ object TirupWidgetUpdater {
             (now - ble.lastPacketTimestamp) / 60_000L
         } else 999L
         val isBleStale = isStale || packetAgeMinutes > 7
-        val hasBattery = isObserver && (battery in 0..100 || ble.lastPacketTimestamp > 0L)
-        if (!excludeTypes.contains("battery") && hasBattery) {
-            val batText = if (isBleStale) "🔋 ?" else "🔋 $battery%"
+        val hasValidBattery = isObserver && (battery in 0..100) && !isBleStale
+        if (!excludeTypes.contains("battery") && hasValidBattery) {
+            val batText = "🔋 $battery%"
             val batColor = when {
                 battery <= 15 -> 0xFFEF4444.toInt()
                 battery <= 25 -> 0xFFF59E0B.toInt()
@@ -1168,7 +1168,7 @@ object TirupWidgetUpdater {
                 WidgetBadge(
                     type = "battery",
                     text = batText,
-                    color = if (isBleStale) grayColor else batColor
+                    color = batColor
                 )
             )
         }

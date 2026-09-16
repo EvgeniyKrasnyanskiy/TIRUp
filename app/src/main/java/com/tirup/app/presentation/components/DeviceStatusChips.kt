@@ -23,6 +23,7 @@ import com.tirup.app.domain.model.SensorStatus
 import com.tirup.app.domain.model.daysRemaining
 import com.tirup.app.domain.model.isExpired
 import com.tirup.app.domain.model.millisRemaining
+import com.tirup.app.presentation.theme.ActionBlue
 
 /**
  * Unified compact status chip for sensor, pump infusion set, and lancet.
@@ -81,8 +82,8 @@ fun DeviceStatusChips(
 
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+        color = ActionBlue.copy(alpha = 0.08f),
+        border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.45f))
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
