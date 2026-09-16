@@ -20,7 +20,7 @@ class BleScanKeepAliveReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != ACTION_BLE_KEEP_ALIVE) return
 
-        Log.d(TAG, "Keep-alive alarm tick received")
+        Log.i(TAG, "Keep-alive alarm tick received via goAsync")
 
         if (BleObserverManager.isServiceRunning) {
             // Re-arm for the next 5 minutes to maintain the continuous watchdog chain
