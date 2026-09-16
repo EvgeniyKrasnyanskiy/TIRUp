@@ -74,7 +74,7 @@ class BleScanKeepAliveReceiver : BroadcastReceiver() {
                 } else {
                     alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
                 }
-                Log.d(TAG, "Keep-alive alarm scheduled for +20 min")
+                Log.d(TAG, "Keep-alive alarm scheduled for +5 min")
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to schedule keep-alive alarm: ${e.message}")
             }
