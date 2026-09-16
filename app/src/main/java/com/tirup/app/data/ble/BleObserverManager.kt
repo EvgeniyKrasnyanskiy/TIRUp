@@ -226,7 +226,7 @@ object BleObserverManager {
             Log.i(TAG, "Proactive reset triggered during keep-alive tick: scan age is ${elapsedSinceStart / 60000} min (AOSP limit 30 min). Refreshing scan.")
             restartScanInternal("alarm_proactive_reset")
         } else {
-            Log.d(TAG, "Keep-alive tick healthy: scanAge=${elapsedSinceStart / 60000}m, packetSilence=${elapsedSincePacket / 1000}s")
+            Log.i(TAG, "Keep-alive tick healthy: scanAge=${elapsedSinceStart / 60000}m, packetSilence=${elapsedSincePacket / 1000}s, lastPacketReceivedMs=$lastPacketReceivedSystemMs")
         }
     }
 
