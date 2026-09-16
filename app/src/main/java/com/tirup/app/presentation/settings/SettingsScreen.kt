@@ -3861,7 +3861,7 @@ private fun PatientProfileSummaryCard(
 }
 
 @Composable
-private fun Hba1cHistoryDialog(
+fun Hba1cHistoryDialog(
     records: List<LabHba1cRecord>,
     sensorGmi90d: Double?,
     meanGlucose90dMmol: Double?,

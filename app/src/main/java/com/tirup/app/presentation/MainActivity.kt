@@ -72,6 +72,7 @@ import com.tirup.app.presentation.reports.ReportsScreen
 import com.tirup.app.presentation.reports.ReportsViewModel
 import com.tirup.app.presentation.settings.SettingsScreen
 import com.tirup.app.presentation.settings.SettingsViewModel
+import com.tirup.app.presentation.settings.Hba1cHistoryDialog
 import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.PrimaryEmerald
 import com.tirup.app.presentation.theme.TIRUpTheme
@@ -453,12 +454,6 @@ fun AppNavigationRoot(
     }
 
     LaunchedEffect(Unit) {
-        MainActivity.navigateToHba1cEvent.collect {
-            navController.navigate("settings?target=hba1c")
-        }
-    }
-
-    LaunchedEffect(Unit) {
         MainActivity.navigateToYearEndEvent.collect {
             navController.navigate("settings?target=year_end")
         }
@@ -473,6 +468,7 @@ fun AppNavigationRoot(
                 focusViewModel = focusViewModel,
                 trendsViewModel = trendsViewModel,
                 reportsViewModel = reportsViewModel,
+                settingsViewModel = settingsViewModel,
                 onOpenSettings = { target ->
                     if (!target.isNullOrBlank()) {
                         navController.navigate("settings?target=$target")
@@ -509,11 +505,13 @@ fun MainPagerScaffold(
     focusViewModel: FocusViewModel,
     trendsViewModel: TrendsViewModel,
     reportsViewModel: ReportsViewModel,
+    settingsViewModel: SettingsViewModel,
     onOpenSettings: (String?) -> Unit
 ) {
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })
     val coroutineScope = rememberCoroutineScope()
     var isBottomBarVisible by remember { mutableStateOf(true) }
+    var showHba1cDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         launch {
@@ -525,6 +523,11 @@ fun MainPagerScaffold(
             MainActivity.navigateToDigestEvent.collect {
                 pagerState.animateScrollToPage(1)
                 trendsViewModel.openWeeklyDigest()
+            }
+        }
+        launch {
+            MainActivity.navigateToHba1cEvent.collect {
+                showHba1cDialog = true
             }
         }
     }
@@ -635,11 +638,39 @@ fun MainPagerScaffold(
                     2 -> ReportsScreen(
                         viewModel = reportsViewModel,
                         onOpenSettings = { onOpenSettings(null) },
-                        onOpenHba1c = { onOpenSettings("hba1c") }
+                        onOpenHba1c = { showHba1cDialog = true }
                     )
                 }
             }
         }
+    }
+
+    if (showHba1cDialog) {
+        val currentSettingsState by settingsViewModel.uiState.collectAsState()
+        val userSettings = currentSettingsState.userSettings
+        val isRu = userSettings.language.equals("RU", ignoreCase = true)
+        Hba1cHistoryDialog(
+            records = userSettings.hba1cRecords,
+            sensorGmi90d = currentSettingsState.sensorGmi90d,
+            meanGlucose90dMmol = currentSettingsState.meanGlucose90dMmol,
+            tirPercent90d = currentSettingsState.tirPercent90d,
+            skippedQuarterTimestamp = userSettings.hba1cSkippedQuarterTimestamp,
+            isRu = isRu,
+            snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() },
+            onAddRecord = { value, timestamp, lab, notes ->
+                settingsViewModel.addHba1cRecord(valuePercent = value, timestamp = timestamp, labName = lab, notes = notes)
+            },
+            onDeleteRecord = { id ->
+                settingsViewModel.deleteHba1cRecord(id)
+            },
+            onSkipQuarter = {
+                settingsViewModel.skipHba1cQuarter()
+            },
+            onExportPdf = {
+                settingsViewModel.exportHba1cReportToPdf()
+            },
+            onDismiss = { showHba1cDialog = false }
+        )
     }
 }
 
