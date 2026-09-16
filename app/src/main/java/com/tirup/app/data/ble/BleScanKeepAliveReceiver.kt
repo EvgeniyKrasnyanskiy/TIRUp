@@ -7,6 +7,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * BroadcastReceiver for keeping BLE Observer scanner alive across Android Doze mode
@@ -23,8 +26,17 @@ class BleScanKeepAliveReceiver : BroadcastReceiver() {
             // Re-arm for the next 5 minutes to maintain the continuous watchdog chain
             scheduleKeepAlive(context)
 
-            // Delegate unified health check (silence watchdog + 20-min proactive reset) to manager
-            BleObserverManager.onKeepAliveTick()
+            // Hold wake lock across async scan restart via goAsync() so CPU does not sleep mid-restart
+            val pendingResult = goAsync()
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    BleObserverManager.onKeepAliveTickSuspend()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in keep-alive tick: ${e.message}")
+                } finally {
+                    pendingResult.finish()
+                }
+            }
         } else {
             Log.d(TAG, "BleObserverService is not running, skipping reschedule")
         }
