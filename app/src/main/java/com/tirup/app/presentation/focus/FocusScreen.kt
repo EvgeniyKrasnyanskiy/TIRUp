@@ -282,7 +282,7 @@ fun FocusScreen(
                 (System.currentTimeMillis() - heroBleSettings.lastPacketTimestamp) / 60_000L
             } else 999L
             val isMasterBatteryStale = packetAgeMinutes >= 5
-            val masterBattery = if (isObserver && (heroBleSettings.lastMasterBattery in 0..100 || heroBleSettings.lastPacketTimestamp > 0L)) {
+            val masterBattery = if (isObserver && heroBleSettings.lastMasterBattery in 0..100 && !isMasterBatteryStale) {
                 heroBleSettings.lastMasterBattery
             } else null
 
@@ -1102,7 +1102,10 @@ fun FocusScreen(
             onDismiss = { showDeviceModal = false },
             onNewSensor = { days, time -> viewModel.updateSensorInstalled(days, time) },
             onNewPumpSet = { days, time -> viewModel.updatePumpSetInstalled(days, time) },
-            onNewLancet = { days, time -> viewModel.updateLancetInstalled(days, time) }
+            onNewLancet = { days, time -> viewModel.updateLancetInstalled(days, time) },
+            onUpdateSensorDuration = { days -> viewModel.updateSensorDuration(days) },
+            onUpdatePumpDuration = { days -> viewModel.updatePumpSetDuration(days) },
+            onUpdateLancetDuration = { days -> viewModel.updateLancetDuration(days) }
         )
     }
 
@@ -1972,7 +1975,7 @@ private fun HeroGlucoseCard(
         ) {
             val hasIob = (latestReading?.iob != null && latestReading.iob > 0.0)
             val hasCob = (latestReading?.cob != null && latestReading.cob > 0.0)
-            val hasBattery = masterBatteryPct != null
+            val hasBattery = masterBatteryPct != null && masterBatteryPct in 0..100 && !isMasterBatteryStale
 
             // Header Row: [ Bell History ] --- [ Badges: Battery/IoB/CoB ] --- [ BLE Master pulse ]
             Row(
@@ -2012,29 +2015,23 @@ private fun HeroGlucoseCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (hasBattery) {
-                        val grayColor = Color(0xFF94A3B8)
-                        val (batText, batColor) = if (isMasterBatteryStale) {
-                            Pair("🔋 ?", grayColor)
-                        } else {
-                            val color = when {
-                                masterBatteryPct!! <= 15 -> ColorVeryLow
-                                masterBatteryPct <= 25 -> ColorHigh
-                                else -> PrimaryEmerald
-                            }
-                            Pair("🔋 $masterBatteryPct%", color)
+                        val color = when {
+                            masterBatteryPct!! <= 15 -> ColorVeryLow
+                            masterBatteryPct <= 25 -> ColorHigh
+                            else -> PrimaryEmerald
                         }
                         Surface(
                             shape = RoundedCornerShape(10.dp),
-                            color = batColor.copy(alpha = 0.12f),
-                            border = BorderStroke(0.8.dp, batColor.copy(alpha = 0.35f)),
+                            color = color.copy(alpha = 0.12f),
+                            border = BorderStroke(0.8.dp, color.copy(alpha = 0.35f)),
                             modifier = Modifier.clickable { onBatteryClick() }
                         ) {
                             Text(
-                                text = batText,
+                                text = "🔋 $masterBatteryPct%",
                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = batColor
+                                color = color
                             )
                         }
                     }

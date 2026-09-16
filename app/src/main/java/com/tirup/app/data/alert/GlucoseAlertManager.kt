@@ -1815,7 +1815,7 @@ object GlucoseAlertManager {
             (System.currentTimeMillis() - ble.lastPacketTimestamp) / 60_000L
         } else 999L
         val isStaleBattery = packetAgeMinutes >= 5
-        val hasMasterBattery = isObserver && (ble.lastMasterBattery in 0..100 || ble.lastPacketTimestamp > 0L)
+        val hasMasterBattery = isObserver && (ble.lastMasterBattery in 0..100) && !isExpired && !isStaleBattery
         if (hasMasterBattery) {
             val bat = ble.lastMasterBattery
             val batColor = when {
@@ -1823,9 +1823,8 @@ object GlucoseAlertManager {
                 bat <= 25 -> "#F59E0B"
                 else -> "#10B981"
             }
-            val finalBatColor = if (isExpired || isStaleBattery) grayHex else batColor
-            val batText = if (isExpired || isStaleBattery) "🔋 ?" else "🔋 $bat%"
-            extrasList.add("<font color='$finalBatColor'><b>$batText</b></font>")
+            val batText = "🔋 $bat%"
+            extrasList.add("<font color='$batColor'><b>$batText</b></font>")
         }
 
         val bodyHtml = extrasList.joinToString(" &nbsp;<font color='#64748B'>•</font>&nbsp; ")
@@ -1915,14 +1914,14 @@ object GlucoseAlertManager {
             if (hasMasterBattery) {
                 setViewVisibility(R.id.notif_dot3, android.view.View.VISIBLE)
                 setViewVisibility(R.id.notif_battery, android.view.View.VISIBLE)
-                val batText = if (isExpired || isStaleBattery) "🔋 ?" else "🔋 ${ble.lastMasterBattery}%"
+                val batText = "🔋 ${ble.lastMasterBattery}%"
                 setTextViewText(R.id.notif_battery, batText)
                 val batColor = when {
                     ble.lastMasterBattery <= 15 -> Color.parseColor("#EF4444")
                     ble.lastMasterBattery <= 25 -> Color.parseColor("#F59E0B")
                     else -> Color.parseColor("#10B981")
                 }
-                setTextColor(R.id.notif_battery, if (isExpired || isStaleBattery) grayColor else batColor)
+                setTextColor(R.id.notif_battery, batColor)
             } else {
                 setViewVisibility(R.id.notif_dot3, android.view.View.GONE)
                 setViewVisibility(R.id.notif_battery, android.view.View.GONE)

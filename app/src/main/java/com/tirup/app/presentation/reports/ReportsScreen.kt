@@ -176,8 +176,8 @@ fun ReportsScreen(
                 val latestHba1c = state.userSettings.latestHba1cRecord
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFFEF4444).copy(alpha = 0.12f),
-                    border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f)),
+                    color = ActionBlue.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.45f)),
                     modifier = Modifier.clickable { onOpenHba1c() }
                 ) {
                     Row(
@@ -192,7 +192,7 @@ fun ReportsScreen(
                             } else {
                                 "HbA1c: +"
                             },
-                            color = Color(0xFFEF4444),
+                            color = ActionBlue,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp
                         )
@@ -560,7 +560,7 @@ private fun LiveReportCard(
                 ) {
                     Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp), tint = ActionBlue)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = if (isRu) "Сохранить PDF" else "Save PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(text = if (isRu) "Сохранить" else "Save", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
 
                 OutlinedButton(
@@ -642,7 +642,7 @@ private fun HistoricalReportCard(
                                 if (isRu) "${hist.readings.size} измерений • ${hist.dateRangeStr} (предпросмотр)"
                                 else "${hist.readings.size} readings • ${hist.dateRangeStr} (preview)"
                             } else {
-                                if (isRu) "Импорт из xDrip CSV / ZIP" else "Import from xDrip CSV / ZIP"
+                                if (isRu) "Импорт из xDrip+ CSV / ZIP" else "Import from xDrip+ CSV / ZIP"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -692,7 +692,7 @@ private fun HistoricalReportCard(
                             ) {
                                 Text("🩸", fontSize = 11.sp)
                                 Text(
-                                    text = "xDrip",
+                                    text = "xDrip+",
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                     color = Color(0xFF38BDF8)
                                 )
@@ -827,7 +827,7 @@ private fun HistoricalReportCard(
                         ) {
                             Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp), tint = ActionBlue)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = if (isRu) "Сохранить PDF" else "Save PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(text = if (isRu) "Сохранить" else "Save", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
 
                         OutlinedButton(
@@ -1446,7 +1446,7 @@ private fun ParametersGuidebookModal(
                             Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (isRu) "Сохранить PDF" else "Save PDF",
+                                text = if (isRu) "Сохранить" else "Save",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )

@@ -329,6 +329,39 @@ class FocusViewModel(
         }
     }
 
+    fun updateSensorDuration(durationDays: Int) {
+        val currentSettings = _uiState.value.userSettings
+        viewModelScope.launch {
+            settingsRepository.updateSettings(
+                currentSettings.copy(
+                    sensorStatus = currentSettings.sensorStatus.copy(lastUsedDurationDays = durationDays)
+                )
+            )
+        }
+    }
+
+    fun updatePumpSetDuration(durationDays: Int) {
+        val currentSettings = _uiState.value.userSettings
+        viewModelScope.launch {
+            settingsRepository.updateSettings(
+                currentSettings.copy(
+                    pumpSetStatus = currentSettings.pumpSetStatus.copy(lastUsedDurationDays = durationDays)
+                )
+            )
+        }
+    }
+
+    fun updateLancetDuration(durationDays: Int) {
+        val currentSettings = _uiState.value.userSettings
+        viewModelScope.launch {
+            settingsRepository.updateSettings(
+                currentSettings.copy(
+                    lancetStatus = currentSettings.lancetStatus.copy(lastUsedDurationDays = durationDays)
+                )
+            )
+        }
+    }
+
     fun toggleBleBridgeEnabled() {
         val currentSettings = _uiState.value.userSettings
         val currentBle = currentSettings.bleBridgeSettings
