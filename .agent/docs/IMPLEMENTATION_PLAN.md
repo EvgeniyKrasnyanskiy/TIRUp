@@ -271,23 +271,23 @@
 - `GlucoseAlertManager.kt`: в lockscreen-уведомлении скрывать батарейку при отсутствии данных или устаревании.
 - `FocusScreen.kt`: в `HeroGlucoseCard` скрывать бейдж батареи, если данных нет или они неактуальны.
 
-## 14. Итерация 14: Стабилизация Слушателя BLE-моста (Anti-Throttling & Keep-Alive Engine)
+## 14. Итерация 14: [Completed] Стабилизация Слушателя BLE-моста (Anti-Throttling & Keep-Alive Engine)
 
-### Этап 1: Аппаратный AlarmManager Keep-Alive (обход 30-минутного лимита AOSP)
-- `BleScanKeepAliveReceiver.kt`: специализированный `BroadcastReceiver`.
-  - Приём намерения `ACTION_BLE_KEEP_ALIVE`.
-  - Самоперепланирование на следующие 20 минут через `setAndAllowWhileIdle()` (или `setExactAndAllowWhileIdle()`, если есть разрешение), гарантированно работающее сквозь Doze без блокировки по `SCHEDULE_EXACT_ALARM`.
-  - Вызов единой точки входа перезапуска скана `BleObserverManager.restartScanInternal("alarm_keep_alive")`.
-- `BleObserverService.kt`: запуск планировщика будильника при старте службы и отмена при остановке.
+### Этап 1: [Completed] Аппаратный AlarmManager Keep-Alive (5-минутный пульс сквозь Doze)
+- `BleScanKeepAliveReceiver.kt`:
+  - Аппаратный 5-минутный цикл будильника с самоперепланированием цепочки.
+  - Совместимость с Android 12+ (API 31+): проверка `canScheduleExactAlarms()` с безопасным fallback на `setAndAllowWhileIdle()` (не требует опасного разрешения `SCHEDULE_EXACT_ALARM` и гарантированно будит CPU из глубокого Doze).
+  - Вызов `BleObserverManager.onKeepAliveTick()`.
+- `BleObserverService.kt`: регистрация/отмена аппаратного таймера при жизненном цикле сервиса.
 - `AndroidManifest.xml`: регистрация ресивера `BleScanKeepAliveReceiver`.
 
-### Этап 2: Единая точка входа перезапуска скана и защита от гонок в BleObserverManager
+### Этап 2: [Completed] Единая точка проверки здоровья и защита от гонок в BleObserverManager
 - `BleObserverManager.kt`:
-  - Единая функция `restartScanInternal(reason: String)` с блокировкой `mutex.withLock`.
-  - Защита от частых вызовов (cooldown): игнорирование рестарта, если с момента предыдущего прошло менее 60 секунд (защита от лимита AOSP «не более 5 startScan за 30 сек»).
-  - Полное уничтожение старого экземпляра `ScanCallback` и создание нового объекта на каждый запуск (устранение ошибки `SCAN_FAILED_ALREADY_STARTED`).
-  - Подробное логирование ошибок `onScanFailed(errorCode)` с расшифровкой кодов.
-  - Реактивная страховка по тишине: фоновый таймер на 7 минут отсутствия пакетов, вызывающий ту же функцию `restartScanInternal("silence_timeout")`.
+  - Метод `onKeepAliveTick()`: объединил в одном аппаратном тике реактивную проверку тишины (>= 6 мин без пакетов) и проактивный сброс 30-минутного лимита AOSP (скан старше 20 мин). Устранены ненадежные корутинные `delay()`, замерзающие при выключенном экране.
+  - Единая функция `restartScanInternal(reason: String)` под `mutex.withLock`.
+  - Защита от спама (кулдаун 60 сек, предохраняющий от лимита AOSP «5 стартов за 30 сек»).
+  - Пауза 350 мс перед стартом для IPC-стека Bluetooth и создание совершенно нового экземпляра `ScanCallback` на каждый рестарт.
+  - Детальное логирование кодов ошибок `onScanFailed`.
 
 
 
