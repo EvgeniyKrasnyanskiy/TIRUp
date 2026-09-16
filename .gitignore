@@ -18,3 +18,5 @@ app/build/
 *.jks
 *.keystore
 *.log
+ble_test_log.txt
+
