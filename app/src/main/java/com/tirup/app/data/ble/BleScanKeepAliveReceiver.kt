@@ -17,14 +17,14 @@ class BleScanKeepAliveReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != ACTION_BLE_KEEP_ALIVE) return
 
-        Log.i(TAG, "Keep-alive alarm triggered, refreshing BLE scan to reset 30-min AOSP timeout")
+        Log.d(TAG, "Keep-alive alarm tick received")
 
         if (BleObserverManager.isServiceRunning) {
-            // Re-arm for the next 20 minutes to maintain the chain
+            // Re-arm for the next 5 minutes to maintain the continuous watchdog chain
             scheduleKeepAlive(context)
 
-            // Trigger single entry-point scan restart
-            BleObserverManager.restartScan("alarm_keep_alive")
+            // Delegate unified health check (silence watchdog + 20-min proactive reset) to manager
+            BleObserverManager.onKeepAliveTick()
         } else {
             Log.d(TAG, "BleObserverService is not running, skipping reschedule")
         }
@@ -34,7 +34,7 @@ class BleScanKeepAliveReceiver : BroadcastReceiver() {
         const val ACTION_BLE_KEEP_ALIVE = "com.tirup.app.ACTION_BLE_KEEP_ALIVE"
         private const val TAG = "BleKeepAliveReceiver"
         private const val REQUEST_CODE = 9924
-        const val KEEP_ALIVE_INTERVAL_MS = 20 * 60 * 1000L // 20 minutes (safely below 30-min AOSP limit)
+        const val KEEP_ALIVE_INTERVAL_MS = 5 * 60 * 1000L // 5 minutes hardware heartbeat
 
         fun scheduleKeepAlive(context: Context) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return

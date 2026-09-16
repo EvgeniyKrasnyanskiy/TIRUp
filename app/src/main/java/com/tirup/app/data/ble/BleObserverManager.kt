@@ -41,7 +41,8 @@ object BleObserverManager {
 
     private const val TAG = "BleObserverManager"
     private const val MIN_RESTART_COOLDOWN_MS = 60_000L // anti-spam cooldown (protects against max 5 starts / 30s AOSP limit)
-    private const val SILENCE_TIMEOUT_MS = 7 * 60 * 1000L // 7 minutes without packet triggers reactive restart
+    private const val SILENCE_TIMEOUT_MS = 6 * 60 * 1000L // 6 minutes without packet triggers reactive restart
+    private const val PROACTIVE_RESET_INTERVAL_MS = 20 * 60 * 1000L // 20 minutes continuous scan triggers proactive AOSP demotion reset
 
     private val scope = CoroutineScope(Dispatchers.IO)
     private val mutex = Mutex()
@@ -55,13 +56,15 @@ object BleObserverManager {
     private var isScanning = false
     private var isBoostActive = false
     private var boostJob: Job? = null
-    private var silenceJob: Job? = null
 
     @Volatile
     private var lastRestartTimestampMs: Long = 0L
 
     @Volatile
     private var lastPacketReceivedSystemMs: Long = 0L
+
+    @Volatile
+    private var scanStartTimestampMs: Long = 0L
 
     private val _isScanningFlow = MutableStateFlow(false)
     val isScanningFlow: StateFlow<Boolean> = _isScanningFlow.asStateFlow()
@@ -195,6 +198,37 @@ object BleObserverManager {
     ) = boostScanFor60Sec(context, settingsRepository, glucoseRepository)
 
     /**
+     * Periodic hardware heartbeat invoked by BleScanKeepAliveReceiver (every 5 minutes via AlarmManager).
+     * Single source of truth for both:
+     * 1) Reactive silence detection (restarts scan if no packets received for >= 6 minutes).
+     * 2) Proactive AOSP demotion avoidance (restarts scan if running continuously for >= 20 minutes).
+     * Driven by AlarmManager RTC_WAKEUP, ensuring execution across deep Doze mode without relying on frozen coroutine delays.
+     */
+    fun onKeepAliveTick() {
+        if (!isServiceRunning && !isScanning) return
+
+        val now = System.currentTimeMillis()
+        if (!isScanning) {
+            Log.w(TAG, "Keep-alive tick: Scanner is unexpectedly stopped. Restarting.")
+            restartScan("alarm_scanner_dead")
+            return
+        }
+
+        val elapsedSincePacket = if (lastPacketReceivedSystemMs > 0L) now - lastPacketReceivedSystemMs else 0L
+        val elapsedSinceStart = if (scanStartTimestampMs > 0L) now - scanStartTimestampMs else 0L
+
+        if (lastPacketReceivedSystemMs > 0L && elapsedSincePacket >= SILENCE_TIMEOUT_MS) {
+            Log.w(TAG, "Silence watchdog triggered during keep-alive tick: ${elapsedSincePacket / 1000}s since last packet. Restarting scan.")
+            restartScan("alarm_silence_timeout")
+        } else if (scanStartTimestampMs > 0L && elapsedSinceStart >= PROACTIVE_RESET_INTERVAL_MS) {
+            Log.i(TAG, "Proactive reset triggered during keep-alive tick: scan age is ${elapsedSinceStart / 60000} min (AOSP limit 30 min). Refreshing scan.")
+            restartScan("alarm_proactive_reset")
+        } else {
+            Log.d(TAG, "Keep-alive tick healthy: scanAge=${elapsedSinceStart / 60000}m, packetSilence=${elapsedSincePacket / 1000}s")
+        }
+    }
+
+    /**
      * Public unified entry point for scan restarts (called by BleScanKeepAliveReceiver or silence detector).
      * Protected by Mutex and anti-spam cooldown to guarantee race-free execution.
      */
@@ -225,8 +259,6 @@ object BleObserverManager {
         } catch (e: Exception) {
             Log.w(TAG, "Error stopping scan during restart: ${e.message}")
         }
-        silenceJob?.cancel()
-        silenceJob = null
         activeCallback = null
         scanner = null
         isScanning = false
@@ -347,9 +379,10 @@ object BleObserverManager {
             activeCallback = callback
             isScanning = true
             _isScanningFlow.value = true
-            lastPacketReceivedSystemMs = System.currentTimeMillis()
+            val now = System.currentTimeMillis()
+            scanStartTimestampMs = now
+            lastPacketReceivedSystemMs = now
             Log.i(TAG, "BLE Observer started scanning successfully (boost=$boost)")
-            startSilenceWatcher()
         } catch (e: SecurityException) {
             Log.w(TAG, "SecurityException starting scan: ${e.message}")
             _isScanningFlow.value = false
@@ -428,31 +461,11 @@ object BleObserverManager {
             }
         } catch (_: SecurityException) {
         } catch (_: Exception) {}
-        silenceJob?.cancel()
-        silenceJob = null
         activeCallback = null
         scanner = null
         isScanning = false
         _isScanningFlow.value = false
         Log.i(TAG, "BLE Observer stopped scanning")
-    }
-
-    private fun startSilenceWatcher() {
-        silenceJob?.cancel()
-        silenceJob = scope.launch {
-            while (isScanning) {
-                delay(60_000L) // check every minute
-                if (!isScanning || isBoostActive) continue
-
-                val now = System.currentTimeMillis()
-                val elapsedSinceLastPacket = now - lastPacketReceivedSystemMs
-                if (lastPacketReceivedSystemMs > 0L && elapsedSinceLastPacket >= SILENCE_TIMEOUT_MS) {
-                    Log.w(TAG, "No BLE packet for ${elapsedSinceLastPacket / 1000}s (threshold ${SILENCE_TIMEOUT_MS / 1000}s). Triggering silence recovery restart.")
-                    lastPacketReceivedSystemMs = now // reset to avoid rapid repeated restarts
-                    restartScanInternal("silence_timeout_7min")
-                }
-            }
-        }
     }
 
     fun isBluetoothEnabled(context: Context): Boolean {
