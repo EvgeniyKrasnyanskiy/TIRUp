@@ -184,7 +184,7 @@ fun ReportsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
-                        Text("🩸", fontSize = 13.sp)
+                        Text("🧪", fontSize = 13.sp)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = if (latestHba1c != null) {

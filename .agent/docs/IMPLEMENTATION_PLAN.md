@@ -252,13 +252,13 @@
 - `GlucoseAlertManager.kt`: учет `isMasterActive` в `checkSignalLoss`, чтобы потеря связи не воспроизводила звук во время активной паузы всех тревог.
 - `FocusViewModel.kt`: обновление дефолтной паузы до 1 часа (`3600 * 1000L`).
 
-## 13. Итерация 13: Оформление кнопок, защита и выбор даты расходников, очистка виджетов от батарейки с ?
+## 13. Итерация 13: [Completed] Оформление кнопок, защита и выбор даты расходников, очистка виджетов от батарейки с ?
 
-### Этап 1: Кнопка HbA1c и Кнопка устройств (Пункты 2 и 3)
-- `ReportsScreen.kt`: кнопка HbA1c — синяя рамка и текст `ActionBlue`, мягкий фон `ActionBlue.copy(alpha = 0.08f)`, эмодзи 🩸 сохранён красным.
+### Этап 1: [Completed] Кнопка HbA1c и Кнопка устройств (Пункты 2 и 3)
+- `ReportsScreen.kt`: кнопка HbA1c — синяя рамка и текст `ActionBlue`, мягкий фон `ActionBlue.copy(alpha = 0.08f)`, эмодзи заменён на пробирку `🧪`.
 - `DeviceStatusChips.kt`: чип расходников — синяя рамка `ActionBlue.copy(alpha = 0.4f)`, фон `ActionBlue.copy(alpha = 0.08f)`. Стрик сохраняет статусную окраску (`PrimaryEmerald`).
 
-### Этап 2: Экран «Устройства и расходники»: запоминание дней, защита и выбор даты (Пункт 5)
+### Этап 2: [Completed] Экран «Устройства и расходники»: запоминание дней, защита и выбор даты (Пункт 5)
 - `FocusViewModel.kt`: методы обновления сроков службы расходников `updateSensorDuration(days)`, `updatePumpDuration(days)`, `updateLancetDuration(days)` с мгновенным сохранением в `SettingsRepository`.
 - `DeviceStatusModal.kt`:
   - Сохранение выбранных дней при изменении без сброса при закрытии диалога.
@@ -266,9 +266,28 @@
   - Добавление полноценного `DatePickerDialog` в `CountdownConfirmDialog`, позволяющего выбрать любую прошедшую дату установки нового устройства (а не только «Вчера»).
 - `FocusScreen.kt`: передача коллбэков обновления длительностей в `DeviceStatusModal`.
 
-### Этап 3: Очистка от батарейки со знаком вопроса «🔋 ?» (Пункт 6)
+### Этап 3: [Completed] Очистка от батарейки со знаком вопроса «🔋 ?» (Пункт 6)
 - `TirupWidgetUpdater.kt`: скрывать слот батареи на виджетах, если батарея неизвестна (`battery < 0`) или устарела, чтобы не вытеснять другие важные параметры (стрик, расходники, IOB/COB).
 - `GlucoseAlertManager.kt`: в lockscreen-уведомлении скрывать батарейку при отсутствии данных или устаревании.
 - `FocusScreen.kt`: в `HeroGlucoseCard` скрывать бейдж батареи, если данных нет или они неактуальны.
+
+## 14. Итерация 14: Стабилизация Слушателя BLE-моста (Anti-Throttling & Keep-Alive Engine)
+
+### Этап 1: Аппаратный AlarmManager Keep-Alive (обход 30-минутного лимита AOSP)
+- `BleScanKeepAliveReceiver.kt`: специализированный `BroadcastReceiver`.
+  - Приём намерения `ACTION_BLE_KEEP_ALIVE`.
+  - Самоперепланирование на следующие 20 минут через `setAndAllowWhileIdle()` (или `setExactAndAllowWhileIdle()`, если есть разрешение), гарантированно работающее сквозь Doze без блокировки по `SCHEDULE_EXACT_ALARM`.
+  - Вызов единой точки входа перезапуска скана `BleObserverManager.restartScanInternal("alarm_keep_alive")`.
+- `BleObserverService.kt`: запуск планировщика будильника при старте службы и отмена при остановке.
+- `AndroidManifest.xml`: регистрация ресивера `BleScanKeepAliveReceiver`.
+
+### Этап 2: Единая точка входа перезапуска скана и защита от гонок в BleObserverManager
+- `BleObserverManager.kt`:
+  - Единая функция `restartScanInternal(reason: String)` с блокировкой `mutex.withLock`.
+  - Защита от частых вызовов (cooldown): игнорирование рестарта, если с момента предыдущего прошло менее 60 секунд (защита от лимита AOSP «не более 5 startScan за 30 сек»).
+  - Полное уничтожение старого экземпляра `ScanCallback` и создание нового объекта на каждый запуск (устранение ошибки `SCAN_FAILED_ALREADY_STARTED`).
+  - Подробное логирование ошибок `onScanFailed(errorCode)` с расшифровкой кодов.
+  - Реактивная страховка по тишине: фоновый таймер на 7 минут отсутствия пакетов, вызывающий ту же функцию `restartScanInternal("silence_timeout")`.
+
 
 

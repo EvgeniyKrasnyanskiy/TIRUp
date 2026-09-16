@@ -40,16 +40,28 @@ import kotlinx.coroutines.sync.withLock
 object BleObserverManager {
 
     private const val TAG = "BleObserverManager"
-    private const val WATCHDOG_INTERVAL_MS = 15 * 60 * 1000L // 15 minutes anti-throttling refresh
+    private const val MIN_RESTART_COOLDOWN_MS = 60_000L // anti-spam cooldown (protects against max 5 starts / 30s AOSP limit)
+    private const val SILENCE_TIMEOUT_MS = 7 * 60 * 1000L // 7 minutes without packet triggers reactive restart
+
     private val scope = CoroutineScope(Dispatchers.IO)
     private val mutex = Mutex()
+
+    private var appContext: Context? = null
+    private var cachedSettingsRepo: SettingsRepository? = null
+    private var cachedGlucoseRepo: GlucoseRepository? = null
 
     private var scanner: BluetoothLeScanner? = null
     private var activeCallback: ScanCallback? = null
     private var isScanning = false
     private var isBoostActive = false
     private var boostJob: Job? = null
-    private var watchdogJob: Job? = null
+    private var silenceJob: Job? = null
+
+    @Volatile
+    private var lastRestartTimestampMs: Long = 0L
+
+    @Volatile
+    private var lastPacketReceivedSystemMs: Long = 0L
 
     private val _isScanningFlow = MutableStateFlow(false)
     val isScanningFlow: StateFlow<Boolean> = _isScanningFlow.asStateFlow()
@@ -75,6 +87,10 @@ object BleObserverManager {
         settingsRepository: SettingsRepository,
         glucoseRepository: GlucoseRepository
     ) {
+        appContext = context.applicationContext
+        cachedSettingsRepo = settingsRepository
+        cachedGlucoseRepo = glucoseRepository
+
         scope.launch {
             val userSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
             val ble = userSettings.bleBridgeSettings
@@ -114,6 +130,10 @@ object BleObserverManager {
         settingsRepository: SettingsRepository,
         glucoseRepository: GlucoseRepository
     ) {
+        appContext = context.applicationContext
+        cachedSettingsRepo = settingsRepository
+        cachedGlucoseRepo = glucoseRepository
+
         scope.launch {
             val userSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
             val ble = userSettings.bleBridgeSettings
@@ -137,6 +157,10 @@ object BleObserverManager {
         settingsRepository: SettingsRepository,
         glucoseRepository: GlucoseRepository
     ) {
+        appContext = context.applicationContext
+        cachedSettingsRepo = settingsRepository
+        cachedGlucoseRepo = glucoseRepository
+
         scope.launch {
             val userSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
             val ble = userSettings.bleBridgeSettings
@@ -156,7 +180,7 @@ object BleObserverManager {
                     _boostRemainingSec.value = (_boostRemainingSec.value - 1).coerceAtLeast(0)
                 }
                 isBoostActive = false
-                // Revert to BALANCED scan mode
+                // Revert to normal scan mode
                 stopScanningInternal()
                 startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = false)
             }
@@ -170,6 +194,58 @@ object BleObserverManager {
         glucoseRepository: GlucoseRepository
     ) = boostScanFor60Sec(context, settingsRepository, glucoseRepository)
 
+    /**
+     * Public unified entry point for scan restarts (called by BleScanKeepAliveReceiver or silence detector).
+     * Protected by Mutex and anti-spam cooldown to guarantee race-free execution.
+     */
+    fun restartScan(reason: String) {
+        scope.launch {
+            restartScanInternal(reason)
+        }
+    }
+
+    private suspend fun restartScanInternal(reason: String) = mutex.withLock {
+        val now = System.currentTimeMillis()
+        val elapsedSinceLastRestart = now - lastRestartTimestampMs
+        if (lastRestartTimestampMs > 0L && elapsedSinceLastRestart < MIN_RESTART_COOLDOWN_MS) {
+            Log.d(TAG, "Restart suppressed by cooldown ($reason, elapsed=${elapsedSinceLastRestart}ms < ${MIN_RESTART_COOLDOWN_MS}ms)")
+            return@withLock
+        }
+        if (!isServiceRunning && !isScanning) {
+            Log.d(TAG, "Observer is not active, skipping restart ($reason)")
+            return@withLock
+        }
+
+        lastRestartTimestampMs = now
+        Log.i(TAG, "Executing clean BLE scan restart: reason='$reason'")
+
+        // 1. Stop current scan and discard old callback object
+        try {
+            activeCallback?.let { cb -> scanner?.stopScan(cb) }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error stopping scan during restart: ${e.message}")
+        }
+        silenceJob?.cancel()
+        silenceJob = null
+        activeCallback = null
+        scanner = null
+        isScanning = false
+
+        // 2. Pause 350ms to allow system Bluetooth stack IPC to fully clear the client registration
+        delay(350L)
+
+        // 3. Resolve context and repositories
+        val context = appContext ?: TirupApplication.instance
+        val settingsRepo = cachedSettingsRepo ?: (context as? TirupApplication)?.settingsRepository ?: return@withLock
+        val glucoseRepo = cachedGlucoseRepo ?: (context as? TirupApplication)?.glucoseRepository ?: return@withLock
+        val userSettings = settingsRepo.getSettings().firstOrNull() ?: return@withLock
+        val ble = userSettings.bleBridgeSettings
+        if (!ble.isEnabled || ble.role != BleBridgeRole.OBSERVER) return@withLock
+
+        // 4. Start completely fresh scan with a NEW ScanCallback instance
+        startScanningInternalLocked(context, ble.familyPin, settingsRepo, glucoseRepo, boost = isBoostActive)
+    }
+
     private suspend fun startScanningInternal(
         context: Context,
         familyPin: String,
@@ -177,27 +253,37 @@ object BleObserverManager {
         glucoseRepository: GlucoseRepository,
         boost: Boolean
     ) = mutex.withLock {
-        if (isScanning) return@withLock
+        startScanningInternalLocked(context, familyPin, settingsRepository, glucoseRepository, boost)
+    }
+
+    private fun startScanningInternalLocked(
+        context: Context,
+        familyPin: String,
+        settingsRepository: SettingsRepository,
+        glucoseRepository: GlucoseRepository,
+        boost: Boolean
+    ) {
+        if (isScanning) return
 
         if (!hasScanPermission(context)) {
             Log.w(TAG, "Cannot start BLE scanner: scan permission not granted")
             _isScanningFlow.value = false
-            return@withLock
+            return
         }
 
-        val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager ?: return@withLock
+        val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager ?: return
         val adapter = bm.adapter
         if (adapter == null || !adapter.isEnabled) {
             Log.d(TAG, "Bluetooth disabled, cannot start BLE Observer")
             _isScanningFlow.value = false
-            return@withLock
+            return
         }
 
         val leScanner = adapter.bluetoothLeScanner
         if (leScanner == null) {
             Log.w(TAG, "BluetoothLeScanner not available")
             _isScanningFlow.value = false
-            return@withLock
+            return
         }
 
         // Manufacturer ScanFilter with exact 'TU' magic header ensures hardware filtering keeps scanning alive while screen is off (Android 8+)
@@ -221,6 +307,7 @@ object BleObserverManager {
             }
             .build()
 
+        // Guarantee a completely fresh instance of ScanCallback on each start
         val callback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult?) {
                 if (result == null) return
@@ -234,8 +321,23 @@ object BleObserverManager {
             }
 
             override fun onScanFailed(errorCode: Int) {
-                Log.w(TAG, "BLE Scan failed with errorCode: $errorCode")
+                val errorDesc = when (errorCode) {
+                    SCAN_FAILED_ALREADY_STARTED -> "SCAN_FAILED_ALREADY_STARTED (1)"
+                    SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> "SCAN_FAILED_APPLICATION_REGISTRATION_FAILED (2)"
+                    SCAN_FAILED_INTERNAL_ERROR -> "SCAN_FAILED_INTERNAL_ERROR (3)"
+                    SCAN_FAILED_FEATURE_UNSUPPORTED -> "SCAN_FAILED_FEATURE_UNSUPPORTED (4)"
+                    SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES -> "SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES (5)"
+                    else -> "SCAN_FAILED_UNKNOWN ($errorCode)"
+                }
+                Log.e(TAG, "BLE Scan failed: $errorDesc")
                 _isScanningFlow.value = false
+
+                if (errorCode == SCAN_FAILED_ALREADY_STARTED || errorCode == SCAN_FAILED_INTERNAL_ERROR) {
+                    scope.launch {
+                        delay(2500L)
+                        restartScanInternal("on_scan_failed_recovery")
+                    }
+                }
             }
         }
 
@@ -245,8 +347,9 @@ object BleObserverManager {
             activeCallback = callback
             isScanning = true
             _isScanningFlow.value = true
-            Log.i(TAG, "BLE Observer started scanning (boost=$boost)")
-            startWatchdog()
+            lastPacketReceivedSystemMs = System.currentTimeMillis()
+            Log.i(TAG, "BLE Observer started scanning successfully (boost=$boost)")
+            startSilenceWatcher()
         } catch (e: SecurityException) {
             Log.w(TAG, "SecurityException starting scan: ${e.message}")
             _isScanningFlow.value = false
@@ -271,6 +374,7 @@ object BleObserverManager {
         // Anti-duplicate protection: ignore if timestamp already processed or in past
         if (packet.timestamp <= lastHandledTimestamp) return
         lastHandledTimestamp = packet.timestamp
+        lastPacketReceivedSystemMs = System.currentTimeMillis()
 
         val rssi = result.rssi
         Log.i(TAG, "Received valid BLE glucose packet: ts=${packet.timestamp}, bg=${packet.valueMmol}, rssi=$rssi, bat=${packet.batteryPercent}%")
@@ -324,8 +428,8 @@ object BleObserverManager {
             }
         } catch (_: SecurityException) {
         } catch (_: Exception) {}
-        watchdogJob?.cancel()
-        watchdogJob = null
+        silenceJob?.cancel()
+        silenceJob = null
         activeCallback = null
         scanner = null
         isScanning = false
@@ -333,46 +437,19 @@ object BleObserverManager {
         Log.i(TAG, "BLE Observer stopped scanning")
     }
 
-    private fun startWatchdog() {
-        watchdogJob?.cancel()
-        watchdogJob = scope.launch {
+    private fun startSilenceWatcher() {
+        silenceJob?.cancel()
+        silenceJob = scope.launch {
             while (isScanning) {
-                delay(WATCHDOG_INTERVAL_MS)
+                delay(60_000L) // check every minute
                 if (!isScanning || isBoostActive) continue
-                Log.i(TAG, "Watchdog: refreshing BLE scan to prevent 30-min opportunistic throttling")
-                mutex.withLock {
-                    if (isScanning && !isBoostActive) {
-                        try {
-                            activeCallback?.let { cb -> scanner?.stopScan(cb) }
-                        } catch (_: Exception) {}
-                        delay(150L)
-                        try {
-                            val scanFilter = ScanFilter.Builder()
-                                .setManufacturerData(
-                                    BlePacketCodec.MANUFACTURER_ID,
-                                    byteArrayOf(0x54, 0x55),
-                                    byteArrayOf(0xFF.toByte(), 0xFF.toByte())
-                                )
-                                .build()
-                            val scanSettings = ScanSettings.Builder()
-                                .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
-                                .setReportDelay(0L)
-                                .apply {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                        setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
-                                        setNumOfMatches(ScanSettings.MATCH_NUM_ONE_ADVERTISEMENT)
-                                        setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
-                                    }
-                                }
-                                .build()
-                            activeCallback?.let { cb ->
-                                scanner?.startScan(listOf(scanFilter), scanSettings, cb)
-                                Log.i(TAG, "Watchdog: BLE scan refreshed successfully")
-                            }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Watchdog refresh error: ${e.message}")
-                        }
-                    }
+
+                val now = System.currentTimeMillis()
+                val elapsedSinceLastPacket = now - lastPacketReceivedSystemMs
+                if (lastPacketReceivedSystemMs > 0L && elapsedSinceLastPacket >= SILENCE_TIMEOUT_MS) {
+                    Log.w(TAG, "No BLE packet for ${elapsedSinceLastPacket / 1000}s (threshold ${SILENCE_TIMEOUT_MS / 1000}s). Triggering silence recovery restart.")
+                    lastPacketReceivedSystemMs = now // reset to avoid rapid repeated restarts
+                    restartScanInternal("silence_timeout_7min")
                 }
             }
         }

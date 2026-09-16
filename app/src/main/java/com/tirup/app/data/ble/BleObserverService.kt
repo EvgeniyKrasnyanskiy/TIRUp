@@ -62,6 +62,7 @@ class BleObserverService : Service() {
         }
 
         BleObserverManager.startScanningFromService(applicationContext, settingsRepo, glucoseRepo)
+        BleScanKeepAliveReceiver.scheduleKeepAlive(applicationContext)
 
         return START_STICKY
     }
@@ -69,6 +70,7 @@ class BleObserverService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         BleObserverManager.isServiceRunning = false
+        BleScanKeepAliveReceiver.cancelKeepAlive(applicationContext)
         Log.i(TAG, "BleObserverService onDestroy")
         try {
             if (wakeLock?.isHeld == true) {
