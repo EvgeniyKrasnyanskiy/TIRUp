@@ -202,15 +202,17 @@ object BleObserverManager {
      * Single source of truth for both:
      * 1) Reactive silence detection (restarts scan if no packets received for >= 6 minutes).
      * 2) Proactive AOSP demotion avoidance (restarts scan if running continuously for >= 20 minutes).
-     * Driven by AlarmManager RTC_WAKEUP, ensuring execution across deep Doze mode without relying on frozen coroutine delays.
+     *
+     * Executed inside BroadcastReceiver's goAsync() block, guaranteeing CPU WakeLock remains held
+     * during the entire stop -> delay(350ms) -> startScan sequence.
      */
-    fun onKeepAliveTick() {
+    suspend fun onKeepAliveTickSuspend() {
         if (!isServiceRunning && !isScanning) return
 
         val now = System.currentTimeMillis()
         if (!isScanning) {
             Log.w(TAG, "Keep-alive tick: Scanner is unexpectedly stopped. Restarting.")
-            restartScan("alarm_scanner_dead")
+            restartScanInternal("alarm_scanner_dead")
             return
         }
 
@@ -219,12 +221,19 @@ object BleObserverManager {
 
         if (lastPacketReceivedSystemMs > 0L && elapsedSincePacket >= SILENCE_TIMEOUT_MS) {
             Log.w(TAG, "Silence watchdog triggered during keep-alive tick: ${elapsedSincePacket / 1000}s since last packet. Restarting scan.")
-            restartScan("alarm_silence_timeout")
+            restartScanInternal("alarm_silence_timeout")
         } else if (scanStartTimestampMs > 0L && elapsedSinceStart >= PROACTIVE_RESET_INTERVAL_MS) {
             Log.i(TAG, "Proactive reset triggered during keep-alive tick: scan age is ${elapsedSinceStart / 60000} min (AOSP limit 30 min). Refreshing scan.")
-            restartScan("alarm_proactive_reset")
+            restartScanInternal("alarm_proactive_reset")
         } else {
             Log.d(TAG, "Keep-alive tick healthy: scanAge=${elapsedSinceStart / 60000}m, packetSilence=${elapsedSincePacket / 1000}s")
+        }
+    }
+
+    /** Non-suspending convenience wrapper */
+    fun onKeepAliveTick() {
+        scope.launch {
+            onKeepAliveTickSuspend()
         }
     }
 
