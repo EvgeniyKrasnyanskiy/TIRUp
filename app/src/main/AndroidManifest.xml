@@ -144,6 +144,15 @@
             android:foregroundServiceType="connectedDevice"
             tools:targetApi="upside_down_cake" />
 
+        <!-- Receiver for 20-minute BLE scan keep-alive alarm (anti-throttling) -->
+        <receiver
+            android:name=".data.ble.BleScanKeepAliveReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.tirup.app.ACTION_BLE_KEEP_ALIVE" />
+            </intent-filter>
+        </receiver>
+
         <!-- FileProvider for secure offline sharing of generated PDF medical reports -->
         <provider
             android:name="androidx.core.content.FileProvider"
