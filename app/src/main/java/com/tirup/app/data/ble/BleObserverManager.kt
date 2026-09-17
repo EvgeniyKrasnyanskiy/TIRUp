@@ -12,6 +12,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.tirup.app.TirupApplication
@@ -42,7 +43,7 @@ object BleObserverManager {
     private const val TAG = "BleObserverManager"
     private const val MIN_RESTART_COOLDOWN_MS = 60_000L // anti-spam cooldown (protects against max 5 starts / 30s AOSP limit)
     private const val SILENCE_TIMEOUT_MS = 6 * 60 * 1000L // 6 minutes without packet triggers reactive restart
-    private const val PROACTIVE_RESET_INTERVAL_MS = 20 * 60 * 1000L // 20 minutes continuous scan triggers proactive AOSP demotion reset
+    private const val PROACTIVE_RESET_INTERVAL_MS = 27 * 60 * 1000L // 27 minutes continuous scan triggers proactive AOSP 30-min limit reset
 
     private val scope = CoroutineScope(Dispatchers.IO)
     private val mutex = Mutex()
@@ -222,12 +223,15 @@ object BleObserverManager {
         val elapsedSincePacket = if (lastPacketReceivedSystemMs > 0L) now - lastPacketReceivedSystemMs else 0L
         val elapsedSinceStart = if (scanStartTimestampMs > 0L) now - scanStartTimestampMs else 0L
 
-        if (lastPacketReceivedSystemMs > 0L && elapsedSincePacket >= SILENCE_TIMEOUT_MS) {
-            Log.w(TAG, "Silence watchdog triggered during keep-alive tick: ${elapsedSincePacket / 1000}s since last packet. Restarting scan.")
-            restartScanInternal("alarm_silence_timeout")
-        } else if (scanStartTimestampMs > 0L && elapsedSinceStart >= PROACTIVE_RESET_INTERVAL_MS) {
-            Log.i(TAG, "Proactive reset triggered during keep-alive tick: scan age is ${elapsedSinceStart / 60000} min (AOSP limit 30 min). Refreshing scan.")
-            restartScanInternal("alarm_proactive_reset")
+        val isPacketSilence = lastPacketReceivedSystemMs > 0L && elapsedSincePacket >= SILENCE_TIMEOUT_MS
+        val isAospLimitApproaching = scanStartTimestampMs > 0L && elapsedSinceStart >= PROACTIVE_RESET_INTERVAL_MS
+
+        if (isPacketSilence) {
+            Log.w(TAG, "Silence watchdog triggered during keep-alive tick: ${elapsedSincePacket / 1000}s since last packet. Restarting scan with boost.")
+            restartScanInternal("alarm_silence_timeout", boost = true)
+        } else if (isAospLimitApproaching) {
+            Log.i(TAG, "Proactive reset triggered during keep-alive tick: scan age is ${elapsedSinceStart / 60000} min (AOSP limit 30 min). Refreshing scan with boost.")
+            restartScanInternal("alarm_proactive_reset", boost = true)
         } else {
             Log.i(TAG, "Keep-alive tick healthy: scanAge=${elapsedSinceStart / 60000}m, packetSilence=${elapsedSincePacket / 1000}s, lastPacketReceivedMs=$lastPacketReceivedSystemMs")
         }
@@ -244,13 +248,13 @@ object BleObserverManager {
      * Public unified entry point for scan restarts (called by BleScanKeepAliveReceiver or silence detector).
      * Protected by Mutex and anti-spam cooldown to guarantee race-free execution.
      */
-    fun restartScan(reason: String) {
+    fun restartScan(reason: String, boost: Boolean = false) {
         scope.launch {
-            restartScanInternal(reason)
+            restartScanInternal(reason, boost = boost)
         }
     }
 
-    private suspend fun restartScanInternal(reason: String) = mutex.withLock {
+    private suspend fun restartScanInternal(reason: String, boost: Boolean = false) = mutex.withLock {
         val now = System.currentTimeMillis()
         val elapsedSinceLastRestart = now - lastRestartTimestampMs
         if (lastRestartTimestampMs > 0L && elapsedSinceLastRestart < MIN_RESTART_COOLDOWN_MS) {
@@ -262,32 +266,73 @@ object BleObserverManager {
             return@withLock
         }
 
-        lastRestartTimestampMs = now
-        Log.i(TAG, "Executing clean BLE scan restart: reason='$reason'")
-
-        // 1. Stop current scan and discard old callback object
-        try {
-            activeCallback?.let { cb -> scanner?.stopScan(cb) }
-        } catch (e: Exception) {
-            Log.w(TAG, "Error stopping scan during restart: ${e.message}")
-        }
-        activeCallback = null
-        scanner = null
-        isScanning = false
-
-        // 2. Pause 800ms to allow system Bluetooth stack IPC to fully clear the client registration
-        delay(800L)
-
-        // 3. Resolve context and repositories
         val context = appContext ?: TirupApplication.instance
-        val settingsRepo = cachedSettingsRepo ?: (context as? TirupApplication)?.settingsRepository ?: return@withLock
-        val glucoseRepo = cachedGlucoseRepo ?: (context as? TirupApplication)?.glucoseRepository ?: return@withLock
-        val userSettings = settingsRepo.getSettings().firstOrNull() ?: return@withLock
-        val ble = userSettings.bleBridgeSettings
-        if (!ble.isEnabled || ble.role != BleBridgeRole.OBSERVER) return@withLock
+        val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val restartWakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TIRUp:BleRestartWakeLock")?.apply {
+            setReferenceCounted(false)
+            acquire(15_000L)
+        }
 
-        // 4. Start completely fresh scan with a NEW ScanCallback instance
-        startScanningInternalLocked(context, ble.familyPin, settingsRepo, glucoseRepo, boost = isBoostActive)
+        try {
+            lastRestartTimestampMs = now
+            Log.i(TAG, "Executing clean BLE scan restart: reason='$reason', boost=$boost")
+
+            // 1. Stop current scan and discard old callback object
+            try {
+                activeCallback?.let { cb -> scanner?.stopScan(cb) }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error stopping scan during restart: ${e.message}")
+            }
+            activeCallback = null
+            scanner = null
+            isScanning = false
+
+            // 2. Pause 800ms to allow system Bluetooth stack IPC to fully clear the client registration
+            delay(800L)
+
+            // 3. Resolve context and repositories
+            val settingsRepo = cachedSettingsRepo ?: (context as? TirupApplication)?.settingsRepository ?: return@withLock
+            val glucoseRepo = cachedGlucoseRepo ?: (context as? TirupApplication)?.glucoseRepository ?: return@withLock
+            val userSettings = settingsRepo.getSettings().firstOrNull() ?: return@withLock
+            val ble = userSettings.bleBridgeSettings
+            if (!ble.isEnabled || ble.role != BleBridgeRole.OBSERVER) return@withLock
+
+            // If boost is requested, run 60 seconds of LOW_LATENCY then gracefully revert to BALANCED
+            if (boost) {
+                boostJob?.cancel()
+                isBoostActive = true
+                _boostRemainingSec.value = 60
+                boostJob = scope.launch {
+                    while (_boostRemainingSec.value > 0) {
+                        delay(1000L)
+                        _boostRemainingSec.value = (_boostRemainingSec.value - 1).coerceAtLeast(0)
+                    }
+                    isBoostActive = false
+                    mutex.withLock {
+                        if (isScanning && !isBoostActive) {
+                            Log.i(TAG, "Reverting scan mode from boost (LOW_LATENCY) to BALANCED")
+                            try {
+                                activeCallback?.let { cb -> scanner?.stopScan(cb) }
+                            } catch (_: Exception) {}
+                            activeCallback = null
+                            scanner = null
+                            isScanning = false
+                            delay(800L)
+                            startScanningInternalLocked(context, ble.familyPin, settingsRepo, glucoseRepo, boost = false)
+                        }
+                    }
+                }
+            }
+
+            // 4. Start completely fresh scan with a NEW ScanCallback instance
+            startScanningInternalLocked(context, ble.familyPin, settingsRepo, glucoseRepo, boost = isBoostActive || boost)
+        } finally {
+            try {
+                if (restartWakeLock?.isHeld == true) {
+                    restartWakeLock.release()
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     private suspend fun startScanningInternal(
@@ -382,7 +427,7 @@ object BleObserverManager {
                 ) {
                     scope.launch {
                         delay(2500L)
-                        restartScanInternal("on_scan_failed_recovery")
+                        restartScanInternal("on_scan_failed_recovery", boost = true)
                     }
                 }
             }
@@ -437,6 +482,7 @@ object BleObserverManager {
                 try {
                     val currentSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
                     val updatedBle = currentSettings.bleBridgeSettings.copy(
+                        lastRadioContactMs = now,
                         lastRssi = rssi,
                         lastMasterBattery = if (packet.batteryPercent in 0..100) packet.batteryPercent else currentSettings.bleBridgeSettings.lastMasterBattery
                     )
@@ -456,6 +502,7 @@ object BleObserverManager {
                 val currentSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
                 val updatedBle = currentSettings.bleBridgeSettings.copy(
                     lastPacketTimestamp = packet.timestamp,
+                    lastRadioContactMs = now,
                     lastRssi = rssi,
                     lastMasterBattery = packet.batteryPercent
                 )

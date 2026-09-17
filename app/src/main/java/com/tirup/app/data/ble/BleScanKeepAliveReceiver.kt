@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.PowerManager
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +27,13 @@ class BleScanKeepAliveReceiver : BroadcastReceiver() {
             // Re-arm for the next 5 minutes to maintain the continuous watchdog chain
             scheduleKeepAlive(context)
 
-            // Hold wake lock across async scan restart via goAsync() so CPU does not sleep mid-restart
+            // Hold REAL WakeLock across async scan restart via goAsync() so CPU does not sleep mid-restart
+            val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            val wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TIRUp:KeepAliveWakeLock")?.apply {
+                setReferenceCounted(false)
+                acquire(15_000L) // 15 seconds safe window covering stop -> delay(800ms) -> startScan
+            }
+
             val pendingResult = goAsync()
             CoroutineScope(Dispatchers.IO).launch {
                 try {
@@ -34,6 +41,11 @@ class BleScanKeepAliveReceiver : BroadcastReceiver() {
                 } catch (e: Exception) {
                     Log.e(TAG, "Error in keep-alive tick: ${e.message}")
                 } finally {
+                    try {
+                        if (wakeLock?.isHeld == true) {
+                            wakeLock.release()
+                        }
+                    } catch (_: Exception) {}
                     pendingResult.finish()
                 }
             }
