@@ -13,7 +13,8 @@ data class BleBridgeSettings(
     val transmitBattery: Boolean = true,
     val lastPacketTimestamp: Long = 0L,
     val lastRssi: Int = 0,
-    val lastMasterBattery: Int = -1
+    val lastMasterBattery: Int = -1,
+    val lastRadioContactMs: Long = 0L
 )
 
 data class BleGlucosePacket(

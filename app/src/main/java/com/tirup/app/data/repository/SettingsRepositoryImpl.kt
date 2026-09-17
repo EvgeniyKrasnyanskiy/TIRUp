@@ -142,6 +142,7 @@ class SettingsRepositoryImpl(
             .putString(KEY_BLE_BRIDGE_PIN, settings.bleBridgeSettings.familyPin)
             .putBoolean(KEY_BLE_BRIDGE_TRANSMIT_BATTERY, settings.bleBridgeSettings.transmitBattery)
             .putLong(KEY_BLE_BRIDGE_LAST_TIMESTAMP, settings.bleBridgeSettings.lastPacketTimestamp)
+            .putLong(KEY_BLE_BRIDGE_LAST_RADIO_CONTACT_MS, settings.bleBridgeSettings.lastRadioContactMs)
             .putInt(KEY_BLE_BRIDGE_LAST_RSSI, settings.bleBridgeSettings.lastRssi)
             .putInt(KEY_BLE_BRIDGE_LAST_MASTER_BATTERY, settings.bleBridgeSettings.lastMasterBattery)
             .putBoolean(KEY_DEVICE_REMINDERS_ENABLED, settings.isDeviceRemindersEnabled)
@@ -346,7 +347,8 @@ class SettingsRepositoryImpl(
                 transmitBattery = prefs.getBoolean(KEY_BLE_BRIDGE_TRANSMIT_BATTERY, true),
                 lastPacketTimestamp = prefs.getLong(KEY_BLE_BRIDGE_LAST_TIMESTAMP, 0L),
                 lastRssi = prefs.getInt(KEY_BLE_BRIDGE_LAST_RSSI, 0),
-                lastMasterBattery = prefs.getInt(KEY_BLE_BRIDGE_LAST_MASTER_BATTERY, -1)
+                lastMasterBattery = prefs.getInt(KEY_BLE_BRIDGE_LAST_MASTER_BATTERY, -1),
+                lastRadioContactMs = prefs.getLong(KEY_BLE_BRIDGE_LAST_RADIO_CONTACT_MS, 0L)
             ),
             isDeviceRemindersEnabled = prefs.getBoolean(KEY_DEVICE_REMINDERS_ENABLED, true),
             isSensorReminderEnabled = prefs.getBoolean(KEY_SENSOR_REMINDER_ENABLED, true),
@@ -530,6 +532,7 @@ class SettingsRepositoryImpl(
         private const val KEY_BLE_BRIDGE_PIN = "key_ble_bridge_pin"
         private const val KEY_BLE_BRIDGE_TRANSMIT_BATTERY = "key_ble_bridge_transmit_battery"
         private const val KEY_BLE_BRIDGE_LAST_TIMESTAMP = "key_ble_bridge_last_timestamp"
+        private const val KEY_BLE_BRIDGE_LAST_RADIO_CONTACT_MS = "key_ble_bridge_last_radio_contact_ms"
         private const val KEY_BLE_BRIDGE_LAST_RSSI = "key_ble_bridge_last_rssi"
         private const val KEY_BLE_BRIDGE_LAST_MASTER_BATTERY = "key_ble_bridge_last_master_battery"
 

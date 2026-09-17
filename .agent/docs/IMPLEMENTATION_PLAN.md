@@ -312,3 +312,37 @@
 
 ### Этап 4: [Completed] Аппаратная подстраховка `MATCH_NUM_MAX_ADVERTISEMENT`
 - `BleObserverManager.kt`: в `ScanSettings.Builder()` значение `setNumOfMatches()` изменено с `MATCH_NUM_ONE_ADVERTISEMENT` на `MATCH_NUM_MAX_ADVERTISEMENT` в связке с `CALLBACK_TYPE_ALL_MATCHES` для предотвращения подавления последующих пакетов вещателя в радиочипсетах Qualcomm/MediaTek.
+
+## 16. Итерация 16: [Completed] Аппаратный WakeLock, режим Boost при рестартах (60с), лимит 27 мин и разделение времени радиоконтакта и замера глюкозы
+
+### Этап 1: [Completed] Разделение меток времени радиоконтакта и реального замера глюкозы
+- **Модель `BleBridgeSettings` и репозиторий (`SettingsRepositoryImpl.kt`)**:
+  - Добавлено поле `val lastRadioContactMs: Long = 0L` и ключ `KEY_BLE_BRIDGE_LAST_RADIO_CONTACT_MS`.
+  - В `handleScanResult`:
+    - При Heartbeat (повторный пакет) обновляется `lastRadioContactMs = now` (подтверждение живой радиосвязи), но `lastPacketTimestamp` остаётся временем реального измерения сенсора.
+    - При новом замере обновляются оба поля: `lastPacketTimestamp = packet.timestamp` и `lastRadioContactMs = now`.
+- **Пользовательский интерфейс (`FocusScreen.kt`, `SettingsScreen.kt`)**:
+  - Анимированный бейдж `BleBridgeBadge` на главном экране ориентируется на `lastRadioContactMs`: пульсирует и отображает `<1м`, если радиосвязь активна прямо сейчас.
+  - В модальном окне `BleStatusDialog` показатели строго разделены на две информационные строки:
+    - `• Последний замер: $readingAgeStr` (фактическое время замера сенсора: 4 мин назад, 10 мин назад и т.д., исключая дезинформацию пользователя о свежести сахара).
+    - `• Радиосигнал: $contactAgeStr` (свежесть радиоэфира / последнего heartbeat: 5 сек назад, 20 сек назад).
+  - В настройках `SettingsScreen.kt` в карточке приёмника отображается `• Радиосигнал: $ageStr` по метке `lastRadioContactMs`.
+
+### Этап 2: [Completed] Аппаратный WakeLock при рестартах сканера сквозь глубокий Doze
+- `BleScanKeepAliveReceiver.kt`:
+  - Внутри `goAsync()` добавлен захват `PowerManager.PARTIAL_WAKE_LOCK` с таймаутом 15 секунд (`wakeLock.acquire(15_000L)`).
+  - Процессор смартфона гарантированно удерживается в бодрствующем состоянии на весь период междуфазной паузы IPC (800 мс) и старта сканирования.
+- `BleObserverManager.kt`:
+  - Внутри `restartScanInternal` добавлен вспомогательный `PARTIAL_WAKE_LOCK` (15 с), предотвращающий засыпание CPU при перезапусках по вотчдогу тишины или ошибкам Bluetooth-стека.
+
+### Этап 3: [Completed] Активация 60-секундного Boost (`SCAN_MODE_LOW_LATENCY`) при программных перезапусках
+- `BleObserverManager.kt`:
+  - При вызовах `restartScanInternal` по причинам `alarm_silence_timeout`, `alarm_proactive_reset` и `on_scan_failed_recovery` сканер запускается с флагом `boost = true`.
+  - Радиочипсет переключается в 100% duty cycle (`SCAN_MODE_LOW_LATENCY`) на первые 60 секунд после рестарта с экрана в режиме сна, гарантированно захватывая следующий секундный пакет вещателя в Doze.
+  - По истечении 60 секунд сканер плавно и незаметно для радиоканала переходит в энергоэффективный режим `SCAN_MODE_BALANCED`.
+
+### Этап 4: [Completed] Смещение проактивного сброса на 27 минут
+- `BleObserverManager.kt`:
+  - Интервал `PROACTIVE_RESET_INTERVAL_MS` увеличен с 20 до 27 минут (`27 * 60 * 1000L`).
+  - Обеспечивает непрерывную сессию сканирования на 35% дольше, сохраняя при этом надёжный 3-минутный буфер безопасности до 30-минутного аппаратного лимита AOSP.
+

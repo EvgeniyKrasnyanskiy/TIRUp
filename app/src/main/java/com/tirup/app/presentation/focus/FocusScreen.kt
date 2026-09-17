@@ -1485,10 +1485,10 @@ private fun BleBridgeBadge(
                 }
             }
         } else {
-            // Observer Idle: Bluetooth icon + age of last packet
-            val lastTs = bleSettings.lastPacketTimestamp
+            // Observer Idle: Bluetooth icon + age of last radio contact
+            val contactTs = if (bleSettings.lastRadioContactMs > 0L) bleSettings.lastRadioContactMs else bleSettings.lastPacketTimestamp
             val nowMs = System.currentTimeMillis()
-            val ageMin = if (lastTs > 0L) ((nowMs - lastTs) / 60_000L).toInt() else -1
+            val ageMin = if (contactTs > 0L) ((nowMs - contactTs) / 60_000L).toInt() else -1
 
             val isStale = ageMin >= 5
             val badgeText = when {
@@ -1630,14 +1630,25 @@ private fun BleStatusDialog(
         }
         else -> {
             // Observer
-            val lastTs = bleSettings.lastPacketTimestamp
+            val readingTs = bleSettings.lastPacketTimestamp
+            val contactTs = if (bleSettings.lastRadioContactMs > 0L) bleSettings.lastRadioContactMs else bleSettings.lastPacketTimestamp
             val nowMs = System.currentTimeMillis()
-            val ageMins = if (lastTs > 0L) (nowMs - lastTs) / 60000L else null
-            val ageStr = if (ageMins != null) {
+
+            val readingAgeMins = if (readingTs > 0L) (nowMs - readingTs) / 60000L else null
+            val readingAgeStr = if (readingAgeMins != null) {
                 when {
-                    ageMins < 1L -> if (isRu) "только что" else "just now"
-                    ageMins < 60L -> "$ageMins " + (if (isRu) "мин. назад" else "min ago")
-                    else -> "${ageMins / 60L} " + (if (isRu) "ч. назад" else "h ago")
+                    readingAgeMins < 1L -> if (isRu) "только что" else "just now"
+                    readingAgeMins < 60L -> "$readingAgeMins " + (if (isRu) "мин. назад" else "min ago")
+                    else -> "${readingAgeMins / 60L} " + (if (isRu) "ч. назад" else "h ago")
+                }
+            } else if (isRu) "нет данных" else "no data"
+
+            val contactAgeSecs = if (contactTs > 0L) (nowMs - contactTs) / 1000L else null
+            val contactAgeStr = if (contactAgeSecs != null) {
+                when {
+                    contactAgeSecs < 60L -> if (isRu) "${contactAgeSecs} сек. назад" else "${contactAgeSecs}s ago"
+                    contactAgeSecs < 3600L -> "${contactAgeSecs / 60L} " + (if (isRu) "мин. назад" else "min ago")
+                    else -> "${contactAgeSecs / 3600L} " + (if (isRu) "ч. назад" else "h ago")
                 }
             } else if (isRu) "нет данных" else "no data"
 
@@ -1653,12 +1664,14 @@ private fun BleStatusDialog(
 
             if (isRu) {
                 "Приёмник активен и прослушивает эфир.\n\n" +
-                "• Последний пакет: $ageStr\n" +
+                "• Последний замер: $readingAgeStr\n" +
+                "• Радиосигнал: $contactAgeStr\n" +
                 "• Батарея вещателя: $batStr\n" +
                 "• Качество сигнала: $signalQuality"
             } else {
                 "Receiver is active listening for packets.\n\n" +
-                "• Last packet: $ageStr\n" +
+                "• Last reading: $readingAgeStr\n" +
+                "• Radio signal: $contactAgeStr\n" +
                 "• Broadcaster battery: $batStr\n" +
                 "• Signal quality: $signalQuality"
             }

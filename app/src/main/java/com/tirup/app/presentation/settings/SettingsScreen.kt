@@ -1588,8 +1588,9 @@ fun SettingsScreen(
                                         )
                                     }
 
-                                    if (ble.lastPacketTimestamp > 0L) {
-                                        val ageMinutes = ((System.currentTimeMillis() - ble.lastPacketTimestamp) / 60000L).coerceAtLeast(0)
+                                    val contactTs = if (ble.lastRadioContactMs > 0L) ble.lastRadioContactMs else ble.lastPacketTimestamp
+                                    if (contactTs > 0L) {
+                                        val ageMinutes = ((System.currentTimeMillis() - contactTs) / 60000L).coerceAtLeast(0)
                                         val ageStr = when {
                                             ageMinutes == 0L -> if (isRu) "только что" else "just now"
                                             ageMinutes < 60L -> if (isRu) "$ageMinutes мин назад" else "${ageMinutes}m ago"
@@ -1610,8 +1611,8 @@ fun SettingsScreen(
                                         }
 
                                         Text(
-                                            text = if (isRu) "• Последний пакет: $ageStr\n• Сигнал: ${ble.lastRssi} dBm ($signalQuality)$batteryInfo"
-                                                   else "• Last packet: $ageStr\n• Signal: ${ble.lastRssi} dBm ($signalQuality)$batteryInfo",
+                                            text = if (isRu) "• Радиосигнал: $ageStr\n• Сигнал: ${ble.lastRssi} dBm ($signalQuality)$batteryInfo"
+                                                   else "• Radio signal: $ageStr\n• Signal: ${ble.lastRssi} dBm ($signalQuality)$batteryInfo",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
