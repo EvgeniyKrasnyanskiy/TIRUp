@@ -377,6 +377,36 @@ class SettingsViewModel(
         }
     }
 
+    fun restoreLatestAutoBackup() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRestoreInProgress = true) }
+            val res = AutoBackupManager.restoreLatestAutoBackup(context, database, settingsRepository)
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            if (res.isSuccess) {
+                val result = res.getOrNull()!!
+                val msg = if (isRu) {
+                    "Восстановлено: ${result.readingsRestored} замеров, ${result.treatmentsRestored} меток" +
+                            (if (result.settingsRestored) ", настройки" else "")
+                } else {
+                    "Restored: ${result.readingsRestored} readings, ${result.treatmentsRestored} treatments" +
+                            (if (result.settingsRestored) ", settings" else "")
+                }
+                _events.emit(SettingsEvent.Info(msg))
+                loadBackupSummary()
+            } else {
+                val err = res.exceptionOrNull()?.message ?: "Unknown error"
+                _events.emit(SettingsEvent.Info(if (isRu) "Ошибка восстановления: $err" else "Restore failed: $err"))
+            }
+            _uiState.update {
+                it.copy(
+                    isRestoreInProgress = false,
+                    pendingRestoreSummary = null,
+                    pendingRestoreUri = null
+                )
+            }
+        }
+    }
+
     fun updateAlertSettings(alerts: AlertSettings) {
         viewModelScope.launch {
             val updated = _uiState.value.userSettings.copy(alertSettings = alerts)
