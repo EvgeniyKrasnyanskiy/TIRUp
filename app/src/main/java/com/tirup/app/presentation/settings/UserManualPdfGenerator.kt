@@ -318,8 +318,8 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Уровень 4: Потеря сигнала (20–25 мин) и Экстренные SOS SMS" else "Tier 4: Sleep-Aware Signal Loss & Emergency SOS SMS",
                         if (isRu) "Будильник & SOS" else "Alarm & SOS",
-                        if (isRu) "Сигнал будильника (USAGE_ALARM + Bypass DND) с расписанием день/ночь. При игноре сирены гипо 5м отправляет близким SOS SMS с GPS. При шатдауне интернета близкие запрашивают сахар по SMS («сахар»)."
-                        else "Treated as alarm with day/night wake schedule. Sends SMS with GPS if severe hypo siren ignored for 5m. Trusted contact can query glucose offline via SMS ('sugar')."
+                        if (isRu) "Сигнал будильника (USAGE_ALARM + Bypass DND) с расписанием день/ночь. При игноре сирены гипо 5м отправляет близким SOS SMS с GPS. Близкие могут запросить сахар по SMS («сахар» / «?» / «tir»)."
+                        else "Treated as alarm with day/night wake schedule. Sends SMS with GPS if severe hypo siren ignored for 5m. Trusted contact can query glucose offline via SMS ('sugar' / '?' / 'tir')."
                     )
                 ),
                 cardHeight = 41f
