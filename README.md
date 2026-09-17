@@ -140,6 +140,15 @@
 - Потоковый парсинг без перегрузки оперативной памяти, автоматическое определение диалектов разделителей и формата дат.
 - Фоновая дедупликация и объединение сотен тысяч и миллионов точек в базу данных Room с интерактивным прогресс-баром и отчётом об импорте.
 
+### 19. Учёт расходных материалов и устройств (Supplies & Device Tracker)
+- Модальное окно **«Устройства и расходники»** на экране «Фокус» для централизованного контроля сроков службы:
+  - **Сенсор CGM**: настраиваемый срок 1–90 дней (по умолчанию 10, 14 или 15 дн.).
+  - **Канюля / инфузионный набор помпы**: срок 2–7 дней (по умолчанию 3 дн.).
+  - **Ланцет прокалывателя**: срок 1–7 дней (по умолчанию 1 дн.).
+- **Интерактивный пересчёт в реальном времени**: изменение срока службы на счётчике (`+` / `-`) мгновенно пересчитывает дату окончания, оставшееся время и цветовую шкалу износа без необходимости сброса устройства.
+- **Умные уведомления о замене**: заблаговременные напоминания (за 2 дня, за 1 день) и уведомление об окончании срока с защитой от спама.
+- **Автоматическая синхронизация канюли из xDrip+**: при сохранении заметки с меткой `канюля`, `инфуз` или `cannula`, TIRUp мгновенно обновляет таймер инфузионного набора.
+
 ---
 
 ## 📱 Интеграция с источниками данных
@@ -250,6 +259,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - **Zero-Lag Annual History Archiving & Dec 31 Digest**: Automatically seals past calendar years into `tirup_readings_YYYY.csv` keeping the Room database lightweight across 1–5+ years; delivers a festive annual summary modal and PDF postcard on Dec 31 at 20:00.
 - **Full ZIP Backup Export**: One-click manual export of database and settings into `Documents/TIRUp/Backups/`.
 - **Permissionless Daily Auto-Backup**: Exact RTC AlarmManager backs up settings and database into the app sandbox daily at 23:59:59 without dangerous external storage permissions.
+- **Supplies & Device Lifecycle Tracker**: Dedicated modal on the Focus screen tracking CGM sensor, pump cannula, and lancet remaining lifespans with real-time recalculation upon stepper adjustments, proactive expiration alerts, and automatic xDrip+ cannula sync.
 - **Dual Units & Localization**: Seamless one-tap switching between `mmol/L` and `mg/dL`, full Russian and English localization.
 
 ---

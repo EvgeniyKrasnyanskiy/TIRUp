@@ -216,6 +216,16 @@ fun localizeTherapyType(therapy: String, isRu: Boolean): String {
     }
 }
 
+fun localizeTherapyTypeCompact(therapy: String, isRu: Boolean): String {
+    return when (therapy.trim()) {
+        "Инсулиновая помпа", "Insulin Pump" -> if (isRu) "Помпа" else "Pump"
+        "Шприц-ручки (МДИ)", "Multiple Daily Injections (MDI)" -> if (isRu) "Ручки" else "Pens"
+        "Пероральные препараты (Таблетки)", "Oral Medication (Pills)" -> if (isRu) "Таблетки" else "Pills"
+        "Диетотерапия", "Diet Therapy" -> if (isRu) "Диета" else "Diet"
+        else -> therapy
+    }
+}
+
 fun localizeDiabetesType(diabetes: String, isRu: Boolean): String {
     return when (diabetes.trim()) {
         "СД1", "T1D" -> if (isRu) "СД1" else "T1D"
