@@ -289,5 +289,26 @@
   - Пауза 350 мс перед стартом для IPC-стека Bluetooth и создание совершенно нового экземпляра `ScanCallback` на каждый рестарт.
   - Детальное логирование кодов ошибок `onScanFailed`.
 
+## 15. Итерация 15: [Completed] Коррекция учёта тишины эфира, приём Heartbeat-пакетов и аппаратная оптимизация BLE
 
+### Этап 1: [Completed] Сохранение `lastPacketReceivedSystemMs` при рестартах сканера
+- `BleObserverManager.kt`: в `startScanningInternalLocked` устранена перезапись `lastPacketReceivedSystemMs = now` при каждом рестарте сканера.
+- Значение инициализируется текущим временем только при самом первом холодном старте (`lastPacketReceivedSystemMs == 0L`), а при последующих рестартах (по кулдауну, проактивному сбросу 20-минутного лимита AOSP или ошибкам) сохраняет отметку времени реального последнего принятого радиопакета.
+- Результат: счётчик `packetSilence` в тиках будильника и вотчдог тишины (`silence watchdog`) измеряют истинное время отсутствия эфира, не обнуляясь ложно каждые 20 минут.
 
+### Этап 2: [Completed] Обработка и логирование Heartbeat/повторных пакетов (`handleScanResult`)
+- `BleObserverManager.kt`:
+  - `lastPacketReceivedSystemMs = System.currentTimeMillis()` теперь обновляется **до** проверки на дубликат.
+  - Если `packet.timestamp <= lastHandledTimestamp`, пакет классифицируется как Heartbeat / дубликат в рамках всплеска (burst) вещателя.
+  - Добавлено явное информационное логирование с частотой не чаще раза в 3 секунды:
+    `Heartbeat received: ts=${packet.timestamp}, bg=${packet.valueMmol}, rssi=$rssi (duplicate, connection alive)`.
+  - Испускается событие в `_packetReceivedEvent`, позволяющее UI (зелёная пульсация радиоволны на `FocusScreen`) подтверждать живую связь.
+  - Обновляется `lastRssi` в настройках/диагностике, исключая при этом повторную запись дубликатов в Room DB и спам алертами.
+
+### Этап 3: [Completed] Увеличение IPC-паузы и авто-восстановление при ошибке регистрации (код 2)
+- `BleObserverManager.kt`:
+  - В `restartScanInternal` пауза между `stopScan()` и созданием нового `ScanCallback` увеличена с 350 мс до 800 мс для надёжной очистки регистрации клиента в IPC-стеке Bluetooth на прошивках ColorOS/OxygenOS/HyperOS.
+  - В `onScanFailed` добавлена автоматическая обработка ошибки `SCAN_FAILED_APPLICATION_REGISTRATION_FAILED (2)` с повторной попыткой перезапуска через 2.5 секунды.
+
+### Этап 4: [Completed] Аппаратная подстраховка `MATCH_NUM_MAX_ADVERTISEMENT`
+- `BleObserverManager.kt`: в `ScanSettings.Builder()` значение `setNumOfMatches()` изменено с `MATCH_NUM_ONE_ADVERTISEMENT` на `MATCH_NUM_MAX_ADVERTISEMENT` в связке с `CALLBACK_TYPE_ALL_MATCHES` для предотвращения подавления последующих пакетов вещателя в радиочипсетах Qualcomm/MediaTek.
