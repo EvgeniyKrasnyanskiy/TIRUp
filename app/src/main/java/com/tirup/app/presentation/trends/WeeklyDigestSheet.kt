@@ -19,19 +19,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.WeeklyDigest
 import com.tirup.app.presentation.theme.ActionBlue
@@ -55,7 +53,6 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WeeklyDigestSheet(
     digest: WeeklyDigest,
@@ -64,64 +61,48 @@ fun WeeklyDigestSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val isMmol = unit == GlucoseUnit.MMOL_L
 
     val periodSubtext = formatCompactDigestDateRange(digest, isRu)
     val dateFormat = SimpleDateFormat(if (isRu) "d MMMM" else "MMM d", if (isRu) Locale("ru") else Locale.US)
     val currentPeriodStr = "${dateFormat.format(Date(digest.currentWeekStart))} — ${dateFormat.format(Date(digest.currentWeekEnd))}"
 
-    ModalBottomSheet(
+    AlertDialog(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 32.dp)
-                .verticalScroll(rememberScrollState())
-        ) {
-            // Header Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "📊",
-                            fontSize = 22.sp,
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Text(
-                            text = if (isRu) "Воскресный дайджест" else "Weekly Sunday Digest",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 24.dp),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "📊",
+                    fontSize = 24.sp,
+                    modifier = Modifier.padding(end = 10.dp)
+                )
+                Column {
+                    Text(
+                        text = if (isRu) "Воскресный дайджест" else "Weekly Sunday Digest",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = periodSubtext,
-                        fontSize = 12.5.sp,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = if (isRu) "Закрыть" else "Close",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             }
-
-            Spacer(modifier = Modifier.height(14.dp))
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
 
             // Sufficiency Chip
             Surface(
@@ -427,12 +408,13 @@ fun WeeklyDigestSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Action Buttons
+            }
+        },
+        confirmButton = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedButton(
                     onClick = {
@@ -456,12 +438,8 @@ fun WeeklyDigestSheet(
                         }
                         context.startActivity(Intent.createChooser(sendIntent, if (isRu) "Поделиться дайджестом" else "Share Digest"))
                     },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, ActionBlue),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = ActionBlue
-                    )
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, ActionBlue)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Share,
@@ -469,32 +447,20 @@ fun WeeklyDigestSheet(
                         modifier = Modifier.size(18.dp),
                         tint = ActionBlue
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = if (isRu) "Поделиться" else "Share",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
+                        color = ActionBlue
                     )
                 }
 
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, ActionBlue),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = ActionBlue
-                    )
-                ) {
-                    Text(
-                        text = if (isRu) "Закрыть" else "Close",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                TextButton(onClick = onDismiss) {
+                    Text(text = if (isRu) "Закрыть" else "Close", color = ActionBlue)
                 }
             }
-        }
-    }
+        },
+        dismissButton = null
+    )
 }
 
 @Composable
