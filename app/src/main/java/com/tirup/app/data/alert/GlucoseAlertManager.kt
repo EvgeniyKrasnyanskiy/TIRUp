@@ -33,6 +33,7 @@ import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.domain.model.UserSettings
+import com.tirup.app.domain.model.formatDeviceRemainingTime
 import com.tirup.app.presentation.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -448,21 +449,16 @@ object GlucoseAlertManager {
 
         val isExpired = millisRemaining <= 0L
         val expiredHours = if (isExpired) (-millisRemaining / 3600_000L).toInt().coerceAtLeast(1) else 0
-        val remainingHours = (millisRemaining / 3600_000L).toInt().coerceAtLeast(1)
-        val remainingDays = (millisRemaining / 86_400_000L).toInt()
 
-        val timeStr = when {
-            isExpired -> if (isRu) "$expiredHours ч назад" else "$expiredHours h ago"
-            millisRemaining < 3600_000L -> {
-                val mins = (millisRemaining / 60_000L).toInt().coerceAtLeast(1)
-                if (isRu) "$mins мин" else "$mins min"
-            }
-            millisRemaining < 24 * 3600_000L -> {
-                if (isRu) "$remainingHours ч" else "$remainingHours h"
-            }
-            else -> {
-                if (isRu) "$remainingDays дн." else "$remainingDays d"
-            }
+        val timeStr = if (isExpired) {
+            if (isRu) "$expiredHours ч назад" else "$expiredHours h ago"
+        } else {
+            formatDeviceRemainingTime(
+                millisRemaining = millisRemaining,
+                installedAt = 1L,
+                isRu = isRu,
+                isCompact = false
+            ).removePrefix(if (isRu) "Осталось: " else "Remaining: ")
         }
 
         val title: String

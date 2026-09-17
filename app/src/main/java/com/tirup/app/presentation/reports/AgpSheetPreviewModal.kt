@@ -232,7 +232,7 @@ fun AgpSheetPreviewModal(
                             ) {
                                 Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                     Text(
-                                        text = if (isRu) "СТАТИСТИКА ГЛЮКОЗЫ И ЦЕЛИ" else "GLUCOSE STATISTICS & TARGETS",
+                                        text = if (isRu) "ОСНОВНЫЕ ПОКАЗАТЕЛИ (ATTD / ADA)" else "CORE CGM METRICS (ATTD / ADA)",
                                         fontSize = 10.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF0F172A)
@@ -249,19 +249,57 @@ fun AgpSheetPreviewModal(
                                         String.format(Locale.US, "%d", (statistics.sdMmol * 18.0182).toInt())
                                     }
 
-                                    ReportStatLine(if (isRu) "Средний сахар (Mean):" else "Average Glucose (Mean):", meanStr)
                                     val previewMin = readings.minOfOrNull { it.valueMmol } ?: statistics.minMmol
                                     val previewMax = readings.maxOfOrNull { it.valueMmol } ?: statistics.maxMmol
                                     val previewMinMax = if (isMmol) {
-                                        String.format(Locale.US, "%.1f – %.1f %s", previewMin, previewMax, if (isRu) "ммоль/л" else "mmol/L")
+                                        String.format(Locale.US, "%.1f – %.1f", previewMin, previewMax)
                                     } else {
-                                        String.format(Locale.US, "%d – %d %s", (previewMin * 18.0182).toInt(), (previewMax * 18.0182).toInt(), if (isRu) "мг/дл" else "mg/dL")
+                                        String.format(Locale.US, "%d – %d", (previewMin * 18.0182).toInt(), (previewMax * 18.0182).toInt())
                                     }
-                                    ReportStatLine(if (isRu) "Минимум / максимум:" else "Minimum / maximum:", previewMinMax)
-                                    ReportStatLine(if (isRu) "Вариабельность (%CV):" else "Glucose Variability (%CV):", String.format(Locale.US, "%.1f%% (%s ≤36.0%%) • SD: %s", statistics.cvPercent, if (isRu) "Цель" else "Target", sdStr))
-                                    ReportStatLine(if (isRu) "Расчётный eA1c (GMI):" else "Estimated A1c (eA1c):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol))
-                                    ReportStatLine(if (isRu) "GRI (риск гипо):" else "GRI (Hypo Risk):", String.format(Locale.US, "%.1f (%s, %s ≤40.0)", statistics.gri, statistics.griLabel, if (isRu) "цель" else "target"))
-                                    ReportStatLine(if (isRu) "Индексы GVI / PGS:" else "Variability Indexes (GVI/PGS):", String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs))
+                                    val meanTitle = if (isRu) "Средний сахар (Mean) • Мин/Макс:" else "Average Glucose (Mean) • Min/Max:"
+                                    val meanVal = "$meanStr • ${if (isRu) "Мин/Макс" else "Min/Max"}: $previewMinMax"
+                                    ReportStatLine(meanTitle, meanVal)
+
+                                    val cvTitle = if (isRu) "Вариабельность глюкозы (%CV):" else "Glucose Variability (%CV):"
+                                    val cvVal = String.format(Locale.US, if (isRu) "%.1f%% (Цель ≤36.0%%) • SD: %s" else "%.1f%% (Target ≤36.0%%) • SD: %s", statistics.cvPercent, sdStr)
+                                    ReportStatLine(cvTitle, cvVal)
+
+                                    val latestHba1c = userSettings.latestHba1cRecord
+                                    val hba1cDateFmt = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+                                    val labHba1cVal = if (latestHba1c != null) {
+                                        val dateStr = hba1cDateFmt.format(Date(latestHba1c.timestamp))
+                                        "${String.format(Locale.US, "%.1f%%", latestHba1c.valuePercent)} ($dateStr)"
+                                    } else {
+                                        "—"
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            ReportStatLine(
+                                                if (isRu) "Расчётный eA1c (GMI):" else "Estimated A1c (GMI):",
+                                                String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            ReportStatLine(
+                                                if (isRu) "Лаб. HbA1c:" else "Lab HbA1c:",
+                                                labHba1cVal
+                                            )
+                                        }
+                                    }
+
+                                    val griTitle = if (isRu) "GRI (риск гипо / Klonoff 2022):" else "Glycemia Risk Index (GRI / Hypo Risk):"
+                                    val griVal = String.format(Locale.US, if (isRu) "%.1f (%s, цель ≤40.0)" else "%.1f (%s, target ≤40.0)", statistics.gri, statistics.griLabel)
+                                    ReportStatLine(griTitle, griVal)
+
+                                    val gviTitle = if (isRu) "Индексы GVI / PGS:" else "Variability Indexes (GVI/PGS):"
+                                    val gviVal = String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs)
+                                    ReportStatLine(gviTitle, gviVal)
+
                                     val nStart = userSettings.nightStartHour
                                     val nEnd = userSettings.nightEndHour
                                     val nightStr = if (statistics.nightStability.isStable) {
@@ -271,7 +309,9 @@ fun AgpSheetPreviewModal(
                                         if (isRu) "Колебания (TIR ${String.format(Locale.US, "%.1f%%", statistics.nightStability.tirPercent)})"
                                         else "Fluctuations (TIR ${String.format(Locale.US, "%.1f%%", statistics.nightStability.tirPercent)})"
                                     }
-                                    ReportStatLine(if (isRu) "Ночной профиль (${String.format(Locale.US, "%02d:00", nStart)}–${String.format(Locale.US, "%02d:00", nEnd)}):" else "Night Sleep Profile (${String.format(Locale.US, "%02d:00", nStart)}–${String.format(Locale.US, "%02d:00", nEnd)}):", nightStr)
+                                    val nightTitle = if (isRu) "Ночной профиль (${String.format(Locale.US, "%02d:00", nStart)}–${String.format(Locale.US, "%02d:00", nEnd)}):"
+                                                     else "Night Sleep Profile (${String.format(Locale.US, "%02d:00", nStart)}–${String.format(Locale.US, "%02d:00", nEnd)}):"
+                                    ReportStatLine(nightTitle, nightStr)
                                 }
                             }
                         }
@@ -293,7 +333,7 @@ fun AgpSheetPreviewModal(
                                     color = Color(0xFF0F172A)
                                 )
                                 Text(
-                                    text = if (isRu) "Медиана 50% (зелёная линия), 25–75% диапазон и 10–90% перцентильное облако" else "50% Median (green line), 25–75% interquartile range and 10–90% percentile cloud",
+                                    text = if (isRu) "Медиана 50% (зелёная линия), 25–75% межквартильный диапазон и 10–90% перцентильное облако" else "50% Median curve (green), 25–75% interquartile band, and 10–90% percentile cloud",
                                     fontSize = 9.5.sp,
                                     color = Color(0xFF64748B)
                                 )

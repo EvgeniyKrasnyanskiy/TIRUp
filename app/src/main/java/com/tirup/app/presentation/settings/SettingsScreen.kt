@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -116,12 +117,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import android.widget.Toast
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -3650,7 +3653,6 @@ fun SettingsScreen(
             tirPercent90d = state.tirPercent90d,
             skippedQuarterTimestamp = settings.hba1cSkippedQuarterTimestamp,
             isRu = isRu,
-            snackbarHostState = snackbarHostState,
             onAddRecord = { value, timestamp, lab, notes ->
                 viewModel.addHba1cRecord(valuePercent = value, timestamp = timestamp, labName = lab, notes = notes)
             },
@@ -3660,8 +3662,8 @@ fun SettingsScreen(
             onSkipQuarter = {
                 viewModel.skipHba1cQuarter()
             },
-            onExportPdf = {
-                viewModel.exportHba1cReportToPdf()
+            onExportPdf = { onSaved ->
+                viewModel.exportHba1cReportToPdf(onSaved)
             },
             onDismiss = { viewModel.toggleHba1cDialog(false) }
         )
@@ -3869,11 +3871,10 @@ fun Hba1cHistoryDialog(
     tirPercent90d: Int?,
     skippedQuarterTimestamp: Long,
     isRu: Boolean,
-    snackbarHostState: SnackbarHostState? = null,
     onAddRecord: (value: Double, timestamp: Long, lab: String, notes: String) -> Unit,
     onDeleteRecord: (id: Long) -> Unit,
     onSkipQuarter: () -> Unit,
-    onExportPdf: () -> Unit,
+    onExportPdf: (((String) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -3883,6 +3884,11 @@ fun Hba1cHistoryDialog(
     var notesText by remember { mutableStateOf("") }
     var inputError by remember { mutableStateOf<String?>(null) }
     var showDeleteConfirmId by remember { mutableStateOf<Long?>(null) }
+
+    val localSnackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    var isExporting by remember { mutableStateOf(false) }
+    var lastExportedPath by remember { mutableStateOf<String?>(null) }
 
     val openDatePicker = {
         val calendar = Calendar.getInstance()
@@ -4246,67 +4252,83 @@ fun Hba1cHistoryDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
-                        sortedRecords.forEach { record ->
-                            val recordDate = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(record.timestamp))
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
-                                modifier = Modifier.fillMaxWidth()
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 180.dp)
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                        modifier = Modifier.weight(1f)
+                                sortedRecords.forEach { record ->
+                                    val recordDate = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(record.timestamp))
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.surface,
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Surface(
-                                            shape = RoundedCornerShape(8.dp),
-                                            border = BorderStroke(1.dp, Color(0xFFEF4444)),
-                                            color = Color(0xFFEF4444).copy(alpha = 0.1f)
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
-                                            Text(
-                                                text = String.format(Locale.US, "%.1f%%", record.valuePercent),
-                                                style = MaterialTheme.typography.labelLarge,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFFEF4444),
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                            )
-                                        }
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                                                    color = Color(0xFFEF4444).copy(alpha = 0.1f)
+                                                ) {
+                                                    Text(
+                                                        text = String.format(Locale.US, "%.1f%%", record.valuePercent),
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFFEF4444),
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
 
-                                        Column {
-                                            Text(
-                                                text = recordDate + if (record.labName.isNotBlank()) " • ${record.labName}" else "",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                            if (record.notes.isNotBlank()) {
-                                                Text(
-                                                    text = record.notes,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                Column {
+                                                    Text(
+                                                        text = recordDate + if (record.labName.isNotBlank()) " • ${record.labName}" else "",
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    if (record.notes.isNotBlank()) {
+                                                        Text(
+                                                            text = record.notes,
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            IconButton(
+                                                onClick = { showDeleteConfirmId = record.id },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Delete,
+                                                    contentDescription = "Delete",
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                                    modifier = Modifier.size(16.dp)
                                                 )
                                             }
                                         }
-                                    }
-
-                                    IconButton(
-                                        onClick = { showDeleteConfirmId = record.id },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Delete",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                            modifier = Modifier.size(18.dp)
-                                        )
                                     }
                                 }
                             }
@@ -4320,22 +4342,102 @@ fun Hba1cHistoryDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (snackbarHostState != null) {
-                    SnackbarHost(hostState = snackbarHostState)
+                if (lastExportedPath != null) {
+                    val filePath = lastExportedPath!!
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = ActionBlue.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isRu) "Выписка сохранена в Загрузки" else "Saved to Downloads",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ActionBlue
+                                )
+                                Text(
+                                    text = filePath.substringAfterLast('/'),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Button(
+                                onClick = { openSavedFileFolder(context, filePath) },
+                                colors = ButtonDefaults.buttonColors(containerColor = ActionBlue),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Text(
+                                    text = if (isRu) "Открыть" else "Open",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
+
+                SnackbarHost(hostState = localSnackbarHostState)
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedButton(
-                        onClick = onExportPdf,
+                        onClick = {
+                            if (!isExporting && onExportPdf != null) {
+                                isExporting = true
+                                onExportPdf { savedPath ->
+                                    isExporting = false
+                                    lastExportedPath = savedPath
+                                    val fileName = savedPath.substringAfterLast('/')
+                                    val msg = if (isRu) "Выписка сохранена в Загрузки: $fileName" else "Report saved to Downloads: $fileName"
+                                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                                    coroutineScope.launch {
+                                        val actionLabel = if (isRu) "Открыть" else "Open"
+                                        val result = localSnackbarHostState.showSnackbar(
+                                            message = msg,
+                                            actionLabel = actionLabel,
+                                            duration = SnackbarDuration.Long
+                                        )
+                                        if (result == SnackbarResult.ActionPerformed) {
+                                            openSavedFileFolder(context, savedPath)
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        enabled = !isExporting && onExportPdf != null,
                         shape = RoundedCornerShape(10.dp),
                         border = BorderStroke(1.dp, ActionBlue)
                     ) {
-                        Icon(imageVector = Icons.Default.PictureAsPdf, contentDescription = null, tint = ActionBlue, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = if (isRu) "Выписка PDF" else "PDF Report", color = ActionBlue)
+                        if (isExporting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = ActionBlue
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = if (isRu) "Экспорт..." else "Exporting...", color = ActionBlue)
+                        } else {
+                            Icon(imageVector = Icons.Default.PictureAsPdf, contentDescription = null, tint = ActionBlue, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = if (isRu) "Выписка PDF" else "PDF Report", color = ActionBlue)
+                        }
                     }
 
                     TextButton(onClick = onDismiss) {
