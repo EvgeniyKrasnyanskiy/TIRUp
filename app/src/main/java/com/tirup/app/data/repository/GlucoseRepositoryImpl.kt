@@ -13,6 +13,7 @@ import com.tirup.app.domain.repository.GlucoseRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.TimeZone
@@ -55,6 +56,23 @@ class GlucoseRepositoryImpl(
 
     override fun getStreakDays(): Flow<Int> {
         return summaryDao.getAllSummaries().map { summaries ->
+            if (summaries.size <= 2) {
+                kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val total = readingDao.getTotalCount()
+                        if (total > 10) {
+                            val earliest = readingDao.getEarliestTimestamp()
+                            val latest = readingDao.getLatestTimestamp()
+                            if (earliest != null && latest != null) {
+                                val expectedDays = ((latest - earliest) / 86400000L).toInt() + 1
+                                if (summaryDao.getCount() < expectedDays) {
+                                    recalculateDailySummaries(earliest, latest)
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
             calculateStreakDays(summaries)
         }
     }
@@ -148,6 +166,19 @@ class GlucoseRepositoryImpl(
         }
 
         summaryDao.insertBatch(summaries)
+    }
+
+    override suspend fun ensureDailySummariesUpToDate() = withContext(Dispatchers.IO) {
+        val totalReadings = readingDao.getTotalCount()
+        if (totalReadings == 0L) return@withContext
+        val earliest = readingDao.getEarliestTimestamp() ?: return@withContext
+        val latest = readingDao.getLatestTimestamp() ?: return@withContext
+
+        val expectedDays = ((latest - earliest) / 86400000L).toInt() + 1
+        val summaryCount = summaryDao.getCount()
+        if (summaryCount < expectedDays) {
+            recalculateDailySummaries(earliest, latest)
+        }
     }
 
     override suspend fun insertTreatment(treatment: Treatment): Long = withContext(Dispatchers.IO) {

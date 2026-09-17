@@ -50,9 +50,13 @@ class TirupApplication : Application() {
         com.tirup.app.data.ble.BleObserverManager.syncWithSettings(this, settingsRepository, glucoseRepository)
 
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO).launch {
+            glucoseRepository.ensureDailySummariesUpToDate()
             com.tirup.app.data.backup.AutoBackupManager.maybeTriggerAutoBackup(this@TirupApplication, database, settingsRepository)
             try {
                 val settings = settingsRepository.getSettings().first()
+                if (!settings.isWeeklyDigestEnabled) {
+                    settingsRepository.updateSettings(settings.copy(isWeeklyDigestEnabled = true))
+                }
                 if (settings.isFloatingBubbleEnabled && android.provider.Settings.canDrawOverlays(this@TirupApplication)) {
                     com.tirup.app.presentation.overlay.FloatingBubbleService.start(this@TirupApplication)
                 }

@@ -508,7 +508,7 @@ fun MainPagerScaffold(
     settingsViewModel: SettingsViewModel,
     onOpenSettings: (String?) -> Unit
 ) {
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })
+    val pagerState = rememberPagerState(initialPage = 1, pageCount = { 3 })
     val coroutineScope = rememberCoroutineScope()
     var isBottomBarVisible by remember { mutableStateOf(true) }
     var showHba1cDialog by remember { mutableStateOf(false) }
@@ -516,12 +516,12 @@ fun MainPagerScaffold(
     LaunchedEffect(Unit) {
         launch {
             MainActivity.navigateToFocusEvent.collect {
-                pagerState.animateScrollToPage(0)
+                pagerState.animateScrollToPage(1)
             }
         }
         launch {
             MainActivity.navigateToDigestEvent.collect {
-                pagerState.animateScrollToPage(1)
+                pagerState.animateScrollToPage(0)
                 trendsViewModel.openWeeklyDigest()
             }
         }
@@ -551,12 +551,12 @@ fun MainPagerScaffold(
 
     val tabs = listOf(
         NavigationItem(
-            title = androidx.compose.ui.res.stringResource(com.tirup.app.R.string.nav_focus),
-            icon = Icons.Default.Adjust
-        ),
-        NavigationItem(
             title = androidx.compose.ui.res.stringResource(com.tirup.app.R.string.nav_trends),
             icon = Icons.AutoMirrored.Filled.TrendingUp
+        ),
+        NavigationItem(
+            title = androidx.compose.ui.res.stringResource(com.tirup.app.R.string.nav_focus),
+            icon = Icons.Default.Adjust
         ),
         NavigationItem(
             title = androidx.compose.ui.res.stringResource(com.tirup.app.R.string.nav_reports),
@@ -587,6 +587,7 @@ fun MainPagerScaffold(
                     ) {
                         tabs.forEachIndexed { index, item ->
                             val selected = pagerState.currentPage == index
+                            val isCenterHome = index == 1
                             NavigationBarItem(
                                 selected = selected,
                                 onClick = {
@@ -597,15 +598,22 @@ fun MainPagerScaffold(
                                 icon = {
                                     Box(
                                         modifier = Modifier
-                                            .size(width = 44.dp, height = 28.dp)
-                                            .clip(RoundedCornerShape(14.dp))
-                                            .background(if (selected) ActionBlue.copy(alpha = 0.16f) else Color.Transparent),
+                                            .size(
+                                                width = if (isCenterHome) 50.dp else 44.dp,
+                                                height = if (isCenterHome) 30.dp else 28.dp
+                                            )
+                                            .clip(RoundedCornerShape(15.dp))
+                                            .background(
+                                                if (selected) ActionBlue.copy(alpha = 0.18f)
+                                                else if (isCenterHome) ActionBlue.copy(alpha = 0.05f)
+                                                else Color.Transparent
+                                            ),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = item.icon,
                                             contentDescription = item.title,
-                                            modifier = Modifier.size(20.dp)
+                                            modifier = Modifier.size(if (isCenterHome) 22.dp else 20.dp)
                                         )
                                     }
                                 },
@@ -633,8 +641,8 @@ fun MainPagerScaffold(
                 modifier = Modifier.fillMaxSize()
             ) { page ->
                 when (page) {
-                    0 -> FocusScreen(viewModel = focusViewModel, onOpenSettings = onOpenSettings)
-                    1 -> TrendsScreen(viewModel = trendsViewModel, onOpenSettings = { onOpenSettings(null) })
+                    0 -> TrendsScreen(viewModel = trendsViewModel, onOpenSettings = { onOpenSettings(null) })
+                    1 -> FocusScreen(viewModel = focusViewModel, onOpenSettings = onOpenSettings)
                     2 -> ReportsScreen(
                         viewModel = reportsViewModel,
                         onOpenSettings = { onOpenSettings(null) },
