@@ -50,6 +50,7 @@ import com.tirup.app.presentation.theme.ColorVeryHigh
 import com.tirup.app.presentation.theme.ColorVeryLow
 import com.tirup.app.presentation.theme.PrimaryEmerald
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -66,9 +67,9 @@ fun WeeklyDigestSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val isMmol = unit == GlucoseUnit.MMOL_L
 
+    val periodSubtext = formatCompactDigestDateRange(digest, isRu)
     val dateFormat = SimpleDateFormat(if (isRu) "d MMMM" else "MMM d", if (isRu) Locale("ru") else Locale.US)
     val currentPeriodStr = "${dateFormat.format(Date(digest.currentWeekStart))} — ${dateFormat.format(Date(digest.currentWeekEnd))}"
-    val prevPeriodStr = "${dateFormat.format(Date(digest.previousWeekStart))} — ${dateFormat.format(Date(digest.previousWeekEnd))}"
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -106,7 +107,7 @@ fun WeeklyDigestSheet(
                     }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "$currentPeriodStr (${if (isRu) "к прошлой нед." else "vs"} $prevPeriodStr)",
+                        text = periodSubtext,
                         fontSize = 12.5.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -550,4 +551,52 @@ private fun DigestMetricRow(
             modifier = Modifier.weight(1.1f)
         )
     }
+}
+
+internal fun formatCompactDigestDateRange(digest: WeeklyDigest, isRu: Boolean): String {
+    val curStartCal = Calendar.getInstance().apply { timeInMillis = digest.currentWeekStart }
+    val curEndCal = Calendar.getInstance().apply { timeInMillis = digest.currentWeekEnd }
+    val prevStartCal = Calendar.getInstance().apply { timeInMillis = digest.previousWeekStart }
+    val prevEndCal = Calendar.getInstance().apply { timeInMillis = digest.previousWeekEnd }
+
+    return if (isRu) {
+        val curStartMonth = getShortRussianMonth(curStartCal.get(Calendar.MONTH))
+        val curEndMonth = getShortRussianMonth(curEndCal.get(Calendar.MONTH))
+        val currentPeriod = "${curStartCal.get(Calendar.DAY_OF_MONTH)} $curStartMonth — ${curEndCal.get(Calendar.DAY_OF_MONTH)} $curEndMonth"
+
+        val prevPeriod = if (prevStartCal.get(Calendar.MONTH) == prevEndCal.get(Calendar.MONTH)) {
+            val endDayMonth = String.format(Locale.getDefault(), "%02d.%02d", prevEndCal.get(Calendar.DAY_OF_MONTH), prevEndCal.get(Calendar.MONTH) + 1)
+            "${prevStartCal.get(Calendar.DAY_OF_MONTH)} — $endDayMonth"
+        } else {
+            val startDayMonth = String.format(Locale.getDefault(), "%02d.%02d", prevStartCal.get(Calendar.DAY_OF_MONTH), prevStartCal.get(Calendar.MONTH) + 1)
+            val endDayMonth = String.format(Locale.getDefault(), "%02d.%02d", prevEndCal.get(Calendar.DAY_OF_MONTH), prevEndCal.get(Calendar.MONTH) + 1)
+            "$startDayMonth — $endDayMonth"
+        }
+        "$currentPeriod (к прошлой нед. $prevPeriod)"
+    } else {
+        val curFmt = SimpleDateFormat("MMM d", Locale.US)
+        val currentPeriod = "${curFmt.format(Date(digest.currentWeekStart))} — ${curFmt.format(Date(digest.currentWeekEnd))}"
+        val prevPeriod = if (prevStartCal.get(Calendar.MONTH) == prevEndCal.get(Calendar.MONTH)) {
+            "${curFmt.format(Date(digest.previousWeekStart))} — ${prevEndCal.get(Calendar.DAY_OF_MONTH)}"
+        } else {
+            "${curFmt.format(Date(digest.previousWeekStart))} — ${curFmt.format(Date(digest.previousWeekEnd))}"
+        }
+        "$currentPeriod (vs $prevPeriod)"
+    }
+}
+
+internal fun getShortRussianMonth(month: Int): String = when (month) {
+    0 -> "янв."
+    1 -> "февр."
+    2 -> "мар."
+    3 -> "апр."
+    4 -> "мая"
+    5 -> "июн."
+    6 -> "июл."
+    7 -> "авг."
+    8 -> "сен."
+    9 -> "окт."
+    10 -> "нояб."
+    11 -> "дек."
+    else -> ""
 }

@@ -123,7 +123,13 @@ object TargetCompensatorCalculator {
                 val suffHintRu = if (!isDataSufficient) " (сбор данных: $observedPointsCount точек)" else ""
                 val suffHintEn = if (!isDataSufficient) " (collecting data: $observedPointsCount pts)" else ""
 
-                if (neededMinutesToday > remainingMinutesToday) {
+                val isTargetGuaranteed = inRangeMinutes >= targetGoalMinutes || neededMinutesToday == 0
+
+                if (isTargetGuaranteed) {
+                    status = CompensatorStatus.EXCEEDING
+                    recRu = "Сахар вне диапазона$suffHintRu. Суточная цель (≥$targetPctInt%) уже выполнена досрочно! Вернитесь в норму для улучшения результата текущих суток."
+                    recEn = "Glucose is out of range$suffHintEn. Daily target (≥$targetPctInt%) is already achieved! Return to range to improve your score for today."
+                } else if (neededMinutesToday > remainingMinutesToday) {
                     status = CompensatorStatus.UNREALISTIC
                     val maxTirStr = String.format(Locale.US, "%.0f%%", maxPossibleTir)
                     recRu = "Сахар вне диапазона$suffHintRu. До конца суток осталось $remainStrRu (макс. $targetName сегодня: $maxTirStr). Вернитесь в норму, чтобы завершить день с лучшим счётом."

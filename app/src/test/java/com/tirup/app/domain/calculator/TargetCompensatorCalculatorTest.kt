@@ -122,6 +122,49 @@ class TargetCompensatorCalculatorTest {
     }
 
     @org.junit.Test
+    fun testDailyCompensatorTargetAlreadyAchievedOutOfRange() {
+        val ranges = com.tirup.app.domain.model.TargetRanges()
+        val calendar = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 20)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val eveningTime = calendar.timeInMillis
+        calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        val startOfDay = calendar.timeInMillis
+
+        // 240 readings from 00:00 to 20:00 (every 5 min)
+        // 230 points in range (19+ hours in range, exceeding the 16.8h target goal of 70% of 24h)
+        val readings = (0..240).map { i ->
+            val t = startOfDay + i * 5 * 60_000L
+            com.tirup.app.domain.model.GlucoseReading(
+                timestamp = t,
+                valueMmol = if (i < 230) 6.0 else 11.0
+            )
+        }
+        val latest = readings.last()
+
+        val goal = TargetCompensatorCalculator.calculateDailyCompensator(
+            targetMode = TargetMode.TIR,
+            targetPercent = 70.0,
+            latestReading = latest,
+            recentReadings = readings,
+            targetRanges = ranges,
+            language = "RU",
+            referenceTimestamp = eveningTime
+        )
+
+        org.junit.Assert.assertFalse(goal.isCurrentlyInRange)
+        org.junit.Assert.assertEquals(0, goal.neededMinutesToday)
+        org.junit.Assert.assertEquals(com.tirup.app.domain.model.CompensatorStatus.EXCEEDING, goal.status)
+        org.junit.Assert.assertTrue(goal.recommendationRu.contains("уже выполнена досрочно"))
+        org.junit.Assert.assertTrue(goal.recommendationRu.contains("Вернитесь в норму для улучшения результата"))
+        org.junit.Assert.assertFalse(goal.recommendationRu.contains("0 мин"))
+        org.junit.Assert.assertFalse(goal.recommendationRu.contains("0 минут"))
+    }
+
+    @org.junit.Test
     fun testDailyCompensatorFewPointsDoesNotTriggerExceeding() {
         val ranges = com.tirup.app.domain.model.TargetRanges()
         val calendar = java.util.Calendar.getInstance().apply {
