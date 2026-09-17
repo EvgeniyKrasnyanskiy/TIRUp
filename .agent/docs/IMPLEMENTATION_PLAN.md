@@ -346,3 +346,21 @@
   - Интервал `PROACTIVE_RESET_INTERVAL_MS` увеличен с 20 до 27 минут (`27 * 60 * 1000L`).
   - Обеспечивает непрерывную сессию сканирования на 35% дольше, сохраняя при этом надёжный 3-минутный буфер безопасности до 30-минутного аппаратного лимита AOSP.
 
+## 17. Итерация 17: [Completed] Устранение двойного рестарта в Doze и стабилизация сканирования в BALANCED
+
+### Этап 1: [Completed] Исключение boost из программных фоновых сбросов сканера
+- `BleObserverManager.kt`:
+  - В `onKeepAliveTickSuspend()` для `alarm_proactive_reset` (27 мин) и `alarm_silence_timeout` (6 мин) флаг `boost` переведён в `false`.
+  - При ошибках регистрации `on_scan_failed_recovery` сброс также выполняется в `boost = false`.
+  - Сканер атомарно перезапускается прямо в `SCAN_MODE_BALANCED` внутри 15-секундного аппаратного `WakeLock`. Устранено фатальное удвоение рестартов за 60 секунд.
+
+### Этап 2: [Completed] Аппаратный WakeLock при возврате из ручного boost в BALANCED
+- `BleObserverManager.kt`:
+  - В `boostJob` блок `Reverting scan mode from boost (LOW_LATENCY) to BALANCED` обёрнут в `PowerManager.PARTIAL_WAKE_LOCK` (15 сек).
+  - Исключено засыпание процессора во время фазы IPC `delay(800L)` при ручном запуске теста из UI.
+
+### Этап 3: [Completed] Превентивная очистка зависшего скана при старте сервиса
+- `BleObserverManager.kt`:
+  - В `startScanningFromService()` добавлен превентивный вызов `stopScanningInternal()` перед стартом сканирования, исключающий зомби-регистрации в стеке Android после обновления APK.
+
+

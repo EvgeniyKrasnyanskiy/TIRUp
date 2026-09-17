@@ -145,6 +145,8 @@ object BleObserverManager {
             val userSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
             val ble = userSettings.bleBridgeSettings
             if (ble.isEnabled && ble.role == BleBridgeRole.OBSERVER) {
+                // Ensure any previous dead or stale scan registration is cleared before starting fresh
+                stopScanningInternal()
                 startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = isBoostActive)
             } else {
                 try {
@@ -227,11 +229,11 @@ object BleObserverManager {
         val isAospLimitApproaching = scanStartTimestampMs > 0L && elapsedSinceStart >= PROACTIVE_RESET_INTERVAL_MS
 
         if (isPacketSilence) {
-            Log.w(TAG, "Silence watchdog triggered during keep-alive tick: ${elapsedSincePacket / 1000}s since last packet. Restarting scan with boost.")
-            restartScanInternal("alarm_silence_timeout", boost = true)
+            Log.w(TAG, "Silence watchdog triggered during keep-alive tick: ${elapsedSincePacket / 1000}s since last packet. Restarting scan directly in BALANCED mode.")
+            restartScanInternal("alarm_silence_timeout", boost = false)
         } else if (isAospLimitApproaching) {
-            Log.i(TAG, "Proactive reset triggered during keep-alive tick: scan age is ${elapsedSinceStart / 60000} min (AOSP limit 30 min). Refreshing scan with boost.")
-            restartScanInternal("alarm_proactive_reset", boost = true)
+            Log.i(TAG, "Proactive reset triggered during keep-alive tick: scan age is ${elapsedSinceStart / 60000} min (AOSP limit 30 min). Refreshing scan directly in BALANCED mode.")
+            restartScanInternal("alarm_proactive_reset", boost = false)
         } else {
             Log.i(TAG, "Keep-alive tick healthy: scanAge=${elapsedSinceStart / 60000}m, packetSilence=${elapsedSincePacket / 1000}s, lastPacketReceivedMs=$lastPacketReceivedSystemMs")
         }
@@ -308,18 +310,30 @@ object BleObserverManager {
                         _boostRemainingSec.value = (_boostRemainingSec.value - 1).coerceAtLeast(0)
                     }
                     isBoostActive = false
-                    mutex.withLock {
-                        if (isScanning && !isBoostActive) {
-                            Log.i(TAG, "Reverting scan mode from boost (LOW_LATENCY) to BALANCED")
-                            try {
-                                activeCallback?.let { cb -> scanner?.stopScan(cb) }
-                            } catch (_: Exception) {}
-                            activeCallback = null
-                            scanner = null
-                            isScanning = false
-                            delay(800L)
-                            startScanningInternalLocked(context, ble.familyPin, settingsRepo, glucoseRepo, boost = false)
+                    val revertWakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TIRUp:BleBoostRevertWakeLock")?.apply {
+                        setReferenceCounted(false)
+                        acquire(15_000L)
+                    }
+                    try {
+                        mutex.withLock {
+                            if (isScanning && !isBoostActive) {
+                                Log.i(TAG, "Reverting scan mode from boost (LOW_LATENCY) to BALANCED")
+                                try {
+                                    activeCallback?.let { cb -> scanner?.stopScan(cb) }
+                                } catch (_: Exception) {}
+                                activeCallback = null
+                                scanner = null
+                                isScanning = false
+                                delay(800L)
+                                startScanningInternalLocked(context, ble.familyPin, settingsRepo, glucoseRepo, boost = false)
+                            }
                         }
+                    } finally {
+                        try {
+                            if (revertWakeLock?.isHeld == true) {
+                                revertWakeLock.release()
+                            }
+                        } catch (_: Exception) {}
                     }
                 }
             }
@@ -427,7 +441,7 @@ object BleObserverManager {
                 ) {
                     scope.launch {
                         delay(2500L)
-                        restartScanInternal("on_scan_failed_recovery", boost = true)
+                        restartScanInternal("on_scan_failed_recovery", boost = false)
                     }
                 }
             }
