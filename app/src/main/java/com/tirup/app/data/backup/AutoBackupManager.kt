@@ -7,8 +7,10 @@ import android.util.JsonReader
 import android.util.JsonWriter
 import android.util.Log
 import com.tirup.app.data.local.AppDatabase
+import com.tirup.app.data.local.entity.DailySummaryEntity
 import com.tirup.app.data.local.entity.GlucoseReadingEntity
 import com.tirup.app.data.local.entity.TreatmentEntity
+import com.tirup.app.domain.calculator.GlucoseMetricsCalculator
 import com.tirup.app.domain.model.AlertSettings
 import com.tirup.app.domain.model.BleBridgeRole
 import com.tirup.app.domain.model.BleBridgeSettings
@@ -617,6 +619,27 @@ object AutoBackupManager {
             writer.name("labName").value(rec.labName)
             writer.name("notes").value(rec.notes)
             writer.endObject()
+        }
+        writer.endArray()
+
+        writer.name("isWeeklyDigestEnabled").value(settings.isWeeklyDigestEnabled)
+        writer.name("dismissedWeeklyDigestTimestamp").value(settings.dismissedWeeklyDigestTimestamp)
+        writer.name("bestStreakDays").value(settings.bestStreakDays)
+        writer.name("lastStreakCelebratedDays").value(settings.lastStreakCelebratedDays)
+        writer.name("showTreatmentsOnChart").value(settings.showTreatmentsOnChart)
+        writer.name("showPredictionOnChart").value(settings.showPredictionOnChart)
+
+        writer.name("metricsOrder")
+        writer.beginArray()
+        for (m in settings.metricsOrder) {
+            writer.value(m)
+        }
+        writer.endArray()
+
+        writer.name("hiddenMetrics")
+        writer.beginArray()
+        for (h in settings.hiddenMetrics) {
+            writer.value(h)
         }
         writer.endArray()
 
@@ -1389,6 +1412,9 @@ object AutoBackupManager {
                         val end = (i + batchSize).coerceAtMost(restoredReadings.size)
                         database.glucoseReadingDao().insertBatch(restoredReadings.subList(i, end))
                     }
+                    if (restoredReadings.isNotEmpty()) {
+                        recalculateSummariesAfterRestore(database)
+                    }
                     return@withContext Result.success(
                         BackupRestoreResult(
                             readingsRestored = restoredReadings.size,
@@ -1515,6 +1541,10 @@ object AutoBackupManager {
                         readingsRestored = restoreReadingsFromCsvStream(bufferedIn, database)
                     }
                 }
+            }
+
+            if (readingsRestored > 0) {
+                recalculateSummariesAfterRestore(database)
             }
 
             Result.success(
@@ -1723,6 +1753,9 @@ object AutoBackupManager {
                 val end = (i + batchSize).coerceAtMost(restoredReadings.size)
                 database.glucoseReadingDao().insertBatch(restoredReadings.subList(i, end))
             }
+            if (restoredReadings.isNotEmpty()) {
+                recalculateSummariesAfterRestore(database)
+            }
             Result.success(restoredReadings.size)
         } catch (e: Exception) {
             Log.e(TAG, "restoreLegacyJson error: ${e.message}", e)
@@ -1762,6 +1795,14 @@ object AutoBackupManager {
         var hba1cRemindersCountInCycle = 0
         var lastHba1cReminderTimestamp = 0L
         var lastYearEndDigestShownYear = 0
+        var isWeeklyDigest = false
+        var dismissedWeeklyDigest = 0L
+        var bestStreak = 0
+        var lastStreakCelebrated = 0
+        var showTreatments = true
+        var showPrediction = true
+        var metricsOrder = com.tirup.app.domain.model.DEFAULT_METRICS_ORDER
+        var hiddenMetrics = emptyList<String>()
 
         reader.beginObject()
         while (reader.hasNext()) {
@@ -1936,6 +1977,26 @@ object AutoBackupManager {
                     reader.endArray()
                     hba1cRecords = list
                 }
+                "isWeeklyDigestEnabled" -> isWeeklyDigest = reader.nextBoolean()
+                "dismissedWeeklyDigestTimestamp" -> dismissedWeeklyDigest = reader.nextLong()
+                "bestStreakDays" -> bestStreak = reader.nextInt()
+                "lastStreakCelebratedDays" -> lastStreakCelebrated = reader.nextInt()
+                "showTreatmentsOnChart" -> showTreatments = reader.nextBoolean()
+                "showPredictionOnChart" -> showPrediction = reader.nextBoolean()
+                "metricsOrder" -> {
+                    val list = mutableListOf<String>()
+                    reader.beginArray()
+                    while (reader.hasNext()) list.add(reader.nextString())
+                    reader.endArray()
+                    metricsOrder = list
+                }
+                "hiddenMetrics" -> {
+                    val list = mutableListOf<String>()
+                    reader.beginArray()
+                    while (reader.hasNext()) list.add(reader.nextString())
+                    reader.endArray()
+                    hiddenMetrics = list
+                }
                 else -> reader.skipValue()
             }
         }
@@ -1971,8 +2032,60 @@ object AutoBackupManager {
             hba1cRemindersCountInCycle = hba1cRemindersCountInCycle,
             lastHba1cReminderTimestamp = lastHba1cReminderTimestamp,
             lastYearEndDigestShownYear = lastYearEndDigestShownYear,
+            isWeeklyDigestEnabled = isWeeklyDigest,
+            dismissedWeeklyDigestTimestamp = dismissedWeeklyDigest,
+            bestStreakDays = bestStreak,
+            lastStreakCelebratedDays = lastStreakCelebrated,
+            showTreatmentsOnChart = showTreatments,
+            showPredictionOnChart = showPrediction,
+            metricsOrder = metricsOrder,
+            hiddenMetrics = hiddenMetrics,
             hasSeenOnboarding = true
         )
+    }
+
+    private suspend fun recalculateSummariesAfterRestore(database: AppDatabase) = withContext(Dispatchers.IO) {
+        try {
+            val earliest = database.glucoseReadingDao().getEarliestTimestamp() ?: return@withContext
+            val latest = database.glucoseReadingDao().getLatestTimestamp() ?: return@withContext
+            val defaultTargets = TargetRanges()
+
+            val allReadings = database.glucoseReadingDao().getReadingsBetweenSync(earliest, latest)
+            if (allReadings.isEmpty()) return@withContext
+
+            val groupedByDay = allReadings.groupBy { getStartOfDay(it.timestamp) }
+            val summaries = groupedByDay.map { (dayStart, dayEntities) ->
+                val domainReadings = dayEntities.map { it.toDomain() }
+                val stats = GlucoseMetricsCalculator.calculateStatistics(domainReadings, defaultTargets)
+                DailySummaryEntity(
+                    dateTimestamp = dayStart,
+                    mean = stats.meanMmol,
+                    tir = stats.tirPercent,
+                    ting = stats.tingPercent,
+                    tbrVeryLow = stats.tbrVeryLowPercent,
+                    tbrLow = stats.tbrLowPercent,
+                    tarHigh = stats.tarHighPercent,
+                    tarVeryHigh = stats.tarVeryHighPercent,
+                    sd = stats.sdMmol,
+                    cv = stats.cvPercent,
+                    count = stats.totalCount
+                )
+            }
+            database.dailySummaryDao().insertBatch(summaries)
+            Log.d(TAG, "recalculateSummariesAfterRestore: generated ${summaries.size} daily summaries")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to recalculate summaries after restore: ${e.message}", e)
+        }
+    }
+
+    private fun getStartOfDay(timestamp: Long): Long {
+        val cal = java.util.Calendar.getInstance()
+        cal.timeInMillis = timestamp
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        cal.set(java.util.Calendar.MINUTE, 0)
+        cal.set(java.util.Calendar.SECOND, 0)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+        return cal.timeInMillis
     }
 
     private fun parseAlertSettings(reader: JsonReader): AlertSettings {
