@@ -10,6 +10,7 @@ import com.tirup.app.domain.model.LabHba1cRecord
 import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.domain.model.localizeDiabetesType
 import com.tirup.app.domain.model.localizeTherapyType
+import com.tirup.app.domain.model.localizeTherapyTypeCompact
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -130,11 +131,21 @@ class Hba1cReportPdfGenerator(private val context: Context) {
             val patientDisplayName = if (profile.fullName.isNotBlank()) profile.fullName else (if (isRu) "Пациент не указан" else "Patient not specified")
             val pAge = if (profile.birthYear > 1900) com.tirup.app.domain.util.PluralUtils.formatYears(profile.calculatedAge, isRu) else "—"
             val pDiab = if (profile.diabetesType.isNotBlank()) localizeDiabetesType(profile.diabetesType, isRu) else "—"
-            val pTherapy = if (profile.therapyType.isNotBlank()) localizeTherapyType(profile.therapyType, isRu) else "—"
+            val pTherapy = if (profile.therapyType.isNotBlank()) localizeTherapyTypeCompact(profile.therapyType, isRu) else "—"
 
-            canvas.drawText(if (isRu) "Пациент: $patientDisplayName" else "Patient: $patientDisplayName", 52f, pY, valPaint)
-            canvas.drawText(if (isRu) "Возраст: $pAge" else "Age: $pAge", 300f, pY, valPaint)
-            canvas.drawText(if (isRu) "Диагноз: $pDiab" else "Diagnosis: $pDiab", 410f, pY, valPaint)
+            val patLabel = if (isRu) "Пациент: $patientDisplayName" else "Patient: $patientDisplayName"
+            canvas.drawText(patLabel, 52f, pY, valPaint)
+            val patWidth = valPaint.measureText(patLabel)
+            val ageLabel = if (isRu) "Возраст: $pAge" else "Age: $pAge"
+            val diagLabel = if (isRu) "Диагноз: $pDiab" else "Diagnosis: $pDiab"
+            val ageX = maxOf(330f, 52f + patWidth + 14f)
+            if (ageX + valPaint.measureText(ageLabel) + 14f + valPaint.measureText(diagLabel) <= 545f) {
+                canvas.drawText(ageLabel, ageX, pY, valPaint)
+                canvas.drawText(diagLabel, maxOf(430f, ageX + valPaint.measureText(ageLabel) + 14f), pY, valPaint)
+            } else {
+                canvas.drawText(ageLabel, 330f, pY, valPaint)
+                canvas.drawText(diagLabel, 430f, pY, valPaint)
+            }
 
             canvas.drawText(if (isRu) "Тип терапии: $pTherapy" else "Therapy: $pTherapy", 52f, pY + 18f, labelPaint)
             if (profile.heightCm.isNotBlank() && profile.weightKg.isNotBlank()) {

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.HorizontalDivider
@@ -3926,29 +3927,27 @@ fun Hba1cHistoryDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 24.dp),
         title = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Science,
-                        contentDescription = null,
-                        tint = Color(0xFFEF4444),
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isRu) "Журнал HbA1c" else "HbA1c Journal",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close", modifier = Modifier.size(20.dp))
-                }
+                Icon(
+                    imageVector = Icons.Default.Science,
+                    contentDescription = null,
+                    tint = Color(0xFFEF4444),
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isRu) "Журнал HbA1c" else "HbA1c Journal",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
             }
         },
         text = {
@@ -4342,54 +4341,6 @@ fun Hba1cHistoryDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (lastExportedPath != null) {
-                    val filePath = lastExportedPath!!
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = ActionBlue.copy(alpha = 0.12f),
-                        border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.35f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = if (isRu) "Выписка сохранена в Загрузки" else "Saved to Downloads",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = ActionBlue
-                                )
-                                Text(
-                                    text = filePath.substringAfterLast('/'),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Button(
-                                onClick = { openSavedFileFolder(context, filePath) },
-                                colors = ButtonDefaults.buttonColors(containerColor = ActionBlue),
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                modifier = Modifier.height(32.dp)
-                            ) {
-                                Text(
-                                    text = if (isRu) "Открыть" else "Open",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-
                 SnackbarHost(hostState = localSnackbarHostState)
 
                 Row(
@@ -4406,13 +4357,12 @@ fun Hba1cHistoryDialog(
                                     lastExportedPath = savedPath
                                     val fileName = savedPath.substringAfterLast('/')
                                     val msg = if (isRu) "Выписка сохранена в Загрузки: $fileName" else "Report saved to Downloads: $fileName"
-                                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
                                     coroutineScope.launch {
                                         val actionLabel = if (isRu) "Открыть" else "Open"
                                         val result = localSnackbarHostState.showSnackbar(
                                             message = msg,
                                             actionLabel = actionLabel,
-                                            duration = SnackbarDuration.Long
+                                            duration = SnackbarDuration.Short
                                         )
                                         if (result == SnackbarResult.ActionPerformed) {
                                             openSavedFileFolder(context, savedPath)
@@ -4500,6 +4450,10 @@ private fun PatientProfileEditDialog(
             onProfileChange(localProfile)
             onDismiss()
         },
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 24.dp),
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(

@@ -14,6 +14,7 @@ import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.domain.model.localizeDiabetesType
 import com.tirup.app.domain.model.localizeTherapyType
+import com.tirup.app.domain.model.localizeTherapyTypeCompact
 import com.tirup.app.presentation.trends.TrendPeriod
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -99,14 +100,19 @@ class AgpPdfGenerator(private val context: Context) {
             val pHeight = if (patient.heightCm.isNotBlank()) (if (isRu) "${patient.heightCm} см" else "${patient.heightCm} cm") else "_______"
             val pType = localizeDiabetesType(patient.diabetesType, isRu)
             val pDur = com.tirup.app.domain.util.PluralUtils.formatYears(patient.calculatedDuration, isRu)
-            val pTherapy = localizeTherapyType(patient.therapyType, isRu)
-            val latestHba1c = userSettings.latestHba1cRecord
-            val hba1cDateFmt = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
-
-            val patientLine = if (isRu) {
-                "Пациент: $pName • Возраст: $pAge • Вес: $pWeight • Рост: $pHeight • $pType (стаж $pDur) • $pTherapy"
-            } else {
-                "Patient: $pName • Age: $pAge • Weight: $pWeight • Height: $pHeight • $pType (duration $pDur) • $pTherapy"
+            var pTherapy = localizeTherapyType(patient.therapyType, isRu)
+            val buildPatientLine = { th: String ->
+                if (isRu) {
+                    "Пациент: $pName • Возраст: $pAge • Вес: $pWeight • Рост: $pHeight • $pType (стаж $pDur) • $th"
+                } else {
+                    "Patient: $pName • Age: $pAge • Weight: $pWeight • Height: $pHeight • $pType (duration $pDur) • $th"
+                }
+            }
+            var patientLine = buildPatientLine(pTherapy)
+            val maxHeaderLineWidth = (595f - margin) - (margin + 12f) - 12f
+            if (subTextPaint.measureText(patientLine) > maxHeaderLineWidth) {
+                pTherapy = localizeTherapyTypeCompact(patient.therapyType, isRu)
+                patientLine = buildPatientLine(pTherapy)
             }
             canvas.drawText(patientLine, margin + 12f, 55f, subTextPaint)
 
@@ -218,6 +224,8 @@ class AgpPdfGenerator(private val context: Context) {
                 String.format(Locale.US, "%d – %d", (minVal * 18.0182).toInt(), (maxVal * 18.0182).toInt())
             }
 
+            val latestHba1c = userSettings.latestHba1cRecord
+            val hba1cDateFmt = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
             val labHba1cVal = if (latestHba1c != null) {
                 val dateStr = hba1cDateFmt.format(Date(latestHba1c.timestamp))
                 "${String.format(Locale.US, "%.1f%%", latestHba1c.valuePercent)} ($dateStr)"

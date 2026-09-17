@@ -48,6 +48,7 @@ import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.domain.model.localizeDiabetesType
 import com.tirup.app.domain.model.localizeTherapyType
+import com.tirup.app.domain.model.localizeTherapyTypeCompact
 import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.PrimaryEmerald
 import com.tirup.app.presentation.trends.AgpChart
@@ -133,7 +134,7 @@ fun AgpSheetPreviewModal(
                                 val pHeight = if (patient.heightCm.isNotBlank()) "${patient.heightCm} ${if (isRu) "см" else "cm"}" else "_______"
                                 val pType = localizeDiabetesType(patient.diabetesType, isRu)
                                 val pDur = com.tirup.app.domain.util.PluralUtils.formatYears(patient.calculatedDuration, isRu)
-                                val pTherapy = localizeTherapyType(patient.therapyType, isRu)
+                                val pTherapy = localizeTherapyTypeCompact(patient.therapyType, isRu)
 
                                 val patientLine = if (isRu) {
                                     "Пациент: $pName • Возраст: $pAge • Вес: $pWeight • Рост: $pHeight • $pType ($pDur) • $pTherapy"

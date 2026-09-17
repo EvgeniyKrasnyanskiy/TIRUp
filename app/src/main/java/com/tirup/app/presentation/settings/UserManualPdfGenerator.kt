@@ -194,11 +194,11 @@ class UserManualPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Семейный BLE-мост (без интернета, радиус 10–15м)" else "Family BLE Bridge (100% Offline, 10–15m Range)",
                         if (isRu) "BLE-мост" else "BLE Bridge",
-                        if (isRu) "Прямая связь родитель–ребёнок по BLE (импульс 12–15с) без сопряжения и интернета с защитой Family PIN. Для 100% стабильности в фоне держите включённым «Уведомление на экране блокировки» (Foreground Service)."
-                        else "Direct parent-child link over BLE (12-15s bursts) without pairing or internet, secured by Family PIN. For 24/7 background stability keep 'Lockscreen Notification' enabled."
+                        if (isRu) "Связь родитель–ребёнок по BLE (импульс 15с раз в 5м, Family PIN). Мост идеален на улице, в школе и дороге. В глубоком сне (Doze) Android урезает BLE ради батареи; ночью дома держите Wi-Fi фолловер активным. При пробуждении экрана связь восстанавливается за 1–2 мин."
+                        else "Parent-child BLE link (15s bursts per 5m, Family PIN). Ideal outdoors, at school and travel. In deep sleep (Doze) Android limits BLE scanning to save power; use Wi-Fi follower at night. Reconnects within 1-2 min after screen wake."
                     )
                 ),
-                cardHeight = 41f
+                cardHeight = 48f
             )
 
             // Section 2: Homescreen, Lockscreen Widgets & Floating Bubble

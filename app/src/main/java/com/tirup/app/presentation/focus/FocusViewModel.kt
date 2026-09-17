@@ -334,7 +334,10 @@ class FocusViewModel(
         viewModelScope.launch {
             settingsRepository.updateSettings(
                 currentSettings.copy(
-                    sensorStatus = currentSettings.sensorStatus.copy(lastUsedDurationDays = durationDays)
+                    sensorStatus = currentSettings.sensorStatus.copy(
+                        durationDays = durationDays,
+                        lastUsedDurationDays = durationDays
+                    )
                 )
             )
         }
@@ -345,7 +348,10 @@ class FocusViewModel(
         viewModelScope.launch {
             settingsRepository.updateSettings(
                 currentSettings.copy(
-                    pumpSetStatus = currentSettings.pumpSetStatus.copy(lastUsedDurationDays = durationDays)
+                    pumpSetStatus = currentSettings.pumpSetStatus.copy(
+                        durationDays = durationDays,
+                        lastUsedDurationDays = durationDays
+                    )
                 )
             )
         }
@@ -356,7 +362,10 @@ class FocusViewModel(
         viewModelScope.launch {
             settingsRepository.updateSettings(
                 currentSettings.copy(
-                    lancetStatus = currentSettings.lancetStatus.copy(lastUsedDurationDays = durationDays)
+                    lancetStatus = currentSettings.lancetStatus.copy(
+                        durationDays = durationDays,
+                        lastUsedDurationDays = durationDays
+                    )
                 )
             )
         }
