@@ -656,7 +656,6 @@ fun MainPagerScaffold(
             tirPercent90d = currentSettingsState.tirPercent90d,
             skippedQuarterTimestamp = userSettings.hba1cSkippedQuarterTimestamp,
             isRu = isRu,
-            snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() },
             onAddRecord = { value, timestamp, lab, notes ->
                 settingsViewModel.addHba1cRecord(valuePercent = value, timestamp = timestamp, labName = lab, notes = notes)
             },
@@ -666,8 +665,8 @@ fun MainPagerScaffold(
             onSkipQuarter = {
                 settingsViewModel.skipHba1cQuarter()
             },
-            onExportPdf = {
-                settingsViewModel.exportHba1cReportToPdf()
+            onExportPdf = { onSaved ->
+                settingsViewModel.exportHba1cReportToPdf(onSaved)
             },
             onDismiss = { showHba1cDialog = false }
         )

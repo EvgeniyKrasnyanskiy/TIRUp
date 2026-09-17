@@ -723,7 +723,7 @@ class SettingsViewModel(
 
     private val hba1cPdfGenerator = Hba1cReportPdfGenerator(context)
 
-    fun exportHba1cReportToPdf() {
+    fun exportHba1cReportToPdf(onSuccess: ((String) -> Unit)? = null) {
         viewModelScope.launch {
             val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
             val settings = _uiState.value.userSettings
@@ -763,6 +763,9 @@ class SettingsViewModel(
                         filePath = savedPath,
                         message = if (isRu) "Выписка HbA1c сохранена в Загрузки" else "HbA1c summary saved to Downloads"
                     ))
+                    withContext(Dispatchers.Main) {
+                        onSuccess?.invoke(savedPath)
+                    }
                 } catch (e: Exception) {
                     _events.emit(SettingsEvent.Info("Save failed: ${e.message}"))
                 }

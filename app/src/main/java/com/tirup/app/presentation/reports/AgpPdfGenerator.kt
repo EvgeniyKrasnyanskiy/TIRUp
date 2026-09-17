@@ -102,18 +102,11 @@ class AgpPdfGenerator(private val context: Context) {
             val pTherapy = localizeTherapyType(patient.therapyType, isRu)
             val latestHba1c = userSettings.latestHba1cRecord
             val hba1cDateFmt = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
-            val hba1cHeaderStr = if (latestHba1c != null) {
-                val dateStr = hba1cDateFmt.format(Date(latestHba1c.timestamp))
-                if (isRu) "Лаб. HbA1c: ${String.format(Locale.US, "%.1f%%", latestHba1c.valuePercent)} ($dateStr)"
-                else "Lab HbA1c: ${String.format(Locale.US, "%.1f%%", latestHba1c.valuePercent)} ($dateStr)"
-            } else ""
 
             val patientLine = if (isRu) {
-                "Пациент: $pName • Возраст: $pAge • Вес: $pWeight • Рост: $pHeight • $pType (стаж $pDur) • $pTherapy" +
-                    if (hba1cHeaderStr.isNotEmpty()) " • $hba1cHeaderStr" else ""
+                "Пациент: $pName • Возраст: $pAge • Вес: $pWeight • Рост: $pHeight • $pType (стаж $pDur) • $pTherapy"
             } else {
-                "Patient: $pName • Age: $pAge • Weight: $pWeight • Height: $pHeight • $pType (duration $pDur) • $pTherapy" +
-                    if (hba1cHeaderStr.isNotEmpty()) " • $hba1cHeaderStr" else ""
+                "Patient: $pName • Age: $pAge • Weight: $pWeight • Height: $pHeight • $pType (duration $pDur) • $pTherapy"
             }
             canvas.drawText(patientLine, margin + 12f, 55f, subTextPaint)
 
@@ -225,32 +218,58 @@ class AgpPdfGenerator(private val context: Context) {
                 String.format(Locale.US, "%d – %d", (minVal * 18.0182).toInt(), (maxVal * 18.0182).toInt())
             }
 
-            val statRows = if (isRu) {
-                listOf(
-                    Pair("Средний сахар (Mean) • Мин/Макс:", "$meanStr • Мин/Макс: $minMaxStr"),
-                    Pair("Вариабельность глюкозы (%CV):", String.format(Locale.US, "%.1f%% (Цель ≤36.0%%) • SD: %s", statistics.cvPercent, sdStr)),
-                    Pair("Расчётный eA1c (ADAG):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)),
-                    Pair("GRI (риск гипо / Klonoff 2022):", String.format(Locale.US, "%.1f (%s, цель ≤40.0)", statistics.gri, statistics.griLabel)),
-                    Pair("Индексы GVI / PGS:", String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs)),
-                    Pair("Ночной профиль (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)}):", nightStr)
-                )
+            val labHba1cVal = if (latestHba1c != null) {
+                val dateStr = hba1cDateFmt.format(Date(latestHba1c.timestamp))
+                "${String.format(Locale.US, "%.1f%%", latestHba1c.valuePercent)} ($dateStr)"
             } else {
-                listOf(
-                    Pair("Average Glucose (Mean) • Min/Max:", "$meanStr • Min/Max: $minMaxStr"),
-                    Pair("Glucose Variability (%CV):", String.format(Locale.US, "%.1f%% (Target ≤36.0%%) • SD: %s", statistics.cvPercent, sdStr)),
-                    Pair("Estimated A1c (eA1c):", String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)),
-                    Pair("Glycemia Risk Index (GRI / Hypo Risk):", String.format(Locale.US, "%.1f (%s, target ≤40.0)", statistics.gri, statistics.griLabel)),
-                    Pair("Variability Indexes (GVI/PGS):", String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs)),
-                    Pair("Night Sleep Profile (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)}):", nightStr)
-                )
+                "—"
             }
 
             var statY = panelTop + 38f
-            statRows.forEach { (title, value) ->
-                canvas.drawText(title, col2Left + 12f, statY, subTextPaint)
-                canvas.drawText(value, col2Left + 12f, statY + 12f, textPaint)
-                statY += 26f
-            }
+
+            // Row 1: Mean & Min/Max
+            val meanTitle = if (isRu) "Средний сахар (Mean) • Мин/Макс:" else "Average Glucose (Mean) • Min/Max:"
+            val meanVal = "$meanStr • Мин/Макс: $minMaxStr"
+            canvas.drawText(meanTitle, col2Left + 12f, statY, subTextPaint)
+            canvas.drawText(meanVal, col2Left + 12f, statY + 12f, textPaint)
+            statY += 26f
+
+            // Row 2: CV & SD
+            val cvTitle = if (isRu) "Вариабельность глюкозы (%CV):" else "Glucose Variability (%CV):"
+            val cvVal = String.format(Locale.US, if (isRu) "%.1f%% (Цель ≤36.0%%) • SD: %s" else "%.1f%% (Target ≤36.0%%) • SD: %s", statistics.cvPercent, sdStr)
+            canvas.drawText(cvTitle, col2Left + 12f, statY, subTextPaint)
+            canvas.drawText(cvVal, col2Left + 12f, statY + 12f, textPaint)
+            statY += 26f
+
+            // Row 3: eA1c & Lab HbA1c (2 columns)
+            val ea1cTitle = if (isRu) "Расчётный eA1c (GMI):" else "Estimated A1c (GMI):"
+            val ea1cVal = String.format(Locale.US, "%.1f%% (%d mmol/mol)", statistics.gmiPercent, statistics.hba1cMmolMol)
+            val labHba1cTitle = if (isRu) "Лаб. HbA1c:" else "Lab HbA1c:"
+            canvas.drawText(ea1cTitle, col2Left + 12f, statY, subTextPaint)
+            canvas.drawText(ea1cVal, col2Left + 12f, statY + 12f, textPaint)
+            canvas.drawText(labHba1cTitle, col2Left + 150f, statY, subTextPaint)
+            canvas.drawText(labHba1cVal, col2Left + 150f, statY + 12f, textPaint)
+            statY += 26f
+
+            // Row 4: GRI
+            val griTitle = if (isRu) "GRI (риск гипо / Klonoff 2022):" else "Glycemia Risk Index (GRI / Hypo Risk):"
+            val griVal = String.format(Locale.US, if (isRu) "%.1f (%s, цель ≤40.0)" else "%.1f (%s, target ≤40.0)", statistics.gri, statistics.griLabel)
+            canvas.drawText(griTitle, col2Left + 12f, statY, subTextPaint)
+            canvas.drawText(griVal, col2Left + 12f, statY + 12f, textPaint)
+            statY += 26f
+
+            // Row 5: GVI / PGS
+            val gviTitle = if (isRu) "Индексы GVI / PGS:" else "Variability Indexes (GVI/PGS):"
+            val gviVal = String.format(Locale.US, "GVI %.2f (≤1.20) • PGS %.1f (≤35.0)", statistics.gvi, statistics.pgs)
+            canvas.drawText(gviTitle, col2Left + 12f, statY, subTextPaint)
+            canvas.drawText(gviVal, col2Left + 12f, statY + 12f, textPaint)
+            statY += 26f
+
+            // Row 6: Night Profile
+            val nightTitle = if (isRu) "Ночной профиль (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)}):"
+                             else "Night Sleep Profile (${String.format(Locale.US, "%02d:00", userSettings.nightStartHour)}–${String.format(Locale.US, "%02d:00", userSettings.nightEndHour)}):"
+            canvas.drawText(nightTitle, col2Left + 12f, statY, subTextPaint)
+            canvas.drawText(nightStr, col2Left + 12f, statY + 12f, textPaint)
 
             // 3. AGP 24-Hour Modal Day Chart with 3-Hour Perpendiculars
             val chartTop = 326f
