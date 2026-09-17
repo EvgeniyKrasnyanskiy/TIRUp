@@ -79,6 +79,9 @@ object BleObserverManager {
     private var lastHandledTimestamp: Long = 0L
 
     @Volatile
+    private var lastHeartbeatLogMs: Long = 0L
+
+    @Volatile
     var isServiceRunning: Boolean = false
 
     /**
@@ -272,8 +275,8 @@ object BleObserverManager {
         scanner = null
         isScanning = false
 
-        // 2. Pause 350ms to allow system Bluetooth stack IPC to fully clear the client registration
-        delay(350L)
+        // 2. Pause 800ms to allow system Bluetooth stack IPC to fully clear the client registration
+        delay(800L)
 
         // 3. Resolve context and repositories
         val context = appContext ?: TirupApplication.instance
@@ -342,7 +345,7 @@ object BleObserverManager {
             .apply {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
-                    setNumOfMatches(ScanSettings.MATCH_NUM_ONE_ADVERTISEMENT)
+                    setNumOfMatches(ScanSettings.MATCH_NUM_MAX_ADVERTISEMENT)
                     setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
                 }
             }
@@ -373,7 +376,10 @@ object BleObserverManager {
                 Log.e(TAG, "BLE Scan failed: $errorDesc")
                 _isScanningFlow.value = false
 
-                if (errorCode == SCAN_FAILED_ALREADY_STARTED || errorCode == SCAN_FAILED_INTERNAL_ERROR) {
+                if (errorCode == SCAN_FAILED_ALREADY_STARTED ||
+                    errorCode == SCAN_FAILED_APPLICATION_REGISTRATION_FAILED ||
+                    errorCode == SCAN_FAILED_INTERNAL_ERROR
+                ) {
                     scope.launch {
                         delay(2500L)
                         restartScanInternal("on_scan_failed_recovery")
@@ -390,7 +396,9 @@ object BleObserverManager {
             _isScanningFlow.value = true
             val now = System.currentTimeMillis()
             scanStartTimestampMs = now
-            lastPacketReceivedSystemMs = now
+            if (lastPacketReceivedSystemMs == 0L) {
+                lastPacketReceivedSystemMs = now
+            }
             Log.i(TAG, "BLE Observer started scanning successfully (boost=$boost)")
         } catch (e: SecurityException) {
             Log.w(TAG, "SecurityException starting scan: ${e.message}")
@@ -413,12 +421,32 @@ object BleObserverManager {
 
         val packet = BlePacketCodec.decodePacket(rawData, expectedPin) ?: return
 
-        // Anti-duplicate protection: ignore if timestamp already processed or in past
-        if (packet.timestamp <= lastHandledTimestamp) return
-        lastHandledTimestamp = packet.timestamp
-        lastPacketReceivedSystemMs = System.currentTimeMillis()
-
         val rssi = result.rssi
+        val now = System.currentTimeMillis()
+        lastPacketReceivedSystemMs = now
+
+        // Check if this is a repeat packet from the same burst or a fallback heartbeat with the same reading timestamp
+        if (packet.timestamp <= lastHandledTimestamp) {
+            // Heartbeat or repeat packet within burst: keeps watchdog alive without cluttering Room DB
+            if (now - lastHeartbeatLogMs >= 3000L) {
+                lastHeartbeatLogMs = now
+                Log.i(TAG, "Heartbeat received: ts=${packet.timestamp}, bg=${packet.valueMmol}, rssi=$rssi (duplicate, connection alive)")
+                _packetReceivedEvent.tryEmit(Pair(packet, rssi))
+            }
+            scope.launch {
+                try {
+                    val currentSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
+                    val updatedBle = currentSettings.bleBridgeSettings.copy(
+                        lastRssi = rssi,
+                        lastMasterBattery = if (packet.batteryPercent in 0..100) packet.batteryPercent else currentSettings.bleBridgeSettings.lastMasterBattery
+                    )
+                    settingsRepository.updateSettings(currentSettings.copy(bleBridgeSettings = updatedBle))
+                } catch (_: Exception) {}
+            }
+            return
+        }
+
+        lastHandledTimestamp = packet.timestamp
         Log.i(TAG, "Received valid BLE glucose packet: ts=${packet.timestamp}, bg=${packet.valueMmol}, rssi=$rssi, bat=${packet.batteryPercent}%")
         _packetReceivedEvent.tryEmit(Pair(packet, rssi))
 
