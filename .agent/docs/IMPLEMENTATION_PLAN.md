@@ -427,8 +427,29 @@
 ### Этап 5: [Completed] Актуализация документации и README.md
 - `README.md`:
   - Добавлен раздел об учёте расходных материалов и устройств (Supplies & Device Tracker) в русской и английской версиях.
-  - Актуализировано описание Семейного BLE-моста.
+  ## 20. Итерация 20: [Completed] Улучшение UX восстановления данных и актуализация превью виджетов
 
+### Этап 1: [Completed] Окно выбора варианта восстановления и гид по файлам (`SettingsScreen.kt`, `SettingsViewModel.kt`, `AutoBackupManager.kt`)
+- `AutoBackupManager.kt`:
+  - Реализован метод `restoreLatestAutoBackup(context, database, settingsRepository)` с возвратом подробного `BackupRestoreResult` (число замеров сахара, меток терапии и статус восстановления настроек). Метод автоматически находит и восстанавливает самую свежую резервную копию из `Documents/TIRUp/Backups/` или внутреннего хранилища (как многофайловые `csv/json`, так и `tirup_backup.json` / `zip`).
+- `SettingsViewModel.kt`:
+  - Добавлен метод `restoreLatestAutoBackup()` с индикатором прогресса и информационным событием `SettingsEvent.Info` с подробным отчетом пользователю.
+- `SettingsScreen.kt`:
+  - Кнопка «Восстановить» теперь открывает удобное модальное окно `RestoreOptionsModal`:
+    - Карточка обнаруженной резервной копии: дата сохранения, количество замеров и меток с кнопкой «⚡ Восстановить в 1 клик».
+    - Шпаргалка-гид по файлам: подробно разъяснено назначение каждого типа файла (`tirup_backup_*.zip` или `.json` — полное восстановление; `tirup_readings.csv` — только замеры без сброса настроек; `tirup_treatments.csv` — метки терапии; `tirup_settings.json` — настройки и профиль).
+    - Кнопка «Выбрать файл в папке...» запускает системный `restoreBackupLauncher` с переданным `DocumentsContract.EXTRA_INITIAL_URI`, автоматически открывая проводник сразу в папке `Documents/TIRUp/Backups/`.
 
-
-
+### Этап 2: [Completed] Актуализация превью всех 7 виджетов рабочего стола (`drawable-nodpi/`)
+- Полностью перерисованы все 7 растровых превью виджетов с суперсемплингом 3x (`SCALE = 3`) и сглаживанием LANCZOS в точном соответствии с эталонным стилем `widget_strip_preview.png`:
+  - `widget_2x1_preview.png` (252 x 130)
+  - `widget_3x1_preview.png` (395 x 130)
+  - `widget_compact_preview.png` (248 x 247)
+  - `widget_dashboard_medium_preview.png` (390 x 247)
+  - `widget_dashboard_preview.png` (534 x 248)
+  - `widget_minimal_preview.png` (144 x 144)
+  - `widget_vertical_preview.png` (104 x 248)
+- В превью виджетов обновлены показатели: актуальный сахар `6.5 → -0.1`, TIR `92%`, суточный баланс Компенсатора `+1ч 15м`, активный инсулин `💉 1.2 U` и стрик `🔥 7 д.`.
+- Удалены устаревшие элементы (время `+7м`, слот батарейки `[battery] ?`).
+- В виджетах Dashboard и Dashboard Medium отрисован чистый темный коридор нормы (3.9–10.0 ммоль/л) с плавной сплайн-кривой Catmull-Rom и светящейся точкой текущего сахара.
+- В виджете Minimal выровнено идеальное центрирование всех элементов.

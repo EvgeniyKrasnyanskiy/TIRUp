@@ -1,9 +1,11 @@
 package com.tirup.app.presentation.settings
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -187,6 +189,7 @@ fun SettingsScreen(
     var masterOffHintVisible by rememberSaveable { mutableStateOf(false) }
     var showBleHelpModal by rememberSaveable { mutableStateOf(false) }
     var showBlePinDialog by rememberSaveable { mutableStateOf(false) }
+    var showRestoreOptionsModal by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -276,8 +279,19 @@ fun SettingsScreen(
         }
     }
 
+    val backupFolderUri = remember {
+        Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADocuments%2FTIRUp%2FBackups")
+    }
     val restoreBackupLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
+        contract = object : ActivityResultContracts.OpenDocument() {
+            override fun createIntent(context: Context, input: Array<String>): Intent {
+                val intent = super.createIntent(context, input)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, backupFolderUri)
+                }
+                return intent
+            }
+        }
     ) { uri ->
         if (uri != null) {
             viewModel.prepareRestoreFromUri(uri)
@@ -2853,7 +2867,7 @@ fun SettingsScreen(
 
                         OutlinedButton(
                             onClick = {
-                                restoreBackupLauncher.launch(arrayOf("application/zip", "application/json", "text/csv", "text/comma-separated-values", "*/*"))
+                                showRestoreOptionsModal = true
                             },
                             enabled = !state.isRestoreInProgress,
                             modifier = Modifier.weight(1f),
@@ -3067,6 +3081,158 @@ fun SettingsScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
+        )
+    }
+
+    if (showRestoreOptionsModal) {
+        val backupSummary = state.backupSummary
+        AlertDialog(
+            onDismissRequest = { showRestoreOptionsModal = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FileUpload,
+                        contentDescription = null,
+                        tint = ActionBlue
+                    )
+                    Text(
+                        text = if (isRu) "Восстановление данных" else "Restore Data",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.verticalScroll(rememberScrollState())
+                ) {
+                    if (backupSummary != null) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = PrimaryEmerald.copy(alpha = 0.1f),
+                            border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.3f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = if (isRu) "⚡ Автоматическая копия найдена" else "⚡ Local Auto-Backup Available",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PrimaryEmerald
+                                )
+                                val fmt = SimpleDateFormat("dd.MM.yyyy 'в' HH:mm", Locale.getDefault())
+                                val dateStr = if (backupSummary.exportedAt > 0L) fmt.format(Date(backupSummary.exportedAt)) else "—"
+                                Text(
+                                    text = if (isRu) "📅 Дата: $dateStr" else "📅 Date: $dateStr",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                Text(
+                                    text = if (isRu) "🩸 Замеров: ${backupSummary.readingsCount} • 💉 Меток: ${backupSummary.treatmentsCount}"
+                                    else "🩸 Readings: ${backupSummary.readingsCount} • 💉 Treatments: ${backupSummary.treatmentsCount}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Button(
+                                    onClick = {
+                                        showRestoreOptionsModal = false
+                                        viewModel.restoreLatestAutoBackup()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = if (isRu) "Восстановить в 1 клик" else "Restore in 1 Click",
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 2.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                    }
+
+                    Text(
+                        text = if (isRu) "📁 Папка с копиями:\nDocuments/TIRUp/Backups/"
+                        else "📁 Backup directory:\nDocuments/TIRUp/Backups/",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = ActionBlue
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = if (isRu) "Шпаргалка по выбору файла:" else "File picker guide:",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (isRu)
+                                    "• tirup_backup_*.zip или *.json — ПОЛНОЕ восстановление (замеры + метки + профиль и настройки).\n" +
+                                    "• tirup_readings.csv — только замеры сахара (настройки не заменяются).\n" +
+                                    "• tirup_treatments.csv — только метки инсулина и углеводов.\n" +
+                                    "• tirup_settings.json — только профиль и пороги тревог."
+                                else
+                                    "• tirup_backup_*.zip or *.json — FULL restore (readings + treatments + settings).\n" +
+                                    "• tirup_readings.csv — readings only.\n" +
+                                    "• tirup_treatments.csv — treatments only.\n" +
+                                    "• tirup_settings.json — settings only.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            showRestoreOptionsModal = false
+                            restoreBackupLauncher.launch(
+                                arrayOf("application/zip", "application/json", "text/csv", "text/comma-separated-values", "*/*")
+                            )
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, ActionBlue),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FileUpload,
+                            contentDescription = null,
+                            tint = ActionBlue,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isRu) "Выбрать файл в папке..." else "Select file from folder...",
+                            color = ActionBlue,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showRestoreOptionsModal = false }) {
+                    Text(if (isRu) "Закрыть" else "Close")
+                }
+            }
         )
     }
 

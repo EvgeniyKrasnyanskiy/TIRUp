@@ -1292,6 +1292,121 @@ object AutoBackupManager {
     }
 
     /**
+     * Automatically restores the most recent backup found in Documents/TIRUp/Backups or app internal storage.
+     * Returns detailed BackupRestoreResult with readings, treatments, and settings restoration status.
+     */
+    suspend fun restoreLatestAutoBackup(
+        context: Context? = null,
+        database: AppDatabase,
+        settingsRepository: SettingsRepository
+    ): Result<BackupRestoreResult> = withContext(Dispatchers.IO) {
+        try {
+            val pubDir = getPublicBackupDirectory()
+            val intDir = getInternalBackupDirectory(context)
+            val candidateDirs = listOf(pubDir, intDir).distinctBy { it.absolutePath }
+
+            for (dir in candidateDirs) {
+                val settingsFile = File(dir, SETTINGS_FILE_NAME)
+                val readingsFile = File(dir, READINGS_FILE_NAME)
+                val treatmentsFile = File(dir, TREATMENTS_FILE_NAME)
+                val legacyFile = File(dir, LEGACY_BACKUP_FILE_NAME)
+
+                if (settingsFile.exists() || readingsFile.exists()) {
+                    var readingsRestored = 0
+                    var treatmentsRestored = 0
+                    var settingsRestored = false
+
+                    if (settingsFile.exists() && settingsFile.length() > 0L) {
+                        try {
+                            FileReader(settingsFile).use { fr ->
+                                JsonReader(fr).use { reader ->
+                                    reader.beginObject()
+                                    while (reader.hasNext()) {
+                                        if (reader.nextName() == "settings") {
+                                            val s = parseSettings(reader)
+                                            applySettings(s, settingsRepository)
+                                            settingsRestored = true
+                                        } else {
+                                            reader.skipValue()
+                                        }
+                                    }
+                                    reader.endObject()
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error restoring settings file: ${e.message}")
+                        }
+                    }
+
+                    if (readingsFile.exists() && readingsFile.length() > 0L) {
+                        try {
+                            readingsRestored = restoreReadingsFromCsvStream(FileInputStream(readingsFile), database)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error restoring readings file: ${e.message}")
+                        }
+                    }
+
+                    if (treatmentsFile.exists() && treatmentsFile.length() > 0L) {
+                        try {
+                            treatmentsRestored = restoreTreatmentsFromCsvStream(FileInputStream(treatmentsFile), database)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error restoring treatments file: ${e.message}")
+                        }
+                    }
+
+                    return@withContext Result.success(
+                        BackupRestoreResult(
+                            readingsRestored = readingsRestored,
+                            treatmentsRestored = treatmentsRestored,
+                            settingsRestored = settingsRestored
+                        )
+                    )
+                }
+
+                if (legacyFile.exists() && legacyFile.length() > 0L) {
+                    val restoredReadings = mutableListOf<GlucoseReadingEntity>()
+                    var restoredSettings: UserSettings? = null
+                    FileReader(legacyFile).use { fr ->
+                        JsonReader(fr).use { reader ->
+                            reader.beginObject()
+                            while (reader.hasNext()) {
+                                when (reader.nextName()) {
+                                    "settings" -> restoredSettings = parseSettings(reader)
+                                    "readings" -> parseReadings(reader, restoredReadings)
+                                    else -> reader.skipValue()
+                                }
+                            }
+                            reader.endObject()
+                        }
+                    }
+                    var settingsRestored = false
+                    if (restoredSettings != null) {
+                        applySettings(restoredSettings!!, settingsRepository)
+                        settingsRestored = true
+                    }
+                    val batchSize = 1000
+                    for (i in restoredReadings.indices step batchSize) {
+                        val end = (i + batchSize).coerceAtMost(restoredReadings.size)
+                        database.glucoseReadingDao().insertBatch(restoredReadings.subList(i, end))
+                    }
+                    return@withContext Result.success(
+                        BackupRestoreResult(
+                            readingsRestored = restoredReadings.size,
+                            treatmentsRestored = 0,
+                            settingsRestored = settingsRestored
+                        )
+                    )
+                }
+            }
+
+            Result.failure(IllegalStateException("No backup files found in Documents/TIRUp/Backups or app storage"))
+        } catch (e: Exception) {
+            Log.e(TAG, "restoreLatestAutoBackup error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Full restore from user-selected URI (ZIP, JSON or CSV).
      */
     suspend fun restoreFromUri(
