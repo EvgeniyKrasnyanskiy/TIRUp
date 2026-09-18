@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.unit.sp
 import com.tirup.app.domain.model.millisRemaining
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -631,7 +632,7 @@ fun MainPagerScaffold(
 
     LaunchedEffect(lastInteractionTime, isBottomBarVisible, showQuickHud) {
         if (isBottomBarVisible && !showQuickHud) {
-            delay(3000L)
+            delay(2200L)
             if (!showQuickHud) {
                 isBottomBarVisible = false
             }
@@ -711,7 +712,7 @@ fun MainPagerScaffold(
 
     val iobStr = latestReading?.iob?.let { if (it > 0.0) String.format(Locale.US, "%.1f %s", it, if (isRu) "ед" else "u") else "0.0" } ?: "—"
     val cobStr = latestReading?.cob?.let { if (it > 0.0) String.format(Locale.US, "%.0f %s", it, if (isRu) "г" else "g") else "0" } ?: "—"
-    val tirPercent = focusState.statistics.tirPercent
+    val tirFormatted = String.format(Locale.US, "%.0f%%", focusState.statistics.tirPercent)
     val sensorRemaining = formatDeviceRemainingTime(
         millisRemaining = focusState.sensorStatus.millisRemaining,
         installedAt = focusState.sensorStatus.installedAt,
@@ -749,306 +750,129 @@ fun MainPagerScaffold(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+            AnimatedVisibility(
+                visible = isBottomBarVisible,
+                enter = slideInVertically { it },
+                exit = slideOutVertically { it }
             ) {
-                AnimatedVisibility(
-                    visible = showQuickHud,
-                    enter = fadeIn() + scaleIn(initialScale = 0.88f),
-                    exit = fadeOut() + scaleOut(targetScale = 0.88f)
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 28.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                    shadowElevation = 4.dp
                 ) {
-                    Surface(
-                        modifier = Modifier
-                            .padding(horizontal = 20.dp, vertical = 6.dp)
-                            .fillMaxWidth(0.94f),
-                        shape = RoundedCornerShape(26.dp),
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
-                        border = BorderStroke(1.5.dp, glucoseColor.copy(alpha = 0.6f)),
-                        shadowElevation = 14.dp
+                    NavigationBar(
+                        containerColor = Color.Transparent,
+                        modifier = Modifier.height(48.dp)
                     ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            // Row 1: Glucose, Arrow, Rate of change, TIR %
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.Bottom) {
-                                    Text(
-                                        text = glucoseValStr,
-                                        fontSize = 42.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = glucoseColor,
-                                        lineHeight = 44.sp
-                                    )
-                                    if (trendArrow.isNotBlank()) {
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = trendArrow,
-                                            fontSize = 32.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = glucoseColor,
-                                            modifier = Modifier.padding(bottom = 2.dp)
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Column(modifier = Modifier.padding(bottom = 4.dp)) {
-                                        Text(
-                                            text = unitStr,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        if (rateStr.isNotBlank()) {
-                                            Text(
-                                                text = rateStr,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = ActionBlue
-                                            )
+                        tabs.forEachIndexed { index, item ->
+                            val selected = pagerState.currentPage == index
+                            val isCenterHome = index == 1
+                            NavigationBarItem(
+                                selected = selected,
+                                onClick = {
+                                    markUserActivity()
+                                    if (!isCenterHome) {
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(index)
                                         }
                                     }
-                                }
+                                },
+                                icon = {
+                                    if (isCenterHome) {
+                                        // Premium Accent FAB-style Center Button with Quick Glance HUD gesture (> 1.1s)
+                                        Box(
+                                            modifier = Modifier
+                                                .size(42.dp)
+                                                .shadow(
+                                                    elevation = if (selected) 6.dp else 2.dp,
+                                                    shape = CircleShape
+                                                )
+                                                .clip(CircleShape)
+                                                .background(
+                                                    if (selected) ActionBlue
+                                                    else ActionBlue.copy(alpha = 0.14f)
+                                                )
+                                                .border(
+                                                    BorderStroke(
+                                                        width = if (selected) 2.dp else 1.5.dp,
+                                                        color = if (selected) Color.White.copy(alpha = 0.4f) else ActionBlue.copy(alpha = 0.45f)
+                                                    ),
+                                                    CircleShape
+                                                )
+                                                .pointerInput(Unit) {
+                                                    awaitEachGesture {
+                                                        awaitFirstDown(requireUnconsumed = false)
+                                                        markUserActivity()
+                                                        var isLongPressed = false
 
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = PrimaryEmerald.copy(alpha = 0.15f),
-                                    border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.4f))
-                                ) {
-                                    Text(
-                                        text = "🎯 $tirPercent% TIR",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = PrimaryEmerald,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                                    )
-                                }
-                            }
+                                                        val longPressJob = coroutineScope.launch {
+                                                            delay(1100L) // 1.1 seconds hold
+                                                            isLongPressed = true
+                                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                            showQuickHud = true
+                                                        }
 
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Row 2: IOB & COB
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(text = "💉", fontSize = 13.sp)
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = if (isRu) "Инсулин (IOB):" else "Insulin (IOB):",
-                                            fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(modifier = Modifier.weight(1f))
-                                        Text(
-                                            text = iobStr,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
-
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(text = "🥖", fontSize = 13.sp)
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = if (isRu) "Углеводы (COB):" else "Carbs (COB):",
-                                            fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(modifier = Modifier.weight(1f))
-                                        Text(
-                                            text = cobStr,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Row 3: Sensor remaining time & Battery / Signal telemetry
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(text = "⏱️", fontSize = 12.sp)
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "${if (isRu) "Сенсор" else "Sensor"}: $sensorRemaining",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-
-                                val telemetryParts = listOfNotNull(
-                                    batteryStr.ifBlank { null },
-                                    rssiStr.ifBlank { null }
-                                )
-                                if (telemetryParts.isNotEmpty()) {
-                                    Text(
-                                        text = telemetryParts.joinToString("  "),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                AnimatedVisibility(
-                    visible = isBottomBarVisible,
-                    enter = slideInVertically { it },
-                    exit = slideOutVertically { it }
-                ) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 28.dp, vertical = 6.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
-                        shadowElevation = 4.dp
-                    ) {
-                        NavigationBar(
-                            containerColor = Color.Transparent,
-                            modifier = Modifier.height(48.dp)
-                        ) {
-                            tabs.forEachIndexed { index, item ->
-                                val selected = pagerState.currentPage == index
-                                val isCenterHome = index == 1
-                                NavigationBarItem(
-                                    selected = selected,
-                                    onClick = {
-                                        markUserActivity()
-                                        if (!isCenterHome) {
-                                            coroutineScope.launch {
-                                                pagerState.animateScrollToPage(index)
-                                            }
-                                        }
-                                    },
-                                    icon = {
-                                        if (isCenterHome) {
-                                            // Premium Accent FAB-style Center Button with Quick Glance HUD gesture (> 2s)
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(42.dp)
-                                                    .shadow(
-                                                        elevation = if (selected) 6.dp else 2.dp,
-                                                        shape = CircleShape
-                                                    )
-                                                    .clip(CircleShape)
-                                                    .background(
-                                                        if (selected) ActionBlue
-                                                        else ActionBlue.copy(alpha = 0.14f)
-                                                    )
-                                                    .border(
-                                                        BorderStroke(
-                                                            width = if (selected) 2.dp else 1.5.dp,
-                                                            color = if (selected) Color.White.copy(alpha = 0.4f) else ActionBlue.copy(alpha = 0.45f)
-                                                        ),
-                                                        CircleShape
-                                                    )
-                                                    .pointerInput(Unit) {
-                                                        awaitEachGesture {
-                                                            awaitFirstDown(requireUnconsumed = false)
-                                                            markUserActivity()
-                                                            var isLongPressed = false
-
-                                                            val longPressJob = coroutineScope.launch {
-                                                                delay(2000L) // > 2 seconds
-                                                                isLongPressed = true
-                                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                                showQuickHud = true
-                                                            }
-
-                                                            try {
-                                                                var pointerUp = false
-                                                                while (!pointerUp) {
-                                                                    val event = awaitPointerEvent()
-                                                                    if (event.changes.all { !it.pressed }) {
-                                                                        pointerUp = true
-                                                                    }
+                                                        try {
+                                                            var pointerUp = false
+                                                            while (!pointerUp) {
+                                                                val event = awaitPointerEvent()
+                                                                if (event.changes.all { !it.pressed }) {
+                                                                    pointerUp = true
                                                                 }
-                                                            } finally {
-                                                                longPressJob.cancel()
-                                                                if (showQuickHud) {
-                                                                    showQuickHud = false
-                                                                    markUserActivity()
-                                                                } else if (!isLongPressed) {
-                                                                    coroutineScope.launch {
-                                                                        pagerState.animateScrollToPage(1)
-                                                                    }
+                                                            }
+                                                        } finally {
+                                                            longPressJob.cancel()
+                                                            if (showQuickHud) {
+                                                                showQuickHud = false
+                                                                markUserActivity()
+                                                            } else if (!isLongPressed) {
+                                                                coroutineScope.launch {
+                                                                    pagerState.animateScrollToPage(1)
                                                                 }
                                                             }
                                                         }
-                                                    },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = item.icon,
-                                                    contentDescription = item.title,
-                                                    tint = if (selected) Color.White else ActionBlue,
-                                                    modifier = Modifier.size(24.dp)
-                                                )
-                                            }
-                                        } else {
-                                            // Standard Side Buttons
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(width = 44.dp, height = 30.dp)
-                                                    .clip(RoundedCornerShape(12.dp))
-                                                    .background(
-                                                        if (selected) ActionBlue.copy(alpha = 0.15f)
-                                                        else Color.Transparent
-                                                    ),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = item.icon,
-                                                    contentDescription = item.title,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
+                                                    }
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = item.icon,
+                                                contentDescription = item.title,
+                                                tint = if (selected) Color.White else ActionBlue,
+                                                modifier = Modifier.size(24.dp)
+                                            )
                                         }
-                                    },
-                                    label = null,
-                                    colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = ActionBlue,
-                                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                                        indicatorColor = Color.Transparent
-                                    )
+                                    } else {
+                                        // Standard Side Buttons
+                                        Box(
+                                            modifier = Modifier
+                                                .size(width = 44.dp, height = 30.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(
+                                                    if (selected) ActionBlue.copy(alpha = 0.15f)
+                                                    else Color.Transparent
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = item.icon,
+                                                contentDescription = item.title,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                },
+                                label = null,
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = ActionBlue,
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                                    indicatorColor = Color.Transparent
                                 )
-                            }
+                            )
                         }
                     }
                 }
@@ -1058,6 +882,12 @@ fun MainPagerScaffold(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        markUserActivity()
+                    }
+                }
                 .nestedScroll(nestedScrollConnection)
                 .padding(bottom = if (isBottomBarVisible) innerPadding.calculateBottomPadding() else 0.dp)
         ) {
@@ -1076,18 +906,197 @@ fun MainPagerScaffold(
                 }
             }
 
-            if (!isBottomBarVisible) {
-                Box(
+            // Floating Centered Quick Glance HUD (60% screen height, 3x larger typography)
+            AnimatedVisibility(
+                visible = showQuickHud,
+                enter = fadeIn() + scaleIn(initialScale = 0.82f),
+                exit = fadeOut() + scaleOut(targetScale = 0.82f),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .zIndex(100f)
+            ) {
+                Surface(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .height(36.dp)
-                        .pointerInput(Unit) {
-                            detectTapGestures {
-                                markUserActivity()
+                        .fillMaxWidth(0.92f)
+                        .fillMaxHeight(0.60f),
+                    shape = RoundedCornerShape(32.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                    border = BorderStroke(2.dp, glucoseColor.copy(alpha = 0.7f)),
+                    shadowElevation = 24.dp
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 24.dp, vertical = 20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        // 1. Header: TIR % and Rate of Change
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = PrimaryEmerald.copy(alpha = 0.16f),
+                                border = BorderStroke(1.5.dp, PrimaryEmerald.copy(alpha = 0.5f))
+                            ) {
+                                Text(
+                                    text = "🎯 $tirFormatted TIR",
+                                    fontSize = 26.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = PrimaryEmerald,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                                )
+                            }
+
+                            if (rateStr.isNotBlank()) {
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = ActionBlue.copy(alpha = 0.12f),
+                                    border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.4f))
+                                ) {
+                                    Text(
+                                        text = rateStr,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ActionBlue,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    )
+                                }
                             }
                         }
-                )
+
+                        // 2. Huge Central Hero: Glucose value + Arrow + Unit
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = glucoseValStr,
+                                fontSize = 90.sp,
+                                fontWeight = FontWeight.Black,
+                                color = glucoseColor,
+                                letterSpacing = (-2).sp
+                            )
+                            if (trendArrow.isNotBlank()) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = trendArrow,
+                                    fontSize = 68.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = glucoseColor
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = unitStr,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        // 3. IOB & COB Big Cards
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(18.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(text = "💉", fontSize = 24.sp)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isRu) "Инсулин" else "Insulin",
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Text(
+                                        text = iobStr,
+                                        fontSize = 28.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(18.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(text = "🥖", fontSize = 24.sp)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isRu) "Углеводы" else "Carbs",
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Text(
+                                        text = cobStr,
+                                        fontSize = 28.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+
+                        // 4. Telemetry Footer: Sensor Remaining & Battery / RSSI
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = "⏱️", fontSize = 22.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "${if (isRu) "Сенсор" else "Sensor"}: $sensorRemaining",
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            val telemetryParts = listOfNotNull(
+                                batteryStr.ifBlank { null },
+                                rssiStr.ifBlank { null }
+                            )
+                            if (telemetryParts.isNotEmpty()) {
+                                Text(
+                                    text = telemetryParts.joinToString("  "),
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
