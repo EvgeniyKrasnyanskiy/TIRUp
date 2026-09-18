@@ -601,6 +601,7 @@ object AutoBackupManager {
         writer.name("isEnabled").value(ble.isEnabled)
         writer.name("familyPin").value(ble.familyPin)
         writer.name("transmitBattery").value(ble.transmitBattery)
+        writer.name("useLongRange").value(ble.useLongRange)
         writer.endObject()
 
         // HbA1c Lab Records
@@ -1881,6 +1882,7 @@ object AutoBackupManager {
                     var isEnabled = true
                     var familyPin = ""
                     var transmitBattery = true
+                    var useLongRange = false
                     reader.beginObject()
                     while (reader.hasNext()) {
                         when (reader.nextName()) {
@@ -1888,11 +1890,12 @@ object AutoBackupManager {
                             "isEnabled" -> isEnabled = reader.nextBoolean()
                             "familyPin" -> familyPin = reader.nextString()
                             "transmitBattery" -> transmitBattery = reader.nextBoolean()
+                            "useLongRange" -> useLongRange = reader.nextBoolean()
                             else -> reader.skipValue()
                         }
                     }
                     reader.endObject()
-                    bleBridgeSettings = BleBridgeSettings(role = role, isEnabled = isEnabled, familyPin = familyPin, transmitBattery = transmitBattery)
+                    bleBridgeSettings = BleBridgeSettings(role = role, isEnabled = isEnabled, familyPin = familyPin, transmitBattery = transmitBattery, useLongRange = useLongRange)
                 }
                 "isDeviceRemindersEnabled" -> isDeviceReminders = reader.nextBoolean()
                 "isSensorReminderEnabled" -> isSensorReminder = reader.nextBoolean()
