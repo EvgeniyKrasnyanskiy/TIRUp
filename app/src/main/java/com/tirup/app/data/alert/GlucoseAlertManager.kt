@@ -35,6 +35,7 @@ import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.domain.model.formatDeviceRemainingTime
 import com.tirup.app.presentation.MainActivity
+import com.tirup.app.presentation.alert.PatientCriticalHypoActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -857,7 +858,14 @@ object GlucoseAlertManager {
     /**
      * Test trigger directly from SettingsScreen buttons.
      */
-    fun sendTestAlert(context: Context, tier: AlertTier, isRu: Boolean, volumePercent: Int = 80) {
+    fun sendTestAlert(
+        context: Context,
+        tier: AlertTier,
+        isRu: Boolean,
+        volumePercent: Int = 80,
+        primaryPhone: String = "",
+        primaryName: String = ""
+    ) {
         initChannels(context)
 
         val channelId = when (tier) {
@@ -895,8 +903,44 @@ object GlucoseAlertManager {
             tier = tier,
             vibrate = true,
             flash = tier == AlertTier.CRITICAL,
-            volumePercent = volumePercent
+            volumePercent = volumePercent,
+            glucoseDisplay = "2.8",
+            trendArrow = "⇊",
+            primaryContactPhone = primaryPhone,
+            primaryContactName = primaryName
         )
+    }
+
+    /**
+     * Launches the full-screen Patient Rescue screen directly (used in System Testing with 5s delay).
+     */
+    fun launchPatientRescueScreen(
+        context: Context,
+        glucoseDisplay: String = "2.8",
+        trendArrow: String = "⇊",
+        isTest: Boolean = true,
+        primaryPhone: String = "",
+        primaryName: String = ""
+    ) {
+        val appContext = context.applicationContext
+        isCriticalAlarmActive = true
+        MedicalSoundPlayer.playSound(AlertTier.CRITICAL, 100)
+        triggerVibration(appContext, AlertTier.CRITICAL)
+        triggerFlashlight(appContext, AlertTier.CRITICAL)
+
+        try {
+            val intent = Intent(appContext, PatientCriticalHypoActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra(PatientCriticalHypoActivity.EXTRA_GLUCOSE, glucoseDisplay)
+                putExtra(PatientCriticalHypoActivity.EXTRA_TREND, trendArrow)
+                putExtra(PatientCriticalHypoActivity.EXTRA_IS_TEST, isTest)
+                putExtra(PatientCriticalHypoActivity.EXTRA_PRIMARY_CONTACT_PHONE, primaryPhone)
+                putExtra(PatientCriticalHypoActivity.EXTRA_PRIMARY_CONTACT_NAME, primaryName)
+            }
+            appContext.startActivity(intent)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to launch PatientCriticalHypoActivity: ${e.message}")
+        }
     }
 
     /**
@@ -1135,8 +1179,8 @@ object GlucoseAlertManager {
         // ----------------------------------------------------
         // Hypo protection is always on unless temporarily paused (<2h) or permanently disabled with explicit consent
         if (isHypoProtectionActive) {
-            // Extreme Low (< 3.0) or Prolonged Low (< 3.9 for >= criticalHypoMinutes)
-            val isExtremeLow = latest.valueMmol < targetRanges.veryLowThresholdMmol
+            // Extreme Low or Prolonged Low
+            val isExtremeLow = latest.valueMmol < alerts.criticalLowThresholdMmol
             val isProlongedLow = checkProlongedOutOfRange(sorted, isLow = true, threshold = tirLow, minutes = alerts.criticalHypoMinutes)
 
             if (isExtremeLow || isProlongedLow) {
@@ -1177,7 +1221,21 @@ object GlucoseAlertManager {
                         latest.valueMmol,
                         iobText
                     )
-                    sendNotification(context, CHANNEL_CRITICAL, NOTIFICATION_ID_CRITICAL, title, text, AlertTier.CRITICAL, alerts.isCriticalVibrate, alerts.isCriticalFlash)
+                    sendNotification(
+                        context = context,
+                        channelId = CHANNEL_CRITICAL,
+                        notificationId = NOTIFICATION_ID_CRITICAL,
+                        title = title,
+                        text = text,
+                        tier = AlertTier.CRITICAL,
+                        vibrate = alerts.isCriticalVibrate,
+                        flash = alerts.isCriticalFlash,
+                        volumePercent = 100,
+                        glucoseDisplay = String.format(Locale.US, "%.1f", latest.valueMmol),
+                        trendArrow = latest.trendArrow ?: "→",
+                        primaryContactPhone = alerts.emergencyContactPhone,
+                        primaryContactName = alerts.emergencyContactName
+                    )
                     scheduleEmergencySmsIfEnabled(context, latest.valueMmol, latest.trendArrow ?: "→", alerts, settings.patientProfile, isRu, settings.unit)
                     return
                 }
@@ -1188,8 +1246,8 @@ object GlucoseAlertManager {
         if (!isMasterActive) return
 
         if (alerts.isCriticalEnabled) {
-            // Extreme High (> 13.9) or Prolonged High (> tirHigh for >= criticalHyperMinutes)
-            val isExtremeHigh = latest.valueMmol > targetRanges.veryHighThresholdMmol
+            // Extreme High or Prolonged High
+            val isExtremeHigh = latest.valueMmol > alerts.criticalHighThresholdMmol
             val isProlongedHigh = checkProlongedOutOfRange(sorted, isLow = false, threshold = tirHigh, minutes = alerts.criticalHyperMinutes)
 
             if (isExtremeHigh || isProlongedHigh) {
@@ -1230,7 +1288,21 @@ object GlucoseAlertManager {
                         latest.valueMmol,
                         iobText
                     )
-                    sendNotification(context, CHANNEL_CRITICAL, NOTIFICATION_ID_CRITICAL, title, text, AlertTier.CRITICAL, alerts.isCriticalVibrate, alerts.isCriticalFlash)
+                    sendNotification(
+                        context = context,
+                        channelId = CHANNEL_CRITICAL,
+                        notificationId = NOTIFICATION_ID_CRITICAL,
+                        title = title,
+                        text = text,
+                        tier = AlertTier.CRITICAL,
+                        vibrate = alerts.isCriticalVibrate,
+                        flash = alerts.isCriticalFlash,
+                        volumePercent = 100,
+                        glucoseDisplay = String.format(Locale.US, "%.1f", latest.valueMmol),
+                        trendArrow = "↑",
+                        primaryContactPhone = alerts.emergencyContactPhone,
+                        primaryContactName = alerts.emergencyContactName
+                    )
                     return
                 }
             }
@@ -1439,7 +1511,11 @@ object GlucoseAlertManager {
         tier: AlertTier,
         vibrate: Boolean,
         flash: Boolean,
-        volumePercent: Int = 80
+        volumePercent: Int = 80,
+        glucoseDisplay: String = "2.8",
+        trendArrow: String = "⇊",
+        primaryContactPhone: String = "",
+        primaryContactName: String = ""
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
@@ -1511,6 +1587,31 @@ object GlucoseAlertManager {
 
         if (tier == AlertTier.CRITICAL) {
             isCriticalAlarmActive = true
+
+            val isHypo = title.contains("гипо", true) || title.contains("low", true) || title.contains("Тест", true) || title.contains("Test", true)
+            if (isHypo) {
+                val fullScreenIntent = Intent(context, PatientCriticalHypoActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    putExtra(PatientCriticalHypoActivity.EXTRA_GLUCOSE, glucoseDisplay)
+                    putExtra(PatientCriticalHypoActivity.EXTRA_TREND, trendArrow)
+                    putExtra(PatientCriticalHypoActivity.EXTRA_IS_TEST, title.contains("Тест", true) || title.contains("Test", true))
+                    putExtra(PatientCriticalHypoActivity.EXTRA_PRIMARY_CONTACT_PHONE, primaryContactPhone)
+                    putExtra(PatientCriticalHypoActivity.EXTRA_PRIMARY_CONTACT_NAME, primaryContactName)
+                }
+                val fullScreenPending = PendingIntent.getActivity(
+                    context,
+                    201,
+                    fullScreenIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                builder.setFullScreenIntent(fullScreenPending, true)
+
+                try {
+                    context.startActivity(fullScreenIntent)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not launch PatientCriticalHypoActivity directly: ${e.message}")
+                }
+            }
         }
 
         if (vibrate) {

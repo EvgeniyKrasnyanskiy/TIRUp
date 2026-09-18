@@ -28,6 +28,8 @@ data class AlertSettings(
     val isCriticalFlash: Boolean = true,
     val criticalHypoPauseUntilTimestamp: Long = 0L,
     val isCriticalHypoPermanentDisabled: Boolean = false,
+    val criticalLowThresholdMmol: Double = 3.0,
+    val criticalHighThresholdMmol: Double = 13.9,
 
     // Tier 4: Signal Loss (Потеря связи с сенсором >20 мин)
     val isSignalLossEnabled: Boolean = true,

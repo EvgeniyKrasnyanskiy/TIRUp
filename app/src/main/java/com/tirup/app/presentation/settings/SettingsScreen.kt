@@ -188,8 +188,10 @@ fun SettingsScreen(
     var showAdvancedSettings by rememberSaveable { mutableStateOf(false) }
     var isBleCardExpanded by rememberSaveable { mutableStateOf(false) }
     var isSmsCardExpanded by rememberSaveable { mutableStateOf(false) }
+    var isTestsCardExpanded by rememberSaveable { mutableStateOf(false) }
     var showProfileDialog by rememberSaveable { mutableStateOf(false) }
     var showCriticalHypoSafetyDialog by rememberSaveable { mutableStateOf(false) }
+    var showCriticalThresholdDialog by rememberSaveable { mutableStateOf(false) }
     var showMainThresholdDialog by rememberSaveable { mutableStateOf(false) }
     var showPredictiveHorizonDialog by rememberSaveable { mutableStateOf(false) }
     var showPredictiveInfoDialog by rememberSaveable { mutableStateOf(false) }
@@ -405,6 +407,14 @@ fun SettingsScreen(
         if (testSosSmsCooldownSec > 0) {
             delay(1000L)
             testSosSmsCooldownSec -= 1
+        }
+    }
+
+    var testRescueCountdownSec by remember { mutableStateOf(0) }
+    LaunchedEffect(testRescueCountdownSec) {
+        if (testRescueCountdownSec > 0) {
+            delay(1000L)
+            testRescueCountdownSec -= 1
         }
     }
 
@@ -1030,7 +1040,8 @@ fun SettingsScreen(
                             !alerts.isCriticalEnabled -> {
                                 if (isRu) "Выключено пользователем" else "Disabled by user"
                             }
-                            else -> if (isRu) "Сирена ~12 сек при гипо >20 мин, гипер >90 мин или <3.0 / >13.9" else "Siren ~12s on hypo >20m, hyper >90m or <3.0 / >13.9"
+                            else -> if (isRu) "Сирена ~12 сек при гипо >20 мин, гипер >90 мин или <${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)} / >${String.format(Locale.US, "%.1f", alerts.criticalHighThresholdMmol)}"
+                                    else "Siren ~12s on hypo >20m, hyper >90m or <${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)} / >${String.format(Locale.US, "%.1f", alerts.criticalHighThresholdMmol)}"
                         }
 
                         // Tier 3: Critical (Prolonged / Extreme)
@@ -1063,7 +1074,9 @@ fun SettingsScreen(
                             onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.CRITICAL) },
                             isRu = isRu,
                             timerBadge = criticalBadge,
-                            isPaused = isCriticalInPauseState
+                            isPaused = isCriticalInPauseState,
+                            thresholdBadge = "< ${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)}  |  > ${String.format(Locale.US, "%.1f", alerts.criticalHighThresholdMmol)}",
+                            onThresholdClick = { showCriticalThresholdDialog = true }
                         )
                         
                         Spacer(modifier = Modifier.height(6.dp))
@@ -2287,8 +2300,125 @@ fun SettingsScreen(
                                 }
                             )
                         }
+                    }
+                }
+            }
+        }
 
-                        // Local Siren sound test (3 sec)
+        // Section: System Testing (Тестирование систем)
+        BentoCard(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(horizontal = 2.dp, vertical = 2.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { isTestsCardExpanded = !isTestsCardExpanded },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (isRu) "🛠️ Тестирование систем" else "🛠️ System Testing",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (isRu) "Проверка экрана спасения, сирены опекуна, тестового SMS и дальности BLE-моста"
+                            else "Verify rescue screen, caregiver siren, test SMS, and BLE bridge range",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 16.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    IconButton(onClick = { isTestsCardExpanded = !isTestsCardExpanded }) {
+                        Icon(
+                            imageVector = if (isTestsCardExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (isTestsCardExpanded) "Collapse" else "Expand",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                AnimatedVisibility(visible = isTestsCardExpanded) {
+                    Column(
+                        modifier = Modifier.padding(top = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                        // Test 1: Rescue Screen (5 sec countdown)
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.startPatientRescueTestCountdown(5)
+                                testRescueCountdownSec = 5
+                            },
+                            enabled = testRescueCountdownSec == 0,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(
+                                1.5.dp,
+                                if (testRescueCountdownSec > 0) ColorVeryLow else ActionBlue.copy(alpha = 0.8f)
+                            ),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = if (testRescueCountdownSec > 0) ColorVeryLow.copy(alpha = 0.15f) else Color.Transparent
+                            )
+                        ) {
+                            Text(text = "🚨", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (testRescueCountdownSec > 0) {
+                                    if (isRu) "🔒 Заблокируйте экран! Старт через ${testRescueCountdownSec}с..." else "🔒 Lock screen! Launching in ${testRescueCountdownSec}s..."
+                                } else {
+                                    if (isRu) "🚨 Тест экрана спасения (через 5 сек)" else "🚨 Test Rescue Screen (in 5 sec)"
+                                },
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (testRescueCountdownSec > 0) ColorVeryLow else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Text(
+                            text = if (isRu) "💡 После нажатия заблокируйте телефон клавишей питания, чтобы убедиться, что окно спасения пробуждает экран поверх блокировки и PIN-кода."
+                            else "💡 Lock phone right after pressing to verify the rescue screen wakes up over lockscreen & PIN.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 15.sp,
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+
+                        // Test 2: Caregiver SOS SMS
+                        OutlinedButton(
+                            onClick = {
+                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                                    smsPermissionsLauncher.launch(arrayOf(Manifest.permission.SEND_SMS))
+                                } else {
+                                    viewModel.sendCaregiverSosTestSms()
+                                    testSosSmsCooldownSec = 60
+                                }
+                            },
+                            enabled = testSosSmsCooldownSec == 0,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, if (testSosSmsCooldownSec == 0) ColorVeryLow.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                        ) {
+                            Text(text = "🚨", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (testSosSmsCooldownSec > 0) {
+                                    if (isRu) "Тест SOS для опекуна (${testSosSmsCooldownSec}с)" else "Test Caregiver SOS (${testSosSmsCooldownSec}s)"
+                                } else {
+                                    if (isRu) "Тест SOS для опекуна (SMS)" else "Test Caregiver SOS (SMS)"
+                                },
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (testSosSmsCooldownSec == 0) ColorVeryLow else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            )
+                        }
+
+                        // Test 3: Caregiver Siren (3 sec)
                         OutlinedButton(
                             onClick = {
                                 com.tirup.app.data.alert.MedicalSoundPlayer.playCaregiverSosAlarm(cycles = 2)
@@ -2311,7 +2441,7 @@ fun SettingsScreen(
                             )
                         }
 
-                        // Send test verification SMS button
+                        // Test 4: Verification SMS
                         OutlinedButton(
                             onClick = {
                                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
@@ -2344,35 +2474,26 @@ fun SettingsScreen(
                             )
                         }
 
-                        // Send Caregiver SOS test SMS button
+                        // Test 5: BLE Bridge range test
                         OutlinedButton(
                             onClick = {
-                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-                                    smsPermissionsLauncher.launch(arrayOf(Manifest.permission.SEND_SMS))
+                                val isBt = com.tirup.app.data.ble.BleBroadcaster.isBluetoothEnabled(context)
+                                if (!isBt) {
+                                    Toast.makeText(context, if (isRu) "Включите Bluetooth на смартфоне" else "Enable Bluetooth first", Toast.LENGTH_SHORT).show()
                                 } else {
-                                    viewModel.sendCaregiverSosTestSms()
-                                    testSosSmsCooldownSec = 60
+                                    checkAndRequestBlePermissions(BleBridgeRole.BROADCASTER)
+                                    viewModel.sendBleTestPing()
                                 }
                             },
-                            enabled = testSosSmsCooldownSec == 0,
+                            enabled = !isBroadcasting,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, if (testSosSmsCooldownSec == 0) ColorVeryLow.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.7f))
                         ) {
                             Text(
-                                text = "🚨",
-                                fontSize = 16.sp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (testSosSmsCooldownSec > 0) {
-                                    if (isRu) "Тест SOS для опекуна (${testSosSmsCooldownSec}с)" else "Test Caregiver SOS (${testSosSmsCooldownSec}s)"
-                                } else {
-                                    if (isRu) "Тест SOS для опекуна (SMS)" else "Test Caregiver SOS (SMS)"
-                                },
+                                text = if (isRu) "📡 Тест связи BLE-моста (30 сек)" else "📡 Test BLE Bridge Link (30s)",
                                 style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = if (testSosSmsCooldownSec == 0) ColorVeryLow else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                color = ActionBlue
                             )
                         }
                     }
@@ -3768,6 +3889,137 @@ fun SettingsScreen(
                     }
                 ) {
                     Text(if (isRu) "Сброс к норме (3.9 - 10.0)" else "Default (3.9 - 10.0)")
+                }
+            }
+        )
+    }
+
+    if (showCriticalThresholdDialog) {
+        var lowVal by remember { mutableStateOf(settings.alertSettings.criticalLowThresholdMmol) }
+        var highVal by remember { mutableStateOf(settings.alertSettings.criticalHighThresholdMmol) }
+
+        AlertDialog(
+            onDismissRequest = { showCriticalThresholdDialog = false },
+            title = {
+                Text(
+                    text = if (isRu) "Пороги критических тревог" else "Critical Alert Thresholds",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text(
+                        text = if (isRu) "При выходе за эти границы включается громкая сирена, полноэкранное окно спасения поверх блокировки и отсчёт таймера SOS опекунам."
+                        else "Crossing these thresholds triggers maximum loud siren, full-screen rescue window over lockscreen, and caregiver SOS countdown.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // Critical Low threshold
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (isRu) "Критическая гипогликемия:" else "Critical hypoglycemia:",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = String.format(Locale.US, "%.1f ммоль/л", lowVal),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = ColorVeryLow
+                            )
+                        }
+                        Slider(
+                            value = lowVal.toFloat(),
+                            onValueChange = { lowVal = (Math.round(it * 10.0) / 10.0) },
+                            valueRange = 2.5f..4.5f,
+                            steps = 19,
+                            colors = SliderDefaults.colors(
+                                thumbColor = ColorVeryLow,
+                                activeTrackColor = ColorVeryLow
+                            )
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("2.5", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(if (isRu) "По умолчанию: 3.0" else "Default: 3.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("4.5", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    // Critical High threshold
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (isRu) "Критическая гипергликемия:" else "Critical hyperglycemia:",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = String.format(Locale.US, "%.1f ммоль/л", highVal),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = ColorHigh
+                            )
+                        }
+                        Slider(
+                            value = highVal.toFloat(),
+                            onValueChange = { highVal = (Math.round(it * 10.0) / 10.0) },
+                            valueRange = 11.0f..16.0f,
+                            steps = 49,
+                            colors = SliderDefaults.colors(
+                                thumbColor = ColorHigh,
+                                activeTrackColor = ColorHigh
+                            )
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("11.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(if (isRu) "По умолчанию: 13.9" else "Default: 13.9", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("16.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.updateAlertSettings(
+                            settings.alertSettings.copy(
+                                criticalLowThresholdMmol = lowVal,
+                                criticalHighThresholdMmol = highVal
+                            )
+                        )
+                        showCriticalThresholdDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
+                ) {
+                    Text(if (isRu) "Сохранить" else "Save")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.updateAlertSettings(
+                            settings.alertSettings.copy(
+                                criticalLowThresholdMmol = 3.0,
+                                criticalHighThresholdMmol = 13.9
+                            )
+                        )
+                        showCriticalThresholdDialog = false
+                    }
+                ) {
+                    Text(if (isRu) "Сброс к норме (<3.0 / >13.9)" else "Default (<3.0 / >13.9)")
                 }
             }
         )
