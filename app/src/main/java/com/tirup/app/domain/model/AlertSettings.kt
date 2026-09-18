@@ -43,7 +43,7 @@ data class AlertSettings(
 
     // Daily Compensator: Last Chance Alert (Последний шанс спасти суточный TIR)
     val isLastChanceAlertEnabled: Boolean = true,
-    val lastChanceBufferMinutes: Int = 90,
+    val lastChanceBufferMinutes: Int = 120,
 
     // Emergency SMS Alerts to trusted contacts on critical unacknowledged hypo
     val isEmergencySmsEnabled: Boolean = false,
@@ -51,7 +51,7 @@ data class AlertSettings(
     val emergencyContactName: String = "",
     val secondaryEmergencyContactPhone: String = "",
     val secondaryEmergencyContactName: String = "",
-    val emergencySmsDelayMinutes: Int = 5,
+    val emergencySmsDelayMinutes: Int = 3,
     val includeLocationInEmergencySms: Boolean = true,
     val lastEmergencySmsTimestamp: Long = 0L,
 
