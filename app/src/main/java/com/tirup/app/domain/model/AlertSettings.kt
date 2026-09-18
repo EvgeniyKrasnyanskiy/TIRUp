@@ -54,5 +54,8 @@ data class AlertSettings(
     val lastEmergencySmsTimestamp: Long = 0L,
 
     // SMS glucose query auto-reply for trusted contacts
-    val isSmsQueryReplyEnabled: Boolean = true
+    val isSmsQueryReplyEnabled: Boolean = true,
+
+    // Caregiver SOS Wakeup Alarm (Экстренное пробуждение опекуна при входящем SOS)
+    val isCaregiverSosWakeupEnabled: Boolean = true
 )

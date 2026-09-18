@@ -88,6 +88,9 @@ class AlertActionReceiver : BroadcastReceiver() {
                     }
                 }
             }
+            ACTION_DISMISS_CAREGIVER_SOS -> {
+                com.tirup.app.data.alert.CaregiverSosAlarmManager.dismissSosAlarm(context)
+            }
         }
     }
 
@@ -97,5 +100,6 @@ class AlertActionReceiver : BroadcastReceiver() {
         const val ACTION_LAUNCH_DIANIGHT = "com.tirup.app.ACTION_LAUNCH_DIANIGHT"
         const val ACTION_CHECK_SIGNAL_LOSS = "com.tirup.app.ACTION_CHECK_SIGNAL_LOSS"
         const val ACTION_SKIP_HBA1C_QUARTER = "com.tirup.app.ACTION_SKIP_HBA1C_QUARTER"
+        const val ACTION_DISMISS_CAREGIVER_SOS = "com.tirup.app.ACTION_DISMISS_CAREGIVER_SOS"
     }
 }

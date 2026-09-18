@@ -661,6 +661,42 @@ class SettingsViewModel(
         }
     }
 
+    fun sendCaregiverSosTestSms() {
+        val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+        val alerts = _uiState.value.userSettings.alertSettings
+        val patientName = _uiState.value.userSettings.patientProfile.fullName
+        val phones = listOf(alerts.emergencyContactPhone.trim(), alerts.secondaryEmergencyContactPhone.trim()).filter { it.isNotBlank() }
+
+        if (phones.isEmpty()) {
+            val msg = if (isRu) "Номер телефона не указан" else "Phone number is empty"
+            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        var sentCount = 0
+        for (phone in phones) {
+            com.tirup.app.data.alert.EmergencySmsManager.sendCaregiverSosTestSms(
+                context = context,
+                phone = phone,
+                patientName = patientName,
+                isRu = isRu
+            ).fold(
+                onSuccess = {
+                    sentCount++
+                },
+                onFailure = { error ->
+                    val msg = if (isRu) "Ошибка отправки на $phone: ${error.localizedMessage}" else "SMS send error to $phone: ${error.localizedMessage}"
+                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                }
+            )
+        }
+        if (sentCount > 0) {
+            val msg = if (isRu) "🚨 Тестовое SOS-SMS отправлено опекуну ($sentCount ном.)" else "🚨 Test SOS SMS sent to caregiver ($sentCount number(s))"
+            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+            _uiState.update { it.copy(infoMessage = msg) }
+        }
+    }
+
     fun load90dMetrics() {
         viewModelScope.launch(Dispatchers.IO) {
             val now = System.currentTimeMillis()
