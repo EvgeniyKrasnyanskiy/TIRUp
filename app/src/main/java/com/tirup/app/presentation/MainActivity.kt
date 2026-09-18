@@ -12,15 +12,34 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.runtime.mutableLongStateOf
+import com.tirup.app.domain.model.BleBridgeRole
+import com.tirup.app.domain.model.GlucoseUnit
+import com.tirup.app.domain.model.formatDeviceRemainingTime
+import com.tirup.app.presentation.theme.ColorHigh
+import com.tirup.app.presentation.theme.ColorTight
+import com.tirup.app.presentation.theme.ColorVeryHigh
+import com.tirup.app.presentation.theme.ColorVeryLow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.sp
+import com.tirup.app.domain.model.millisRemaining
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -588,6 +607,36 @@ fun MainPagerScaffold(
     val coroutineScope = rememberCoroutineScope()
     var isBottomBarVisible by remember { mutableStateOf(true) }
     var showHba1cDialog by remember { mutableStateOf(false) }
+    var showQuickHud by remember { mutableStateOf(false) }
+    var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+
+    val focusState by focusViewModel.uiState.collectAsState()
+    val settingsState by settingsViewModel.uiState.collectAsState()
+    val userSettings = settingsState.userSettings
+    val isRu = userSettings.language.equals("RU", ignoreCase = true)
+    val isMmol = userSettings.unit == GlucoseUnit.MMOL_L
+
+    fun markUserActivity() {
+        lastInteractionTime = System.currentTimeMillis()
+        if (!isBottomBarVisible) {
+            isBottomBarVisible = true
+        }
+    }
+
+    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
+        markUserActivity()
+    }
+
+    LaunchedEffect(lastInteractionTime, isBottomBarVisible, showQuickHud) {
+        if (isBottomBarVisible && !showQuickHud) {
+            delay(3000L)
+            if (!showQuickHud) {
+                isBottomBarVisible = false
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         launch {
@@ -614,6 +663,7 @@ fun MainPagerScaffold(
                 available: Offset,
                 source: NestedScrollSource
             ): Offset {
+                markUserActivity()
                 val delta = available.y
                 if (delta < -12f) {
                     isBottomBarVisible = false
@@ -624,6 +674,62 @@ fun MainPagerScaffold(
             }
         }
     }
+
+    val latestReading = focusState.latestReading
+    val glucoseValStr = if (latestReading != null) {
+        if (isMmol) String.format(Locale.US, "%.1f", latestReading.valueMmol)
+        else String.format(Locale.US, "%.0f", latestReading.getValue(GlucoseUnit.MG_DL))
+    } else "--"
+    val unitStr = if (isMmol) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL")
+    val trendArrow = latestReading?.trendArrow ?: ""
+
+    val glucoseColor = if (latestReading != null) {
+        val v = latestReading.valueMmol
+        when {
+            v < 3.0 -> ColorVeryLow
+            v < 3.9 -> ColorVeryLow
+            v <= 7.8 -> ColorTight
+            v <= 10.0 -> PrimaryEmerald
+            v <= 13.9 -> ColorHigh
+            else -> ColorVeryHigh
+        }
+    } else ActionBlue
+
+    val rateStr = remember(focusState.recentReadings, isMmol, isRu) {
+        if (focusState.recentReadings.size >= 2) {
+            val r0 = focusState.recentReadings[0]
+            val r1 = focusState.recentReadings[1]
+            val delta = r0.valueMmol - r1.valueMmol
+            val dtMin = ((r0.timestamp - r1.timestamp) / 60000.0).coerceIn(0.5, 15.0)
+            val rate = delta / dtMin
+            val sign = if (rate >= 0) "+" else ""
+            val rateVal = if (isMmol) rate else rate * 18.0182
+            val u = if (isMmol) (if (isRu) "ммоль/мин" else "mmol/min") else (if (isRu) "мг/мин" else "mg/min")
+            String.format(Locale.US, "%s%.2f %s", sign, rateVal, u)
+        } else ""
+    }
+
+    val iobStr = latestReading?.iob?.let { if (it > 0.0) String.format(Locale.US, "%.1f %s", it, if (isRu) "ед" else "u") else "0.0" } ?: "—"
+    val cobStr = latestReading?.cob?.let { if (it > 0.0) String.format(Locale.US, "%.0f %s", it, if (isRu) "г" else "g") else "0" } ?: "—"
+    val tirPercent = focusState.statistics.tirPercent
+    val sensorRemaining = formatDeviceRemainingTime(
+        millisRemaining = focusState.sensorStatus.millisRemaining,
+        installedAt = focusState.sensorStatus.installedAt,
+        isRu = isRu,
+        isCompact = false
+    )
+
+    val bleSettings = userSettings.bleBridgeSettings
+    val batteryStr = remember(bleSettings, context) {
+        val bat = if (bleSettings.role == BleBridgeRole.OBSERVER && bleSettings.lastMasterBattery in 0..100) {
+            bleSettings.lastMasterBattery
+        } else {
+            val bm = context.getSystemService(Context.BATTERY_SERVICE) as? android.os.BatteryManager
+            bm?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
+        }
+        if (bat in 0..100) "🔋 $bat%" else ""
+    }
+    val rssiStr = if (bleSettings.role == BleBridgeRole.OBSERVER && bleSettings.lastRssi != 0) "📶 ${bleSettings.lastRssi} dBm" else ""
 
     val tabs = listOf(
         NavigationItem(
@@ -643,92 +749,306 @@ fun MainPagerScaffold(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            AnimatedVisibility(
-                visible = isBottomBarVisible,
-                enter = slideInVertically { it },
-                exit = slideOutVertically { it }
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 28.dp, vertical = 6.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
-                    shadowElevation = 4.dp
+                AnimatedVisibility(
+                    visible = showQuickHud,
+                    enter = fadeIn() + scaleIn(initialScale = 0.88f),
+                    exit = fadeOut() + scaleOut(targetScale = 0.88f)
                 ) {
-                    NavigationBar(
-                        containerColor = Color.Transparent,
-                        modifier = Modifier.height(48.dp)
+                    Surface(
+                        modifier = Modifier
+                            .padding(horizontal = 20.dp, vertical = 6.dp)
+                            .fillMaxWidth(0.94f),
+                        shape = RoundedCornerShape(26.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                        border = BorderStroke(1.5.dp, glucoseColor.copy(alpha = 0.6f)),
+                        shadowElevation = 14.dp
                     ) {
-                        tabs.forEachIndexed { index, item ->
-                            val selected = pagerState.currentPage == index
-                            val isCenterHome = index == 1
-                            NavigationBarItem(
-                                selected = selected,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        pagerState.animateScrollToPage(index)
+                        Column(
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // Row 1: Glucose, Arrow, Rate of change, TIR %
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.Bottom) {
+                                    Text(
+                                        text = glucoseValStr,
+                                        fontSize = 42.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = glucoseColor,
+                                        lineHeight = 44.sp
+                                    )
+                                    if (trendArrow.isNotBlank()) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = trendArrow,
+                                            fontSize = 32.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = glucoseColor,
+                                            modifier = Modifier.padding(bottom = 2.dp)
+                                        )
                                     }
-                                },
-                                icon = {
-                                    if (isCenterHome) {
-                                        // Premium Accent FAB-style Center Button
-                                        Box(
-                                            modifier = Modifier
-                                                .size(42.dp)
-                                                .shadow(
-                                                    elevation = if (selected) 6.dp else 2.dp,
-                                                    shape = CircleShape
-                                                )
-                                                .clip(CircleShape)
-                                                .background(
-                                                    if (selected) ActionBlue
-                                                    else ActionBlue.copy(alpha = 0.14f)
-                                                )
-                                                .border(
-                                                    BorderStroke(
-                                                        width = if (selected) 2.dp else 1.5.dp,
-                                                        color = if (selected) Color.White.copy(alpha = 0.4f) else ActionBlue.copy(alpha = 0.45f)
-                                                    ),
-                                                    CircleShape
-                                                ),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = item.icon,
-                                                contentDescription = item.title,
-                                                tint = if (selected) Color.White else ActionBlue,
-                                                modifier = Modifier.size(24.dp)
-                                            )
-                                        }
-                                    } else {
-                                        // Standard Side Buttons
-                                        Box(
-                                            modifier = Modifier
-                                                .size(width = 44.dp, height = 30.dp)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(
-                                                    if (selected) ActionBlue.copy(alpha = 0.15f)
-                                                    else Color.Transparent
-                                                ),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = item.icon,
-                                                contentDescription = item.title,
-                                                modifier = Modifier.size(20.dp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Column(modifier = Modifier.padding(bottom = 4.dp)) {
+                                        Text(
+                                            text = unitStr,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        if (rateStr.isNotBlank()) {
+                                            Text(
+                                                text = rateStr,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = ActionBlue
                                             )
                                         }
                                     }
-                                },
-                                label = null,
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = ActionBlue,
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                                    indicatorColor = Color.Transparent
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = PrimaryEmerald.copy(alpha = 0.15f),
+                                    border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.4f))
+                                ) {
+                                    Text(
+                                        text = "🎯 $tirPercent% TIR",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PrimaryEmerald,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Row 2: IOB & COB
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = "💉", fontSize = 13.sp)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = if (isRu) "Инсулин (IOB):" else "Insulin (IOB):",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.weight(1f))
+                                        Text(
+                                            text = iobStr,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = "🥖", fontSize = 13.sp)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = if (isRu) "Углеводы (COB):" else "Carbs (COB):",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.weight(1f))
+                                        Text(
+                                            text = cobStr,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Row 3: Sensor remaining time & Battery / Signal telemetry
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(text = "⏱️", fontSize = 12.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "${if (isRu) "Сенсор" else "Sensor"}: $sensorRemaining",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                val telemetryParts = listOfNotNull(
+                                    batteryStr.ifBlank { null },
+                                    rssiStr.ifBlank { null }
                                 )
-                            )
+                                if (telemetryParts.isNotEmpty()) {
+                                    Text(
+                                        text = telemetryParts.joinToString("  "),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = isBottomBarVisible,
+                    enter = slideInVertically { it },
+                    exit = slideOutVertically { it }
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 28.dp, vertical = 6.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                        shadowElevation = 4.dp
+                    ) {
+                        NavigationBar(
+                            containerColor = Color.Transparent,
+                            modifier = Modifier.height(48.dp)
+                        ) {
+                            tabs.forEachIndexed { index, item ->
+                                val selected = pagerState.currentPage == index
+                                val isCenterHome = index == 1
+                                NavigationBarItem(
+                                    selected = selected,
+                                    onClick = {
+                                        markUserActivity()
+                                        if (!isCenterHome) {
+                                            coroutineScope.launch {
+                                                pagerState.animateScrollToPage(index)
+                                            }
+                                        }
+                                    },
+                                    icon = {
+                                        if (isCenterHome) {
+                                            // Premium Accent FAB-style Center Button with Quick Glance HUD gesture (> 2s)
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(42.dp)
+                                                    .shadow(
+                                                        elevation = if (selected) 6.dp else 2.dp,
+                                                        shape = CircleShape
+                                                    )
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        if (selected) ActionBlue
+                                                        else ActionBlue.copy(alpha = 0.14f)
+                                                    )
+                                                    .border(
+                                                        BorderStroke(
+                                                            width = if (selected) 2.dp else 1.5.dp,
+                                                            color = if (selected) Color.White.copy(alpha = 0.4f) else ActionBlue.copy(alpha = 0.45f)
+                                                        ),
+                                                        CircleShape
+                                                    )
+                                                    .pointerInput(Unit) {
+                                                        awaitEachGesture {
+                                                            awaitFirstDown(requireUnconsumed = false)
+                                                            markUserActivity()
+                                                            var isLongPressed = false
+
+                                                            val longPressJob = coroutineScope.launch {
+                                                                delay(2000L) // > 2 seconds
+                                                                isLongPressed = true
+                                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                                showQuickHud = true
+                                                            }
+
+                                                            try {
+                                                                var pointerUp = false
+                                                                while (!pointerUp) {
+                                                                    val event = awaitPointerEvent()
+                                                                    if (event.changes.all { !it.pressed }) {
+                                                                        pointerUp = true
+                                                                    }
+                                                                }
+                                                            } finally {
+                                                                longPressJob.cancel()
+                                                                if (showQuickHud) {
+                                                                    showQuickHud = false
+                                                                    markUserActivity()
+                                                                } else if (!isLongPressed) {
+                                                                    coroutineScope.launch {
+                                                                        pagerState.animateScrollToPage(1)
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = item.icon,
+                                                    contentDescription = item.title,
+                                                    tint = if (selected) Color.White else ActionBlue,
+                                                    modifier = Modifier.size(24.dp)
+                                                )
+                                            }
+                                        } else {
+                                            // Standard Side Buttons
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(width = 44.dp, height = 30.dp)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(
+                                                        if (selected) ActionBlue.copy(alpha = 0.15f)
+                                                        else Color.Transparent
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = item.icon,
+                                                    contentDescription = item.title,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+                                    },
+                                    label = null,
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = ActionBlue,
+                                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                                        indicatorColor = Color.Transparent
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -755,19 +1075,31 @@ fun MainPagerScaffold(
                     )
                 }
             }
+
+            if (!isBottomBarVisible) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(36.dp)
+                        .pointerInput(Unit) {
+                            detectTapGestures {
+                                markUserActivity()
+                            }
+                        }
+                )
+            }
         }
     }
 
     if (showHba1cDialog) {
         val currentSettingsState by settingsViewModel.uiState.collectAsState()
-        val userSettings = currentSettingsState.userSettings
-        val isRu = userSettings.language.equals("RU", ignoreCase = true)
         Hba1cHistoryDialog(
-            records = userSettings.hba1cRecords,
+            records = currentSettingsState.userSettings.hba1cRecords,
             sensorGmi90d = currentSettingsState.sensorGmi90d,
             meanGlucose90dMmol = currentSettingsState.meanGlucose90dMmol,
             tirPercent90d = currentSettingsState.tirPercent90d,
-            skippedQuarterTimestamp = userSettings.hba1cSkippedQuarterTimestamp,
+            skippedQuarterTimestamp = currentSettingsState.userSettings.hba1cSkippedQuarterTimestamp,
             isRu = isRu,
             onAddRecord = { value, timestamp, lab, notes ->
                 settingsViewModel.addHba1cRecord(valuePercent = value, timestamp = timestamp, labName = lab, notes = notes)
