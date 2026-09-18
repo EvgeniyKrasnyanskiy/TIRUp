@@ -337,6 +337,36 @@ object BleBroadcaster {
         )
     }
 
+    /**
+     * Sends a 10-second test ping burst specifically for open-field range testing.
+     */
+    fun broadcastRangeTestPing(
+        context: Context,
+        reading: GlucoseReading?,
+        settings: BleBridgeSettings,
+        durationSec: Int = 10,
+        isRu: Boolean = true,
+        onStatus: (Boolean, String) -> Unit
+    ) {
+        val targetReading = reading ?: GlucoseReading(
+            timestamp = System.currentTimeMillis(),
+            valueMmol = 6.0,
+            trendArrow = "→",
+            iob = null,
+            cob = null
+        )
+        broadcastReading(
+            context = context,
+            reading = targetReading,
+            rateOfChange = 0.0,
+            iob = targetReading.iob ?: 0.0,
+            settings = settings,
+            burstDurationMs = durationSec * 1000L,
+            isRu = isRu,
+            onStatus = onStatus
+        )
+    }
+
     fun stopAdvertising() {
         scope.launch {
             mutex.withLock {

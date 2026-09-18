@@ -216,6 +216,46 @@ object BleObserverManager {
     ) = boostScanFor60Sec(context, settingsRepository, glucoseRepository)
 
     /**
+     * Boosts scan for a custom duration (e.g. 10s range test).
+     */
+    fun boostScanForDuration(
+        context: Context,
+        settingsRepository: SettingsRepository,
+        glucoseRepository: GlucoseRepository,
+        durationSec: Int = 10
+    ) {
+        appContext = context.applicationContext
+        cachedSettingsRepo = settingsRepository
+        cachedGlucoseRepo = glucoseRepository
+
+        scope.launch {
+            val userSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
+            val ble = userSettings.bleBridgeSettings
+
+            boostJob?.cancel()
+            isBoostActive = true
+            _boostRemainingSec.value = durationSec
+
+            // Restart scanner in low latency mode
+            stopScanningInternal()
+            startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = true)
+
+            boostJob = launch {
+                while (_boostRemainingSec.value > 0) {
+                    delay(1000L)
+                    _boostRemainingSec.value = (_boostRemainingSec.value - 1).coerceAtLeast(0)
+                }
+                isBoostActive = false
+                // Revert to normal scan mode if observer, else stop
+                stopScanningInternal()
+                if (ble.role == BleBridgeRole.OBSERVER) {
+                    startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = false)
+                }
+            }
+        }
+    }
+
+    /**
      * Periodic hardware heartbeat invoked by BleScanKeepAliveReceiver (every 5 minutes via AlarmManager).
      * Single source of truth for both:
      * 1) Reactive silence detection (restarts scan if no packets received for >= 6 minutes).

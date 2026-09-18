@@ -15,11 +15,12 @@ object EmergencySmsBuilder {
      * Fallbacks to default if blank.
      */
     fun extractShortName(fullName: String, isRu: Boolean = true): String {
-        val trimmed = fullName.trim()
-        if (trimmed.isBlank()) {
+        // Strip any test or meta tags like [ТЕСТ], [TEST], (Тест)
+        val clean = fullName.replace(Regex("^(\\[.*?\\]|\\(.*?\\))\\s*"), "").trim()
+        if (clean.isBlank()) {
             return if (isRu) "пациент" else "patient"
         }
-        val words = trimmed.split(Regex("\\s+")).filter { it.isNotBlank() }
+        val words = clean.split(Regex("\\s+")).filter { it.isNotBlank() }
         val name = when {
             words.size >= 2 -> words[1]
             words.size == 1 -> words[0]
@@ -39,7 +40,8 @@ object EmergencySmsBuilder {
         latitude: Double? = null,
         longitude: Double? = null,
         isRu: Boolean = true,
-        unit: GlucoseUnit = GlucoseUnit.MMOL_L
+        unit: GlucoseUnit = GlucoseUnit.MMOL_L,
+        isTest: Boolean = false
     ): String {
         val name = extractShortName(patientName, isRu)
 
@@ -56,10 +58,11 @@ object EmergencySmsBuilder {
             "\n$mapsUrl"
         } else ""
 
+        val testPrefix = if (isTest) (if (isRu) "[ТЕСТ] " else "[TEST] ") else ""
         val baseMsg = if (isRu) {
-            "SOS! $name - критич. гипо: $glucoseStr$arrowPart! Сирена ${delayMinutes}м без реакции"
+            "${testPrefix}SOS! $name - критич. гипо: $glucoseStr$arrowPart! Сирена ${delayMinutes}м без реакции"
         } else {
-            "SOS! $name - critical hypo: $glucoseStr$arrowPart! Alarm ${delayMinutes}m no reaction"
+            "${testPrefix}SOS! $name - critical hypo: $glucoseStr$arrowPart! Alarm ${delayMinutes}m no reaction"
         }
 
         return baseMsg + locationPart

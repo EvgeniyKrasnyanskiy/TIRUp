@@ -153,14 +153,15 @@ object EmergencySmsManager {
         return try {
             val (lat, lon) = getLastKnownLocation(context)
             val message = EmergencySmsBuilder.buildEmergencyMessage(
-                patientName = "[ТЕСТ] $patientName",
+                patientName = patientName,
                 glucoseValueMmol = 2.8,
                 trendArrow = "→",
                 delayMinutes = 5,
                 latitude = lat,
                 longitude = lon,
                 isRu = isRu,
-                unit = GlucoseUnit.MMOL_L
+                unit = GlucoseUnit.MMOL_L,
+                isTest = true
             )
             sendSmsInternal(context, trimmedPhone, message)
             Log.i(TAG, "Caregiver SOS test SMS sent to $trimmedPhone")
