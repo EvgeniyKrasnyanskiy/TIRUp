@@ -368,7 +368,7 @@ fun CaregiverSosScreen(
                         Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFF38BDF8))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Показать координаты на карте",
+                            text = "Показать координаты",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White
