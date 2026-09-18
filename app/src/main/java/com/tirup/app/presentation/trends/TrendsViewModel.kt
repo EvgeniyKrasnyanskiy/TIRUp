@@ -8,6 +8,8 @@ import com.tirup.app.domain.calculator.AGPPercentilesCalculator
 import com.tirup.app.domain.calculator.GlucoseMetricsCalculator
 import com.tirup.app.domain.calculator.TargetCompensatorCalculator
 import com.tirup.app.domain.calculator.WeeklyDigestCalculator
+import com.tirup.app.domain.calculator.DetectedPattern
+import com.tirup.app.domain.calculator.PatternSeverity
 import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.domain.model.WeeklyDigest
@@ -34,12 +36,16 @@ class TrendsViewModel(
         private const val PREFS_NAME = "tirup_trends_dismissed"
         private const val PREFIX_PATTERN = "dismissed_pattern_"
         private const val PREFIX_INSIGHT = "dismissed_insight_"
+        private const val PREFIX_FIRST_SEEN = "pattern_first_seen_"
     }
 
     private val prefs: SharedPreferences? = context?.applicationContext?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private val _dismissedPatternIds = MutableStateFlow<Set<String>>(emptySet())
     val dismissedPatternIds: StateFlow<Set<String>> = _dismissedPatternIds.asStateFlow()
+
+    private val _expiredPatternIds = MutableStateFlow<Set<String>>(emptySet())
+    val expiredPatternIds: StateFlow<Set<String>> = _expiredPatternIds.asStateFlow()
 
     private val _dismissedInsightIds = MutableStateFlow<Set<String>>(emptySet())
     val dismissedInsightIds: StateFlow<Set<String>> = _dismissedInsightIds.asStateFlow()
@@ -96,6 +102,53 @@ class TrendsViewModel(
         val now = System.currentTimeMillis()
         prefs?.edit()?.putLong("$PREFIX_PATTERN$id", now)?.apply()
         _dismissedPatternIds.value = _dismissedPatternIds.value + id
+    }
+
+    fun registerDetectedPatterns(patterns: List<DetectedPattern>) {
+        val sp = prefs ?: return
+        val now = System.currentTimeMillis()
+        val editor = sp.edit()
+        var changed = false
+        val expired = mutableSetOf<String>()
+
+        patterns.forEach { pattern ->
+            if (pattern.id.isNotBlank() && pattern.id != "collecting_data") {
+                val key = "$PREFIX_FIRST_SEEN${pattern.id}"
+                val firstSeen = sp.getLong(key, 0L)
+                if (firstSeen == 0L) {
+                    editor.putLong(key, now)
+                    changed = true
+                } else {
+                    val ttl = if (pattern.severity == PatternSeverity.ALERT) 48L * 3600_000L else 24L * 3600_000L
+                    if (now - firstSeen > ttl) {
+                        expired.add(pattern.id)
+                    }
+                }
+            }
+        }
+        if (changed) {
+            editor.apply()
+        }
+        _expiredPatternIds.value = expired
+    }
+
+    fun isPatternExpired(id: String, severity: PatternSeverity): Boolean {
+        if (id == "collecting_data") return false
+        val sp = prefs ?: return false
+        val firstSeen = sp.getLong("$PREFIX_FIRST_SEEN$id", 0L)
+        if (firstSeen == 0L) return false
+        val ttl = if (severity == PatternSeverity.ALERT) 48L * 3600_000L else 24L * 3600_000L
+        return (System.currentTimeMillis() - firstSeen) > ttl
+    }
+
+    fun restorePattern(id: String) {
+        val sp = prefs ?: return
+        sp.edit()
+            .remove("$PREFIX_PATTERN$id")
+            .putLong("$PREFIX_FIRST_SEEN$id", System.currentTimeMillis())
+            .apply()
+        _dismissedPatternIds.value = _dismissedPatternIds.value - id
+        _expiredPatternIds.value = _expiredPatternIds.value - id
     }
 
     fun dismissInsight(id: String) {

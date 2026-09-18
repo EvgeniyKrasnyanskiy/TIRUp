@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -79,8 +80,10 @@ fun TrendsScreen(
     val isDigestSheetOpen by viewModel.isDigestSheetOpen.collectAsState()
     var detailDialogInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
     val dismissedPatternIds by viewModel.dismissedPatternIds.collectAsState()
+    val expiredPatternIds by viewModel.expiredPatternIds.collectAsState()
     val dismissedInsightIds by viewModel.dismissedInsightIds.collectAsState()
     var agpCardMode by rememberSaveable { mutableStateOf(0) } // 0 = Chart, 1 = Metrics
+    var showArchivedPatterns by rememberSaveable { mutableStateOf(false) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val onSurface = MaterialTheme.colorScheme.onSurface
@@ -98,8 +101,21 @@ fun TrendsScreen(
         )
     }
 
-    val visiblePatterns = remember(detectedPatterns, dismissedPatternIds) {
-        detectedPatterns.filter { it.id !in dismissedPatternIds }
+    LaunchedEffect(detectedPatterns) {
+        viewModel.registerDetectedPatterns(detectedPatterns)
+        detectedPatterns.forEach { pattern ->
+            if (pattern.id !in dismissedPatternIds && pattern.id !in expiredPatternIds) {
+                com.tirup.app.data.alert.GlucoseAlertManager.notifyPatternIfNew(context, pattern, isRu)
+            }
+        }
+    }
+
+    val visiblePatterns = remember(detectedPatterns, dismissedPatternIds, expiredPatternIds) {
+        detectedPatterns.filter { it.id !in dismissedPatternIds && it.id !in expiredPatternIds }
+    }
+
+    val archivedPatterns = remember(detectedPatterns, dismissedPatternIds, expiredPatternIds) {
+        detectedPatterns.filter { it.id in dismissedPatternIds || it.id in expiredPatternIds }
     }
 
     val tirInsights = remember(state.percentileBins, state.statistics, dismissedInsightIds) {
@@ -107,14 +123,6 @@ fun TrendsScreen(
             bins = state.percentileBins,
             stats = state.statistics
         ).filter { it.id !in dismissedInsightIds }
-    }
-
-    LaunchedEffect(detectedPatterns) {
-        detectedPatterns.forEach { pattern ->
-            if (pattern.id !in dismissedPatternIds) {
-                com.tirup.app.data.alert.GlucoseAlertManager.notifyPatternIfNew(context, pattern, isRu)
-            }
-        }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -240,7 +248,7 @@ fun TrendsScreen(
 
         // 1. Detected Clinical Patterns (Placed at the very top under Period Selector)
         val hasSufficientData = state.statistics.daysCount >= 3 || state.statistics.totalCount >= 100
-        if (hasSufficientData && visiblePatterns.isNotEmpty()) {
+        if (hasSufficientData && (visiblePatterns.isNotEmpty() || archivedPatterns.isNotEmpty())) {
             item {
                 BentoCard(
                     modifier = Modifier.fillMaxWidth(),
@@ -274,56 +282,133 @@ fun TrendsScreen(
                             )
                         }
 
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            visiblePatterns.forEach { pattern ->
-                                val badgeColor = when (pattern.severity) {
-                                    PatternSeverity.ALERT -> ColorVeryLow
-                                    PatternSeverity.WARNING -> ColorHigh
-                                    PatternSeverity.POSITIVE -> PrimaryEmerald
-                                    PatternSeverity.INFO -> ActionBlue
-                                }
+                        if (visiblePatterns.isNotEmpty()) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                visiblePatterns.forEach { pattern ->
+                                    val badgeColor = when (pattern.severity) {
+                                        PatternSeverity.ALERT -> ColorVeryLow
+                                        PatternSeverity.WARNING -> ColorHigh
+                                        PatternSeverity.POSITIVE -> PrimaryEmerald
+                                        PatternSeverity.INFO -> ActionBlue
+                                    }
 
-                                Surface(
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(12.dp),
-                                        verticalAlignment = Alignment.Top
+                                    Surface(
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Text(
-                                            text = pattern.icon,
-                                            fontSize = 18.sp,
-                                            modifier = Modifier.padding(end = 10.dp, top = 2.dp)
-                                        )
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = if (isRu) pattern.titleRu else pattern.titleEn,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = badgeColor
-                                            )
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = if (isRu) pattern.descriptionRu else pattern.descriptionEn,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = onSurfaceVariant,
-                                                lineHeight = 16.sp
-                                            )
-                                        }
-                                        IconButton(
-                                            onClick = { viewModel.dismissPattern(pattern.id) },
-                                            modifier = Modifier.size(28.dp)
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(12.dp),
+                                            verticalAlignment = Alignment.Top
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "Dismiss",
-                                                tint = onSurfaceVariant.copy(alpha = 0.5f),
-                                                modifier = Modifier.size(16.dp)
+                                            Text(
+                                                text = pattern.icon,
+                                                fontSize = 18.sp,
+                                                modifier = Modifier.padding(end = 10.dp, top = 2.dp)
                                             )
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = if (isRu) pattern.titleRu else pattern.titleEn,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = badgeColor
+                                                )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = if (isRu) pattern.descriptionRu else pattern.descriptionEn,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = onSurfaceVariant,
+                                                    lineHeight = 16.sp
+                                                )
+                                            }
+                                            IconButton(
+                                                onClick = { viewModel.dismissPattern(pattern.id) },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Dismiss",
+                                                    tint = onSurfaceVariant.copy(alpha = 0.5f),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (archivedPatterns.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { showArchivedPatterns = !showArchivedPatterns }
+                                    .padding(vertical = 4.dp, horizontal = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (isRu) "Архив паттернов (${archivedPatterns.size})" else "Pattern Archive (${archivedPatterns.size})",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = onSurfaceVariant
+                                )
+                                Text(
+                                    text = if (showArchivedPatterns) (if (isRu) "Скрыть" else "Hide") else (if (isRu) "Показать" else "Show"),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = ActionBlue
+                                )
+                            }
+
+                            if (showArchivedPatterns) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    archivedPatterns.forEach { pattern ->
+                                        Surface(
+                                            shape = RoundedCornerShape(14.dp),
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(12.dp),
+                                                verticalAlignment = Alignment.Top
+                                            ) {
+                                                Text(
+                                                    text = pattern.icon,
+                                                    fontSize = 18.sp,
+                                                    modifier = Modifier.padding(end = 10.dp, top = 2.dp)
+                                                )
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = if (isRu) pattern.titleRu else pattern.titleEn,
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = onSurfaceVariant
+                                                    )
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = if (isRu) pattern.descriptionRu else pattern.descriptionEn,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = onSurfaceVariant.copy(alpha = 0.75f),
+                                                        lineHeight = 16.sp
+                                                    )
+                                                }
+                                                IconButton(
+                                                    onClick = { viewModel.restorePattern(pattern.id) },
+                                                    modifier = Modifier.size(28.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Refresh,
+                                                        contentDescription = "Restore",
+                                                        tint = ActionBlue,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }

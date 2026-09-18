@@ -78,6 +78,7 @@ import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorTargetSoft
 import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
+import com.tirup.app.presentation.theme.ColorVeryLow
 import com.tirup.app.presentation.theme.PrimaryEmerald
 import com.tirup.app.presentation.trends.CompactPeriodSelector
 import com.tirup.app.presentation.trends.TrendPeriod
@@ -175,10 +176,34 @@ fun ReportsScreen(
                     )
                 }
                 val latestHba1c = state.userSettings.latestHba1cRecord
+                val now = System.currentTimeMillis()
+                val freshnessColor = if (latestHba1c != null) {
+                    val ageDays = ((now - latestHba1c.timestamp) / 86_400_000L).coerceAtLeast(0)
+                    when {
+                        ageDays < 30 -> ColorTight
+                        ageDays <= 360 -> PrimaryEmerald
+                        else -> ColorHigh
+                    }
+                } else {
+                    ColorHigh
+                }
+
+                val valueColor = if (latestHba1c != null) {
+                    val v = latestHba1c.valuePercent
+                    when {
+                        v < 6.1 -> ColorTight
+                        v <= 7.0 -> PrimaryEmerald
+                        v <= 8.0 -> ColorHigh
+                        else -> ColorVeryLow
+                    }
+                } else {
+                    ColorHigh
+                }
+
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = ActionBlue.copy(alpha = 0.08f),
-                    border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.45f)),
+                    color = freshnessColor.copy(alpha = 0.10f),
+                    border = BorderStroke(1.2.dp, freshnessColor.copy(alpha = 0.55f)),
                     modifier = Modifier.clickable { onOpenHba1c() }
                 ) {
                     Row(
@@ -188,20 +213,31 @@ fun ReportsScreen(
                         Icon(
                             imageVector = Icons.Default.Science,
                             contentDescription = null,
-                            tint = Color(0xFFEF4444),
+                            tint = freshnessColor,
                             modifier = Modifier.size(15.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (latestHba1c != null) {
-                                String.format(Locale.US, "HbA1c: %.1f%%", latestHba1c.valuePercent)
-                            } else {
-                                "HbA1c: +"
-                            },
-                            color = ActionBlue,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
+                        if (latestHba1c != null) {
+                            Text(
+                                text = "HbA1c: ",
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 12.sp
+                            )
+                            Text(
+                                text = String.format(Locale.US, "%.1f%%", latestHba1c.valuePercent),
+                                color = valueColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        } else {
+                            Text(
+                                text = "HbA1c: +",
+                                color = freshnessColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
             }
