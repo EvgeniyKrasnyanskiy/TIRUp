@@ -507,7 +507,30 @@ class SettingsViewModel(
     fun testAlert(tier: com.tirup.app.data.alert.AlertTier) {
         val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
         val vol = _uiState.value.userSettings.alertSettings.alertVolumePercent
-        com.tirup.app.data.alert.GlucoseAlertManager.sendTestAlert(context, tier, isRu, vol)
+        val alerts = _uiState.value.userSettings.alertSettings
+        com.tirup.app.data.alert.GlucoseAlertManager.sendTestAlert(
+            context,
+            tier,
+            isRu,
+            vol,
+            primaryPhone = alerts.emergencyContactPhone,
+            primaryName = alerts.emergencyContactName
+        )
+    }
+
+    fun startPatientRescueTestCountdown(delaySec: Int = 5) {
+        viewModelScope.launch {
+            val alerts = _uiState.value.userSettings.alertSettings
+            kotlinx.coroutines.delay(delaySec * 1000L)
+            com.tirup.app.data.alert.GlucoseAlertManager.launchPatientRescueScreen(
+                context = context,
+                glucoseDisplay = String.format(java.util.Locale.US, "%.1f", alerts.criticalLowThresholdMmol),
+                trendArrow = "⇊",
+                isTest = true,
+                primaryPhone = alerts.emergencyContactPhone,
+                primaryName = alerts.emergencyContactName
+            )
+        }
     }
 
     fun playTestSound(volumePercent: Int) {

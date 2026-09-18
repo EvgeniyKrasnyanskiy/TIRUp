@@ -574,6 +574,8 @@ object AutoBackupManager {
         writer.name("isCriticalFlash").value(a.isCriticalFlash)
         writer.name("criticalHypoPauseUntilTimestamp").value(a.criticalHypoPauseUntilTimestamp)
         writer.name("isCriticalHypoPermanentDisabled").value(a.isCriticalHypoPermanentDisabled)
+        writer.name("criticalLowThresholdMmol").value(a.criticalLowThresholdMmol)
+        writer.name("criticalHighThresholdMmol").value(a.criticalHighThresholdMmol)
         writer.name("isSignalLossEnabled").value(a.isSignalLossEnabled)
         writer.name("signalLossMinutes").value(a.signalLossMinutes)
         writer.name("isSignalLossVibrate").value(a.isSignalLossVibrate)
@@ -2113,6 +2115,8 @@ object AutoBackupManager {
         var critFlash = true
         var critPause = 0L
         var critPermDisabled = false
+        var critLow = 3.0
+        var critHigh = 13.9
         var sigLossEnabled = true
         var sigLossMin = 20
         var sigLossVib = true
@@ -2155,6 +2159,8 @@ object AutoBackupManager {
                 "isCriticalFlash" -> critFlash = reader.nextBoolean()
                 "criticalHypoPauseUntilTimestamp" -> critPause = reader.nextLong()
                 "isCriticalHypoPermanentDisabled" -> critPermDisabled = reader.nextBoolean()
+                "criticalLowThresholdMmol" -> critLow = reader.nextDouble()
+                "criticalHighThresholdMmol" -> critHigh = reader.nextDouble()
                 "isSignalLossEnabled" -> sigLossEnabled = reader.nextBoolean()
                 "signalLossMinutes" -> sigLossMin = reader.nextInt()
                 "isSignalLossVibrate" -> sigLossVib = reader.nextBoolean()
@@ -2199,6 +2205,8 @@ object AutoBackupManager {
             isCriticalFlash = critFlash,
             criticalHypoPauseUntilTimestamp = critPause,
             isCriticalHypoPermanentDisabled = critPermDisabled,
+            criticalLowThresholdMmol = critLow,
+            criticalHighThresholdMmol = critHigh,
             isSignalLossEnabled = sigLossEnabled,
             signalLossMinutes = sigLossMin,
             isSignalLossVibrate = sigLossVib,

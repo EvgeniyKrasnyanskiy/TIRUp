@@ -122,6 +122,8 @@ class SettingsRepositoryImpl(
             .putBoolean(KEY_ALERT_CRITICAL_FLASH, settings.alertSettings.isCriticalFlash)
             .putLong(KEY_ALERT_CRITICAL_HYPO_PAUSE, settings.alertSettings.criticalHypoPauseUntilTimestamp)
             .putBoolean(KEY_ALERT_CRITICAL_HYPO_PERM_DISABLED, settings.alertSettings.isCriticalHypoPermanentDisabled)
+            .putFloat(KEY_ALERT_CRITICAL_LOW_THRESHOLD, settings.alertSettings.criticalLowThresholdMmol.toFloat())
+            .putFloat(KEY_ALERT_CRITICAL_HIGH_THRESHOLD, settings.alertSettings.criticalHighThresholdMmol.toFloat())
             .putInt(KEY_ALERT_SNOOZE_HYPO, settings.alertSettings.snoozeHypoMinutes)
             .putInt(KEY_ALERT_SNOOZE_HYPER, settings.alertSettings.snoozeHyperMinutes)
             .putBoolean(KEY_ALERT_SIGNAL_LOSS_ENABLED, settings.alertSettings.isSignalLossEnabled)
@@ -319,6 +321,8 @@ class SettingsRepositoryImpl(
                 isCriticalFlash = prefs.getBoolean(KEY_ALERT_CRITICAL_FLASH, true),
                 criticalHypoPauseUntilTimestamp = prefs.getLong(KEY_ALERT_CRITICAL_HYPO_PAUSE, 0L),
                 isCriticalHypoPermanentDisabled = prefs.getBoolean(KEY_ALERT_CRITICAL_HYPO_PERM_DISABLED, false),
+                criticalLowThresholdMmol = prefs.getFloat(KEY_ALERT_CRITICAL_LOW_THRESHOLD, 3.0f).toDouble(),
+                criticalHighThresholdMmol = prefs.getFloat(KEY_ALERT_CRITICAL_HIGH_THRESHOLD, 13.9f).toDouble(),
                 snoozeHypoMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPO, 15),
                 snoozeHyperMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPER, 45),
                 isSignalLossEnabled = prefs.getBoolean(KEY_ALERT_SIGNAL_LOSS_ENABLED, true),
@@ -515,6 +519,8 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_CRITICAL_FLASH = "key_alert_critical_flash"
         private const val KEY_ALERT_CRITICAL_HYPO_PAUSE = "key_alert_critical_hypo_pause"
         private const val KEY_ALERT_CRITICAL_HYPO_PERM_DISABLED = "key_alert_critical_hypo_perm_disabled"
+        private const val KEY_ALERT_CRITICAL_LOW_THRESHOLD = "key_alert_critical_low_threshold"
+        private const val KEY_ALERT_CRITICAL_HIGH_THRESHOLD = "key_alert_critical_high_threshold"
         private const val KEY_ALERT_SNOOZE_HYPO = "key_alert_snooze_hypo"
         private const val KEY_ALERT_SNOOZE_HYPER = "key_alert_snooze_hyper"
         private const val KEY_ALERT_SIGNAL_LOSS_ENABLED = "key_alert_signal_loss_enabled"
