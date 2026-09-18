@@ -1352,10 +1352,11 @@ private fun BleBridgeBadge(
             val minutes = (nextHeartbeatRemainingSec / 60).coerceAtLeast(0)
             val seconds = (nextHeartbeatRemainingSec % 60).coerceAtLeast(0)
             val countdownText = String.format(Locale.US, "%d:%02d", minutes, seconds)
+            val badgeWidth = if (bleSettings.useLongRange) 70.dp else 62.dp
 
             Surface(
                 modifier = modifier
-                    .size(width = 62.dp, height = 24.dp)
+                    .size(width = badgeWidth, height = 24.dp)
                     .clickable { onClick() },
                 shape = RoundedCornerShape(10.dp),
                 color = ActionBlue.copy(alpha = 0.08f),
@@ -1374,6 +1375,16 @@ private fun BleBridgeBadge(
                         tint = ActionBlue.copy(alpha = 0.85f),
                         modifier = Modifier.size(13.dp)
                     )
+                    if (bleSettings.useLongRange) {
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(
+                            text = "LR",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = ActionBlue,
+                            fontSize = 9.sp
+                        )
+                    }
                     Spacer(modifier = Modifier.width(3.dp))
                     Text(
                         text = countdownText,
@@ -1609,12 +1620,17 @@ private fun BleStatusDialog(
             }
         }
         isBroadcaster -> {
+            val lrNote = if (bleSettings.useLongRange) {
+                if (isRu) "\n\n⚡ Активен режим повышенной дальности (Long Range Coded PHY). Если на телефоне родителя пропали показания — отключите Long Range в настройках моста."
+                else "\n\n⚡ Long Range mode (Coded PHY) is active. If caregiver phone stopped receiving readings, disable Long Range in settings."
+            } else ""
+
             if (isBleBroadcasting) {
                 if (isRu) {
                     "Прямо сейчас вещатель передает сигнал Bluetooth в эфир (осталось $broadcastRemainingSec сек).\n\n" +
-                    "Телефоны-приемники в радиусе 10–15 м получают свежий замер сахара, тренд и заряд батареи."
+                    "Телефоны-приемники получают свежий замер сахара, тренд и заряд батареи.$lrNote"
                 } else {
-                    "Broadcasting active ($broadcastRemainingSec s remaining). Receiver phones are receiving fresh glucose, trend, and battery."
+                    "Broadcasting active ($broadcastRemainingSec s remaining). Receiver phones are receiving fresh glucose, trend, and battery.$lrNote"
                 }
             } else {
                 val min = nextHeartbeatRemainingSec / 60
@@ -1622,9 +1638,9 @@ private fun BleStatusDialog(
                 val timeStr = String.format(Locale.US, "%d:%02d", min, sec)
                 if (isRu) {
                     "Вещатель находится в режиме ожидания. До контрольного сигнала (heartbeat): $timeStr.\n\n" +
-                    "Как только от сенсора поступит свежий замер, вещатель немедленно передаст его в эфир."
+                    "Как только от сенсора поступит свежий замер, вещатель немедленно передаст его в эфир.$lrNote"
                 } else {
-                    "Broadcaster is idle. Heartbeat pulse in: $timeStr.\n\nIncoming sensor readings are transmitted immediately."
+                    "Broadcaster is idle. Heartbeat pulse in: $timeStr.\n\nIncoming sensor readings are transmitted immediately.$lrNote"
                 }
             }
         }
@@ -1662,18 +1678,33 @@ private fun BleStatusDialog(
 
             val batStr = if (bleSettings.lastMasterBattery in 0..100) "${bleSettings.lastMasterBattery}%" else if (isRu) "нет данных" else "no data"
 
+            val isObserverLongRangeActive = BleObserverManager.isLongRangeScanActive.value
+            val scanModeStr = if (isObserverLongRangeActive) {
+                if (isRu) "\n• Сканер: Dual (1M + Long Range)" else "\n• Scanner: Dual (1M + Long Range)"
+            } else {
+                if (isRu) "\n• Сканер: Standard (1M Legacy)" else "\n• Scanner: Standard (1M Legacy)"
+            }
+
+            val isSilenceAlert = !isObserverLongRangeActive && (contactAgeSecs != null && contactAgeSecs >= 360L)
+            val silenceWarning = if (isSilenceAlert) {
+                if (isRu) "\n\n⚠️ Внимание: данный смартфон принимает только обычный Bluetooth (Legacy 1M). Если на телефоне пациента включен режим Long Range — отключите его там для восстановления связи."
+                else "\n\n⚠️ Warning: this phone receives standard Bluetooth only. If patient phone has Long Range enabled, disable it there to restore connection."
+            } else ""
+
             if (isRu) {
                 "Приёмник активен и прослушивает эфир.\n\n" +
                 "• Последний замер: $readingAgeStr\n" +
                 "• Радиосигнал: $contactAgeStr\n" +
                 "• Батарея вещателя: $batStr\n" +
-                "• Качество сигнала: $signalQuality"
+                "• Качество сигнала: $signalQuality" +
+                scanModeStr + silenceWarning
             } else {
                 "Receiver is active listening for packets.\n\n" +
                 "• Last reading: $readingAgeStr\n" +
                 "• Radio signal: $contactAgeStr\n" +
                 "• Broadcaster battery: $batStr\n" +
-                "• Signal quality: $signalQuality"
+                "• Signal quality: $signalQuality" +
+                scanModeStr + silenceWarning
             }
         }
     }

@@ -15,29 +15,29 @@
 ## Декомпозиция задач на атомарные этапы (Task Splitting)
 
 ### Этап 1: Доменная модель и вещатель (Broadcaster)
-- [ ] [BleBridgeSettings.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/domain/model/BleBridgeSettings.kt): добавить `useLongRange: Boolean = false`.
-- [ ] [SettingsRepositoryImpl.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/repository/SettingsRepositoryImpl.kt): сохранение и загрузка `KEY_BLE_BRIDGE_USE_LONG_RANGE`.
-- [ ] [AutoBackupManager.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/backup/AutoBackupManager.kt):
+- [x] [BleBridgeSettings.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/domain/model/BleBridgeSettings.kt): добавить `useLongRange: Boolean = false`.
+- [x] [SettingsRepositoryImpl.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/repository/SettingsRepositoryImpl.kt): сохранение и загрузка `KEY_BLE_BRIDGE_USE_LONG_RANGE`.
+- [x] [AutoBackupManager.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/backup/AutoBackupManager.kt):
   - Сериализация `useLongRange` в JSON бэкапа.
   - **Обратная совместимость старых бэкапов:** при десериализации старых JSON (где поле отсутствует) гарантировать значение по умолчанию `false` без исключений.
-- [ ] [BleBroadcaster.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/ble/BleBroadcaster.kt):
+- [x] [BleBroadcaster.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/ble/BleBroadcaster.kt):
   - Проверка аппаратных возможностей (`isLeCodedPhySupported && isLeExtendedAdvertisingSupported`).
   - Поддержка `AdvertisingSetParameters` с `PHY_LE_CODED` при `useLongRange == true`.
   - Fail-safe fallback на `startAdvertising(AdvertiseSettings)` при ошибке в `AdvertisingSetCallback` (например, `ADVERTISE_FAILED_FEATURE_UNSUPPORTED`).
 
 ### Этап 2: Всеядный сканер на стороне приёмника (Observer)
-- [ ] [BleObserverManager.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/ble/BleObserverManager.kt):
+- [x] [BleObserverManager.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/ble/BleObserverManager.kt):
   - Проверка `isLeExtendedAdvertisingSupported` при инициализации сканера.
   - Настройка `ScanSettings`: `setLegacy(false)` и `setPhy(PHY_LE_ALL_SUPPORTED)` для параллельного приёма Legacy 1M и Coded PHY.
   - Fail-safe fallback: при `SCAN_FAILED_FEATURE_UNSUPPORTED` мгновенный прозрачный перезапуск с `setLegacy(true)`.
   - Детекция приёма Long Range в `ScanResult.primaryPhy` для отображения в UI.
 
 ### Этап 3: Пользовательский интерфейс и диагностика (UI / UX)
-- [ ] [SettingsScreen.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/settings/SettingsScreen.kt):
+- [x] [SettingsScreen.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/settings/SettingsScreen.kt):
   - Тумблер с аппаратной блокировкой (`isLeCodedPhySupported && isLeExtendedAdvertisingSupported`).
   - Диалог подтверждения со спокойными предупреждениями.
   - Кнопка Test Ping (30 сек) с визуальным отсчётом таймера.
-- [ ] [FocusScreen.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/focus/FocusScreen.kt):
+- [x] [FocusScreen.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/focus/FocusScreen.kt):
   - Обновление бейджа `BleBridgeBadge`: `📡 Long Range` (вещатель) и `📻 Dual / Standard` (приёмник).
   - При получении пакета во время Test Ping: мгновенная анимация/вспышка бейджа и обновление метки «Только что», дающее родителю наглядное подтверждение «поймал».
   - Адресное сообщение при срабатывании таймаута тишины (`SILENCE_TIMEOUT_MS = 6 мин`) на Legacy-приёмнике.

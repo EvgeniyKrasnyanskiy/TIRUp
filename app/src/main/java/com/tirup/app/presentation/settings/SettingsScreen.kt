@@ -140,6 +140,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tirup.app.R
 import com.tirup.app.data.backup.AutoBackupManager
+import com.tirup.app.data.ble.BleBroadcaster
+import com.tirup.app.data.ble.BleObserverManager
 import com.tirup.app.data.ble.BlePacketCodec
 import com.tirup.app.domain.calculator.CarbRecommendationCalculator
 import com.tirup.app.domain.model.BleBridgeRole
@@ -1477,6 +1479,84 @@ fun SettingsScreen(
                                 )
                             }
 
+                            val isLongRangeSupported = remember(isBtOn) {
+                                BleBroadcaster.isLongRangeSupported(context)
+                            }
+                            var showLongRangeConfirmDialog by remember { mutableStateOf(false) }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isRu) "Режим повышенной дальности (Long Range)" else "Long Range Mode (Coded PHY)",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (isLongRangeSupported) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    )
+                                    Text(
+                                        text = if (!isLongRangeSupported) {
+                                            if (isRu) "Не поддерживается чипсетом этого устройства" else "Not supported by this device's chipset"
+                                        } else {
+                                            if (isRu) "Увеличивает радиус в 2-4 раза. Требуется поддержка на смартфоне наблюдателя"
+                                            else "Extends range 2-4x. Requires support on observer's phone"
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (!isLongRangeSupported) MaterialTheme.colorScheme.error.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = ble.useLongRange,
+                                    enabled = isLongRangeSupported,
+                                    onCheckedChange = { isChecked ->
+                                        if (isChecked) {
+                                            showLongRangeConfirmDialog = true
+                                        } else {
+                                            viewModel.updateBleBridgeSettings(ble.copy(useLongRange = false))
+                                        }
+                                    }
+                                )
+                            }
+
+                            if (showLongRangeConfirmDialog) {
+                                AlertDialog(
+                                    onDismissRequest = { showLongRangeConfirmDialog = false },
+                                    title = {
+                                        Text(if (isRu) "Включить Long Range?" else "Enable Long Range?")
+                                    },
+                                    text = {
+                                        Text(
+                                            if (isRu) "Режим повышенной дальности (LE Coded PHY) увеличивает радиус связи до 4 раз.\n\n" +
+                                                      "Рекомендуется включать, только если смартфон наблюдателя также современный и поддерживает Bluetooth 5.0 Long Range.\n\n" +
+                                                      "Если второй телефон не поддерживает эту технологию, показания сахара могут перестать поступать.\n\n" +
+                                                      "После включения рекомендуем нажать «Тест связи (30 сек)» рядом с приёмником для проверки."
+                                            else "Long Range mode (LE Coded PHY) extends transmission distance up to 4x.\n\n" +
+                                                 "Enable only if observer phone supports Bluetooth 5.0 Long Range.\n\n" +
+                                                 "If observer phone does not support it, readings may not be received.\n\n" +
+                                                 "We recommend using 'Test Link' to verify connection."
+                                        )
+                                    },
+                                    confirmButton = {
+                                        Button(
+                                            onClick = {
+                                                showLongRangeConfirmDialog = false
+                                                viewModel.updateBleBridgeSettings(ble.copy(useLongRange = true))
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
+                                        ) {
+                                            Text(if (isRu) "Включить" else "Enable")
+                                        }
+                                    },
+                                    dismissButton = {
+                                        TextButton(onClick = { showLongRangeConfirmDialog = false }) {
+                                            Text(if (isRu) "Отмена" else "Cancel")
+                                        }
+                                    }
+                                )
+                            }
+
                             // Broadcaster Status Banner with Pulse Animation & Idle Countdown
                             val infiniteTransition = rememberInfiniteTransition(label = "BlePulse")
                             val pulseAlpha by infiniteTransition.animateFloat(
@@ -1628,11 +1708,23 @@ fun SettingsScreen(
                                             else -> "\n• ${if (isRu) "Батарея вещателя" else "Master battery"}: ${ble.lastMasterBattery}%"
                                         }
 
+                                        val isObserverLongRangeActive by BleObserverManager.isLongRangeScanActive.collectAsState()
+                                        val scanModeStr = if (isObserverLongRangeActive) {
+                                            if (isRu) "\n• Сканер: Dual (1M + Long Range)" else "\n• Scanner: Dual (1M + Long Range)"
+                                        } else {
+                                            if (isRu) "\n• Сканер: Standard (1M Legacy)" else "\n• Scanner: Standard (1M Legacy)"
+                                        }
+                                        val isSilenceAlert = ageMinutes >= 6 && !isObserverLongRangeActive
+                                        val silenceWarning = if (isSilenceAlert) {
+                                            if (isRu) "\n\n⚠️ Нет сигнала > 6 мин. Данный телефон принимает только стандартный Bluetooth. Если на смартфоне пациента включен Long Range — отключите его там для восстановления связи."
+                                            else "\n\n⚠️ No signal > 6m. This phone supports Standard BLE only. If patient phone has Long Range enabled, disable it there."
+                                        } else ""
+
                                         Text(
-                                            text = if (isRu) "• Радиосигнал: $ageStr\n• Сигнал: ${ble.lastRssi} dBm ($signalQuality)$batteryInfo"
-                                                   else "• Radio signal: $ageStr\n• Signal: ${ble.lastRssi} dBm ($signalQuality)$batteryInfo",
+                                            text = if (isRu) "• Радиосигнал: $ageStr\n• Сигнал: ${ble.lastRssi} dBm ($signalQuality)$batteryInfo$scanModeStr$silenceWarning"
+                                                   else "• Radio signal: $ageStr\n• Signal: ${ble.lastRssi} dBm ($signalQuality)$batteryInfo$scanModeStr$silenceWarning",
                                             style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = if (isSilenceAlert) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     } else {
                                         Text(
