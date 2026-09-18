@@ -171,17 +171,6 @@ object CaregiverSosAlarmManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val dialIntent = Intent(Intent.ACTION_DIAL).apply {
-            this.data = Uri.parse("tel:${data.senderPhone.trim()}")
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-        val dialPending = PendingIntent.getActivity(
-            context,
-            103,
-            dialIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         val title = if (data.isTest) "🚨 ТЕСТ SOS: ${data.patientName}" else "🚨 SOS! КРИТИЧЕСКАЯ ГИПО: ${data.patientName}"
         val text = "${data.glucoseDisplay} (${data.trendArrow}) • Сирена ${data.delayMinutes}м без ответа"
 
@@ -198,21 +187,7 @@ object CaregiverSosAlarmManager {
             .setAutoCancel(false)
             .setFullScreenIntent(fullScreenPending, true)
             .setContentIntent(fullScreenPending)
-            .addAction(0, "📞 Позвонить", dialPending)
-            .addAction(0, "Отключить", dismissPending)
-
-        if (!data.mapsUrl.isNullOrBlank()) {
-            val mapIntent = Intent(Intent.ACTION_VIEW, Uri.parse(data.mapsUrl)).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            val mapPending = PendingIntent.getActivity(
-                context,
-                104,
-                mapIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            builder.addAction(0, "📍 Карта", mapPending)
-        }
+            .addAction(0, "🔕 Отключить тревогу", dismissPending)
 
         nm.notify(NOTIFICATION_ID_CAREGIVER_SOS, builder.build())
     }

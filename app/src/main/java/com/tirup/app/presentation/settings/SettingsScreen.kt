@@ -203,6 +203,32 @@ fun SettingsScreen(
     val listState = rememberLazyListState()
     var highlightBle by remember { mutableStateOf(false) }
 
+    var localPrimaryPhone by rememberSaveable { mutableStateOf(settings.alertSettings.emergencyContactPhone) }
+    var localPrimaryName by rememberSaveable { mutableStateOf(settings.alertSettings.emergencyContactName) }
+    var localSecondaryPhone by rememberSaveable { mutableStateOf(settings.alertSettings.secondaryEmergencyContactPhone) }
+    var localSecondaryName by rememberSaveable { mutableStateOf(settings.alertSettings.secondaryEmergencyContactName) }
+
+    LaunchedEffect(settings.alertSettings.emergencyContactPhone) {
+        if (localPrimaryPhone != settings.alertSettings.emergencyContactPhone) {
+            localPrimaryPhone = settings.alertSettings.emergencyContactPhone
+        }
+    }
+    LaunchedEffect(settings.alertSettings.emergencyContactName) {
+        if (localPrimaryName != settings.alertSettings.emergencyContactName) {
+            localPrimaryName = settings.alertSettings.emergencyContactName
+        }
+    }
+    LaunchedEffect(settings.alertSettings.secondaryEmergencyContactPhone) {
+        if (localSecondaryPhone != settings.alertSettings.secondaryEmergencyContactPhone) {
+            localSecondaryPhone = settings.alertSettings.secondaryEmergencyContactPhone
+        }
+    }
+    LaunchedEffect(settings.alertSettings.secondaryEmergencyContactName) {
+        if (localSecondaryName != settings.alertSettings.secondaryEmergencyContactName) {
+            localSecondaryName = settings.alertSettings.secondaryEmergencyContactName
+        }
+    }
+
     LaunchedEffect(target) {
         if (target == "ble_bridge") {
             showAdvancedSettings = true
@@ -2043,8 +2069,9 @@ fun SettingsScreen(
 
                             // Primary trusted contact phone input
                             OutlinedTextField(
-                                value = alerts.emergencyContactPhone,
+                                value = localPrimaryPhone,
                                 onValueChange = { phone ->
+                                    localPrimaryPhone = phone
                                     viewModel.updateAlertSettings(alerts.copy(emergencyContactPhone = phone))
                                 },
                             label = { Text(if (isRu) "Основной телефон близкого (+...)" else "Primary trusted phone (+...)") },
@@ -2064,8 +2091,9 @@ fun SettingsScreen(
 
                         // Primary contact name (optional)
                         OutlinedTextField(
-                            value = alerts.emergencyContactName,
+                            value = localPrimaryName,
                             onValueChange = { name ->
+                                localPrimaryName = name
                                 viewModel.updateAlertSettings(alerts.copy(emergencyContactName = name))
                             },
                             label = { Text(if (isRu) "Имя основного контакта (необязательно)" else "Primary contact name (optional)") },
@@ -2084,8 +2112,9 @@ fun SettingsScreen(
 
                         // Secondary trusted contact phone input (reserve: mom/dad)
                         OutlinedTextField(
-                            value = alerts.secondaryEmergencyContactPhone,
+                            value = localSecondaryPhone,
                             onValueChange = { phone ->
+                                localSecondaryPhone = phone
                                 viewModel.updateAlertSettings(alerts.copy(secondaryEmergencyContactPhone = phone))
                             },
                             label = { Text(if (isRu) "Резервный телефон (+...)" else "Secondary trusted phone (+...)") },
@@ -2105,8 +2134,9 @@ fun SettingsScreen(
 
                         // Secondary contact name (optional)
                         OutlinedTextField(
-                            value = alerts.secondaryEmergencyContactName,
+                            value = localSecondaryName,
                             onValueChange = { name ->
+                                localSecondaryName = name
                                 viewModel.updateAlertSettings(alerts.copy(secondaryEmergencyContactName = name))
                             },
                             label = { Text(if (isRu) "Имя резервного контакта (необязательно)" else "Secondary contact name (optional)") },
@@ -2275,7 +2305,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = if (isRu) "🔔 Тест сирены опекуна (3 сек)" else "🔔 Test Caregiver Siren (3s)",
+                                text = if (isRu) "Тест сирены опекуна (3 сек)" else "Test Caregiver Siren (3s)",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = ColorVeryLow
                             )
@@ -2338,7 +2368,7 @@ fun SettingsScreen(
                                 text = if (testSosSmsCooldownSec > 0) {
                                     if (isRu) "Тест SOS для опекуна (${testSosSmsCooldownSec}с)" else "Test Caregiver SOS (${testSosSmsCooldownSec}s)"
                                 } else {
-                                    if (isRu) "🚨 Тест SOS для опекуна (SMS)" else "🚨 Test Caregiver SOS (SMS)"
+                                    if (isRu) "Тест SOS для опекуна (SMS)" else "Test Caregiver SOS (SMS)"
                                 },
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
