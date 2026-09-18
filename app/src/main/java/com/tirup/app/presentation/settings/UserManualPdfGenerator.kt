@@ -192,10 +192,10 @@ class UserManualPdfGenerator(private val context: Context) {
                         else "In Android settings for TIRUp and source app, disable 'Battery Optimization' and allow unrestricted background execution. Lock TIRUp in recent apps to guarantee uninterrupted sync."
                     ),
                     Triple(
-                        if (isRu) "Семейный BLE-мост (без интернета, радиус 10–15м)" else "Family BLE Bridge (100% Offline, 10–15m Range)",
-                        if (isRu) "BLE-мост" else "BLE Bridge",
-                        if (isRu) "Связь родитель–ребёнок по BLE (импульс 15с раз в 5м, Family PIN). Мост идеален на улице, в школе и дороге. В глубоком сне (Doze) Android урезает BLE ради батареи; ночью дома держите Wi-Fi фолловер активным. При пробуждении экрана связь восстанавливается за 1–2 мин."
-                        else "Parent-child BLE link (15s bursts per 5m, Family PIN). Ideal outdoors, at school and travel. In deep sleep (Doze) Android limits BLE scanning to save power; use Wi-Fi follower at night. Reconnects within 1-2 min after screen wake."
+                        if (isRu) "Семейный BLE-мост и Long Range (до 30–50м)" else "Family BLE Bridge & Long Range (up to 30–50m)",
+                        if (isRu) "BLE & LR" else "BLE & LR",
+                        if (isRu) "Связь родитель–ребёнок по BLE (15с импульс, Family PIN). Опциональный Long Range (Coded PHY) расширяет дальность в 2–4 раза сквозь стены с fail-safe откатом. Сканер приёмника слушает оба режима (Dual) автоматически."
+                        else "Parent-child BLE link (15s bursts, Family PIN). Optional Long Range mode (Coded PHY) extends range 2-4x through walls with fail-safe fallback. Observer scanner listens to both modes (Dual) automatically."
                     )
                 ),
                 cardHeight = 48f
