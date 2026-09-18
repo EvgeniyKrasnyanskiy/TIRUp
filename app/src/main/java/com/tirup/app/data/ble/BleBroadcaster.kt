@@ -349,9 +349,9 @@ object BleBroadcaster {
         onStatus: (Boolean, String) -> Unit
     ) {
         val targetReading = reading ?: GlucoseReading(
-            timestamp = System.currentTimeMillis(),
-            valueMmol = 6.0,
-            trendArrow = "→",
+            timestamp = 0L,
+            valueMmol = 0.0,
+            trendArrow = "",
             iob = null,
             cob = null
         )

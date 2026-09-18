@@ -42,6 +42,23 @@ class EmergencySmsBuilderTest {
     }
 
     @Test
+    fun testBuildEmergencyMessageTestFlag() {
+        val msg = EmergencySmsBuilder.buildEmergencyMessage(
+            patientName = "Иванов Иван",
+            glucoseValueMmol = 2.8,
+            trendArrow = "→",
+            delayMinutes = 5,
+            latitude = null,
+            longitude = null,
+            isRu = true,
+            unit = GlucoseUnit.MMOL_L,
+            isTest = true
+        )
+
+        assertTrue(msg.startsWith("SOS! [ТЕСТ] Иван - критич. гипо: 2.8 ммоль"))
+    }
+
+    @Test
     fun testBuildEmergencyMessageEnglishWithMgDl() {
         val msg = EmergencySmsBuilder.buildEmergencyMessage(
             patientName = "John",

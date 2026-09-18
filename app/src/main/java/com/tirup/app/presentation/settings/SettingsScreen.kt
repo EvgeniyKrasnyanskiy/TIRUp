@@ -432,9 +432,14 @@ fun SettingsScreen(
         com.tirup.app.data.ble.BleObserverManager.packetReceivedEvent.collect { pair ->
             val (packet, rssi) = pair
             val signalDot = if (rssi >= -75) "🟢" else if (rssi >= -85) "🟡" else "🔴"
-            val iobStr = if (packet.iob > 0.0) ", 💉${String.format(java.util.Locale.US, "%.1f", packet.iob)}" else ""
             val batStr = if (packet.batteryPercent in 0..100) ", 🔋${packet.batteryPercent}%" else ""
-            val msg = "$signalDot BLE: 🩸${String.format(java.util.Locale.US, "%.1f", packet.valueMmol)} ${packet.trendArrow}$iobStr$batStr (RSSI: $rssi dBm)"
+            val msg = if (packet.valueMmol <= 0.1 || packet.timestamp == 0L) {
+                if (isRu) "$signalDot BLE: 📡 Тест связи (нет данных сенсора)$batStr (RSSI: $rssi dBm)"
+                else "$signalDot BLE: 📡 Range test (no sensor data)$batStr (RSSI: $rssi dBm)"
+            } else {
+                val iobStr = if (packet.iob > 0.0) ", 💉${String.format(java.util.Locale.US, "%.1f", packet.iob)}" else ""
+                "$signalDot BLE: 🩸${String.format(java.util.Locale.US, "%.1f", packet.valueMmol)} ${packet.trendArrow}$iobStr$batStr (RSSI: $rssi dBm)"
+            }
             
             bleSignalBannerText = msg
             val toast = Toast.makeText(context, msg, Toast.LENGTH_LONG)
@@ -2497,10 +2502,10 @@ fun SettingsScreen(
                             )
                         }
 
-                        // Test 3: Caregiver Siren (3 sec)
+                        // Test 3: Caregiver SOS Screen & Siren preview
                         OutlinedButton(
                             onClick = {
-                                com.tirup.app.data.alert.MedicalSoundPlayer.playCaregiverSosAlarm(cycles = 2)
+                                viewModel.testCaregiverSosScreen()
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(10.dp),
@@ -2514,7 +2519,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = if (isRu) "Тест сирены опекуна (3 сек)" else "Test Caregiver Siren (3s)",
+                                text = if (isRu) "Тест экрана и сирены опекуна" else "Test Caregiver Screen & Siren",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = ColorVeryLow
                             )

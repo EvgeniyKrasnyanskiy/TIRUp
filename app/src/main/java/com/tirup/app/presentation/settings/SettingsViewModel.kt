@@ -576,6 +576,25 @@ class SettingsViewModel(
         rescueCountdownJob = null
     }
 
+    fun testCaregiverSosScreen() {
+        val alerts = _uiState.value.userSettings.alertSettings
+        val name = com.tirup.app.domain.alert.EmergencySmsBuilder.extractShortName(
+            _uiState.value.userSettings.patientProfile.fullName,
+            isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+        )
+        val testData = com.tirup.app.domain.alert.SosAlertData(
+            rawText = "SOS! [ТЕСТ] $name - критич. гипо: 2.8 ммоль (⇊)! Сирена 5м без реакции",
+            senderPhone = alerts.emergencyContactPhone.ifBlank { "+79990000000" },
+            patientName = name,
+            glucoseDisplay = "2.8 ммоль",
+            trendArrow = "⇊",
+            delayMinutes = 5,
+            mapsUrl = "https://maps.google.com/?q=55.755800,37.617300",
+            isTest = true
+        )
+        com.tirup.app.data.alert.CaregiverSosAlarmManager.triggerCaregiverSos(context, testData)
+    }
+
     fun playTestSound(volumePercent: Int) {
         com.tirup.app.data.alert.MedicalSoundPlayer.playTestSound(volumePercent)
     }

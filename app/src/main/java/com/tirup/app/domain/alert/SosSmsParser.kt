@@ -22,7 +22,8 @@ object SosSmsParser {
      */
     fun isSosMessage(body: String): Boolean {
         val trimmed = body.trim()
-        if (!trimmed.startsWith("SOS!", ignoreCase = true)) return false
+        val clean = trimmed.replace(Regex("^(\\[.*?\\]|\\(.*?\\))\\s*"), "")
+        if (!trimmed.startsWith("SOS!", ignoreCase = true) && !clean.startsWith("SOS!", ignoreCase = true)) return false
         val lower = trimmed.lowercase()
         return lower.contains("гипо") || lower.contains("hypo") || lower.contains("сирена") || lower.contains("alarm")
     }
@@ -44,9 +45,9 @@ object SosSmsParser {
         }
 
         // 2. Extract Patient Name: between "SOS!" (and optional [ТЕСТ]) and the first "-"
-        // e.g. "SOS! [ТЕСТ] Ваня - критич. гипо..." or "SOS! Ваня - критич. гипо..."
+        // e.g. "SOS! [ТЕСТ] Ваня - критич. гипо...", "[ТЕСТ] SOS! Ваня...", or "SOS! Ваня - критич. гипо..."
         var patientName = ""
-        val namePattern = Pattern.compile("SOS!\\s*(?:\\[[^\\]]+\\]\\s*)?([^-:!]+?)\\s*[-:]", Pattern.CASE_INSENSITIVE)
+        val namePattern = Pattern.compile("(?:^|\\[[^\\]]+\\]\\s*)?SOS!\\s*(?:\\[[^\\]]+\\]\\s*)?([^-:!]+?)\\s*[-:]", Pattern.CASE_INSENSITIVE)
         val nameMatcher = namePattern.matcher(trimmed)
         if (nameMatcher.find()) {
             patientName = nameMatcher.group(1)?.trim() ?: ""
