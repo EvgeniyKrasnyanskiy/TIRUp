@@ -60,9 +60,9 @@ object EmergencySmsBuilder {
 
         val testPrefix = if (isTest) (if (isRu) "[ТЕСТ] " else "[TEST] ") else ""
         val baseMsg = if (isRu) {
-            "${testPrefix}SOS! $name - критич. гипо: $glucoseStr$arrowPart! Сирена ${delayMinutes}м без реакции"
+            "SOS! $testPrefix$name - критич. гипо: $glucoseStr$arrowPart! Сирена ${delayMinutes}м без реакции"
         } else {
-            "${testPrefix}SOS! $name - critical hypo: $glucoseStr$arrowPart! Alarm ${delayMinutes}m no reaction"
+            "SOS! $testPrefix$name - critical hypo: $glucoseStr$arrowPart! Alarm ${delayMinutes}m no reaction"
         }
 
         return baseMsg + locationPart

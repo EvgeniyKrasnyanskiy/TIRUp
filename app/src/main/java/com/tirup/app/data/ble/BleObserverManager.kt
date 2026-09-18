@@ -557,6 +557,24 @@ object BleObserverManager {
         lastPacketReceivedSystemMs = now
 
         // Check if this is a repeat packet from the same burst or a fallback heartbeat with the same reading timestamp
+        if (packet.timestamp == 0L || packet.valueMmol <= 0.1) {
+            // Pure range test ping without real sensor reading: update radio contact and emit event without inserting into Room DB
+            Log.i(TAG, "Test ping packet received: ts=${packet.timestamp}, rssi=$rssi (no sensor reading)")
+            _packetReceivedEvent.tryEmit(Pair(packet, rssi))
+            scope.launch {
+                try {
+                    val currentSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
+                    val updatedBle = currentSettings.bleBridgeSettings.copy(
+                        lastRadioContactMs = now,
+                        lastRssi = rssi,
+                        lastMasterBattery = if (packet.batteryPercent in 0..100) packet.batteryPercent else currentSettings.bleBridgeSettings.lastMasterBattery
+                    )
+                    settingsRepository.updateSettings(currentSettings.copy(bleBridgeSettings = updatedBle))
+                } catch (_: Exception) {}
+            }
+            return
+        }
+
         if (packet.timestamp <= lastHandledTimestamp) {
             // Heartbeat or repeat packet within burst: keeps watchdog alive without cluttering Room DB
             if (now - lastHeartbeatLogMs >= 3000L) {

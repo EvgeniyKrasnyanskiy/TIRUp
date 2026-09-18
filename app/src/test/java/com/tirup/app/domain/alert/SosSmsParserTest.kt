@@ -11,6 +11,8 @@ class SosSmsParserTest {
         assertTrue(SosSmsParser.isSosMessage("SOS! Алексей - критич. гипо: 2.6 ммоль (↓↓)! Сирена 5м без реакции"))
         assertTrue(SosSmsParser.isSosMessage("SOS! John - critical hypo: 45 mg/dL (↓↓)! Alarm 10m no reaction"))
         assertTrue(SosSmsParser.isSosMessage("SOS! [ТЕСТ ОПЕКУНА] Ваня - критич. гипо: 2.8 ммоль/л (↓)! Сирена 5м без реакции"))
+        assertTrue(SosSmsParser.isSosMessage("SOS! [ТЕСТ] Ваня - критич. гипо: 2.8 ммоль (→)! Сирена 5м без реакции"))
+        assertTrue(SosSmsParser.isSosMessage("[ТЕСТ] SOS! Ваня - критич. гипо: 2.8 ммоль (→)! Сирена 5м без реакции"))
         
         // Irrelevant messages
         assertFalse(SosSmsParser.isSosMessage("сахар"))
@@ -84,6 +86,21 @@ class SosSmsParserTest {
         assertEquals("↓", result.trendArrow)
         assertEquals(5, result.delayMinutes)
         assertNotNull(result.mapsUrl)
+    }
+
+    @Test
+    fun testParseLeadingTestPrefix() {
+        val body = "[ТЕСТ] SOS! Ваня - критич. гипо: 2.8 ммоль (→)! Сирена 5м без реакции"
+        val sender = "+79001112233"
+        val result = SosSmsParser.parse(body, sender)
+
+        assertNotNull(result)
+        result!!
+        assertTrue(result.isTest)
+        assertEquals("Ваня", result.patientName)
+        assertEquals("2.8 ммоль", result.glucoseDisplay)
+        assertEquals("→", result.trendArrow)
+        assertEquals(5, result.delayMinutes)
     }
 
     @Test

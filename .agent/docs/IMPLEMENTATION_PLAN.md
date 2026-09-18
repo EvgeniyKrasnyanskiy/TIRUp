@@ -1,62 +1,56 @@
-# План реализации: Полноэкранное окно спасения пациента (Patient Critical Hypo Wakeup), пороги критической тревоги и блок «Тестирование систем»
+# План: Исправление Caregiver SOS теста, телеметрия BLE-моста и аудит нововведений
 
-## 1. Цель и клиническая ценность
-При падении сахара ниже критического уровня (по умолчанию <3.0 ммоль/л) у пациента развивается нейрогликопения, тремор, нарушение мелкой моторики и спутанность сознания.
-В таком состоянии разблокировать телефон, вводить PIN или графический ключ, смахивать шторку — смертельно опасная задержка.
-**Цель задачи:**
-1. **Полноэкранное окно спасения (`PatientCriticalHypoActivity`):** мгновенно пробуждает экран поверх блокировки (PIN/пароль), выводит огромные цифры сахара со стробоскопом, клиническую памятку «Правило 15 г быстрых углеводов», гигантскую кнопку 140dp «Принял углеводы (Отключить сирену)», таймер «Контроль через 15:00» и кнопку быстрого вызова опекуна (первого из списка).
-2. **Настройка критических порогов:** сделать пороги критической тревоги кликабельными в строке «3. Критическая тревога» (<3.0 / >13.9 по умолчанию, гипо 2.5–4.5, гипер 11.0–16.0). По этим же порогам автоматически работают сирена, окно спасения и отправка экстренного SMS.
-3. **Сворачиваемый блок «Тестирование систем»:** перенести проверки в единый компактный центр с функцией «Тест экрана спасения (через 5 сек)» для безопасной проверки пробуждения заблокированного экрана.
+## 1. Ответы на вопросы и аудит
 
----
+### 1.1. Клиническое поведение по «Правилу 15» (Patient Rescue Screen)
+- **Вопрос:** Сработает ли тревога снова, если сахар по сенсору всё ещё ниже порога по истечении 15 минут?
+- **Ответ:** **ДА, обязательно.** В [GlucoseAlertManager.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/alert/GlucoseAlertManager.kt) уже реализована клиническая модель:
+  1. При нажатии гигантской кнопки «Принял 15г углеводов» текущая сирена, вспышка и вибрация отключаются, таймер экстренного SMS отменяется (`dismissCriticalAlarm(fromUser = true)`), и фиксируется время подтверждения (`userAcknowledgedHypoTimestamp = now`).
+  2. Включается 15-минутный клинический снуз (`snoozeHypoMinutes = 15`). Если за это время сахар стремительно падает ($\le -0.3$ ммоль/мин) или $< 2.8$ и не растёт, система прерывает снуз досрочно.
+  3. Если пациент принял углеводы, прошло 15 минут, и на очередном замере сенсора сахар **всё ещё ниже критического порога** ($< 3.0$ или настроенного), условие `shouldTriggerHypo` возвращает `true`:
+     - Снова включается сирена на 100% громкости, вибрация и стробоскоп.
+     - Полноэкранное окно спасения ([PatientCriticalHypoActivity.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/alert/PatientCriticalHypoActivity.kt)) снова всплывает поверх блокировки с актуальным сахаром и кнопкой углеводов.
+     - Заново запускается обратный отсчёт экстренного SMS опекунам (5 минут).
 
-## 2. Архитектура решения
+### 1.2. Баг теста SOS для опекуна (экран тревоги не запустился)
+- **Причина:** В предыдущем коммите тег `[ТЕСТ]` был помещён перед `SOS!`: `"[ТЕСТ] SOS! Ваня - критич. гипо..."`.
+- Приёмник SMS на телефоне опекуна ([SosSmsParser.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/domain/alert/SosSmsParser.kt)) строго проверяет:
+  `if (!trimmed.startsWith("SOS!", ignoreCase = true)) return false`.
+- Поскольку сообщение начиналось с символа `[`, парсер не признал его за SOS и проигнорировал. SMS поступило в обычный мессенджер, но [CaregiverSosAlarmManager.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/alert/CaregiverSosAlarmManager.kt) не сработал.
 
-### 2.1. Доменная модель и сохранение порогов
-- **`AlertSettings.kt`**:
-  - `val criticalLowThresholdMmol: Double = 3.0`
-  - `val criticalHighThresholdMmol: Double = 13.9`
-- **`SettingsRepositoryImpl.kt`**:
-  - Сохранение `KEY_ALERT_CRITICAL_LOW_THRESHOLD` и `KEY_ALERT_CRITICAL_HIGH_THRESHOLD`.
-- **`AutoBackupManager.kt`**:
-  - Сериализация и парсинг новых порогов в JSON резервной копии.
-
-### 2.2. Полноэкранное окно спасения пациента (`PatientCriticalHypoActivity.kt`)
-- `AndroidManifest.xml`:
-  - `PatientCriticalHypoActivity` с `showWhenLocked="true"`, `turnScreenOn="true"`, `launchMode="singleTop"`.
-- Механизм показа:
-  - `setShowWhenLocked(true)`, `setTurnScreenOn(true)`, `FLAG_KEEP_SCREEN_ON`.
-  - Пульсирующий фон (красный / тёмный стробоскоп в такт тревоге).
-  - Крупные цифры текущего сахара и стрелка тренда.
-  - Памятка «Правило 15 г быстрых углеводов» (сок, 4–5 кусков сахара, декстроза).
-  - Кнопка **140dp** «Принял углеводы (Отключить сирену)».
-  - После подтверждения — таймер: **«Контроль через 15:00»** (с обратным отсчётом).
-  - Кнопка **56dp** «Позвонить: [Имя опекуна]» (первому из настроенных доверенных лиц).
-  - Кнопка **50dp** «Закрыть окно» внизу.
-  - Аппаратные кнопки громкости глушат сирену.
-
-### 2.3. Интеграция в движок тревог (`GlucoseAlertManager.kt`)
-- Использование `alerts.criticalLowThresholdMmol` и `alerts.criticalHighThresholdMmol`.
-- При наступлении `AlertTier.CRITICAL` (или тестовом запуске):
-  - Формирование `fullScreenPending` для `PatientCriticalHypoActivity`.
-  - Установка `builder.setFullScreenIntent(fullScreenPending, true)`.
-  - Прямой вызов `context.startActivity(...)` при активном приложении.
-  - Метод `launchPatientRescueScreen(context, isTest = true)` для отложенного теста.
-
-### 2.4. Интерфейс Настроек (`SettingsScreen.kt` & `SettingsViewModel.kt`)
-- **Кликабельные пороги в строке «3. Критическая тревога»:**
-  - Бейдж: `< 3.0  |  > 13.9` в стиле основных тревог.
-  - Диалог `CriticalThresholdDialog` со слайдерами: гипо 2.5–4.5 ммоль/л, гипер 11.0–16.0 ммоль/л.
-- **Сворачиваемый блок «Тестирование систем»:**
-  - Иконка `🧪`, заголовок `Тестирование систем`, подзаголовок `Проверка окна спасения, экстренной связи и BLE-моста`.
-  - Кнопка 1: **«🚨 Тест экрана спасения (через 5 сек)»** — запускает корутину с обратным отсчётом 5 сек, чтобы успеть заблокировать телефон.
-  - Кнопка 2: **«🚨 Тест SOS для опекуна (SMS)»** — перенесена сюда из блока SMS.
-  - Кнопка 3: **«📡 Тест связи BLE-моста (10 сек)»** — быстрый 10-секундный тест с всплывающим тостом.
+### 1.3. Телеметрия сахара в тесте дальности BLE-моста
+- **Вопрос:** Для сахара берутся реальные значения? А если их ещё нет?
+- **Ответ:**
+  - **Реальные значения:** ДА, если сенсор активен или в БД есть замеры, вещатель транслирует реальный сахар, стрелку, активный инсулин и батарею.
+  - **Если замеров ещё нет:** Ранее стояла заглушка 6.0 ммоль/л. В ходе аудита обнаружено, что приёмник ([BleObserverManager.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/ble/BleObserverManager.kt)) мог сохранить эту фиктивную точку в свою базу Room!
+  - **Решение:** При отсутствии замеров вещатель передаёт маркер `0.0`. Приёмник не сохраняет его в БД, а на экране выводит: `"🟢 BLE: 📡 Тест связи (нет данных сенсора) (RSSI: -65 dBm)"`.
 
 ---
 
-- [x] **Этап 1:** [Completed] Модель `AlertSettings.kt`, сохранение в `SettingsRepositoryImpl.kt` и бэкап в `AutoBackupManager.kt`.
-- [x] **Этап 2:** [Completed] Создание `PatientCriticalHypoActivity.kt`, регистрация в `AndroidManifest.xml` и интеграция в `GlucoseAlertManager.kt`.
-- [x] **Этап 3:** [Completed] Диалог настройки критических порогов в `SettingsScreen.kt` (компактный бейдж в строке «3. Критическая тревога»).
-- [x] **Этап 4:** [Completed] Сворачиваемый блок «Тестирование систем» в `SettingsScreen.kt` и запуск тестов во `SettingsViewModel.kt`.
-- [x] **Этап 5:** [Completed] Модульные тесты (testDebugUnitTest), сборка релизного APK (`assembleRelease`) и успешная установка на подключённый смартфон `af27386b`.
+## 2. Предлагаемые изменения
+
+### 2.1. Исправление формата SMS и парсера
+- **[EmergencySmsBuilder.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/domain/alert/EmergencySmsBuilder.kt)**:
+  - Тег `[ТЕСТ]` ставится после `SOS! `: `"SOS! $testPrefix$name - критич. гипо: ..."` -> `"SOS! [ТЕСТ] Ваня..."`.
+- **[SosSmsParser.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/domain/alert/SosSmsParser.kt)**:
+  - Очистка любых тегов в скобках перед проверкой `startsWith("SOS!")` и в regex имени для гарантированного распознавания обоих форматов (`"SOS! [ТЕСТ]..."` и `"[ТЕСТ] SOS!..."`).
+- **[SosSmsParserTest.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/test/java/com/tirup/app/domain/alert/SosSmsParserTest.kt)**:
+  - Добавить тесты на оба варианта.
+
+### 2.2. Защита от фиктивного сахара в BLE-мосте
+- **[BleBroadcaster.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/ble/BleBroadcaster.kt)**:
+  - Если `reading == null`, передавать маркер `valueMmol = 0.0` и `timestamp = 0L`.
+- **[BleObserverManager.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/ble/BleObserverManager.kt)**:
+  - Игнорировать сохранение в Room DB при `packet.valueMmol <= 0.1` или `packet.timestamp == 0L`.
+- **[SettingsScreen.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/settings/SettingsScreen.kt)**:
+  - Показывать баннер `"$signalDot BLE: 📡 Тест связи (нет данных сенсора) (RSSI: $rssi dBm)"` при получении тестового пакета без данных.
+
+### 2.3. Локальный тест экрана опекуна
+- В блоке «Тестирование систем» сделать кнопку проверки сирены опекуна полноценной: не только звук, но и показ тестового экрана [CaregiverSosActivity.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/alert/CaregiverSosActivity.kt) на 3 секунды для наглядной проверки прямо на своём телефоне.
+
+---
+
+## 3. План верификации
+- Запуск тестов `./gradlew testDebugUnitTest`
+- Сборка релизного APK `./gradlew assembleRelease`
+- Установка на телефон `af27386b`
