@@ -454,7 +454,31 @@ class SettingsViewModel(
         }
     }
 
-    fun startBleRangeTest(durationSec: Int = 10) {
+    private var devTestsUnlockedTimestamp: Long = 0L
+    private var settingsExitedTimestamp: Long = 0L
+    private val _isDevTestsUnlocked = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val isDevTestsUnlocked: kotlinx.coroutines.flow.StateFlow<Boolean> = _isDevTestsUnlocked
+
+    fun unlockDevTests() {
+        devTestsUnlockedTimestamp = System.currentTimeMillis()
+        settingsExitedTimestamp = 0L
+        _isDevTestsUnlocked.value = true
+    }
+
+    fun checkDevTestsLockOnResume() {
+        if (settingsExitedTimestamp > 0L && System.currentTimeMillis() - settingsExitedTimestamp > 5 * 60_000L) {
+            _isDevTestsUnlocked.value = false
+            settingsExitedTimestamp = 0L
+        }
+    }
+
+    fun onSettingsScreenDisposed() {
+        if (_isDevTestsUnlocked.value) {
+            settingsExitedTimestamp = System.currentTimeMillis()
+        }
+    }
+
+    fun startBleRangeTest(durationSec: Int = 5) {
         viewModelScope.launch {
             val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
             val ble = _uiState.value.userSettings.bleBridgeSettings
@@ -467,7 +491,6 @@ class SettingsViewModel(
                 )
                 val msg = if (isRu) "🔍 Тест дальности: активный приём ($durationSec сек)..." else "🔍 Range test: active scan ($durationSec s)..."
                 _uiState.update { it.copy(infoMessage = msg) }
-                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
             } else {
                 val latest = glucoseRepository.getLatestReading().firstOrNull()
                 com.tirup.app.data.ble.BleBroadcaster.broadcastRangeTestPing(
@@ -483,7 +506,6 @@ class SettingsViewModel(
                         if (isRu) "⚠️ $message" else "⚠️ BLE error: $message"
                     }
                     _uiState.update { it.copy(infoMessage = text) }
-                    android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).show()
                 }
             }
         }

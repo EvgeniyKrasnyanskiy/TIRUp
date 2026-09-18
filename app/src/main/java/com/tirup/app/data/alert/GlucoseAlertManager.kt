@@ -303,6 +303,7 @@ object GlucoseAlertManager {
 
     private var flashJob: Job? = null
     private var emergencySmsJob: Job? = null
+    private var rescueWakeLock: android.os.PowerManager.WakeLock? = null
 
     fun initChannels(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -759,6 +760,13 @@ object GlucoseAlertManager {
             nm?.cancel(NOTIFICATION_ID_CRITICAL)
         } catch (_: Exception) {}
 
+        try {
+            if (rescueWakeLock?.isHeld == true) {
+                rescueWakeLock?.release()
+            }
+        } catch (_: Exception) {}
+        rescueWakeLock = null
+
         if (fromUser) {
             val now = System.currentTimeMillis()
             userAcknowledgedHypoTimestamp = now
@@ -924,23 +932,42 @@ object GlucoseAlertManager {
     ) {
         val appContext = context.applicationContext
         isCriticalAlarmActive = true
-        MedicalSoundPlayer.playSound(AlertTier.CRITICAL, 100)
-        triggerVibration(appContext, AlertTier.CRITICAL)
-        triggerFlashlight(appContext, AlertTier.CRITICAL)
 
+        // 1. Force screen on via WakeLock with ACQUIRE_CAUSES_WAKEUP
         try {
-            val intent = Intent(appContext, PatientCriticalHypoActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                putExtra(PatientCriticalHypoActivity.EXTRA_GLUCOSE, glucoseDisplay)
-                putExtra(PatientCriticalHypoActivity.EXTRA_TREND, trendArrow)
-                putExtra(PatientCriticalHypoActivity.EXTRA_IS_TEST, isTest)
-                putExtra(PatientCriticalHypoActivity.EXTRA_PRIMARY_CONTACT_PHONE, primaryPhone)
-                putExtra(PatientCriticalHypoActivity.EXTRA_PRIMARY_CONTACT_NAME, primaryName)
+            val pm = appContext.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+            rescueWakeLock?.release()
+            rescueWakeLock = pm?.newWakeLock(
+                android.os.PowerManager.PARTIAL_WAKE_LOCK or android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                "TIRUp:PatientRescueWakeLock"
+            )?.apply {
+                setReferenceCounted(false)
+                acquire(30_000L)
             }
-            appContext.startActivity(intent)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to launch PatientCriticalHypoActivity: ${e.message}")
+            Log.w(TAG, "Failed to acquire rescueWakeLock: ${e.message}")
         }
+
+        MedicalSoundPlayer.playSound(AlertTier.CRITICAL, 100)
+
+        val title = if (isTest) "🚨 ТЕСТ: Экран спасения" else "🚨 ЭКСТРЕМАЛЬНО НИЗКИЙ САХАР!"
+        val text = "Сахар: $glucoseDisplay ($trendArrow). Срочно примите быстрые углеводы!"
+
+        sendNotification(
+            context = appContext,
+            channelId = CHANNEL_CRITICAL,
+            notificationId = NOTIFICATION_ID_CRITICAL,
+            title = title,
+            text = text,
+            tier = AlertTier.CRITICAL,
+            vibrate = true,
+            flash = true,
+            volumePercent = 100,
+            glucoseDisplay = glucoseDisplay,
+            trendArrow = trendArrow,
+            primaryContactPhone = primaryPhone,
+            primaryContactName = primaryName
+        )
     }
 
     /**
