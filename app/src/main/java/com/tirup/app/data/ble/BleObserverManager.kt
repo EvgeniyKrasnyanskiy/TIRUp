@@ -2,6 +2,7 @@ package com.tirup.app.data.ble
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
@@ -67,8 +68,18 @@ object BleObserverManager {
     @Volatile
     private var scanStartTimestampMs: Long = 0L
 
+    @Volatile
+    var extendedScanDisabledByFallback: Boolean = false
+        private set
+
     private val _isScanningFlow = MutableStateFlow(false)
     val isScanningFlow: StateFlow<Boolean> = _isScanningFlow.asStateFlow()
+
+    private val _isLongRangeScanActive = MutableStateFlow(false)
+    val isLongRangeScanActive: StateFlow<Boolean> = _isLongRangeScanActive.asStateFlow()
+
+    private val _lastPacketWasLongRange = MutableStateFlow(false)
+    val lastPacketWasLongRange: StateFlow<Boolean> = _lastPacketWasLongRange.asStateFlow()
 
     private val _boostRemainingSec = MutableStateFlow(0)
     val boostRemainingSec: StateFlow<Int> = _boostRemainingSec.asStateFlow()
@@ -97,6 +108,7 @@ object BleObserverManager {
         appContext = context.applicationContext
         cachedSettingsRepo = settingsRepository
         cachedGlucoseRepo = glucoseRepository
+        extendedScanDisabledByFallback = false
 
         scope.launch {
             val userSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
@@ -398,6 +410,7 @@ object BleObserverManager {
             )
             .build()
 
+        val canAttemptExtended = !extendedScanDisabledByFallback && adapter.isLeExtendedAdvertisingSupported
         val scanSettings = ScanSettings.Builder()
             .setScanMode(if (boost) ScanSettings.SCAN_MODE_LOW_LATENCY else ScanSettings.SCAN_MODE_BALANCED)
             .setReportDelay(0L)
@@ -406,6 +419,10 @@ object BleObserverManager {
                     setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
                     setNumOfMatches(ScanSettings.MATCH_NUM_MAX_ADVERTISEMENT)
                     setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+                }
+                if (canAttemptExtended) {
+                    setLegacy(false)
+                    setPhy(ScanSettings.PHY_LE_ALL_SUPPORTED)
                 }
             }
             .build()
@@ -434,6 +451,17 @@ object BleObserverManager {
                 }
                 Log.e(TAG, "BLE Scan failed: $errorDesc")
                 _isScanningFlow.value = false
+                _isLongRangeScanActive.value = false
+
+                if (errorCode == SCAN_FAILED_FEATURE_UNSUPPORTED && !extendedScanDisabledByFallback) {
+                    Log.w(TAG, "Extended scan unsupported by driver, falling back to legacy 1M")
+                    extendedScanDisabledByFallback = true
+                    scope.launch {
+                        delay(1000L)
+                        restartScanInternal("fallback_legacy_after_feature_unsupported", boost = false)
+                    }
+                    return
+                }
 
                 if (errorCode == SCAN_FAILED_ALREADY_STARTED ||
                     errorCode == SCAN_FAILED_APPLICATION_REGISTRATION_FAILED ||
@@ -453,6 +481,7 @@ object BleObserverManager {
             activeCallback = callback
             isScanning = true
             _isScanningFlow.value = true
+            _isLongRangeScanActive.value = canAttemptExtended
             val now = System.currentTimeMillis()
             scanStartTimestampMs = now
             if (lastPacketReceivedSystemMs == 0L) {
@@ -479,6 +508,9 @@ object BleObserverManager {
         val rawData = record.getManufacturerSpecificData(BlePacketCodec.MANUFACTURER_ID) ?: return
 
         val packet = BlePacketCodec.decodePacket(rawData, expectedPin) ?: return
+
+        val isCodedPhy = result.primaryPhy == BluetoothDevice.PHY_LE_CODED
+        _lastPacketWasLongRange.value = isCodedPhy
 
         val rssi = result.rssi
         val now = System.currentTimeMillis()
@@ -563,7 +595,22 @@ object BleObserverManager {
         scanner = null
         isScanning = false
         _isScanningFlow.value = false
+        _isLongRangeScanActive.value = false
         Log.i(TAG, "BLE Observer stopped scanning")
+    }
+
+    fun isLongRangeScanSupported(context: Context): Boolean {
+        val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager ?: return false
+        val adapter = bm.adapter ?: return false
+        return isLongRangeScanSupported(adapter)
+    }
+
+    fun isLongRangeScanSupported(adapter: BluetoothAdapter): Boolean {
+        return try {
+            adapter.isLeExtendedAdvertisingSupported && !extendedScanDisabledByFallback
+        } catch (_: Exception) {
+            false
+        }
     }
 
     fun isBluetoothEnabled(context: Context): Boolean {
