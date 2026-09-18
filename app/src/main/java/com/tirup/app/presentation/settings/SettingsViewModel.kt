@@ -454,6 +454,41 @@ class SettingsViewModel(
         }
     }
 
+    fun startBleRangeTest(durationSec: Int = 10) {
+        viewModelScope.launch {
+            val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+            val ble = _uiState.value.userSettings.bleBridgeSettings
+            if (ble.role == com.tirup.app.domain.model.BleBridgeRole.OBSERVER) {
+                com.tirup.app.data.ble.BleObserverManager.boostScanForDuration(
+                    context = context,
+                    settingsRepository = settingsRepository,
+                    glucoseRepository = glucoseRepository,
+                    durationSec = durationSec
+                )
+                val msg = if (isRu) "🔍 Тест дальности: активный приём ($durationSec сек)..." else "🔍 Range test: active scan ($durationSec s)..."
+                _uiState.update { it.copy(infoMessage = msg) }
+                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                val latest = glucoseRepository.getLatestReading().firstOrNull()
+                com.tirup.app.data.ble.BleBroadcaster.broadcastRangeTestPing(
+                    context = context,
+                    reading = latest,
+                    settings = ble,
+                    durationSec = durationSec,
+                    isRu = isRu
+                ) { success, message ->
+                    val text = if (success) {
+                        if (isRu) "📡 Тест дальности: $message" else "📡 Range test: $message"
+                    } else {
+                        if (isRu) "⚠️ $message" else "⚠️ BLE error: $message"
+                    }
+                    _uiState.update { it.copy(infoMessage = text) }
+                    android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     fun clearInfoMessage() {
         _uiState.update { it.copy(infoMessage = null) }
     }
@@ -518,8 +553,11 @@ class SettingsViewModel(
         )
     }
 
+    private var rescueCountdownJob: kotlinx.coroutines.Job? = null
+
     fun startPatientRescueTestCountdown(delaySec: Int = 5) {
-        viewModelScope.launch {
+        rescueCountdownJob?.cancel()
+        rescueCountdownJob = viewModelScope.launch {
             val alerts = _uiState.value.userSettings.alertSettings
             kotlinx.coroutines.delay(delaySec * 1000L)
             com.tirup.app.data.alert.GlucoseAlertManager.launchPatientRescueScreen(
@@ -531,6 +569,11 @@ class SettingsViewModel(
                 primaryName = alerts.emergencyContactName
             )
         }
+    }
+
+    fun cancelPatientRescueTest() {
+        rescueCountdownJob?.cancel()
+        rescueCountdownJob = null
     }
 
     fun playTestSound(volumePercent: Int) {

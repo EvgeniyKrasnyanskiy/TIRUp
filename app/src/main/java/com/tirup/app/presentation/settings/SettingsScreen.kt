@@ -134,6 +134,7 @@ import android.widget.Toast
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -199,6 +200,8 @@ fun SettingsScreen(
     var showBleHelpModal by rememberSaveable { mutableStateOf(false) }
     var showBlePinDialog by rememberSaveable { mutableStateOf(false) }
     var showRestoreOptionsModal by rememberSaveable { mutableStateOf(false) }
+    var showBleRangeHelpDialog by rememberSaveable { mutableStateOf(false) }
+    var bleSignalBannerText by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -418,15 +421,23 @@ fun SettingsScreen(
         }
     }
 
+    LaunchedEffect(bleSignalBannerText) {
+        if (bleSignalBannerText != null) {
+            delay(6000L) // 6 seconds duration for open-field range test visibility
+            bleSignalBannerText = null
+        }
+    }
+
     LaunchedEffect(Unit) {
         com.tirup.app.data.ble.BleObserverManager.packetReceivedEvent.collect { pair ->
             val (packet, rssi) = pair
-            val signalDot = if (rssi >= -75) "🟢" else "🟡"
+            val signalDot = if (rssi >= -75) "🟢" else if (rssi >= -85) "🟡" else "🔴"
             val iobStr = if (packet.iob > 0.0) ", 💉${String.format(java.util.Locale.US, "%.1f", packet.iob)}" else ""
             val batStr = if (packet.batteryPercent in 0..100) ", 🔋${packet.batteryPercent}%" else ""
-            val msg = "$signalDot BLE: 🩸${String.format(java.util.Locale.US, "%.1f", packet.valueMmol)} ${packet.trendArrow}$iobStr$batStr"
+            val msg = "$signalDot BLE: 🩸${String.format(java.util.Locale.US, "%.1f", packet.valueMmol)} ${packet.trendArrow}$iobStr$batStr (RSSI: $rssi dBm)"
             
-            val toast = Toast.makeText(context, msg, Toast.LENGTH_SHORT)
+            bleSignalBannerText = msg
+            val toast = Toast.makeText(context, msg, Toast.LENGTH_LONG)
             toast.setGravity(android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL, 0, 140)
             toast.show()
         }
@@ -490,6 +501,37 @@ fun SettingsScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        // Floating BLE Range Signal Banner (visible for 6 seconds upon packet receipt)
+        androidx.compose.animation.AnimatedVisibility(
+            visible = bleSignalBannerText != null,
+            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(),
+            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 16.dp, end = 16.dp)
+                .zIndex(99f)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xFF0F172A).copy(alpha = 0.95f),
+                border = BorderStroke(1.5.dp, PrimaryEmerald),
+                shadowElevation = 8.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = bleSignalBannerText ?: "",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+
         Column(modifier = Modifier.fillMaxSize()) {
         // Fixed Top Header
         Surface(
@@ -2318,7 +2360,7 @@ fun SettingsScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = if (isRu) "🛠️ Тестирование систем" else "🛠️ System Testing",
+                                text = if (isRu) "⚙️ Тестирование систем" else "⚙️ System Testing",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -2351,34 +2393,71 @@ fun SettingsScreen(
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
                         // Test 1: Rescue Screen (5 sec countdown)
-                        OutlinedButton(
-                            onClick = {
-                                viewModel.startPatientRescueTestCountdown(5)
-                                testRescueCountdownSec = 5
-                            },
-                            enabled = testRescueCountdownSec == 0,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(
-                                1.5.dp,
-                                if (testRescueCountdownSec > 0) ColorVeryLow else ActionBlue.copy(alpha = 0.8f)
-                            ),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = if (testRescueCountdownSec > 0) ColorVeryLow.copy(alpha = 0.15f) else Color.Transparent
-                            )
-                        ) {
-                            Text(text = "🚨", fontSize = 16.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (testRescueCountdownSec > 0) {
-                                    if (isRu) "🔒 Заблокируйте экран! Старт через ${testRescueCountdownSec}с..." else "🔒 Lock screen! Launching in ${testRescueCountdownSec}s..."
-                                } else {
-                                    if (isRu) "🚨 Тест экрана спасения (через 5 сек)" else "🚨 Test Rescue Screen (in 5 sec)"
+                        if (testRescueCountdownSec > 0) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedButton(
+                                    onClick = { /* Countdown in progress */ },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.5.dp, ColorVeryLow),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = ColorVeryLow.copy(alpha = 0.15f)
+                                    )
+                                ) {
+                                    Text(text = "🚨", fontSize = 16.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isRu) "Старт через ${testRescueCountdownSec}с..." else "Start in ${testRescueCountdownSec}s...",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ColorVeryLow
+                                    )
+                                }
+                                Button(
+                                    onClick = {
+                                        viewModel.cancelPatientRescueTest()
+                                        testRescueCountdownSec = 0
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Отмена",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (isRu) "Отмена" else "Cancel",
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = {
+                                    viewModel.startPatientRescueTestCountdown(5)
+                                    testRescueCountdownSec = 5
                                 },
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = if (testRescueCountdownSec > 0) ColorVeryLow else MaterialTheme.colorScheme.onSurface
-                            )
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.8f))
+                            ) {
+                                Text(text = "🚨", fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isRu) "Тест экрана спасения (ч/з 5 сек)" else "Test Rescue Screen (in 5 sec)",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
                         Text(
                             text = if (isRu) "💡 После нажатия заблокируйте телефон клавишей питания, чтобы убедиться, что окно спасения пробуждает экран поверх блокировки и PIN-кода."
@@ -2474,27 +2553,70 @@ fun SettingsScreen(
                             )
                         }
 
-                        // Test 5: BLE Bridge range test
-                        OutlinedButton(
-                            onClick = {
-                                val isBt = com.tirup.app.data.ble.BleBroadcaster.isBluetoothEnabled(context)
-                                if (!isBt) {
-                                    Toast.makeText(context, if (isRu) "Включите Bluetooth на смартфоне" else "Enable Bluetooth first", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    checkAndRequestBlePermissions(BleBridgeRole.BROADCASTER)
-                                    viewModel.sendBleTestPing()
-                                }
-                            },
-                            enabled = !isBroadcasting,
+                        // Test 5: BLE Bridge range test (10 sec)
+                        val bleRole = settings.bleBridgeSettings.role
+                        val isBleTesting = (isBroadcasting && broadcastRemaining in 1..10) || (isScanning && boostRemaining in 1..10)
+                        val bleRangeButtonText = when {
+                            isBleTesting -> {
+                                val rem = if (broadcastRemaining in 1..10) broadcastRemaining else boostRemaining.coerceAtMost(10)
+                                if (isRu) "Тест дальности ($rem с)..." else "Range testing ($rem s)..."
+                            }
+                            bleRole == BleBridgeRole.OBSERVER -> {
+                                if (isRu) "Тест дальности: приём (10 сек)" else "Range Test: Receive (10s)"
+                            }
+                            bleRole == BleBridgeRole.BROADCASTER -> {
+                                if (isRu) "Тест дальности: передача (10 сек)" else "Range Test: Broadcast (10s)"
+                            }
+                            else -> {
+                                if (isRu) "Тест дальности BLE-моста (10 сек)" else "BLE Bridge Range Test (10s)"
+                            }
+                        }
+
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.7f))
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = if (isRu) "📡 Тест связи BLE-моста (30 сек)" else "📡 Test BLE Bridge Link (30s)",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = ActionBlue
-                            )
+                            OutlinedButton(
+                                onClick = {
+                                    val isBt = com.tirup.app.data.ble.BleBroadcaster.isBluetoothEnabled(context)
+                                    if (!isBt) {
+                                        Toast.makeText(context, if (isRu) "Включите Bluetooth на смартфоне" else "Enable Bluetooth first", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        if (bleRole == BleBridgeRole.OBSERVER) {
+                                            checkAndRequestBlePermissions(BleBridgeRole.OBSERVER)
+                                        } else {
+                                            checkAndRequestBlePermissions(BleBridgeRole.BROADCASTER)
+                                        }
+                                        viewModel.startBleRangeTest(10)
+                                    }
+                                },
+                                enabled = !isBleTesting,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.7f))
+                            ) {
+                                Text(text = "📡", fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = bleRangeButtonText,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ActionBlue
+                                )
+                            }
+
+                            IconButton(
+                                onClick = { showBleRangeHelpDialog = true },
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = if (isRu) "Информация о тесте дальности" else "Range test info",
+                                    tint = ActionBlue,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -4020,6 +4142,63 @@ fun SettingsScreen(
                     }
                 ) {
                     Text(if (isRu) "Сброс к норме (<3.0 / >13.9)" else "Default (<3.0 / >13.9)")
+                }
+            }
+        )
+    }
+
+    if (showBleRangeHelpDialog) {
+        AlertDialog(
+            onDismissRequest = { showBleRangeHelpDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = ActionBlue,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = if (isRu) "Тест дальности BLE-моста" else "BLE Bridge Range Test",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = if (isRu)
+                            "Как тестировать дальность связи на открытой местности:\n\n" +
+                            "1. На смартфоне пациента (Вещатель) запустите «Тест дальности: передача (10 сек)».\n\n" +
+                            "2. На смартфоне опекуна (Приёмник) запустите «Тест дальности: приём (10 сек)».\n\n" +
+                            "3. Отойдите друг от друга на открытом пространстве (до 30–50 метров).\n\n" +
+                            "4. При приёме пакета на экране приёмника на 6 секунд появится баннер со значением сахара и мощностью сигнала RSSI:\n" +
+                            "   • От -50 до -75 dBm: отличная связь\n" +
+                            "   • От -75 до -85 dBm: средний сигнал\n" +
+                            "   • Ниже -85 dBm: предел дальности"
+                        else
+                            "How to test BLE range outdoors:\n\n" +
+                            "1. On patient phone (Broadcaster), tap 'Range Test: Broadcast (10s)'.\n\n" +
+                            "2. On caregiver phone (Observer), tap 'Range Test: Receive (10s)'.\n\n" +
+                            "3. Walk away from each other in an open area (up to 30–50 meters).\n\n" +
+                            "4. When a packet is received, the caregiver phone shows a banner for 6s with glucose and signal strength (RSSI):\n" +
+                            "   • -50 to -75 dBm: excellent signal\n" +
+                            "   • -75 to -85 dBm: moderate signal\n" +
+                            "   • Below -85 dBm: range limit",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showBleRangeHelpDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
+                ) {
+                    Text(if (isRu) "Понятно" else "Got it")
                 }
             }
         )
