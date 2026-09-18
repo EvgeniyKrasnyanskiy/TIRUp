@@ -15,7 +15,8 @@ data class BleBridgeSettings(
     val lastRssi: Int = 0,
     val lastMasterBattery: Int = -1,
     val lastRadioContactMs: Long = 0L,
-    val useLongRange: Boolean = false
+    val useLongRange: Boolean = false,
+    val showPacketBanner: Boolean = true
 )
 
 data class BleGlucosePacket(
