@@ -10,21 +10,30 @@ import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.zIndex
+import kotlinx.coroutines.delay
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -459,42 +468,109 @@ fun AppNavigationRoot(
         }
     }
 
-    NavHost(
-        navController = navController,
-        startDestination = "main_pager"
-    ) {
-        composable("main_pager") {
-            MainPagerScaffold(
-                focusViewModel = focusViewModel,
-                trendsViewModel = trendsViewModel,
-                reportsViewModel = reportsViewModel,
-                settingsViewModel = settingsViewModel,
-                onOpenSettings = { target ->
-                    if (!target.isNullOrBlank()) {
-                        navController.navigate("settings?target=$target")
-                    } else {
-                        navController.navigate("settings")
-                    }
+    var bleSignalBannerText by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(bleSignalBannerText) {
+        if (bleSignalBannerText != null) {
+            delay(6000L) // 6 seconds duration for open-field range test visibility
+            bleSignalBannerText = null
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        com.tirup.app.data.ble.BleObserverManager.packetReceivedEvent.collect { pair ->
+            val (packet, rssi) = pair
+            val currentSettings = settingsViewModel.uiState.value.userSettings
+            val ble = currentSettings.bleBridgeSettings
+            val isSearchOrTest = (com.tirup.app.data.ble.BleObserverManager.boostRemainingSec.value > 0) ||
+                                 (packet.timestamp == 0L || packet.valueMmol <= 0.1)
+
+            if (ble.showPacketBanner || isSearchOrTest) {
+                val signalDot = if (rssi >= -75) "🟢" else if (rssi >= -85) "🟡" else "🔴"
+                val batStr = if (packet.batteryPercent in 0..100) ", 🔋${packet.batteryPercent}%" else ""
+                val isRussian = currentSettings.language.equals("RU", ignoreCase = true)
+                val msg = if (packet.valueMmol <= 0.1 || packet.timestamp == 0L) {
+                    if (isRussian) "$signalDot BLE: 📡 Тест связи (нет данных сенсора)$batStr (RSSI: $rssi dBm)"
+                    else "$signalDot BLE: 📡 Range test (no sensor data)$batStr (RSSI: $rssi dBm)"
+                } else {
+                    val iobStr = if (packet.iob > 0.0) ", 💉${String.format(java.util.Locale.US, "%.1f", packet.iob)}" else ""
+                    "$signalDot BLE: 🩸${String.format(java.util.Locale.US, "%.1f", packet.valueMmol)} ${packet.trendArrow}$iobStr$batStr (RSSI: $rssi dBm)"
                 }
-            )
+                bleSignalBannerText = msg
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = "main_pager"
+        ) {
+            composable("main_pager") {
+                MainPagerScaffold(
+                    focusViewModel = focusViewModel,
+                    trendsViewModel = trendsViewModel,
+                    reportsViewModel = reportsViewModel,
+                    settingsViewModel = settingsViewModel,
+                    onOpenSettings = { target ->
+                        if (!target.isNullOrBlank()) {
+                            navController.navigate("settings?target=$target")
+                        } else {
+                            navController.navigate("settings")
+                        }
+                    }
+                )
+            }
+
+            composable(
+                route = "settings?target={target}",
+                arguments = listOf(
+                    navArgument("target") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
+            ) { backStackEntry ->
+                val target = backStackEntry.arguments?.getString("target")
+                SettingsScreen(
+                    viewModel = settingsViewModel,
+                    target = target,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
         }
 
-        composable(
-            route = "settings?target={target}",
-            arguments = listOf(
-                navArgument("target") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
+        // Global Floating BLE Range Signal Banner (Visible on any screen in app)
+        AnimatedVisibility(
+            visible = bleSignalBannerText != null,
+            enter = fadeIn() + slideInVertically(),
+            exit = fadeOut() + slideOutVertically(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 10.dp, start = 16.dp, end = 16.dp)
+                .zIndex(999f)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xFF0F172A).copy(alpha = 0.95f),
+                border = BorderStroke(1.5.dp, PrimaryEmerald),
+                shadowElevation = 8.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = bleSignalBannerText ?: "",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
                 }
-            )
-        ) { backStackEntry ->
-            val target = backStackEntry.arguments?.getString("target")
-            SettingsScreen(
-                viewModel = settingsViewModel,
-                target = target,
-                onNavigateBack = { navController.popBackStack() }
-            )
+            }
         }
     }
 }
@@ -583,7 +659,7 @@ fun MainPagerScaffold(
                 ) {
                     NavigationBar(
                         containerColor = Color.Transparent,
-                        modifier = Modifier.height(44.dp)
+                        modifier = Modifier.height(48.dp)
                     ) {
                         tabs.forEachIndexed { index, item ->
                             val selected = pagerState.currentPage == index
@@ -596,25 +672,54 @@ fun MainPagerScaffold(
                                     }
                                 },
                                 icon = {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(
-                                                width = if (isCenterHome) 50.dp else 44.dp,
-                                                height = if (isCenterHome) 30.dp else 28.dp
+                                    if (isCenterHome) {
+                                        // Premium Accent FAB-style Center Button
+                                        Box(
+                                            modifier = Modifier
+                                                .size(42.dp)
+                                                .shadow(
+                                                    elevation = if (selected) 6.dp else 2.dp,
+                                                    shape = CircleShape
+                                                )
+                                                .clip(CircleShape)
+                                                .background(
+                                                    if (selected) ActionBlue
+                                                    else ActionBlue.copy(alpha = 0.14f)
+                                                )
+                                                .border(
+                                                    BorderStroke(
+                                                        width = if (selected) 2.dp else 1.5.dp,
+                                                        color = if (selected) Color.White.copy(alpha = 0.4f) else ActionBlue.copy(alpha = 0.45f)
+                                                    ),
+                                                    CircleShape
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = item.icon,
+                                                contentDescription = item.title,
+                                                tint = if (selected) Color.White else ActionBlue,
+                                                modifier = Modifier.size(24.dp)
                                             )
-                                            .clip(RoundedCornerShape(15.dp))
-                                            .background(
-                                                if (selected) ActionBlue.copy(alpha = 0.18f)
-                                                else if (isCenterHome) ActionBlue.copy(alpha = 0.05f)
-                                                else Color.Transparent
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = item.icon,
-                                            contentDescription = item.title,
-                                            modifier = Modifier.size(if (isCenterHome) 22.dp else 20.dp)
-                                        )
+                                        }
+                                    } else {
+                                        // Standard Side Buttons
+                                        Box(
+                                            modifier = Modifier
+                                                .size(width = 44.dp, height = 30.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(
+                                                    if (selected) ActionBlue.copy(alpha = 0.15f)
+                                                    else Color.Transparent
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = item.icon,
+                                                contentDescription = item.title,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
                                     }
                                 },
                                 label = null,

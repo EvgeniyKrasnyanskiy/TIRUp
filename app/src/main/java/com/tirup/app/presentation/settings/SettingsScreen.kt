@@ -200,7 +200,6 @@ fun SettingsScreen(
     var showBlePinDialog by rememberSaveable { mutableStateOf(false) }
     var showRestoreOptionsModal by rememberSaveable { mutableStateOf(false) }
     var showBleRangeHelpDialog by rememberSaveable { mutableStateOf(false) }
-    var bleSignalBannerText by remember { mutableStateOf<String?>(null) }
     val isDevTestsUnlocked by viewModel.isDevTestsUnlocked.collectAsState()
     var devTapCount by remember { mutableStateOf(0) }
     var lastDevTapTime by remember { mutableStateOf(0L) }
@@ -439,30 +438,6 @@ fun SettingsScreen(
         }
     }
 
-    LaunchedEffect(bleSignalBannerText) {
-        if (bleSignalBannerText != null) {
-            delay(6000L) // 6 seconds duration for open-field range test visibility
-            bleSignalBannerText = null
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        com.tirup.app.data.ble.BleObserverManager.packetReceivedEvent.collect { pair ->
-            val (packet, rssi) = pair
-            val signalDot = if (rssi >= -75) "🟢" else if (rssi >= -85) "🟡" else "🔴"
-            val batStr = if (packet.batteryPercent in 0..100) ", 🔋${packet.batteryPercent}%" else ""
-            val msg = if (packet.valueMmol <= 0.1 || packet.timestamp == 0L) {
-                if (isRu) "$signalDot BLE: 📡 Тест связи (нет данных сенсора)$batStr (RSSI: $rssi dBm)"
-                else "$signalDot BLE: 📡 Range test (no sensor data)$batStr (RSSI: $rssi dBm)"
-            } else {
-                val iobStr = if (packet.iob > 0.0) ", 💉${String.format(java.util.Locale.US, "%.1f", packet.iob)}" else ""
-                "$signalDot BLE: 🩸${String.format(java.util.Locale.US, "%.1f", packet.valueMmol)} ${packet.trendArrow}$iobStr$batStr (RSSI: $rssi dBm)"
-            }
-            
-            bleSignalBannerText = msg
-        }
-    }
-
     LaunchedEffect(state.infoMessage) {
         val msg = state.infoMessage
         if (!msg.isNullOrBlank()) {
@@ -521,37 +496,6 @@ fun SettingsScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Floating BLE Range Signal Banner (visible for 6 seconds upon packet receipt)
-        androidx.compose.animation.AnimatedVisibility(
-            visible = bleSignalBannerText != null,
-            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(),
-            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically(),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 16.dp, start = 16.dp, end = 16.dp)
-                .zIndex(99f)
-        ) {
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = Color(0xFF0F172A).copy(alpha = 0.95f),
-                border = BorderStroke(1.5.dp, PrimaryEmerald),
-                shadowElevation = 8.dp
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = bleSignalBannerText ?: "",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-            }
-        }
-
         Column(modifier = Modifier.fillMaxSize()) {
         // Fixed Top Header
         Surface(
@@ -1896,6 +1840,44 @@ fun SettingsScreen(
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         lineHeight = 15.sp
+                                    )
+                                }
+                            }
+
+                            // Checkbox: Show incoming packet toast/banner
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        viewModel.updateBleBridgeSettings(
+                                            ble.copy(showPacketBanner = !ble.showPacketBanner)
+                                        )
+                                    }
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = ble.showPacketBanner,
+                                    onCheckedChange = { isChecked ->
+                                        viewModel.updateBleBridgeSettings(
+                                            ble.copy(showPacketBanner = isChecked)
+                                        )
+                                    },
+                                    colors = CheckboxDefaults.colors(checkedColor = PrimaryEmerald)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isRu) "Всплывающий баннер при приёме пакета" else "Pop-up banner on packet receipt",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = if (isRu) "Показывать плашку с сахаром и сигналом RSSI вверху экрана (всегда активен при поиске и тесте)"
+                                               else "Show top banner with glucose and RSSI (always active during search & test)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
