@@ -1,55 +1,64 @@
-# План реализации: Экспериментальный режим повышенной дальности BLE-моста (Long Range / LE Coded PHY) [Completed]
+# План реализации: Экстренная реакция на входящее SOS-SMS для доверенного лица (Caregiver SOS Wakeup Alarm)
 
-> **Статус:** [Completed] Все этапы успешно выполнены, протестированы и перенесены в [.agent/docs/ARCHIVE.md](file:///d:/Users/physicist/Desktop/ken/TIRUp/.agent/docs/ARCHIVE.md) (релиз v2.2.0).
+## 1. Цель и клиническая ценность
+Когда у пациента возникает критическая гипогликемия, и сирена на его телефоне игнорируется более N минут (пациент без сознания или в глубоком сне), TIRUp отправляет доверенному лицу экстренное SMS с координатами:
+`SOS! [Имя] - критич. гипо: [X.X] ммоль! Сирена [N]м без реакции [Google Maps URL]`
 
-План реализации опционального (opt-in) режима повышенной дальности Bluetooth 5.0 Long Range (LE Coded PHY) для прямого BLE-моста между смартфонами пациента (Вещатель) и наблюдателя (Приёмник).
-
-## Важное замечание (Клиническая безопасность и обратная совместимость)
-
-> **Сохранение формата пакета `BlePacketCodec`:**  
-> В [BlePacketCodec.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/ble/BlePacketCodec.kt#L93-L96) старые версии приложения делают строгое прямое сравнение PIN: `if (packetPin != myPin) return null`.  
-> Если модифицировать биты PIN-кода, старые версии приложения гарантированно отбросят пакет как неверный PIN.  
-> **Решение:** Формат 16-байтного пакета `BlePacketCodec` остаётся **полностью неизменным**.  
-> В Android API сканер получает тип физического уровня напрямую из радиодрайвера через `ScanResult.primaryPhy == BluetoothDevice.PHY_LE_CODED`.
+Если на телефоне доверенного лица (родителя, опекуна) также установлен TIRUp:
+Обычное системное SMS в ночное время может не разбудить человека (телефон в режиме «Не беспокоить» / DND, тихий звук уведомления).  
+**Цель функции:** перехватить такое экстренное SMS в фоне, пробить DND и беззвучный режим, выставить громкость будильника на 100%, запустить удвоенную медицинскую сирену (~24 секунды) со стробоскопом вспышки и вывести полноэкранное окно тревоги с кнопками немедленного звонка пациенту и открытия координат на карте.
 
 ---
 
-## Декомпозиция задач на атомарные этапы (Task Splitting)
+## 2. Архитектура решения и корректировки
 
-### Этап 1: Доменная модель и вещатель (Broadcaster)
-- [x] [BleBridgeSettings.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/domain/model/BleBridgeSettings.kt): добавить `useLongRange: Boolean = false`.
-- [x] [SettingsRepositoryImpl.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/repository/SettingsRepositoryImpl.kt): сохранение и загрузка `KEY_BLE_BRIDGE_USE_LONG_RANGE`.
-- [x] [AutoBackupManager.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/backup/AutoBackupManager.kt):
-  - Сериализация `useLongRange` в JSON бэкапа.
-  - **Обратная совместимость старых бэкапов:** при десериализации старых JSON (где поле отсутствует) гарантировать значение по умолчанию `false` без исключений.
-- [x] [BleBroadcaster.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/ble/BleBroadcaster.kt):
-  - Проверка аппаратных возможностей (`isLeCodedPhySupported && isLeExtendedAdvertisingSupported`).
-  - Поддержка `AdvertisingSetParameters` с `PHY_LE_CODED` при `useLongRange == true`.
-  - Fail-safe fallback на `startAdvertising(AdvertiseSettings)` при ошибке в `AdvertisingSetCallback` (например, `ADVERTISE_FAILED_FEATURE_UNSUPPORTED`).
+### 2.1. Доменная модель и настройки (`AlertSettings.kt`, `SettingsRepositoryImpl.kt`, `AutoBackupManager.kt`)
+- В `AlertSettings`:
+  - `val isCaregiverSosWakeupEnabled: Boolean = true` (тумблер «Режим опекуна: Сирена при входящем SOS»).
+- Сохранение в SharedPreferences (`KEY_CAREGIVER_SOS_WAKEUP_ENABLED`) и JSON автобэкапа (с дефолтом `true`).
 
-### Этап 2: Всеядный сканер на стороне приёмника (Observer)
-- [x] [BleObserverManager.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/data/ble/BleObserverManager.kt):
-  - Проверка `isLeExtendedAdvertisingSupported` при инициализации сканера.
-  - Настройка `ScanSettings`: `setLegacy(false)` и `setPhy(PHY_LE_ALL_SUPPORTED)` для параллельного приёма Legacy 1M и Coded PHY.
-  - Fail-safe fallback: при `SCAN_FAILED_FEATURE_UNSUPPORTED` мгновенный прозрачный перезапуск с `setLegacy(true)`.
-  - Детекция приёма Long Range в `ScanResult.primaryPhy` для отображения в UI.
+### 2.2. Детекция и валидация входящего SOS (`SmsQueryReceiver.kt`, `SosSmsParser.kt`)
+- В `SmsQueryReceiver`:
+  - Проверять входящие сообщения на маркер экстренного SOS: префикс `SOS!` и сигнатуры `критич. гипо` / `critical hypo`.
+  - **Безопасность (Анти-спам):** проверка номера отправителя по белому списку доверенных номеров (`emergencyContactPhone`, `secondaryEmergencyContactPhone`). Входящее сообщение от чужого номера не запустит сирену на 100% громкости.
+  - Извлечение данных из тела SMS (`SosSmsParser.kt`):
+    - Имя пациента.
+    - Уровень сахара и стрелка тренда.
+    - Длительность отсутствия реакции.
+    - URL координат Google Maps.
+    - Номер телефона отправителя для мгновенного обратного звонка.
 
-### Этап 3: Пользовательский интерфейс и диагностика (UI / UX)
-- [x] [SettingsScreen.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/settings/SettingsScreen.kt):
-  - Тумблер с аппаратной блокировкой (`isLeCodedPhySupported && isLeExtendedAdvertisingSupported`).
-  - Диалог подтверждения со спокойными предупреждениями.
-  - Кнопка Test Ping (30 сек) с визуальным отсчётом таймера.
-- [x] [FocusScreen.kt](file:///d:/Users/physicist/Desktop/ken/TIRUp/app/src/main/java/com/tirup/app/presentation/focus/FocusScreen.kt):
-  - Обновление бейджа `BleBridgeBadge`: `📡 Long Range` (вещатель) и `📻 Dual / Standard` (приёмник).
-  - При получении пакета во время Test Ping: мгновенная анимация/вспышка бейджа и обновление метки «Только что», дающее родителю наглядное подтверждение «поймал».
-  - Адресное сообщение при срабатывании таймаута тишины (`SILENCE_TIMEOUT_MS = 6 мин`) на Legacy-приёмнике.
+### 2.3. Воспроизведение тревоги и стробоскоп (`MedicalSoundPlayer.kt`, `CaregiverSosAlarmManager.kt`)
+- Длительность сирены: **24 секунды** (2 полных цикла критической сирены по 12 секунд, 16 серий импульсов).
+- Аудиопоток: `STREAM_ALARM` (`AudioAttributes.USAGE_ALARM`) с принудительным выставлением громкости на 100% (с сохранением и восстановлением предыдущего уровня после отбоя).
+- Стробоскоп: пульсация вспышки камеры на 24 секунды с автоматическим отключением.
+- Полноэкранное уведомление `setFullScreenIntent` с категорией `CATEGORY_ALARM`.
+
+### 2.4. Полноэкранное окно тревоги (`CaregiverSosActivity.kt`)
+- Показывается поверх экрана блокировки (`FLAG_SHOW_WHEN_LOCKED`, `FLAG_TURN_SCREEN_ON`):
+  - Пульсирующий красный баннер: «ВНИМАНИЕ! КРИТИЧЕСКАЯ ГИПОГЛИКЕМИЯ У БЛИЗКОГО».
+  - Данные сахара, тренда и времени из SMS.
+  - Кнопка **«📞 Позвонить [Имя]»** (`Intent.ACTION_DIAL`).
+  - Кнопка **«📍 Открыть координаты на карте»** (`Intent.ACTION_VIEW` Google Maps).
+  - Кнопка **«Отключить сирену»** (глушит звук, гасит вспышку, восстанавливает громкость). Также звук глушится физическими кнопками громкости.
+
+### 2.5. UI на стороне вещателя и приёмника (`SettingsScreen.kt`)
+- **На стороне приёмника (Опекуна):**
+  - Карточка «Режим опекуна: Сирена при входящем SOS».
+  - Автоматический запрос системного разрешения `RECEIVE_SMS` при включении.
+  - Локальная кнопка «Тест сирены опекуна (3 сек)».
+- **На стороне вещателя (Пациента):**
+  - Кнопка **«🚨 Тест SOS для опекуна (SMS)»**: отправляет реальное тестовое SMS в формате SOS на доверенный номер для проверки всей сквозной цепочки.
+
+### 2.6. Корректировка подсказки по сенсору (`DeviceStatusModal.kt`)
+- Добавить в начале текста окна «Срок службы сенсора»:
+  *«Рекомендуется ставить новый сенсор заранее (до полного отключения старого сенсора), чтобы дать время (1–2 дня) на прогрев и адаптацию нового сенсора.»*
 
 ---
 
-## План верификации
-- **Unit-тесты:**
-  - Тест сохранения и восстановления `BleBridgeSettings.useLongRange` в `SettingsRepositoryImpl`.
-  - Тест десериализации старого JSON бэкапа без поля `useLongRange` в `AutoBackupManagerTest` (проверка дефолта `false`).
-  - Симуляционный тест fail-safe отката (перехват статуса ошибки `ADVERTISE_FAILED_FEATURE_UNSUPPORTED`).
-- **Сборка проекта:** `./gradlew assembleDebug` без ошибок линковки API 26+.
-- **Чек-лист ручного тестирования:** проверка на устройствах с разными чипсетами (включая проверку отсутствия сбоев вещателя на MIUI/Transsion).
+## 3. Декомпозиция задач
+
+- [x] **Этап 1:** Текст в `DeviceStatusModal.kt`, модель `AlertSettings.kt`, репозиторий `SettingsRepositoryImpl.kt` и парсер `SosSmsParser.kt`.
+- [x] **Этап 2:** Воспроизведение 24-секундной сирены в `MedicalSoundPlayer.kt` и менеджер `CaregiverSosAlarmManager.kt`.
+- [x] **Этап 3:** Полноэкранный экран `CaregiverSosActivity.kt`, манифест и связка в `SmsQueryReceiver.kt`.
+- [x] **Этап 4:** Кнопка теста SOS на вещателе и управление `RECEIVE_SMS` в `SettingsScreen.kt`. Unit-тесты.

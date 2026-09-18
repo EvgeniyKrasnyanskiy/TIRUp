@@ -132,6 +132,45 @@ object EmergencySmsManager {
         }
     }
 
+    /**
+     * Dispatches an actual full-format SOS test message to verify Caregiver SOS Wakeup Alarm on receiver phone.
+     */
+    fun sendCaregiverSosTestSms(
+        context: Context,
+        phone: String,
+        patientName: String,
+        isRu: Boolean
+    ): Result<Unit> {
+        val trimmedPhone = phone.trim()
+        if (trimmedPhone.isBlank()) {
+            return Result.failure(IllegalArgumentException(if (isRu) "Номер телефона не указан" else "Phone number is empty"))
+        }
+
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+            return Result.failure(SecurityException(if (isRu) "Разрешение на отправку SMS не предоставлено" else "SEND_SMS permission not granted"))
+        }
+
+        return try {
+            val (lat, lon) = getLastKnownLocation(context)
+            val message = EmergencySmsBuilder.buildEmergencyMessage(
+                patientName = "[ТЕСТ] $patientName",
+                glucoseValueMmol = 2.8,
+                trendArrow = "→",
+                delayMinutes = 5,
+                latitude = lat,
+                longitude = lon,
+                isRu = isRu,
+                unit = GlucoseUnit.MMOL_L
+            )
+            sendSmsInternal(context, trimmedPhone, message)
+            Log.i(TAG, "Caregiver SOS test SMS sent to $trimmedPhone")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send Caregiver SOS test SMS: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
     private fun sendSmsInternal(context: Context, phone: String, message: String) {
         val smsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             context.getSystemService(SmsManager::class.java)

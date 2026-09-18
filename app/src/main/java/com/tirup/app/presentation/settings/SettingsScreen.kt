@@ -345,6 +345,14 @@ fun SettingsScreen(
         }
     }
 
+    var testSosSmsCooldownSec by remember { mutableStateOf(0) }
+    LaunchedEffect(testSosSmsCooldownSec) {
+        if (testSosSmsCooldownSec > 0) {
+            delay(1000L)
+            testSosSmsCooldownSec -= 1
+        }
+    }
+
     LaunchedEffect(Unit) {
         com.tirup.app.data.ble.BleObserverManager.packetReceivedEvent.collect { pair ->
             val (packet, rssi) = pair
@@ -2103,7 +2111,39 @@ fun SettingsScreen(
                             )
                         }
 
-                        if (alerts.isSmsQueryReplyEnabled && (!hasReceiveSmsPermission || ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED)) {
+                        // Caregiver SOS Wakeup Alarm (Incoming SOS SMS)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isRu) "Экстренный будильник для опекуна" else "Caregiver SOS Wakeup Alarm",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isRu) "При получении SOS-SMS от подопечного будит сиреной (24 сек) на 100% громкости, стробоскопом и окном поверх экрана"
+                                    else "On incoming SOS SMS from patient, wakes up with 24s siren at 100% vol, strobe, and lockscreen window",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = alerts.isCaregiverSosWakeupEnabled,
+                                onCheckedChange = { isChecked ->
+                                    if (isChecked && ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
+                                        receiveSmsPermissionLauncher.launch(Manifest.permission.RECEIVE_SMS)
+                                    }
+                                    viewModel.updateAlertSettings(alerts.copy(isCaregiverSosWakeupEnabled = isChecked))
+                                }
+                            )
+                        }
+
+                        val needsReceiveSms = alerts.isSmsQueryReplyEnabled || alerts.isCaregiverSosWakeupEnabled
+                        if (needsReceiveSms && (!hasReceiveSmsPermission || ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED)) {
                             Surface(
                                 shape = RoundedCornerShape(10.dp),
                                 color = ColorHigh.copy(alpha = 0.12f),
@@ -2130,14 +2170,37 @@ fun SettingsScreen(
                                         modifier = Modifier.size(20.dp)
                                     )
                                     Text(
-                                        text = if (isRu) "⚠️ Требуется разрешение на SMS. Нажмите здесь: в настройках Android переключите SMS в «Запретить» и обратно в «Разрешить» для обновления прав системы."
-                                               else "⚠️ Android SMS permission required. Tap here to open App Settings and grant SMS permission.",
+                                        text = if (isRu) "⚠️ Требуется системное разрешение на приём SMS. Нажмите здесь: в настройках Android переключите SMS в «Запретить» и обратно в «Разрешить» для обновления прав системы."
+                                               else "⚠️ Android SMS receive permission required. Tap here to open App Settings and grant SMS permission.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = ColorHigh,
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
                             }
+                        }
+
+                        // Local Siren sound test (3 sec)
+                        OutlinedButton(
+                            onClick = {
+                                com.tirup.app.data.alert.MedicalSoundPlayer.playCaregiverSosAlarm(cycles = 2)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, ColorVeryLow.copy(alpha = 0.6f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.NotificationsActive,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = ColorVeryLow
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isRu) "🔔 Тест сирены опекуна (3 сек)" else "🔔 Test Caregiver Siren (3s)",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = ColorVeryLow
+                            )
                         }
 
                         // Send test verification SMS button
@@ -2170,6 +2233,38 @@ fun SettingsScreen(
                                 },
                                 style = MaterialTheme.typography.labelLarge,
                                 color = if (testSmsCooldownSec == 0) ActionBlue else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            )
+                        }
+
+                        // Send Caregiver SOS test SMS button
+                        OutlinedButton(
+                            onClick = {
+                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                                    smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
+                                } else {
+                                    viewModel.sendCaregiverSosTestSms()
+                                    testSosSmsCooldownSec = 60
+                                }
+                            },
+                            enabled = testSosSmsCooldownSec == 0,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, if (testSosSmsCooldownSec == 0) ColorVeryLow.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                text = "🚨",
+                                fontSize = 16.sp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (testSosSmsCooldownSec > 0) {
+                                    if (isRu) "Тест SOS для опекуна (${testSosSmsCooldownSec}с)" else "Test Caregiver SOS (${testSosSmsCooldownSec}s)"
+                                } else {
+                                    if (isRu) "🚨 Тест SOS для опекуна (SMS)" else "🚨 Test Caregiver SOS (SMS)"
+                                },
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (testSosSmsCooldownSec == 0) ColorVeryLow else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                             )
                         }
                     }

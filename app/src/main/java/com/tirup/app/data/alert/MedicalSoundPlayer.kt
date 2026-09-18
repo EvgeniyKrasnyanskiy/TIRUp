@@ -161,6 +161,22 @@ object MedicalSoundPlayer {
         }
     }
 
+    private fun boostAlarmVolumeToMax() {
+        try {
+            val context = try { com.tirup.app.TirupApplication.instance } catch (_: Exception) { null } ?: return
+            val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager ?: return
+            val maxVol = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM)
+            val currentVol = audioManager.getStreamVolume(android.media.AudioManager.STREAM_ALARM)
+            if (previousAlarmVolume == null) {
+                previousAlarmVolume = currentVol
+            }
+            audioManager.setStreamVolume(android.media.AudioManager.STREAM_ALARM, maxVol, 0)
+            Log.i(TAG, "Alarm volume boosted to 100% ($maxVol) for Caregiver SOS")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to boost alarm volume to max: ${e.message}")
+        }
+    }
+
     private fun boostAlarmVolumeIfNeeded() {
         try {
             val context = try { com.tirup.app.TirupApplication.instance } catch (_: Exception) { null } ?: return
@@ -309,6 +325,46 @@ object MedicalSoundPlayer {
         }
         isCriticalActive = false
         restoreAlarmVolumeIfNeeded()
+    }
+
+    /**
+     * Caregiver SOS Wakeup: Plays double critical alarm series (~24 seconds total, 16 bursts)
+     * with volume forced to 100% on USAGE_ALARM stream.
+     */
+    fun playCaregiverSosAlarm(cycles: Int = 16) {
+        isPlayingActive = true
+        isCriticalActive = true
+        audioScope.launch {
+            try {
+                boostAlarmVolumeToMax()
+                val pulse1 = generateSineWave(freq = 1046.5, durationMs = 150, volume = 1.0f)
+                val pulse2 = generateSineWave(freq = 784.0, durationMs = 150, volume = 1.0f)
+                val pulse3 = generateSineWave(freq = 1046.5, durationMs = 150, volume = 1.0f)
+                val pulse4 = generateSineWave(freq = 784.0, durationMs = 150, volume = 1.0f)
+                val pulse5 = generateSineWave(freq = 1174.66, durationMs = 320, volume = 1.0f)
+                val pause = ShortArray((SAMPLE_RATE * 0.35).toInt()) // 350ms pause
+
+                val burstLen = pulse1.size + pulse2.size + pulse3.size + pulse4.size + pulse5.size + pause.size
+                val burstData = ShortArray(burstLen)
+                var offset = 0
+                System.arraycopy(pulse1, 0, burstData, offset, pulse1.size); offset += pulse1.size
+                System.arraycopy(pulse2, 0, burstData, offset, pulse2.size); offset += pulse2.size
+                System.arraycopy(pulse3, 0, burstData, offset, pulse3.size); offset += pulse3.size
+                System.arraycopy(pulse4, 0, burstData, offset, pulse4.size); offset += pulse4.size
+                System.arraycopy(pulse5, 0, burstData, offset, pulse5.size); offset += pulse5.size
+                System.arraycopy(pause, 0, burstData, offset, pause.size)
+
+                for (cycle in 0 until cycles) {
+                    if (!isCriticalActive || !isPlayingActive) break
+                    playRawPcm(burstData, usage = AudioAttributes.USAGE_ALARM)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Caregiver SOS alarm playback error: ${e.message}")
+            } finally {
+                isCriticalActive = false
+                restoreAlarmVolumeIfNeeded()
+            }
+        }
     }
 
     private fun generateSineWave(freq: Double, durationMs: Int, volume: Float): ShortArray {

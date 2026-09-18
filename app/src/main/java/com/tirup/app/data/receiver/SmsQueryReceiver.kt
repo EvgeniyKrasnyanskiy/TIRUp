@@ -45,15 +45,33 @@ class SmsQueryReceiver : BroadcastReceiver() {
         val settings = repo.getSettings().first()
         val alerts = settings.alertSettings
 
-        // 1. Check if SMS query auto-reply is enabled in settings
+        val trustedPhone1 = alerts.emergencyContactPhone.trim()
+        val trustedPhone2 = alerts.secondaryEmergencyContactPhone.trim()
+        val trustedPhones = listOf(trustedPhone1, trustedPhone2).filter { it.isNotBlank() }
+
+        // 1. Check for Caregiver SOS Wakeup Alarm (Emergency alert from patient)
+        if (alerts.isCaregiverSosWakeupEnabled && com.tirup.app.domain.alert.SosSmsParser.isSosMessage(messageBody)) {
+            Log.i(TAG, "Incoming SMS identified as emergency SOS message: $messageBody")
+            val isSenderTrusted = trustedPhones.any { isMatchingPhone(senderPhone, it) }
+            if (isSenderTrusted) {
+                val sosData = com.tirup.app.domain.alert.SosSmsParser.parse(messageBody, senderPhone)
+                if (sosData != null) {
+                    Log.i(TAG, "Valid SOS alert from trusted contact $senderPhone! Triggering CaregiverSosAlarmManager...")
+                    com.tirup.app.data.alert.CaregiverSosAlarmManager.triggerCaregiverSos(context, sosData)
+                    return
+                }
+            } else {
+                Log.w(TAG, "SOS SMS received but sender ($senderPhone) is not in trusted contacts ($trustedPhones). Ignoring for anti-spam security.")
+                return
+            }
+        }
+
+        // 2. Check if SMS query auto-reply is enabled in settings
         if (!alerts.isSmsQueryReplyEnabled) {
             Log.d(TAG, "SMS query reply is disabled in settings, ignoring.")
             return
         }
 
-        val trustedPhone1 = alerts.emergencyContactPhone.trim()
-        val trustedPhone2 = alerts.secondaryEmergencyContactPhone.trim()
-        val trustedPhones = listOf(trustedPhone1, trustedPhone2).filter { it.isNotBlank() }
         if (trustedPhones.isEmpty()) {
             Log.d(TAG, "No emergency contact phone configured, ignoring incoming SMS.")
             return
