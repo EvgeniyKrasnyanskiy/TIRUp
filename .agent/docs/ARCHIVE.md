@@ -1,3 +1,33 @@
+# План реализации: Экспериментальный режим повышенной дальности BLE-моста (Long Range / LE Coded PHY) [v2.2.0]
+
+## 1. Задачи для реализации
+
+1. [Выполнено] **Доменная модель и вещатель (Broadcaster)** (`BleBridgeSettings.kt`, `SettingsRepositoryImpl.kt`, `AutoBackupManager.kt`, `BleBroadcaster.kt`):
+   - Добавлено свойство `useLongRange: Boolean = false` в `BleBridgeSettings`.
+   - Настроено сохранение и загрузка `KEY_BLE_BRIDGE_USE_LONG_RANGE` в SharedPreferences.
+   - Сериализация в JSON бэкапа и безопасная десериализация старых архивов (с дефолтом `false`).
+   - Вещатель `BleBroadcaster`: проверка аппаратной поддержки (`isLeCodedPhySupported && isLeExtendedAdvertisingSupported`), запуск `AdvertisingSetParameters` с `PHY_LE_CODED`, fail-safe fallback на классический `startAdvertising` при ошибке `ADVERTISE_FAILED_FEATURE_UNSUPPORTED`.
+   - 100% сохранение структуры 16-байтного пакета `BlePacketCodec` без изменения бит PIN-кода для обратной совместимости.
+
+2. [Выполнено] **Всеядный сканер на стороне приёмника (Observer)** (`BleObserverManager.kt`):
+   - Проверка `isLeExtendedAdvertisingSupported` при старте сканера.
+   - Настройка `ScanSettings.setLegacy(false).setPhy(PHY_LE_ALL_SUPPORTED)` для параллельного приёма Legacy 1M и Coded PHY.
+   - Fail-safe fallback: при `SCAN_FAILED_FEATURE_UNSUPPORTED` прозрачный перезапуск сканера с `setLegacy(true)`.
+   - Детекция `ScanResult.primaryPhy == BluetoothDevice.PHY_LE_CODED` и передача состояния в StateFlow (`lastPacketWasLongRange`, `isLongRangeScanActive`).
+
+3. [Выполнено] **Пользовательский интерфейс и диагностика (UI / UX)** (`SettingsScreen.kt`, `FocusScreen.kt`):
+   - Тумблер в настройках моста с аппаратной блокировкой и поясняющим диалогом подтверждения.
+   - Кнопка Test Ping (30 сек) с визуальным отсчётом таймера.
+   - Бейдж `BleBridgeBadge`: `📡 LR` на вещателе и `📻 Dual / Standard` на приёмнике.
+   - Мгновенный отклик бейджа на тестовый пинг для наглядного подтверждения приёма.
+   - Адресная диагностика тишины (>6 мин) на устаревшем сканере с рекомендацией переключить вещатель в Legacy.
+
+4. [Выполнено] **Обновление документации и руководств** (`UserManualPdfGenerator.kt`, `README.md`, `ROADMAP.md`):
+   - Актуализировано 2-страничное руководство пользователя PDF.
+   - Дополнен раздел 14 README.md и дорожная карта.
+
+---
+
 # План реализации: Линия прогноза на суточном графике (25 минут)
 
 ## 1. Задачи для реализации

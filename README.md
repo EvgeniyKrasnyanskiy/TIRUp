@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/Version-2.1.0-brightgreen.svg)
+![Version](https://img.shields.io/badge/Version-2.2.0-brightgreen.svg)
 ![Platform](https://img.shields.io/badge/Platform-Android-green.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-blue.svg)
 ![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%2F%20Material%203-blueviolet.svg)
@@ -102,9 +102,14 @@
 - Точный будильник `AlarmManager.RTC_WAKEUP` сохраняет базу данных и настройки ежедневно строго в **23:59:59** в изолированную песочницу приложения.
 - Автоматическое обнаружение резервной копии и восстановление при переустановке приложения.
 
-### 14. Семейный BLE-мост (Family BLE Bridge, 100% Offline)
+### 14. Семейный BLE-мост и Long Range (Family BLE Bridge & LE Coded PHY, 100% Offline)
 - Прямая локальная трансляция гликемии, стрелки тренда, активного инсулина (IoB) и заряда батареи по **Bluetooth Low Energy (BLE)** раз в 60 секунд.
-- **Работает без интернета, мобильной связи и без сопряжения устройств** (Pairing-free) на расстоянии 10–15 метров (в квартире, школе, машине).
+- **Работает без интернета, мобильной связи и без сопряжения устройств** (Pairing-free) на расстоянии 10–15 метров (в режиме Legacy) и **до 30–50 метров сквозь 2–3 стены** в режиме повышенной дальности.
+- **Режим повышенной дальности (Bluetooth 5.0 Long Range / LE Coded PHY)**:
+  - **Опциональный Opt-in с аппаратным гейткипером**: тумблер на стороне Вещателя доступен только при поддержке чипсетом (`isLeCodedPhySupported && isLeExtendedAdvertisingSupported`) с предупреждающим диалогом и кнопкой проверочного импульса («Тест-пинг 30с»).
+  - **Всеядный Dual-сканер приёмника**: контроллер наблюдателя на Android 8.0+ параллельно слушает как классические пакеты Legacy 1M, так и Coded PHY (`PHY_LE_ALL_SUPPORTED`) без ручного переключения.
+  - **Медицинский fail-safe откат**: при ошибках контроллера (`FEATURE_UNSUPPORTED`) вещатель и приёмник мгновенно и прозрачно откатываются к проверенному режиму Legacy 1M без сбоев службы.
+  - **Сквозная индикация и диагностика в UI**: бейдж `📡 LR` на Главном экране показывает активный режим вещания, а при таймауте тишины (>6 мин) на Legacy-приёмнике выводится точечная рекомендация переключить вещатель в Legacy.
 - **Сверхстабильный радиопротокол 24/7**:
   - Адаптивный импульс вещания: 12 секунд для минутных сенсоров и 15 секунд для 5-минутных для гарантированного захвата сканером Наблюдателя.
   - **Аппаратный пульс сквозь Doze (AlarmManager Keep-Alive)**: 5-минутный таймер `RTC_WAKEUP` с удержанием системного `WakeLock` через `goAsync()`. Гарантирует бесперебойную работу в фоновом режиме на Android 8–16 даже при глубоком сне процессора и погашенном экране.
@@ -254,7 +259,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - **Multi-File Batch Historical Import (CSV / ZIP)**: Seamless concurrent upload and deduplication of unlimited xDrip+ / Dexcom Clarity CSV and ZIP files without memory pressure.
 - **Sunday Compensation Digest**: Automated weekly review delivered every Sunday at 20:00 with week-over-week dynamic delta comparison ($\pm\Delta\%$) and clinical insights.
 - **Clinical AGP Reports**: Generates official Ambulatory Glucose Profile PDF sheets with 12 core clinical parameters (TIR, TING, TBR, TAR, CV, eA1c, GRI, GVI, PGS) matching ATTD/ADA standards.
-- **Family BLE Bridge (100% Offline)**: Local direct Bluetooth Low Energy broadcast (Broadcaster & Observer modes, 10–15m range) transmitting glucose, trend arrow, IoB, and battery every 60s without pairing or internet, guarded by 3-digit Family PIN.
+- **Family BLE Bridge & Long Range (100% Offline)**: Direct Bluetooth Low Energy broadcast (10–15m standard, up to 30–50m with optional Bluetooth 5.0 LE Coded PHY Long Range through walls) transmitting glucose, trend arrow, IoB, and battery every 60s without pairing or internet, with dual-PHY scanning and automatic fail-safe fallback, guarded by 3-digit Family PIN.
 - **Laboratory HbA1c Journal & Quarterly Tracking**: Tracks venous HbA1c lab tests with direct comparison against 90-day sensor GMI and TIR, quarterly reminder alerts (anti-spam 2-push limit, skip button), and 1-page clinical PDF export.
 - **Zero-Lag Annual History Archiving & Dec 31 Digest**: Automatically seals past calendar years into `tirup_readings_YYYY.csv` keeping the Room database lightweight across 1–5+ years; delivers a festive annual summary modal and PDF postcard on Dec 31 at 20:00.
 - **Full ZIP Backup Export**: One-click manual export of database and settings into `Documents/TIRUp/Backups/`.

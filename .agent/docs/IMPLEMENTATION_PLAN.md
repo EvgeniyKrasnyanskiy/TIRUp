@@ -1,4 +1,6 @@
-# План реализации: Экспериментальный режим повышенной дальности BLE-моста (Long Range / LE Coded PHY)
+# План реализации: Экспериментальный режим повышенной дальности BLE-моста (Long Range / LE Coded PHY) [Completed]
+
+> **Статус:** [Completed] Все этапы успешно выполнены, протестированы и перенесены в [.agent/docs/ARCHIVE.md](file:///d:/Users/physicist/Desktop/ken/TIRUp/.agent/docs/ARCHIVE.md) (релиз v2.2.0).
 
 План реализации опционального (opt-in) режима повышенной дальности Bluetooth 5.0 Long Range (LE Coded PHY) для прямого BLE-моста между смартфонами пациента (Вещатель) и наблюдателя (Приёмник).
 
