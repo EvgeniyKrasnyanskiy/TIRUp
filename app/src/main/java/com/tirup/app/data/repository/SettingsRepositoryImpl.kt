@@ -141,6 +141,7 @@ class SettingsRepositoryImpl(
             .putBoolean(KEY_BLE_BRIDGE_IS_ENABLED, settings.bleBridgeSettings.isEnabled)
             .putString(KEY_BLE_BRIDGE_PIN, settings.bleBridgeSettings.familyPin)
             .putBoolean(KEY_BLE_BRIDGE_TRANSMIT_BATTERY, settings.bleBridgeSettings.transmitBattery)
+            .putBoolean(KEY_BLE_BRIDGE_USE_LONG_RANGE, settings.bleBridgeSettings.useLongRange)
             .putLong(KEY_BLE_BRIDGE_LAST_TIMESTAMP, settings.bleBridgeSettings.lastPacketTimestamp)
             .putLong(KEY_BLE_BRIDGE_LAST_RADIO_CONTACT_MS, settings.bleBridgeSettings.lastRadioContactMs)
             .putInt(KEY_BLE_BRIDGE_LAST_RSSI, settings.bleBridgeSettings.lastRssi)
@@ -348,7 +349,8 @@ class SettingsRepositoryImpl(
                 lastPacketTimestamp = prefs.getLong(KEY_BLE_BRIDGE_LAST_TIMESTAMP, 0L),
                 lastRssi = prefs.getInt(KEY_BLE_BRIDGE_LAST_RSSI, 0),
                 lastMasterBattery = prefs.getInt(KEY_BLE_BRIDGE_LAST_MASTER_BATTERY, -1),
-                lastRadioContactMs = prefs.getLong(KEY_BLE_BRIDGE_LAST_RADIO_CONTACT_MS, 0L)
+                lastRadioContactMs = prefs.getLong(KEY_BLE_BRIDGE_LAST_RADIO_CONTACT_MS, 0L),
+                useLongRange = prefs.getBoolean(KEY_BLE_BRIDGE_USE_LONG_RANGE, false)
             ),
             isDeviceRemindersEnabled = prefs.getBoolean(KEY_DEVICE_REMINDERS_ENABLED, true),
             isSensorReminderEnabled = prefs.getBoolean(KEY_SENSOR_REMINDER_ENABLED, true),
@@ -531,6 +533,7 @@ class SettingsRepositoryImpl(
         private const val KEY_BLE_BRIDGE_IS_ENABLED = "key_ble_bridge_is_enabled"
         private const val KEY_BLE_BRIDGE_PIN = "key_ble_bridge_pin"
         private const val KEY_BLE_BRIDGE_TRANSMIT_BATTERY = "key_ble_bridge_transmit_battery"
+        private const val KEY_BLE_BRIDGE_USE_LONG_RANGE = "key_ble_bridge_use_long_range"
         private const val KEY_BLE_BRIDGE_LAST_TIMESTAMP = "key_ble_bridge_last_timestamp"
         private const val KEY_BLE_BRIDGE_LAST_RADIO_CONTACT_MS = "key_ble_bridge_last_radio_contact_ms"
         private const val KEY_BLE_BRIDGE_LAST_RSSI = "key_ble_bridge_last_rssi"

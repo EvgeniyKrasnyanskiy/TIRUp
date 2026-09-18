@@ -2,10 +2,14 @@ package com.tirup.app.data.ble
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
+import android.bluetooth.le.AdvertisingSet
+import android.bluetooth.le.AdvertisingSetCallback
+import android.bluetooth.le.AdvertisingSetParameters
 import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.Context
 import android.content.pm.PackageManager
@@ -43,6 +47,7 @@ object BleBroadcaster {
 
     private var currentAdvertiser: BluetoothLeAdvertiser? = null
     private var activeCallback: AdvertiseCallback? = null
+    private var activeSetCallback: AdvertisingSetCallback? = null
     private var stopBurstJob: Job? = null
     private var countdownJob: Job? = null
     private var heartbeatTickerJob: Job? = null
@@ -175,9 +180,46 @@ object BleBroadcaster {
                         }
                     }
 
-                    activeCallback = callback
-                    currentAdvertiser = advertiser
-                    advertiser.startAdvertising(advertiseSettings, advertiseData, callback)
+                    val canUseLongRange = settings.useLongRange && isLongRangeSupported(adapter)
+                    if (canUseLongRange) {
+                        val setCallback = object : AdvertisingSetCallback() {
+                            override fun onAdvertisingSetStarted(advertisingSet: AdvertisingSet?, txPower: Int, status: Int) {
+                                if (status == AdvertisingSetCallback.ADVERTISE_SUCCESS) {
+                                    Log.i(TAG, "BLE Long Range (Coded PHY) broadcast started successfully for reading ts=${reading.timestamp}")
+                                    _isBroadcasting.value = true
+                                    onStatus?.invoke(true, if (isRu) "Long Range запущен ($durationSec сек)" else "Long Range started ($durationSec s)")
+                                } else {
+                                    Log.w(TAG, "BLE Long Range advertising set failed with status: $status. Falling back to Legacy 1M...")
+                                    scope.launch {
+                                        mutex.withLock {
+                                            stopAdvertisingInternal(cancelHeartbeat = false)
+                                            startLegacyAdvertising(advertiser, advertiseSettings, advertiseData, callback, isRu, onStatus)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        val parameters = AdvertisingSetParameters.Builder()
+                            .setLegacyMode(false)
+                            .setConnectable(false)
+                            .setInterval(AdvertisingSetParameters.INTERVAL_MEDIUM)
+                            .setTxPowerLevel(AdvertisingSetParameters.TX_POWER_MEDIUM)
+                            .setPrimaryPhy(BluetoothDevice.PHY_LE_CODED)
+                            .setSecondaryPhy(BluetoothDevice.PHY_LE_CODED)
+                            .build()
+
+                        activeSetCallback = setCallback
+                        currentAdvertiser = advertiser
+                        try {
+                            advertiser.startAdvertisingSet(parameters, advertiseData, null, null, null, setCallback)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Exception starting AdvertisingSet, falling back to legacy: ${e.message}")
+                            startLegacyAdvertising(advertiser, advertiseSettings, advertiseData, callback, isRu, onStatus)
+                        }
+                    } else {
+                        startLegacyAdvertising(advertiser, advertiseSettings, advertiseData, callback, isRu, onStatus)
+                    }
 
                     _broadcastRemainingSec.value = durationSec
 
@@ -304,6 +346,26 @@ object BleBroadcaster {
     }
 
     @android.annotation.SuppressLint("MissingPermission")
+    private fun startLegacyAdvertising(
+        advertiser: BluetoothLeAdvertiser,
+        advertiseSettings: AdvertiseSettings,
+        advertiseData: AdvertiseData,
+        callback: AdvertiseCallback,
+        isRu: Boolean,
+        onStatus: ((Boolean, String) -> Unit)?
+    ) {
+        try {
+            activeCallback = callback
+            currentAdvertiser = advertiser
+            advertiser.startAdvertising(advertiseSettings, advertiseData, callback)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start legacy advertising: ${e.message}")
+            stopAdvertisingInternal(cancelHeartbeat = false)
+            onStatus?.invoke(false, if (isRu) "Ошибка запуска BLE: ${e.message}" else "BLE start error: ${e.message}")
+        }
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
     private fun stopAdvertisingInternal(cancelHeartbeat: Boolean = true) {
         try {
             activeCallback?.let { cb ->
@@ -312,6 +374,14 @@ object BleBroadcaster {
         } catch (_: SecurityException) {
         } catch (_: Exception) {}
         activeCallback = null
+
+        try {
+            activeSetCallback?.let { cb ->
+                currentAdvertiser?.stopAdvertisingSet(cb)
+            }
+        } catch (_: SecurityException) {
+        } catch (_: Exception) {}
+        activeSetCallback = null
         currentAdvertiser = null
         _isBroadcasting.value = false
         _broadcastRemainingSec.value = 0
@@ -336,6 +406,20 @@ object BleBroadcaster {
     fun isBluetoothEnabled(context: Context): Boolean {
         val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager ?: return false
         return bm.adapter?.isEnabled == true
+    }
+
+    fun isLongRangeSupported(context: Context): Boolean {
+        val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager ?: return false
+        val adapter = bm.adapter ?: return false
+        return isLongRangeSupported(adapter)
+    }
+
+    fun isLongRangeSupported(adapter: BluetoothAdapter): Boolean {
+        return try {
+            adapter.isLeCodedPhySupported && adapter.isLeExtendedAdvertisingSupported
+        } catch (_: Exception) {
+            false
+        }
     }
 
     fun hasAdvertisePermission(context: Context): Boolean {
