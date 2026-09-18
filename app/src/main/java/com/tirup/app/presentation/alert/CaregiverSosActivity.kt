@@ -8,12 +8,14 @@ import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.animateColor
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Warning
@@ -39,9 +42,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -61,7 +64,7 @@ class CaregiverSosActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Turn on screen and show over lockscreen
+        // Turn on screen and show over lockscreen even if locked / password-protected
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -74,6 +77,7 @@ class CaregiverSosActivity : ComponentActivity() {
                 WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
             )
         }
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         val patientName = intent.getStringExtra(EXTRA_PATIENT_NAME) ?: "Близкий"
         val glucoseDisplay = intent.getStringExtra(EXTRA_GLUCOSE) ?: "Критич. гипо"
@@ -108,6 +112,13 @@ class CaregiverSosActivity : ComponentActivity() {
                     }
                 },
                 onDismissAlarm = {
+                    if (isAlarmActive) {
+                        CaregiverSosAlarmManager.dismissSosAlarm(this)
+                    } else {
+                        finish()
+                    }
+                },
+                onCloseScreen = {
                     CaregiverSosAlarmManager.dismissSosAlarm(this)
                     finish()
                 }
@@ -151,9 +162,10 @@ fun CaregiverSosScreen(
     isTest: Boolean,
     onCallPatient: () -> Unit,
     onOpenMap: () -> Unit,
-    onDismissAlarm: () -> Unit
+    onDismissAlarm: () -> Unit,
+    onCloseScreen: () -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val infiniteTransition = rememberInfiniteTransition(label = "sos_alarm_anim")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.95f,
         targetValue = 1.08f,
@@ -164,9 +176,21 @@ fun CaregiverSosScreen(
         label = "scale"
     )
 
+    // Pulsate screen background between dark slate and urgent emergency red during alarm
+    val strobeBgColor by infiniteTransition.animateColor(
+        initialValue = Color(0xFF07090E),
+        targetValue = Color(0xFF6B0E0E),
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "strobe_bg"
+    )
+    val currentBg = if (isAlarmActive) strobeBgColor else Color(0xFF07090E)
+
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0xFF090D16)
+        color = currentBg
     ) {
         Box(
             modifier = Modifier
@@ -223,7 +247,7 @@ fun CaregiverSosScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .border(1.5.dp, Color(0xFFDC2626).copy(alpha = 0.6f), RoundedCornerShape(18.dp)),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1B2E)),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1B2E).copy(alpha = 0.92f)),
                     shape = RoundedCornerShape(18.dp)
                 ) {
                     Column(
@@ -273,7 +297,34 @@ fun CaregiverSosScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Action 1: Call Patient
+                // Action 1: Dismiss / Silence Alarm (Prominent Solid Blue Button)
+                Button(
+                    onClick = onDismissAlarm,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isAlarmActive) Color(0xFF0284C7) else Color(0xFF334155)
+                    ),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isAlarmActive) Icons.Default.NotificationsOff else Icons.Default.Close,
+                        contentDescription = null,
+                        tint = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = if (isAlarmActive) "🔕 Отключить тревогу" else "Закрыть окно",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Action 2: Call Patient (Solid Emerald Green Button)
                 if (senderPhone.isNotBlank()) {
                     Button(
                         onClick = onCallPatient,
@@ -286,7 +337,7 @@ fun CaregiverSosScreen(
                         Icon(Icons.Default.Call, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Позвонить: $patientName",
+                            text = "📞 Позвонить: $patientName",
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -296,20 +347,21 @@ fun CaregiverSosScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                // Action 2: Open Map
+                // Action 3: Open Map (if coordinates provided)
                 if (!mapsUrl.isNullOrBlank()) {
                     Button(
                         onClick = onOpenMap,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                            .height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
+                        border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.5f)),
                         shape = RoundedCornerShape(14.dp)
                     ) {
-                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.White)
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFF38BDF8))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Показать координаты на карте",
+                            text = "📍 Показать координаты на карте",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White
@@ -319,23 +371,18 @@ fun CaregiverSosScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                // Action 3: Dismiss / Silence Alarm
-                OutlinedButton(
-                    onClick = onDismissAlarm,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFE2E8F0)),
-                    border = ButtonDefaults.outlinedButtonBorder.copy(brush = Brush.linearGradient(listOf(Color(0xFF64748B), Color(0xFF475569)))),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Icon(Icons.Default.NotificationsOff, contentDescription = null, tint = Color(0xFFCBD5E1))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isAlarmActive) "Отключить сирену" else "Закрыть окно",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                // Action 4: Subtle close if alarm is active and user wants to exit directly
+                if (isAlarmActive) {
+                    TextButton(
+                        onClick = onCloseScreen,
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        Text(
+                            text = "Закрыть и отключить звук",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 13.sp
+                        )
+                    }
                 }
             }
         }
