@@ -22,6 +22,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.core.content.ContextCompat
+import androidx.core.app.ActivityCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -226,13 +231,54 @@ fun SettingsScreen(
         label = "ble_border"
     )
 
-    val smsPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            Toast.makeText(context, if (isRu) "Разрешение на отправку SMS предоставлено" else "SMS permission granted", Toast.LENGTH_SHORT).show()
+    var hasSendSmsPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    var hasReceiveSmsPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    var hasAttemptedSmsRequest by rememberSaveable { mutableStateOf(false) }
+
+    fun refreshSmsPermissions() {
+        hasSendSmsPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
+        hasReceiveSmsPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
+    }
+
+    val lifecycleOwner = context as? LifecycleOwner
+    if (lifecycleOwner != null) {
+        DisposableEffect(lifecycleOwner) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    refreshSmsPermissions()
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+            }
+        }
+    }
+
+    val smsPermissionsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms ->
+        hasAttemptedSmsRequest = true
+        refreshSmsPermissions()
+        val sendGranted = perms[Manifest.permission.SEND_SMS] ?: (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED)
+        val receiveGranted = perms[Manifest.permission.RECEIVE_SMS] ?: (ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED)
+
+        if (sendGranted && receiveGranted) {
+            Toast.makeText(context, if (isRu) "Разрешения на отправку и приём SMS предоставлены" else "SMS send and receive permissions granted", Toast.LENGTH_SHORT).show()
+        } else if (sendGranted && !receiveGranted) {
+            Toast.makeText(context, if (isRu) "Предоставлено только разрешение на отправку SMS. Приём SMS отклонён." else "Only SMS send granted. SMS receive was denied.", Toast.LENGTH_LONG).show()
+        } else if (!sendGranted && receiveGranted) {
+            Toast.makeText(context, if (isRu) "Предоставлено только разрешение на приём SMS. Отправка SMS отклонена." else "Only SMS receive granted. SMS send was denied.", Toast.LENGTH_LONG).show()
         } else {
-            Toast.makeText(context, if (isRu) "Разрешение на отправку SMS отклонено" else "SMS permission denied", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, if (isRu) "Разрешения на SMS отклонены" else "SMS permissions denied", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -241,23 +287,6 @@ fun SettingsScreen(
     ) { isGranted ->
         if (isGranted) {
             Toast.makeText(context, if (isRu) "Доступ к геопозиции предоставлен" else "Location permission granted", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    var hasReceiveSmsPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-
-    val receiveSmsPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasReceiveSmsPermission = isGranted
-        if (isGranted) {
-            Toast.makeText(context, if (isRu) "Разрешение на приём SMS-запросов предоставлено" else "SMS receive permission granted", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(context, if (isRu) "Разрешение на приём SMS отклонено" else "SMS receive permission denied", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1853,11 +1882,21 @@ fun SettingsScreen(
                             Switch(
                                 checked = alerts.isEmergencySmsEnabled,
                                 onCheckedChange = { isChecked ->
-                                    if (isChecked && ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-                                        smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
+                                    if (isChecked) {
+                                        val needed = mutableListOf<String>()
+                                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                                            needed.add(Manifest.permission.SEND_SMS)
+                                        }
+                                        if ((alerts.isCaregiverSosWakeupEnabled || alerts.isSmsQueryReplyEnabled) &&
+                                            ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
+                                            needed.add(Manifest.permission.RECEIVE_SMS)
+                                        }
+                                        if (needed.isNotEmpty()) {
+                                            smsPermissionsLauncher.launch(needed.toTypedArray())
+                                        }
+                                        isSmsCardExpanded = true
                                     }
                                     viewModel.updateAlertSettings(alerts.copy(isEmergencySmsEnabled = isChecked))
-                                    if (isChecked) isSmsCardExpanded = true
                                 },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = Color.White,
@@ -1878,7 +1917,43 @@ fun SettingsScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
-                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                            val missingSend = alerts.isEmergencySmsEnabled && !hasSendSmsPermission
+                            val missingReceive = (alerts.isSmsQueryReplyEnabled || alerts.isCaregiverSosWakeupEnabled) && !hasReceiveSmsPermission
+                            val hasMissingSms = missingSend || missingReceive
+
+                            if (hasMissingSms) {
+                                val needed = mutableListOf<String>()
+                                if (missingSend) needed.add(Manifest.permission.SEND_SMS)
+                                if (missingReceive) needed.add(Manifest.permission.RECEIVE_SMS)
+
+                                val activity = context as? android.app.Activity
+                                val isPermanentlyDenied = hasAttemptedSmsRequest && activity != null && needed.any { perm ->
+                                    !ActivityCompat.shouldShowRequestPermissionRationale(activity, perm) &&
+                                    ContextCompat.checkSelfPermission(context, perm) != PackageManager.PERMISSION_GRANTED
+                                }
+
+                                val bannerTitle = if (missingSend && missingReceive) {
+                                    if (isRu) "Требуется доступ к SMS (отправка и приём)" else "SMS Permissions Required (Send & Receive)"
+                                } else if (missingSend) {
+                                    if (isRu) "Требуется разрешение на отправку SMS" else "SMS Sending Permission Required"
+                                } else {
+                                    if (isRu) "Требуется разрешение на приём SMS" else "SMS Receiving Permission Required"
+                                }
+
+                                val bannerDesc = if (isPermanentlyDenied) {
+                                    if (isRu) "Доступ заблокирован системой Android. Нажмите кнопку ниже, чтобы включить доступ к SMS в настройках приложения."
+                                    else "Permission was permanently denied. Tap below to enable SMS permission in App Settings."
+                                } else if (missingSend && missingReceive) {
+                                    if (isRu) "Для авто-отправки экстренных сообщений близким и пробуждения опекуна при входящем SOS требуются системные разрешения Android на отправку и приём SMS."
+                                    else "To send emergency alerts to contacts and wake up caregiver on incoming SOS, grant SMS permissions."
+                                } else if (missingSend) {
+                                    if (isRu) "Для автоматической отправки экстренных сообщений близким при тяжёлой гипогликемии предоставьте системное разрешение на отправку SMS."
+                                    else "To automatically send emergency SMS to trusted contacts on severe low, grant SMS sending permission."
+                                } else {
+                                    if (isRu) "Для работы экстренного будильника опекуна и ответов на SMS-запросы близких предоставьте системное разрешение на приём SMS."
+                                    else "To activate caregiver wakeup alarm and reply to glucose queries, grant SMS receiving permission."
+                                }
+
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
                                     color = Color(0xFFEF4444).copy(alpha = 0.10f),
@@ -1895,31 +1970,72 @@ fun SettingsScreen(
                                         ) {
                                             Text("⚠️", fontSize = 16.sp)
                                             Text(
-                                                text = if (isRu) "Требуется разрешение на отправку SMS"
-                                                       else "SMS sending permission required",
+                                                text = bannerTitle,
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 fontWeight = FontWeight.Bold,
                                                 color = Color(0xFFEF4444)
                                             )
                                         }
                                         Text(
-                                            text = if (isRu) "Для автоматической отправки экстренных сообщений близким при тяжёлой гипогликемии предоставьте системное разрешение."
-                                                   else "To automatically send emergency SMS to trusted contacts on severe low, grant system SMS permission.",
+                                            text = bannerDesc,
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             lineHeight = 16.sp
                                         )
-                                        Button(
-                                            onClick = { smsPermissionLauncher.launch(Manifest.permission.SEND_SMS) },
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-                                            shape = RoundedCornerShape(10.dp),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Text(
-                                                text = if (isRu) "Предоставить доступ к SMS" else "Grant SMS Permission",
-                                                color = Color.White,
-                                                fontWeight = FontWeight.Bold
-                                            )
+                                        if (isPermanentlyDenied) {
+                                            Button(
+                                                onClick = {
+                                                    val intent = Intent(
+                                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                                        Uri.fromParts("package", context.packageName, null)
+                                                    )
+                                                    context.startActivity(intent)
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                                shape = RoundedCornerShape(10.dp),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text(
+                                                    text = if (isRu) "Открыть настройки Android" else "Open App Settings",
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        } else {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Button(
+                                                    onClick = { smsPermissionsLauncher.launch(needed.toTypedArray()) },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Text(
+                                                        text = if (isRu) "Предоставить доступ к SMS" else "Grant SMS Permission",
+                                                        color = Color.White,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        val intent = Intent(
+                                                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                                            Uri.fromParts("package", context.packageName, null)
+                                                        )
+                                                        context.startActivity(intent)
+                                                    },
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.5f))
+                                                ) {
+                                                    Text(
+                                                        text = if (isRu) "Настройки" else "Settings",
+                                                        color = Color(0xFFEF4444),
+                                                        fontWeight = FontWeight.Medium
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -2104,7 +2220,7 @@ fun SettingsScreen(
                                 checked = alerts.isSmsQueryReplyEnabled,
                                 onCheckedChange = { isChecked ->
                                     if (isChecked && ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
-                                        receiveSmsPermissionLauncher.launch(Manifest.permission.RECEIVE_SMS)
+                                        smsPermissionsLauncher.launch(arrayOf(Manifest.permission.RECEIVE_SMS))
                                     }
                                     viewModel.updateAlertSettings(alerts.copy(isSmsQueryReplyEnabled = isChecked))
                                 }
@@ -2135,49 +2251,11 @@ fun SettingsScreen(
                                 checked = alerts.isCaregiverSosWakeupEnabled,
                                 onCheckedChange = { isChecked ->
                                     if (isChecked && ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
-                                        receiveSmsPermissionLauncher.launch(Manifest.permission.RECEIVE_SMS)
+                                        smsPermissionsLauncher.launch(arrayOf(Manifest.permission.RECEIVE_SMS))
                                     }
                                     viewModel.updateAlertSettings(alerts.copy(isCaregiverSosWakeupEnabled = isChecked))
                                 }
                             )
-                        }
-
-                        val needsReceiveSms = alerts.isSmsQueryReplyEnabled || alerts.isCaregiverSosWakeupEnabled
-                        if (needsReceiveSms && (!hasReceiveSmsPermission || ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED)) {
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = ColorHigh.copy(alpha = 0.12f),
-                                border = BorderStroke(1.dp, ColorHigh.copy(alpha = 0.5f)),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        val intent = Intent(
-                                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                            Uri.fromParts("package", context.packageName, null)
-                                        )
-                                        context.startActivity(intent)
-                                    }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Warning,
-                                        contentDescription = null,
-                                        tint = ColorHigh,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Text(
-                                        text = if (isRu) "⚠️ Требуется системное разрешение на приём SMS. Нажмите здесь: в настройках Android переключите SMS в «Запретить» и обратно в «Разрешить» для обновления прав системы."
-                                               else "⚠️ Android SMS receive permission required. Tap here to open App Settings and grant SMS permission.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = ColorHigh,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
                         }
 
                         // Local Siren sound test (3 sec)
@@ -2207,7 +2285,7 @@ fun SettingsScreen(
                         OutlinedButton(
                             onClick = {
                                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-                                    smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
+                                    smsPermissionsLauncher.launch(arrayOf(Manifest.permission.SEND_SMS))
                                 } else {
                                     viewModel.sendTestEmergencySms()
                                     testSmsCooldownSec = 60
@@ -2240,7 +2318,7 @@ fun SettingsScreen(
                         OutlinedButton(
                             onClick = {
                                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-                                    smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
+                                    smsPermissionsLauncher.launch(arrayOf(Manifest.permission.SEND_SMS))
                                 } else {
                                     viewModel.sendCaregiverSosTestSms()
                                     testSosSmsCooldownSec = 60
