@@ -220,8 +220,8 @@ fun ReportsScreen(
                         if (latestHba1c != null) {
                             Text(
                                 text = "HbA1c: ",
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
-                                fontWeight = FontWeight.Medium,
+                                color = freshnessColor,
+                                fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp
                             )
                             Text(

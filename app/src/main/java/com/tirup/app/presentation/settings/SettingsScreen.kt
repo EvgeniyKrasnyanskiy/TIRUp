@@ -5177,16 +5177,22 @@ fun Hba1cHistoryDialog(
                                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                                 modifier = Modifier.weight(1f)
                                             ) {
+                                                val badgeColor = when {
+                                                    record.valuePercent < 6.1 -> ColorTight
+                                                    record.valuePercent <= 7.0 -> PrimaryEmerald
+                                                    record.valuePercent <= 8.0 -> ColorHigh
+                                                    else -> ColorVeryLow
+                                                }
                                                 Surface(
                                                     shape = RoundedCornerShape(6.dp),
-                                                    border = BorderStroke(1.dp, Color(0xFFEF4444)),
-                                                    color = Color(0xFFEF4444).copy(alpha = 0.1f)
+                                                    border = BorderStroke(1.dp, badgeColor.copy(alpha = 0.6f)),
+                                                    color = badgeColor.copy(alpha = 0.12f)
                                                 ) {
                                                     Text(
                                                         text = String.format(Locale.US, "%.1f%%", record.valuePercent),
                                                         style = MaterialTheme.typography.labelMedium,
                                                         fontWeight = FontWeight.Bold,
-                                                        color = Color(0xFFEF4444),
+                                                        color = badgeColor,
                                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                                     )
                                                 }
