@@ -187,7 +187,7 @@ object CaregiverSosAlarmManager {
             .setAutoCancel(false)
             .setFullScreenIntent(fullScreenPending, true)
             .setContentIntent(fullScreenPending)
-            .addAction(0, "🔕 Отключить тревогу", dismissPending)
+            .addAction(0, "Отключить тревогу", dismissPending)
 
         nm.notify(NOTIFICATION_ID_CAREGIVER_SOS, builder.build())
     }
