@@ -29,8 +29,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
@@ -44,7 +46,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -112,11 +113,7 @@ class CaregiverSosActivity : ComponentActivity() {
                     }
                 },
                 onDismissAlarm = {
-                    if (isAlarmActive) {
-                        CaregiverSosAlarmManager.dismissSosAlarm(this)
-                    } else {
-                        finish()
-                    }
+                    CaregiverSosAlarmManager.dismissSosAlarm(this)
                 },
                 onCloseScreen = {
                     CaregiverSosAlarmManager.dismissSosAlarm(this)
@@ -195,13 +192,15 @@ fun CaregiverSosScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(20.dp),
+                .padding(horizontal = 20.dp, vertical = 16.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
             ) {
                 // Pulsating Warning Badge
                 Box(
@@ -295,34 +294,42 @@ fun CaregiverSosScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
-                // Action 1: Dismiss / Silence Alarm (Prominent Solid Blue Button)
-                Button(
-                    onClick = onDismissAlarm,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isAlarmActive) Color(0xFF0284C7) else Color(0xFF334155)
-                    ),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isAlarmActive) Icons.Default.NotificationsOff else Icons.Default.Close,
-                        contentDescription = null,
-                        tint = Color.White
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = if (isAlarmActive) "🔕 Отключить тревогу" else "Закрыть окно",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
+                // Action 1: Huge 140dp button: Dismiss / Silence Alarm (shown when alarm is active)
+                if (isAlarmActive) {
+                    Button(
+                        onClick = onDismissAlarm,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF0284C7)
+                        ),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.NotificationsOff,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Text(
+                                text = "Отключить тревогу",
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
-
-                Spacer(modifier = Modifier.height(12.dp))
 
                 // Action 2: Call Patient (Solid Emerald Green Button)
                 if (senderPhone.isNotBlank()) {
@@ -337,7 +344,7 @@ fun CaregiverSosScreen(
                         Icon(Icons.Default.Call, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "📞 Позвонить: $patientName",
+                            text = "Позвонить: $patientName",
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -361,7 +368,7 @@ fun CaregiverSosScreen(
                         Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFF38BDF8))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "📍 Показать координаты на карте",
+                            text = "Показать координаты на карте",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White
@@ -371,18 +378,30 @@ fun CaregiverSosScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                // Action 4: Subtle close if alarm is active and user wants to exit directly
-                if (isAlarmActive) {
-                    TextButton(
-                        onClick = onCloseScreen,
-                        modifier = Modifier.padding(top = 4.dp)
-                    ) {
-                        Text(
-                            text = "Закрыть и отключить звук",
-                            color = Color(0xFF94A3B8),
-                            fontSize = 13.sp
-                        )
-                    }
+                // Action 4: Close Window (Positioned below all others)
+                Button(
+                    onClick = onCloseScreen,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF334155)
+                    ),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Закрыть окно",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White
+                    )
                 }
             }
         }
