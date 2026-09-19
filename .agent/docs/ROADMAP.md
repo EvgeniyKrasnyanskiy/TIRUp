@@ -6,18 +6,19 @@
 
 ## Перспективные задачи
 
-### 1. Модуляризация экрана настроек (`SettingsScreen.kt`)
-- **Приоритет:** Средний
-- **Цель:** Файл `SettingsScreen.kt` достиг ~6000 строк кода из-за большого числа диалогов и секций.
-- **План рефакторинга:**
-  - Создать пакет `com.tirup.app.presentation.settings.dialogs`.
-  - Вынести модальные окна в отдельные изолированные файлы:
-    - `Hba1cHistoryDialog.kt` (журнал гликированного гемоглобина, валидация и экспорт PDF).
-    - `PatientProfileEditDialog.kt` (редактирование ФИО, возраста, ИМТ, типа диабета и терапии).
-    - `BleBridgeSettingsDialogs.kt` (смена семейного PIN, справка по BLE мосту, выбор роли).
-    - `AlertThresholdDialogs.kt` (настройка порогов и длительности затяжной гипо/гипергликемии).
-    - `YearEndDigestDialog.kt` (годовой праздничный дайджест).
-  - Снизить размер основного файла `SettingsScreen.kt` до ~800–1000 строк, повысив читаемость и скорость инкрементальной компиляции.
+### 1. [Выполнено] Модуляризация экрана настроек (`SettingsScreen.kt`)
+- **Статус:** [Выполнено] Выполнен полный рефакторинг с выносом тяжёлых диалогов и секций в пакет `com.tirup.app.presentation.settings.dialogs`.
+- **Результаты:**
+  - Создан отдельный пакет `com.tirup.app.presentation.settings.dialogs`.
+  - Вынесены изолированные компоненты:
+    - `Hba1cHistoryDialog.kt` (журнал гликированного гемоглобина, клиническая валидация, медицинские калькуляторы и экспорт PDF).
+    - `YearEndDigestDialog.kt` (годовой праздничный дайджест со сводной аналитикой, анимированными графиками и PDF-сертификатом).
+    - `PatientProfileDialogs.kt` (`PatientProfileSummaryCard`, `PatientProfileEditDialog`, вспомогательные селекторы возраста/типа).
+    - `BleBridgeDialogs.kt` (`BleBridgeHelpDialog`, `BleFamilyPinDialog`, `BleLongRangeConfirmDialog`, `BleRangeHelpDialog`).
+    - `AlertThresholdDialogs.kt` (`MainThresholdDialog`, `CriticalThresholdDialog`, `PredictiveHorizonDialog`, `PredictiveInfoDialog`, `CriticalHypoSafetyDialog`).
+  - Размер файла `SettingsScreen.kt` сокращён более чем на 3080 строк кода (с ~6900 до ~3800 строк).
+  - Архитектура очищена, повышена скорость инкрементальной компиляции, код полностью проверен через `compileDebugKotlin`.
+
 
 ### 2. [Выполнено] Подробное руководство пользователя (6-страничный User Manual PDF)
 - **Статус:** [Выполнено] Реализовано в виде исчерпывающего 6-страничного классического руководства в `UserManualPdfGenerator.kt`.

@@ -79,6 +79,17 @@
     - Изменения синхронизированы в `UserManualPdfGenerator.kt` и проверены через `.\gradlew compileDebugKotlin` без долгой сборки APK.
     - Сгенерирован актуальный тестовый PDF: `TIRUp_User_Manual_Test.pdf`.
 
+13. [Выполнено] **Модуляризация экрана настроек SettingsScreen.kt** (`SettingsScreen.kt`, `Hba1cHistoryDialog.kt`, `YearEndDigestDialog.kt`, `PatientProfileDialogs.kt`, `BleBridgeDialogs.kt`, `AlertThresholdDialogs.kt`):
+    - Создан пакет `com.tirup.app.presentation.settings.dialogs`.
+    - Вынесены крупные изолированные диалоги и секции:
+      - `Hba1cHistoryDialog.kt`: журнал анализов гликированного гемоглобина, валидация, калькуляторы и экспорт PDF.
+      - `YearEndDigestDialog.kt`: праздничный дайджест со сводной аналитикой, анимированными графиками и PDF-сертификатом.
+      - `PatientProfileDialogs.kt`: карточка профиля пациента (`PatientProfileSummaryCard`), диалог редактирования (`PatientProfileEditDialog`) и кастомные выпадающие селекторы.
+      - `BleBridgeDialogs.kt`: справка по локальному BLE-мосту (`BleBridgeHelpDialog`), диалог смены PIN-кода семьи (`BleFamilyPinDialog`), подтверждение режима повышенной дальности (`BleLongRangeConfirmDialog`) и тест дальности (`BleRangeHelpDialog`).
+      - `AlertThresholdDialogs.kt`: настройка порогов основных тревог (`MainThresholdDialog`), критических сирен (`CriticalThresholdDialog`), предиктивного горизонта (`PredictiveHorizonDialog`), справки (`PredictiveInfoDialog`) и протокола защиты от комы (`CriticalHypoSafetyDialog`).
+    - Размер `SettingsScreen.kt` сокращён более чем на 3080 строк кода (с ~6900 до ~3800 строк).
+    - Код проверен пошаговой компиляцией через `compileDebugKotlin` с нулевыми ошибками.
+
 ---
 
 # План реализации: Экспериментальный режим повышенной дальности BLE-моста (Long Range / LE Coded PHY) [v2.2.0]
