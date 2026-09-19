@@ -1,6 +1,7 @@
 package com.tirup.app.domain.alert
 
 import com.tirup.app.domain.model.GlucoseUnit
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -56,6 +57,8 @@ class EmergencySmsBuilderTest {
         )
 
         assertTrue(msg.startsWith("SOS! [ТЕСТ] Иван - критич. гипо: 2.8 ммоль"))
+        assertTrue("Test SOS SMS (${msg.length}) must be <= 70 chars for single SMS segment", msg.length <= 70)
+        assertEquals("SOS! [ТЕСТ] Иван - критич. гипо: 2.8 ммоль (→)! Сирена 5м", msg)
     }
 
     @Test

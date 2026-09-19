@@ -151,14 +151,13 @@ object EmergencySmsManager {
         }
 
         return try {
-            val (lat, lon) = getLastKnownLocation(context)
             val message = EmergencySmsBuilder.buildEmergencyMessage(
                 patientName = patientName,
                 glucoseValueMmol = 2.8,
                 trendArrow = "→",
                 delayMinutes = 5,
-                latitude = lat,
-                longitude = lon,
+                latitude = null,
+                longitude = null,
                 isRu = isRu,
                 unit = GlucoseUnit.MMOL_L,
                 isTest = true
