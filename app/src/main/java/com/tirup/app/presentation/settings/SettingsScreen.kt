@@ -3,10 +3,17 @@ package com.tirup.app.presentation.settings
 import com.tirup.app.presentation.settings.dialogs.BleBridgeHelpDialog
 import com.tirup.app.presentation.settings.dialogs.BleFamilyPinDialog
 import com.tirup.app.presentation.settings.dialogs.BleLongRangeConfirmDialog
+import com.tirup.app.presentation.settings.dialogs.BleRangeHelpDialog
+import com.tirup.app.presentation.settings.dialogs.CriticalHypoSafetyDialog
+import com.tirup.app.presentation.settings.dialogs.CriticalThresholdDialog
 import com.tirup.app.presentation.settings.dialogs.Hba1cHistoryDialog
+import com.tirup.app.presentation.settings.dialogs.MainThresholdDialog
 import com.tirup.app.presentation.settings.dialogs.PatientProfileEditDialog
 import com.tirup.app.presentation.settings.dialogs.PatientProfileSummaryCard
+import com.tirup.app.presentation.settings.dialogs.PredictiveHorizonDialog
+import com.tirup.app.presentation.settings.dialogs.PredictiveInfoDialog
 import com.tirup.app.presentation.settings.dialogs.YearEndDigestDialog
+
 
 
 import android.Manifest
@@ -3884,606 +3891,118 @@ fun SettingsScreen(
     }
 
     if (showMainThresholdDialog) {
-        var lowVal by remember { mutableStateOf(settings.alertSettings.mainLowThresholdMmol) }
-        var highVal by remember { mutableStateOf(settings.alertSettings.mainHighThresholdMmol) }
-
-        AlertDialog(
-            onDismissRequest = { showMainThresholdDialog = false },
-            title = {
-                Text(
-                    text = if (isRu) "Диапазон основных тревог" else "Main Alert Thresholds",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+        MainThresholdDialog(
+            initialLow = settings.alertSettings.mainLowThresholdMmol,
+            initialHigh = settings.alertSettings.mainHighThresholdMmol,
+            isRu = isRu,
+            onSave = { low, high ->
+                viewModel.updateAlertSettings(
+                    settings.alertSettings.copy(
+                        mainLowThresholdMmol = low,
+                        mainHighThresholdMmol = high
+                    )
                 )
             },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(
-                        text = if (isRu) "Срабатывает при подтверждении 5 точек подряд за пределами заданного диапазона."
-                        else "Triggers when 5 consecutive readings fall outside this range.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+            onResetDefault = {
+                viewModel.updateAlertSettings(
+                    settings.alertSettings.copy(
+                        mainLowThresholdMmol = 3.9,
+                        mainHighThresholdMmol = 10.0
                     )
-
-                    // Low threshold
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = if (isRu) "Порог гипогликемии:" else "Low threshold:",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = String.format(Locale.US, "%.1f ммоль/л", lowVal),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = ColorLow
-                            )
-                        }
-                        Slider(
-                            value = lowVal.toFloat(),
-                            onValueChange = { lowVal = (Math.round(it * 10.0) / 10.0) },
-                            valueRange = 3.0f..5.0f,
-                            steps = 19,
-                            colors = SliderDefaults.colors(
-                                thumbColor = ColorLow,
-                                activeTrackColor = ColorLow
-                            )
-                        )
-                    }
-
-                    // High threshold
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = if (isRu) "Порог гипергликемии:" else "High threshold:",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = String.format(Locale.US, "%.1f ммоль/л", highVal),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = ColorHigh
-                            )
-                        }
-                        Slider(
-                            value = highVal.toFloat(),
-                            onValueChange = { highVal = (Math.round(it * 10.0) / 10.0) },
-                            valueRange = 7.0f..15.0f,
-                            steps = 15,
-                            colors = SliderDefaults.colors(
-                                thumbColor = ColorHigh,
-                                activeTrackColor = ColorHigh
-                            )
-                        )
-                    }
-                }
+                )
             },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.updateAlertSettings(
-                            settings.alertSettings.copy(
-                                mainLowThresholdMmol = lowVal,
-                                mainHighThresholdMmol = highVal
-                            )
-                        )
-                        showMainThresholdDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
-                ) {
-                    Text(if (isRu) "Сохранить" else "Save")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.updateAlertSettings(
-                            settings.alertSettings.copy(
-                                mainLowThresholdMmol = 3.9,
-                                mainHighThresholdMmol = 10.0
-                            )
-                        )
-                        showMainThresholdDialog = false
-                    }
-                ) {
-                    Text(if (isRu) "Сброс к норме (3.9 - 10.0)" else "Default (3.9 - 10.0)")
-                }
-            }
+            onDismiss = { showMainThresholdDialog = false }
         )
     }
 
     if (showCriticalThresholdDialog) {
-        var lowVal by remember { mutableStateOf(settings.alertSettings.criticalLowThresholdMmol) }
-        var highVal by remember { mutableStateOf(settings.alertSettings.criticalHighThresholdMmol) }
-
-        AlertDialog(
-            onDismissRequest = { showCriticalThresholdDialog = false },
-            title = {
-                Text(
-                    text = if (isRu) "Пороги критических тревог" else "Critical Alert Thresholds",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+        CriticalThresholdDialog(
+            initialLow = settings.alertSettings.criticalLowThresholdMmol,
+            initialHigh = settings.alertSettings.criticalHighThresholdMmol,
+            isRu = isRu,
+            onSave = { low, high ->
+                viewModel.updateAlertSettings(
+                    settings.alertSettings.copy(
+                        criticalLowThresholdMmol = low,
+                        criticalHighThresholdMmol = high
+                    )
                 )
             },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(
-                        text = if (isRu) "При выходе за эти границы включается громкая сирена, полноэкранное окно спасения поверх блокировки и отсчёт таймера SOS опекунам."
-                        else "Crossing these thresholds triggers maximum loud siren, full-screen rescue window over lockscreen, and caregiver SOS countdown.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+            onResetDefault = {
+                viewModel.updateAlertSettings(
+                    settings.alertSettings.copy(
+                        criticalLowThresholdMmol = 3.0,
+                        criticalHighThresholdMmol = 13.9
                     )
-
-                    // Critical Low threshold
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = if (isRu) "Критическая гипогликемия:" else "Critical hypoglycemia:",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = String.format(Locale.US, "%.1f ммоль/л", lowVal),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = ColorVeryLow
-                            )
-                        }
-                        Slider(
-                            value = lowVal.toFloat(),
-                            onValueChange = { lowVal = (Math.round(it * 10.0) / 10.0) },
-                            valueRange = 2.5f..4.5f,
-                            steps = 19,
-                            colors = SliderDefaults.colors(
-                                thumbColor = ColorVeryLow,
-                                activeTrackColor = ColorVeryLow
-                            )
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("2.5", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(if (isRu) "По умолчанию: 3.0" else "Default: 3.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("4.5", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-
-                    // Critical High threshold
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = if (isRu) "Критическая гипергликемия:" else "Critical hyperglycemia:",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = String.format(Locale.US, "%.1f ммоль/л", highVal),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = ColorHigh
-                            )
-                        }
-                        Slider(
-                            value = highVal.toFloat(),
-                            onValueChange = { highVal = (Math.round(it * 10.0) / 10.0) },
-                            valueRange = 11.0f..16.0f,
-                            steps = 49,
-                            colors = SliderDefaults.colors(
-                                thumbColor = ColorHigh,
-                                activeTrackColor = ColorHigh
-                            )
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("11.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(if (isRu) "По умолчанию: 13.9" else "Default: 13.9", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("16.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
+                )
             },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.updateAlertSettings(
-                            settings.alertSettings.copy(
-                                criticalLowThresholdMmol = lowVal,
-                                criticalHighThresholdMmol = highVal
-                            )
-                        )
-                        showCriticalThresholdDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
-                ) {
-                    Text(if (isRu) "Сохранить" else "Save")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.updateAlertSettings(
-                            settings.alertSettings.copy(
-                                criticalLowThresholdMmol = 3.0,
-                                criticalHighThresholdMmol = 13.9
-                            )
-                        )
-                        showCriticalThresholdDialog = false
-                    }
-                ) {
-                    Text(if (isRu) "Сброс к норме (<3.0 / >13.9)" else "Default (<3.0 / >13.9)")
-                }
-            }
+            onDismiss = { showCriticalThresholdDialog = false }
         )
     }
 
     if (showBleRangeHelpDialog) {
-        AlertDialog(
-            onDismissRequest = { showBleRangeHelpDialog = false },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = null,
-                    tint = ActionBlue,
-                    modifier = Modifier.size(28.dp)
-                )
-            },
-            title = {
-                Text(
-                    text = if (isRu) "Тест дальности BLE-моста" else "BLE Bridge Range Test",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = if (isRu)
-                            "Как тестировать дальность связи на открытой местности:\n\n" +
-                            "1. На смартфоне пациента (Вещатель) запустите «Тест дальности: передача».\n\n" +
-                            "2. На смартфоне опекуна (Приёмник) запустите «Тест дальности: приём».\n\n" +
-                            "3. Отойдите друг от друга на открытом пространстве (до 30–50 метров).\n\n" +
-                            "4. При приёме пакета на экране приёмника на 6 секунд появится баннер со значением сахара и мощностью сигнала RSSI:\n" +
-                            "   • От -50 до -75 dBm: отличная связь\n" +
-                            "   • От -75 до -85 dBm: средний сигнал\n" +
-                            "   • Ниже -85 dBm: предел дальности"
-                        else
-                            "How to test BLE range outdoors:\n\n" +
-                            "1. On patient phone (Broadcaster), tap 'Range Test: Broadcast'.\n\n" +
-                            "2. On caregiver phone (Observer), tap 'Range Test: Receive'.\n\n" +
-                            "3. Walk away from each other in an open area (up to 30–50 meters).\n\n" +
-                            "4. When a packet is received, the caregiver phone shows a banner for 6s with glucose and signal strength (RSSI):\n" +
-                            "   • -50 to -75 dBm: excellent signal\n" +
-                            "   • -75 to -85 dBm: moderate signal\n" +
-                            "   • Below -85 dBm: range limit",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 18.sp
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { showBleRangeHelpDialog = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
-                ) {
-                    Text(if (isRu) "Понятно" else "Got it")
-                }
-            }
+        BleRangeHelpDialog(
+            isRu = isRu,
+            onDismiss = { showBleRangeHelpDialog = false }
         )
     }
 
     if (showPredictiveHorizonDialog) {
-        val alerts = settings.alertSettings
-        val options = listOf(10, 15, 20, 25, 30, 35, 40)
-        var selectedMinutes by remember { mutableStateOf(alerts.predictiveMinutesAhead) }
-
-        AlertDialog(
-            onDismissRequest = { showPredictiveHorizonDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Tune,
-                        contentDescription = null,
-                        tint = ActionBlue,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isRu) "Горизонт предиктивной тревоги" else "Predictive Alert Horizon",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                    IconButton(onClick = { showPredictiveInfoDialog = true }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Info, contentDescription = null, tint = ActionBlue)
-                    }
-                }
+        PredictiveHorizonDialog(
+            currentMinutesAhead = settings.alertSettings.predictiveMinutesAhead,
+            isRu = isRu,
+            onSelectMinutes = { minutes ->
+                viewModel.updateAlertSettings(settings.alertSettings.copy(predictiveMinutesAhead = minutes))
             },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = if (isRu) "За сколько минут алгоритм предупреждает о прогнозируемом выходе за границы диапазона:"
-                               else "How many minutes in advance the algorithm alerts before predicted limit crossing:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        options.forEach { min ->
-                            val isSelected = selectedMinutes == min
-                            val isDefault = min == 15
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (isSelected) ActionBlue.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (isSelected) ActionBlue else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { selectedMinutes = min }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Text(
-                                            text = if (isRu) "$min минут" else "$min minutes",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isSelected) ActionBlue else MaterialTheme.colorScheme.onSurface
-                                        )
-                                        if (isDefault) {
-                                            Surface(
-                                                shape = RoundedCornerShape(6.dp),
-                                                color = PrimaryEmerald.copy(alpha = 0.15f)
-                                            ) {
-                                                Text(
-                                                    text = if (isRu) "стандарт" else "default",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = PrimaryEmerald,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                    if (isSelected) {
-                                        Icon(
-                                            imageVector = Icons.Default.CheckCircle,
-                                            contentDescription = null,
-                                            tint = ActionBlue,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.updateAlertSettings(alerts.copy(predictiveMinutesAhead = selectedMinutes))
-                        showPredictiveHorizonDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
-                ) {
-                    Text(if (isRu) "Применить" else "Apply")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPredictiveHorizonDialog = false }) {
-                    Text(if (isRu) "Отмена" else "Cancel")
-                }
-            }
+            onInfoClick = { showPredictiveInfoDialog = true },
+            onDismiss = { showPredictiveHorizonDialog = false }
         )
     }
 
     if (showPredictiveInfoDialog) {
-        AlertDialog(
-            onDismissRequest = { showPredictiveInfoDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Info, contentDescription = null, tint = ActionBlue, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isRu) "Горизонт предиктивной тревоги" else "Predictive Alert Horizon",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            text = {
-                Text(
-                    text = if (isRu) "Чем меньше горизонт, тем точнее предсказание. 10 мин — высокая точность, 20 мин — умеренная." else "The shorter the horizon, the more accurate the prediction. 10 min = high accuracy, 20 min = moderate.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { showPredictiveInfoDialog = false }) {
-                    Text("OK")
-                }
-            }
+        PredictiveInfoDialog(
+            isRu = isRu,
+            onDismiss = { showPredictiveInfoDialog = false }
         )
     }
 
     if (showCriticalHypoSafetyDialog) {
-        var isAcknowledged by remember { mutableStateOf(false) }
         val alerts = settings.alertSettings
-        AlertDialog(
-            onDismissRequest = { showCriticalHypoSafetyDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Warning,
-                        contentDescription = null,
-                        tint = ColorVeryLow,
-                        modifier = Modifier.size(24.dp)
+        CriticalHypoSafetyDialog(
+            alertSettings = alerts,
+            isRu = isRu,
+            onResumeAndEnable = {
+                viewModel.updateAlertSettings(
+                    alerts.copy(
+                        isAlertsMasterEnabled = true,
+                        isCriticalEnabled = true,
+                        criticalHypoPauseUntilTimestamp = 0L,
+                        isCriticalHypoPermanentDisabled = false
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isRu) "Защита от тяжёлой гипогликемии" else "Severe Hypo Safety Guard",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
+                )
             },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = if (isRu) "Критическая сирена предупреждает о падении сахара ниже 3.0 ммоль/л и спасает от потери сознания и комы во сне.\n\nВ соответствии с клиническими стандартами безопасности рекомендуется ставить оповещение на временную паузу."
-                               else "The critical siren alerts you when glucose drops below 3.0 mmol/L, preventing nocturnal unconsciousness and coma.\n\nPer clinical safety guidelines, a temporary pause is strongly recommended over permanent disabling.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 20.sp
+            onPauseTwoHours = {
+                viewModel.updateAlertSettings(
+                    alerts.copy(
+                        isCriticalEnabled = false,
+                        criticalHypoPauseUntilTimestamp = System.currentTimeMillis() + 2 * 3600 * 1000L,
+                        isCriticalHypoPermanentDisabled = false
                     )
-
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { isAcknowledged = !isAcknowledged }
-                                .padding(10.dp)
-                        ) {
-                            Checkbox(
-                                checked = isAcknowledged,
-                                onCheckedChange = { isAcknowledged = it },
-                                colors = CheckboxDefaults.colors(checkedColor = ColorVeryLow)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (isRu) "Я осознаю смертельный риск гипогликемической комы и беру ответственность на себя"
-                                       else "I acknowledge the life-threatening risk of severe hypoglycemia and assume full responsibility",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                lineHeight = 16.sp
-                            )
-                        }
-                    }
-                }
+                )
             },
-            confirmButton = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (alerts.criticalHypoPauseUntilTimestamp > System.currentTimeMillis()) {
-                        Button(
-                            onClick = {
-                                viewModel.updateAlertSettings(
-                                    alerts.copy(
-                                        isAlertsMasterEnabled = true,
-                                        isCriticalEnabled = true,
-                                        criticalHypoPauseUntilTimestamp = 0L,
-                                        isCriticalHypoPermanentDisabled = false
-                                    )
-                                )
-                                showCriticalHypoSafetyDialog = false
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
-                        ) {
-                            Text(
-                                text = if (isRu) "▶️ Снять паузу и включить сейчас" else "▶️ Resume and Enable Now",
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    } else {
-                        Button(
-                            onClick = {
-                                viewModel.updateAlertSettings(
-                                    alerts.copy(
-                                        isCriticalEnabled = false,
-                                        criticalHypoPauseUntilTimestamp = System.currentTimeMillis() + 2 * 3600 * 1000L,
-                                        isCriticalHypoPermanentDisabled = false
-                                    )
-                                )
-                                showCriticalHypoSafetyDialog = false
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
-                        ) {
-                            Text(
-                                text = if (isRu) "⏸️ Приостановить на 2 часа" else "⏸️ Pause for 2 Hours",
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
-
-                    if (isAcknowledged) {
-                        OutlinedButton(
-                            onClick = {
-                                viewModel.updateAlertSettings(
-                                    alerts.copy(
-                                        isCriticalEnabled = false,
-                                        isCriticalHypoPermanentDisabled = true,
-                                        criticalHypoPauseUntilTimestamp = 0L
-                                    )
-                                )
-                                showCriticalHypoSafetyDialog = false
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(42.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, ColorVeryLow),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ColorVeryLow)
-                        ) {
-                            Text(
-                                text = if (isRu) "Отключить навсегда" else "Disable Permanently",
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    TextButton(
-                        onClick = { showCriticalHypoSafetyDialog = false },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = if (isRu) "Отмена (Оставить включённым)" else "Cancel (Keep Enabled)",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
+            onDisablePermanently = {
+                viewModel.updateAlertSettings(
+                    alerts.copy(
+                        isCriticalEnabled = false,
+                        isCriticalHypoPermanentDisabled = true,
+                        criticalHypoPauseUntilTimestamp = 0L
+                    )
+                )
+            },
+            onDismiss = { showCriticalHypoSafetyDialog = false }
         )
     }
+
 
     if (state.showClearDialog) {
         AlertDialog(
