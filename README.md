@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/Version-2.2.0-brightgreen.svg)
+![Version](https://img.shields.io/badge/Version-2.2.1-brightgreen.svg)
 ![Platform](https://img.shields.io/badge/Platform-Android-green.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-blue.svg)
 ![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%2F%20Material%203-blueviolet.svg)

@@ -4393,13 +4393,13 @@ private fun AlertTierConfigRow(
 private fun getAppVersionName(context: android.content.Context): String {
     return try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0)).versionName ?: "2.0.5"
+            context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0)).versionName ?: "2.2.1"
         } else {
             @Suppress("DEPRECATION")
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "2.0.5"
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "2.2.1"
         }
     } catch (_: Exception) {
-        "2.0.5"
+        "2.2.1"
     }
 }
 
