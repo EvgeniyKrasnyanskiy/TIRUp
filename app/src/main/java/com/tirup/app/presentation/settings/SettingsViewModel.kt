@@ -423,7 +423,10 @@ class SettingsViewModel(
     fun updateBleBridgeSettings(ble: com.tirup.app.domain.model.BleBridgeSettings) {
         viewModelScope.launch {
             val prevRole = _uiState.value.userSettings.bleBridgeSettings.role
-            if (prevRole == com.tirup.app.domain.model.BleBridgeRole.BROADCASTER && ble.role != com.tirup.app.domain.model.BleBridgeRole.BROADCASTER) {
+            val prevEnabled = _uiState.value.userSettings.bleBridgeSettings.isEnabled
+            if ((prevRole == com.tirup.app.domain.model.BleBridgeRole.BROADCASTER && ble.role != com.tirup.app.domain.model.BleBridgeRole.BROADCASTER) ||
+                (prevEnabled && !ble.isEnabled)
+            ) {
                 com.tirup.app.data.ble.BleBroadcaster.stopAdvertising()
             }
             val updated = _uiState.value.userSettings.copy(bleBridgeSettings = ble)

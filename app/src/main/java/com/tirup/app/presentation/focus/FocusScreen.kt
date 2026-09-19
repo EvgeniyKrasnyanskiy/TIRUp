@@ -1239,7 +1239,8 @@ private fun BleBridgeBadge(
     onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    if (!bleSettings.isEnabled) {
+    val isBridgeActive = bleSettings.isEnabled && bleSettings.role != BleBridgeRole.DISABLED
+    if (!isBridgeActive) {
         // Disabled state: Crossed-out / gray Bluetooth icon
         Surface(
             modifier = modifier
@@ -1600,17 +1601,17 @@ private fun BleStatusDialog(
     onOpenSettings: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val isEnabled = bleSettings.isEnabled
+    val isBridgeActive = bleSettings.isEnabled && bleSettings.role != BleBridgeRole.DISABLED
     val isBroadcaster = bleSettings.role == BleBridgeRole.BROADCASTER
 
     val dialogTitle = when {
-        !isEnabled -> if (isRu) "BLE-мост: Отключен" else "BLE Bridge: Disabled"
+        !isBridgeActive -> if (isRu) "BLE-мост: Отключен" else "BLE Bridge: Disabled"
         isBroadcaster -> if (isRu) "BLE-мост: Вещатель" else "BLE Bridge: Broadcaster"
         else -> if (isRu) "BLE-мост: Приёмник" else "BLE Bridge: Receiver"
     }
 
     val dialogDesc = when {
-        !isEnabled -> {
+        !isBridgeActive -> {
             if (isRu) {
                 "BLE-радиомост сейчас полностью отключен.\n\n" +
                 "Связь по Bluetooth между смартфонами приостановлена. Вы можете включить радиомост кнопкой ниже в любой момент."
@@ -1714,9 +1715,9 @@ private fun BleStatusDialog(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = if (!isEnabled) Icons.Default.BluetoothDisabled else Icons.Default.Bluetooth,
+                    imageVector = if (!isBridgeActive) Icons.Default.BluetoothDisabled else Icons.Default.Bluetooth,
                     contentDescription = null,
-                    tint = if (!isEnabled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else ActionBlue,
+                    tint = if (!isBridgeActive) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else ActionBlue,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -1734,7 +1735,7 @@ private fun BleStatusDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (isEnabled && bleSettings.familyPin.isNotBlank()) {
+                if (isBridgeActive && bleSettings.familyPin.isNotBlank()) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1755,7 +1756,7 @@ private fun BleStatusDialog(
                         SpoilerPinBadge(pin = bleSettings.familyPin)
                     }
                 }
-                if (isEnabled) {
+                if (isBridgeActive) {
                     if (isBroadcaster) {
                         Button(
                             onClick = onTestPingClick,
@@ -1830,12 +1831,12 @@ private fun BleStatusDialog(
                     onToggleEnable()
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isEnabled) MaterialTheme.colorScheme.error.copy(alpha = 0.85f) else ActionBlue
+                    containerColor = if (isBridgeActive) MaterialTheme.colorScheme.error.copy(alpha = 0.85f) else ActionBlue
                 ),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
-                    text = if (isEnabled) {
+                    text = if (isBridgeActive) {
                         if (isRu) "Отключить мост" else "Disable Bridge"
                     } else {
                         if (isRu) "Включить мост" else "Enable Bridge"
