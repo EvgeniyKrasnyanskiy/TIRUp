@@ -19,4 +19,5 @@ app/build/
 *.keystore
 *.log
 ble_test_log.txt
+*.pdf
 
