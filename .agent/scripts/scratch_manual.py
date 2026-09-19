@@ -16,16 +16,16 @@ def run():
     total_pages = 3
     app_version = "2.2.0"
 
-    # Fonts
+    # Fonts: Increased sizes for crisp, comfortable readability
     font_header_title = QFont("Arial", 8, QFont.Weight.Bold)
     font_header_sub = QFont("Arial", 8)
-    font_doc_title = QFont("Arial", 11, QFont.Weight.Bold)
-    font_chapter_title = QFont("Arial", 9, QFont.Weight.Bold)
+    font_doc_title = QFont("Arial", 12, QFont.Weight.Bold)
+    font_chapter_title = QFont("Arial", 10, QFont.Weight.Bold)
     font_chapter_subtitle = QFont("Arial", 7, QFont.Weight.Bold)
-    font_section_heading = QFont("Arial", 7, QFont.Weight.Bold)
-    font_body = QFont("Arial", 7)
-    font_bullet_symbol = QFont("Arial", 7, QFont.Weight.Bold)
-    font_bullet_title = QFont("Arial", 7, QFont.Weight.Bold)
+    font_section_heading = QFont("Arial", 8, QFont.Weight.Bold)
+    font_body = QFont("Arial", 8)
+    font_bullet_symbol = QFont("Arial", 8, QFont.Weight.Bold)
+    font_bullet_title = QFont("Arial", 8, QFont.Weight.Bold)
     font_toc_title = QFont("Arial", 7, QFont.Weight.Bold)
     font_toc_body = QFont("Arial", 6)
     font_callout_title = QFont("Arial", 7, QFont.Weight.Bold)
@@ -42,7 +42,6 @@ def run():
     c_bullet_title = QColor(15, 23, 42)
 
     def draw_running_header_and_footer(p: QPainter, page_num: int):
-        # Header text: strictly left title and right page number, never overlapping
         p.setPen(c_doc_header)
         p.setFont(font_header_title)
         hdr_title = "TIRUp • Руководство пользователя и клинический справочник" if is_ru else "TIRUp • User Manual & Clinical Reference"
@@ -51,47 +50,45 @@ def run():
         page_str = f"Стр. {page_num} из {total_pages}" if is_ru else f"Page {page_num} of {total_pages}"
         p.setPen(c_muted)
         p.setFont(font_header_sub)
-        fm_sub = QFontMetricsF(font_header_sub)
-        pw = fm_sub.horizontalAdvance(page_str)
+        p.setFont(font_header_sub)
+        pw = p.fontMetrics().horizontalAdvance(page_str)
         p.drawText(int(559 - pw), 24, page_str)
 
-        # Header rule
         p.setPen(QPen(c_rule, 0.8))
         p.drawLine(36, 30, 559, 30)
 
-        # Footer rule & text
         p.drawLine(36, 814, 559, 814)
         p.setFont(font_header_sub)
         p.setPen(c_muted)
         foot = f"TIRUp v{app_version} • 100% Автономный медицинский спутник" if is_ru else f"TIRUp v{app_version} • 100% Offline Medical Companion"
         p.drawText(36, 826, foot)
         stamp = "github.com/EvgeniyKrasnyanskiy/TIRUp"
-        sw = fm_sub.horizontalAdvance(stamp)
+        sw = p.fontMetrics().horizontalAdvance(stamp)
         p.drawText(int(559 - sw), 826, stamp)
 
     def draw_chapter_heading(p: QPainter, start_y: float, title: str, subtitle: str) -> float:
         y = start_y + 3
         p.setPen(c_chapter_title)
         p.setFont(font_chapter_title)
-        p.drawText(36, int(y + 8), title)
-        y += 11.0
+        p.drawText(36, int(y + 9), title)
+        y += 12.0
 
         p.setPen(c_action_blue)
         p.setFont(font_chapter_subtitle)
         p.drawText(36, int(y + 7), subtitle)
-        return y + 11.0
+        return y + 11.5
 
     def draw_section_heading(p: QPainter, start_y: float, heading: str) -> float:
         y = start_y + 2
         p.setPen(c_section_heading)
         p.setFont(font_section_heading)
-        p.drawText(36, int(y + 7.5), heading)
-        return y + 10.5
+        p.drawText(36, int(y + 8), heading)
+        return y + 11.0
 
-    def draw_paragraph(p: QPainter, start_y: float, text: str, max_w: float = 523.0, line_h: float = 9.6) -> float:
+    def draw_paragraph(p: QPainter, start_y: float, text: str, max_w: float = 523.0, line_h: float = 10.4) -> float:
         p.setPen(c_body)
         p.setFont(font_body)
-        fm = QFontMetricsF(font_body)
+        fm = p.fontMetrics()
 
         words = text.split()
         lines = []
@@ -106,39 +103,38 @@ def run():
         if cur_line:
             lines.append(cur_line)
 
-        y = start_y + 7.2
+        y = start_y + 8.0
         for l in lines:
             p.drawText(36, int(y), l)
             y += line_h
         return (y - line_h) + 4.0
 
-    def draw_bullet_point(p: QPainter, start_y: float, title: str, desc: str, max_w: float = 523.0, line_h: float = 9.6) -> float:
-        y = start_y + 7.2
+    def draw_bullet_point(p: QPainter, start_y: float, title: str, desc: str, max_w: float = 523.0, line_h: float = 10.4) -> float:
+        y = start_y + 8.0
 
         # Bullet icon
         p.setPen(c_action_blue)
         p.setFont(font_bullet_symbol)
         p.drawText(38, int(y), "•")
 
-        # Title
+        # Title: Measure with p.fontMetrics() strictly at device DPI!
         title_colon = f"{title}: "
         p.setPen(c_bullet_title)
         p.setFont(font_bullet_title)
+        title_w = p.fontMetrics().horizontalAdvance(title_colon)
         p.drawText(47, int(y), title_colon)
 
-        fm_title = QFontMetricsF(font_bullet_title)
-        title_w = fm_title.horizontalAdvance(title_colon)
-
-        # Description
+        # Description: Measure with p.fontMetrics() strictly at device DPI!
         p.setPen(c_body)
         p.setFont(font_body)
-        fm_body = QFontMetricsF(font_body)
+        fm_body = p.fontMetrics()
 
         words = desc.split()
         first_line_avail = max_w - 11.0 - title_w
 
         word_idx = 0
         first_line = ""
+        # Only put on first line if reasonable room remains (at least ~45pt)
         if first_line_avail > 45.0:
             while word_idx < len(words):
                 w = words[word_idx]
@@ -152,7 +148,7 @@ def run():
         if first_line:
             p.drawText(int(47 + title_w), int(y), first_line)
 
-        # Remaining lines indented at 47
+        # Subsequent lines indented to 47
         sub_avail = max_w - 11.0
         sub_line = ""
         while word_idx < len(words):
@@ -171,7 +167,7 @@ def run():
             y += line_h
             p.drawText(47, int(y), sub_line)
 
-        return y + 3.0
+        return y + 3.2
 
     def draw_callout(p: QPainter, start_y: float, c_type: str, title: str, text: str, box_w: float = 523.0) -> float:
         y = start_y + 2
@@ -185,7 +181,7 @@ def run():
             bg, border, accent, text_c = QColor(254, 242, 242), QColor(254, 202, 202), QColor(239, 68, 68), QColor(153, 27, 27)
 
         p.setFont(font_callout_body)
-        fm = QFontMetricsF(font_callout_body)
+        fm = p.fontMetrics()
         text_max_w = box_w - 20.0
         words = text.split()
         lines = []
@@ -200,7 +196,7 @@ def run():
         if cur_line:
             lines.append(cur_line)
 
-        line_h = 9.0
+        line_h = 9.2
         total_h = 13.0 + (len(lines) * line_h) + 3.0
 
         p.setPen(QPen(border, 0.8))
@@ -224,7 +220,7 @@ def run():
         return y + total_h + 4.2
 
     # =========================================================================
-    # PAGE 1: Введение, Содержание, Быстрый старт + ГЛАВА 1 + ГЛАВА 2
+    # PAGE 1: Введение, Содержание, Быстрый старт + ГЛАВА 1 + [ОТСТУП 3x] + ГЛАВА 2
     # =========================================================================
     def render_page_1(painter):
         draw_running_header_and_footer(painter, 1)
@@ -232,7 +228,7 @@ def run():
         painter.setPen(c_chapter_title)
         painter.setFont(font_doc_title)
         painter.drawText(36, int(y + 10), "TIRUp • РУКОВОДСТВО ПОЛЬЗОВАТЕЛЯ" if is_ru else "TIRUp • USER MANUAL")
-        y += 13.5
+        y += 14.0
 
         painter.setPen(c_action_blue)
         painter.setFont(font_chapter_subtitle)
@@ -287,6 +283,9 @@ def run():
             "В шторке уведомлений и в HUD приёмника отображаются уровень радиосигнала (RSSI dBm) и процент заряда батареи подопечного. Для быстрой проверки используйте «Тест дальности (5с)»." if is_ru else "Notification and HUD widget display real-time transmitter RSSI (dBm) and battery %. Use 'Range Test (5s)' in Observer settings for immediate verification."
         )
 
+        # 3x CHAPTER SPACING
+        y += 22.0
+
         # CHAPTER 2
         y = draw_chapter_heading(painter, y, "ГЛАВА 2. НАДЕЖНОСТЬ В ФОНЕ И НАСТРОЙКА OEM-ПРОШИВОК" if is_ru else "CHAPTER 2. BACKGROUND RELIABILITY & OEM-SPECIFIC GUIDES", "Преодоление Doze Mode, App Standby и пошаговые чек-листы для вендоров" if is_ru else "Overcoming Doze Mode, App Standby and step-by-step checklists for major OEMs")
         y = draw_section_heading(painter, y, "2.1. Чек-листы фоновой работы для популярных смартфонов" if is_ru else "2.1. Background Reliability Checklists for Major OEMs")
@@ -328,7 +327,7 @@ def run():
         return y
 
     # =========================================================================
-    # PAGE 2: ГЛАВА 3 + ГЛАВА 4
+    # PAGE 2: ГЛАВА 3 + [ОТСТУП 3x] + ГЛАВА 4
     # =========================================================================
     def render_page_2(painter):
         draw_running_header_and_footer(painter, 2)
@@ -369,6 +368,9 @@ def run():
             "При гипогликемии примите 15 г быстрых углеводов (сок, декстроза). Нажмите кнопку «Углеводы приняты» на экране спасения — это заглушит сирену и отменит отправку экстренного SOS SMS родственникам." if is_ru else "Take 15g fast-acting carbs (juice, dextrose). Press 'Carbs Taken' on Rescue Screen to silence siren and cancel emergency SOS SMS dispatch."
         )
 
+        # 3x CHAPTER SPACING
+        y += 24.0
+
         # CHAPTER 4
         y = draw_chapter_heading(painter, y, "ГЛАВА 4. ЭКСТРЕННЫЕ SMS, РЕЖИМ ОПЕКУНА И ТЕЛЕМЕТРИЯ" if is_ru else "CHAPTER 4. EMERGENCY SOS SMS, CAREGIVER MODE & TELEMETRY", "Автономные оповещения с GPS, двусторонний запрос сахара и сирена на телефоне родителя" if is_ru else "Offline GPS distress SMS, two-way glucose queries and caregiver alarm sirens")
         y = draw_paragraph(
@@ -403,7 +405,7 @@ def run():
         return y
 
     # =========================================================================
-    # PAGE 3: ГЛАВА 5 + ГЛАВА 6
+    # PAGE 3: ГЛАВА 5 + [ОТСТУП 3x] + ГЛАВА 6
     # =========================================================================
     def render_page_3(painter):
         draw_running_header_and_footer(painter, 3)
@@ -450,8 +452,15 @@ def run():
             "На вкладке «Отчёты» выберите период (например, 14 дней) и нажмите «Создать AGP отчёт (PDF)». Файл можно сохранить в память или мгновенно отправить лечащему врачу в Telegram, WhatsApp или по почте." if is_ru else "On Reports tab select period and tap 'Create AGP Report (PDF)'. Share directly with your endocrinologist via Telegram, WhatsApp or email."
         )
 
+        # 3x CHAPTER SPACING
+        y += 24.0
+
         # CHAPTER 6
-        y = draw_chapter_heading(painter, y, "ГЛАВА 6. ИНТЕРФЕЙС HUD, ВИДЖЕТЫ, УЧЁТ РАСХОДНИКОВ И АРХИВЫ" if is_ru else "CHAPTER 6. QUICK GLANCE HUD, WIDGETS, SUPPLIES & MAINTENANCE", "Quick Glance HUD 108sp, виджеты рабочего стола, учёт расходников и Zero-Lag база" if is_ru else "Quick Glance HUD 108sp, desktop widgets, supplies tracking and Zero-Lag database")
+        y = draw_chapter_heading(
+            c_painter := painter, y,
+            "ГЛАВА 6. ИНТЕРФЕЙС HUD, ВИДЖЕТЫ, УЧЁТ РАСХОДНИКОВ И АРХИВЫ" if is_ru else "CHAPTER 6. QUICK GLANCE HUD, WIDGETS, SUPPLIES & MAINTENANCE",
+            "Quick Glance HUD 108sp, виджеты рабочего стола, учёт расходников и Zero-Lag база" if is_ru else "Quick Glance HUD 108sp, desktop widgets, supplies tracking and Zero-Lag database"
+        )
         y = draw_bullet_point(
             painter, y,
             "Quick Glance HUD и автоскрытие" if is_ru else "Quick Glance HUD & Auto-Hiding",
