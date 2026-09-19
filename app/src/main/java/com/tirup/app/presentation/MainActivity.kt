@@ -489,10 +489,11 @@ fun AppNavigationRoot(
     }
 
     var bleSignalBannerText by remember { mutableStateOf<String?>(null) }
+    var lastBleBannerShownAt by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(bleSignalBannerText) {
         if (bleSignalBannerText != null) {
-            delay(6000L) // 6 seconds duration for open-field range test visibility
+            delay(3500L) // 3.5 seconds duration
             bleSignalBannerText = null
         }
     }
@@ -505,7 +506,9 @@ fun AppNavigationRoot(
             val isSearchOrTest = (com.tirup.app.data.ble.BleObserverManager.boostRemainingSec.value > 0) ||
                                  (packet.timestamp == 0L || packet.valueMmol <= 0.1)
 
-            if (ble.showPacketBanner || isSearchOrTest) {
+            val now = System.currentTimeMillis()
+            if ((ble.showPacketBanner || isSearchOrTest) && (now - lastBleBannerShownAt >= 60_000L)) {
+                lastBleBannerShownAt = now
                 val signalDot = if (rssi >= -75) "🟢" else if (rssi >= -85) "🟡" else "🔴"
                 val batStr = if (packet.batteryPercent in 0..100) ", 🔋${packet.batteryPercent}%" else ""
                 val isRussian = currentSettings.language.equals("RU", ignoreCase = true)
@@ -705,7 +708,7 @@ fun MainPagerScaffold(
             val rate = delta / dtMin
             val sign = if (rate >= 0) "+" else ""
             val rateVal = if (isMmol) rate else rate * 18.0182
-            val u = if (isMmol) (if (isRu) "ммоль/мин" else "mmol/min") else (if (isRu) "мг/мин" else "mg/min")
+            val u = if (isMmol) (if (isRu) "ммоль/м" else "mmol/m") else (if (isRu) "мг/м" else "mg/m")
             String.format(Locale.US, "%s%.2f %s", sign, rateVal, u)
         } else ""
     }

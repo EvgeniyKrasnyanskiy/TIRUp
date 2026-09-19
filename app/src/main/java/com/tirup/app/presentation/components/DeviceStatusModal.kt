@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Remove
 import android.app.DatePickerDialog
@@ -85,6 +86,22 @@ fun DeviceStatusModal(
     var showPumpInfo by remember { mutableStateOf(false) }
     var showLancetInfo by remember { mutableStateOf(false) }
 
+    val now by produceState(initialValue = System.currentTimeMillis()) {
+        while (true) {
+            delay(30_000L)
+            value = System.currentTimeMillis()
+        }
+    }
+
+    val sensorMillis = if (sensorStatus.installedAt > 0L) sensorStatus.expiresAt - now else 0L
+    val sensorDays = if (sensorStatus.installedAt > 0L) (sensorMillis / 86_400_000L).toInt() else -1
+
+    val pumpMillis = if (pumpSetStatus.installedAt > 0L) pumpSetStatus.expiresAt - now else 0L
+    val pumpDays = if (pumpSetStatus.installedAt > 0L) (pumpMillis / 86_400_000L).toInt() else -1
+
+    val lancetMillis = if (lancetStatus.installedAt > 0L) lancetStatus.expiresAt - now else 0L
+    val lancetDays = if (lancetStatus.installedAt > 0L) (lancetMillis / 86_400_000L).toInt() else -1
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -109,10 +126,15 @@ fun DeviceStatusModal(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (isRu) "Устройства и расходники" else "Device Status",
+                        text = if (isRu) "Устройства и расходники" else "Devices & Supplies",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
                     )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
                 }
 
                 // --- SENSOR SECTION ---
@@ -122,8 +144,8 @@ fun DeviceStatusModal(
                         title = if (isRu) "Сенсор CGM" else "CGM Sensor",
                         installedAt = sensorStatus.installedAt,
                         expiresAt = sensorStatus.expiresAt,
-                        millisRemaining = sensorStatus.millisRemaining,
-                        daysRemaining = sensorStatus.daysRemaining,
+                        millisRemaining = sensorMillis,
+                        daysRemaining = sensorDays,
                         pickerDays = sensorPickerDays,
                         pickerMin = 1,
                         pickerMax = 90,
@@ -149,8 +171,8 @@ fun DeviceStatusModal(
                         title = if (isRu) "Инфузионный набор" else "Infusion Set",
                         installedAt = pumpSetStatus.installedAt,
                         expiresAt = pumpSetStatus.expiresAt,
-                        millisRemaining = pumpSetStatus.millisRemaining,
-                        daysRemaining = pumpSetStatus.daysRemaining,
+                        millisRemaining = pumpMillis,
+                        daysRemaining = pumpDays,
                         pickerDays = pumpPickerDays,
                         pickerMin = 2,
                         pickerMax = 7,
@@ -176,8 +198,8 @@ fun DeviceStatusModal(
                         title = if (isRu) "Ланцет (прокалыватель)" else "Lancet",
                         installedAt = lancetStatus.installedAt,
                         expiresAt = lancetStatus.expiresAt,
-                        millisRemaining = lancetStatus.millisRemaining,
-                        daysRemaining = lancetStatus.daysRemaining,
+                        millisRemaining = lancetMillis,
+                        daysRemaining = lancetDays,
                         pickerDays = lancetPickerDays,
                         pickerMin = 1,
                         pickerMax = 7,

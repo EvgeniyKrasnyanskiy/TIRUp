@@ -67,23 +67,29 @@ fun formatDeviceRemainingTime(
     }
     if (millisRemaining <= 0L) {
         val expiredMs = -millisRemaining
+        val mUnit = if (isRu) "м" else "m"
+        val hUnit = if (isRu) "ч" else "h"
+        val dUnit = if (isRu) "д" else "d"
         return when {
+            expiredMs < 3600_000L -> {
+                val mins = (expiredMs / 60_000L).toInt().coerceAtLeast(1)
+                if (isCompact) "-$mins$mUnit"
+                else if (isRu) "Просрочен: -$mins мин" else "Expired: -$mins min"
+            }
             expiredMs < 24 * 3600_000L -> {
                 val hours = (expiredMs / 3600_000L).toInt().coerceAtLeast(1)
-                val hUnit = if (isRu) "ч" else "h"
                 if (isCompact) "-$hours$hUnit"
                 else if (isRu) "Просрочен: -$hours ч" else "Expired: -$hours h"
             }
             expiredMs < 30L * 86_400_000L -> {
                 val days = (expiredMs / 86_400_000L).toInt().coerceAtLeast(1)
-                val dUnit = if (isRu) "д" else "d"
                 if (isCompact) "-$days$dUnit"
                 else if (isRu) "Просрочен: -$days дн." else "Expired: -$days d"
             }
             else -> {
                 val months = (expiredMs / (30L * 86_400_000L)).toInt().coerceAtLeast(1)
-                val mUnit = if (isRu) "м" else "mo"
-                if (isCompact) "-$months$mUnit"
+                val moUnit = if (isRu) "м" else "mo"
+                if (isCompact) "-$months$moUnit"
                 else if (isRu) "Просрочен: -$months мес." else "Expired: -$months mo"
             }
         }
