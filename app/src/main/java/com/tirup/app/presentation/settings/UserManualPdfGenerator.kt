@@ -49,12 +49,12 @@ class UserManualPdfGenerator(private val context: Context) {
             }
             val docTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(15, 23, 42)
-                textSize = 11.0f
+                textSize = 12.0f
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             }
             val chapterTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(15, 23, 42)
-                textSize = 9.0f
+                textSize = 10.0f
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             }
             val chapterSubtitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -64,21 +64,21 @@ class UserManualPdfGenerator(private val context: Context) {
             }
             val sectionHeadingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(30, 41, 59)
-                textSize = 7.5f
+                textSize = 8.0f
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             }
             val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(51, 65, 85) // Slate 700
-                textSize = 7.0f
+                textSize = 8.0f
             }
             val bulletSymbolPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(37, 99, 235) // ActionBlue
-                textSize = 7.5f
+                textSize = 8.0f
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             }
             val bulletTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(15, 23, 42) // Slate 900
-                textSize = 7.0f
+                textSize = 8.0f
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             }
             val tocTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -131,19 +131,19 @@ class UserManualPdfGenerator(private val context: Context) {
 
             fun drawChapterHeading(canvas: Canvas, startY: Float, title: String, subtitle: String): Float {
                 var y = startY + 3f
-                canvas.drawText(title, 36f, y + 8f, chapterTitlePaint)
-                y += 11.0f
+                canvas.drawText(title, 36f, y + 9f, chapterTitlePaint)
+                y += 12.0f
                 canvas.drawText(subtitle, 36f, y + 7f, chapterSubtitlePaint)
-                return y + 11.0f
+                return y + 11.5f
             }
 
             fun drawSectionHeading(canvas: Canvas, startY: Float, heading: String): Float {
                 val y = startY + 2f
-                canvas.drawText(heading, 36f, y + 7.5f, sectionHeadingPaint)
-                return y + 10.5f
+                canvas.drawText(heading, 36f, y + 8f, sectionHeadingPaint)
+                return y + 11.0f
             }
 
-            fun drawParagraph(canvas: Canvas, startY: Float, text: String, maxWidth: Float = 523f, lineHeight: Float = 9.6f): Float {
+            fun drawParagraph(canvas: Canvas, startY: Float, text: String, maxWidth: Float = 523f, lineHeight: Float = 10.4f): Float {
                 val words = text.split(" ")
                 val lines = mutableListOf<String>()
                 var currentLine = ""
@@ -160,7 +160,7 @@ class UserManualPdfGenerator(private val context: Context) {
                     lines.add(currentLine)
                 }
 
-                var y = startY + 7.2f
+                var y = startY + 8.0f
                 for (l in lines) {
                     canvas.drawText(l, 36f, y, bodyPaint)
                     y += lineHeight
@@ -174,9 +174,9 @@ class UserManualPdfGenerator(private val context: Context) {
                 title: String,
                 desc: String,
                 maxWidth: Float = 523f,
-                lineHeight: Float = 9.6f
+                lineHeight: Float = 10.4f
             ): Float {
-                var y = startY + 7.2f
+                var y = startY + 8.0f
 
                 // Bullet dot
                 canvas.drawText("•", 38f, y, bulletSymbolPaint)
@@ -373,6 +373,9 @@ class UserManualPdfGenerator(private val context: Context) {
                 else "Notification and HUD widget display real-time transmitter RSSI (dBm) and battery %. Use 'Range Test (5s)' in Observer settings for immediate verification."
             )
 
+            // 3x CHAPTER SPACING
+            y1 += 22f
+
             // CHAPTER 2
             y1 = drawChapterHeading(
                 c1, y1,
@@ -479,6 +482,9 @@ class UserManualPdfGenerator(private val context: Context) {
                 else "Take 15g fast-acting carbs (juice, dextrose). Press 'Carbs Taken' on Rescue Screen to silence siren and cancel emergency SOS SMS dispatch."
             )
 
+            // 3x CHAPTER SPACING
+            y2 += 24f
+
             // CHAPTER 4
             y2 = drawChapterHeading(
                 c2, y2,
@@ -583,6 +589,9 @@ class UserManualPdfGenerator(private val context: Context) {
                 if (isRu) "На вкладке «Отчёты» выберите период (например, 14 дней) и нажмите «Создать AGP отчёт (PDF)». Файл можно сохранить в память или мгновенно отправить лечащему врачу в Telegram, WhatsApp или по почте."
                 else "On Reports tab select period and tap 'Create AGP Report (PDF)'. Share directly with your endocrinologist via Telegram, WhatsApp or email."
             )
+
+            // 3x CHAPTER SPACING
+            y3 += 24f
 
             // CHAPTER 6
             y3 = drawChapterHeading(
