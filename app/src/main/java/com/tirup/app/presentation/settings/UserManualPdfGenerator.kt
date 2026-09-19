@@ -28,9 +28,9 @@ class UserManualPdfGenerator(private val context: Context) {
         try {
             val totalPages = 3
             val appVersion = try {
-                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "2.2.0"
+                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "2.2.1"
             } catch (_: Exception) {
-                "2.2.0"
+                "2.2.1"
             }
 
             // Typography Paints
