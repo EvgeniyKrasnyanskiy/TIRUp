@@ -101,7 +101,7 @@ import com.tirup.app.presentation.reports.ReportsScreen
 import com.tirup.app.presentation.reports.ReportsViewModel
 import com.tirup.app.presentation.settings.SettingsScreen
 import com.tirup.app.presentation.settings.SettingsViewModel
-import com.tirup.app.presentation.settings.Hba1cHistoryDialog
+import com.tirup.app.presentation.settings.dialogs.Hba1cHistoryDialog
 import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.PrimaryEmerald
 import com.tirup.app.presentation.theme.TIRUpTheme
