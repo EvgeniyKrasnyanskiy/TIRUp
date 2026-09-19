@@ -579,15 +579,15 @@ class UserManualPdfGenerator(private val context: Context) {
             )
             y3 = drawBulletPoint(
                 c3, y3,
-                if (isRu) "Журнал лабораторного HbA1c и 4 уровня нормы" else "Laboratory HbA1c Journal",
-                if (isRu) "Журнал сопоставляет анализы крови с датчиком (GMI). Классификация: <6.1% (норма), 6.1–7.0% (цель), 7.0–8.0% (субкомпенсация), >8.0% (риск). Кнопка подсвечивает свежесть сдачи (<30д — светло-зелёный, 30–360д — зелёный, >360д — жёлтый)."
-                else "Logs laboratory HbA1c vs sensor GMI: <6.1% (norm), 6.1-7.0% (target), 7.0-8.0% (sub), >8.0% (risk). Button highlights test freshness."
+                if (isRu) "Журнал HbA1c и квартальные напоминания (раз в 90 дн.)" else "HbA1c Journal & Quarterly Reminders (every 90d)",
+                if (isRu) "Журнал сопоставляет анализы крови с датчиком (GMI). Каждые 90 дней срабатывает квартальное напоминание о сдаче крови (макс. 2 раза за цикл с шагом 14 дней, кнопка «Пропустить +90д»). Цвета: <6.1% (норма), 6.1–7.0% (цель), 7.0–8.0% (суб), >8.0% (риск)."
+                else "Logs HbA1c vs sensor GMI. Quarterly reminder fires every 90 days (max 2 per cycle with 14d step, 'Skip +90d' button). Colors: <6.1% (norm), 6.1-7.0% (target), 7.0-8.0% (sub), >8.0% (risk)."
             )
             y3 = drawBulletPoint(
                 c3, y3,
-                if (isRu) "Суточный компенсатор и точка невозврата" else "Daily Compensator & Point of No Return",
-                if (isRu) "Компенсатор рассчитывает точное время удержания диапазона для достижения суточной цели (TIR ≥70% / TING ≥50%). За 1–2 часа до точки невозврата выводится предупреждение «Последний шанс для TIR»."
-                else "Calculates strict in-range minutes needed for daily goals (TIR ≥70% / TING ≥50%). Emits 'Last Chance for TIR' 1-2h before mathematical point of no return."
+                if (isRu) "Суточный компенсатор и воскресный дайджест" else "Daily Compensator & Sunday Digest",
+                if (isRu) "Компенсатор рассчитывает время для цели (TIR ≥70%). За 1–2 ч до точки невозврата звучит «Последний шанс для TIR». Каждое воскресенье в 20:00 формируется аналитический Sunday Digest со сравнением параметров (±Δ%)."
+                else "Calculates in-range time for daily goal (TIR ≥70%). Emits 'Last Chance for TIR' 1-2h before point of no return. Generates Sunday Digest every Sunday at 20:00 (±Δ%)."
             )
             y3 = drawCallout(
                 c3, y3, CalloutType.INFO,
@@ -619,15 +619,15 @@ class UserManualPdfGenerator(private val context: Context) {
             )
             y3 = drawBulletPoint(
                 c3, y3,
-                if (isRu) "Сроки службы устройств и отрицательные счётчики" else "Supplies Lifespan & Negative Counters",
-                if (isRu) "Раздельный учёт датчика CGM (10–14д), канюли помпы (3д) и ланцета. При просрочке счётчик переходит в отрицательные значения: до 24 ч (-Xч), 1–30 дней (-Xд), >30 дней (-Xм)."
-                else "Separate tracking for CGM sensor (10-14d), cannula (3d), and lancet. Expired supplies display negative counters: <24h (-Xh), 1-30d (-Xd), >30d (-Xm)."
+                if (isRu) "Сроки службы расходников и напоминания о замене" else "Supplies Tracking & Expiry Reminders",
+                if (isRu) "Раздельный учёт датчика (10–14д), канюли (3д) и ланцета. Напоминания о замене приходят за 2 дня, за 1 день и по окончании срока. При просрочке счётчик уходит в минус: до 24 ч (-Xч), 1–30 дней (-Xд), >30 дней (-Xм)."
+                else "Separate tracking for sensor (10-14d), cannula (3d), and lancet. Expiry alerts arrive 2 days before, 1 day before, and when overdue (<24h: -Xh, 1-30d: -Xd, >30d: -Xm)."
             )
             y3 = drawBulletPoint(
                 c3, y3,
-                if (isRu) "Архитектура Zero-Lag и ежедневные резервные копии" else "Zero-Lag Engine & Automated Backups",
-                if (isRu) "В конце каждого года замеры архивируются в tirup_readings_YYYY.csv. База данных всегда работает мгновенно без лагов за любые годы. Каждую полночь в 23:59:59 создаётся локальный автобэкап, доступен ручной ZIP-экспорт."
-                else "Past years are archived into tirup_readings_YYYY.csv. Active database stays ultra-fast. Daily midnight auto-backup at 23:59:59 plus manual ZIP export."
+                if (isRu) "Новогодний дайджест 31 декабря, Zero-Lag и автобэкап" else "Dec 31 Year-End Digest, Zero-Lag & Backups",
+                if (isRu) "31 декабря в 20:00 формируется новогодний дайджест 🥂 с PDF-открыткой, а замеры года запечатываются в tirup_readings_YYYY.csv (Zero-Lag база). Каждые сутки в 23:59:59 создаётся локальный автобэкап, доступен экспорт ZIP."
+                else "On Dec 31 at 20:00, Year-End Digest 🥂 exports a PDF holiday card, sealing year readings into tirup_readings_YYYY.csv (Zero-Lag). Nightly auto-backup at 23:59:59 plus ZIP export."
             )
             drawCallout(
                 c3, y3, CalloutType.INFO,

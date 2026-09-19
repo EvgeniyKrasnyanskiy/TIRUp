@@ -53,16 +53,26 @@ object EmergencySmsBuilder {
 
         val arrowPart = if (trendArrow.isNotBlank()) " ($trendArrow)" else ""
 
+        if (isTest) {
+            val testMsg = if (isRu) {
+                "SOS! [ТЕСТ] $name - критич. гипо: $glucoseStr$arrowPart! Сирена ${delayMinutes}м"
+            } else {
+                "SOS! [TEST] $name - critical hypo: $glucoseStr$arrowPart! Alarm ${delayMinutes}m"
+            }
+            return if (testMsg.length > MAX_SINGLE_SMS_CHARS) {
+                testMsg.take(MAX_SINGLE_SMS_CHARS)
+            } else testMsg
+        }
+
         val locationPart = if (latitude != null && longitude != null) {
             val mapsUrl = String.format(Locale.US, "https://maps.google.com/?q=%.6f,%.6f", latitude, longitude)
             "\n$mapsUrl"
         } else ""
 
-        val testPrefix = if (isTest) (if (isRu) "[ТЕСТ] " else "[TEST] ") else ""
         val baseMsg = if (isRu) {
-            "SOS! $testPrefix$name - критич. гипо: $glucoseStr$arrowPart! Сирена ${delayMinutes}м без реакции"
+            "SOS! $name - критич. гипо: $glucoseStr$arrowPart! Сирена ${delayMinutes}м без реакции"
         } else {
-            "SOS! $testPrefix$name - critical hypo: $glucoseStr$arrowPart! Alarm ${delayMinutes}m no reaction"
+            "SOS! $name - critical hypo: $glucoseStr$arrowPart! Alarm ${delayMinutes}m no reaction"
         }
 
         return baseMsg + locationPart
