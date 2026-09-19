@@ -460,14 +460,14 @@ class UserManualPdfGenerator(private val context: Context) {
             y2 = drawBulletPoint(
                 c2, y2,
                 if (isRu) "Уровень 2: Подтверждённое отклонение (3–5 точек)" else "Tier 2: Confirmed Departure (3-5 Points)",
-                if (isRu) "Классический тройной сигнал при выходе за пределы нормы. Адаптивный порог: 3 точки подряд для 5-минутных датчиков или 5 точек для 1-минутных датчиков. При гипергликемии сигнал глушится, если сахар падает и есть активный инсулин (IoB)."
-                else "Triple tone when outside target. Adaptively requires 3 points (5-min CGM) or 5 points (1-min CGM). Auto-mutes on high if glucose is dropping with active IoB onboard."
+                if (isRu) "Классический тройной сигнал при выходе за пределы нормы (3 точки для 5-мин датчиков, 5 точек для 1-мин). Дисплей принудительно НЕ зажигается (только звук и шторка). При гипергликемии сигнал глушится, если сахар падает и есть активный инсулин (IoB)."
+                else "Triple tone when outside target (3 points on 5-min CGM, 5 points on 1-min). Display does NOT forcibly turn on (audio & shade only). Auto-mutes on high if dropping with active IoB."
             )
             y2 = drawBulletPoint(
                 c2, y2,
-                if (isRu) "Уровень 3: Критическая сирена и стробоскоп вспышки" else "Tier 3: Critical Siren & LED Strobe",
-                if (isRu) "Срабатывает при опасных порогах (<3.0 или >13.9 ммоль/л) и затяжной гипо/гипергликемии. Обходит режим «Не беспокоить» (DND bypass), играет через USAGE_ALARM на громкости ≥80% и включает стробоскоп вспышки камеры."
-                else "Fires upon critical values (<3.0 or >13.9 mmol/L) or prolonged breaches. Bypasses DND, sounds via ALARM stream at ≥80% volume, and pulses camera LED flash."
+                if (isRu) "Уровень 3: Критическая сирена и пробуждение дисплея" else "Tier 3: Critical Siren & Screen Wakeup",
+                if (isRu) "Экран принудительно загорается поверх блокировки при критических порогах (<3.0 или >13.9 ммоль/л) и затяжной гипо (>20 мин). Тревога обходит режим «Не беспокоить» (DND bypass), играет через USAGE_ALARM на 100% громкости и включает стробоскоп вспышки."
+                else "Screen forcibly turns on over lockscreen upon critical thresholds (<3.0 or >13.9 mmol/L) or prolonged hypo (>20m). Bypasses DND, sounds via ALARM stream at 100% volume, and pulses camera LED flash."
             )
             y2 = drawBulletPoint(
                 c2, y2,
@@ -478,8 +478,8 @@ class UserManualPdfGenerator(private val context: Context) {
             y2 = drawSectionHeading(c2, y2, if (isRu) "3.2. Экран спасения и защита от комы (Coma Guard <2.8 ммоль/л)" else "3.2. Patient Rescue Screen & Coma Guard (<2.8 mmol/L)")
             y2 = drawParagraph(
                 c2, y2,
-                if (isRu) "При глубокой гипогликемии запускается полноэкранный интерфейс спасения с гигантским сахаром, стрелкой падения, таймером до отправки SOS SMS и кнопкой купирования. При сахаре ниже 2.8 ммоль/л включается протокол Coma Guard: пациенту запрещается снуз более 5 минут, сирена повторяется каждые 5 мин до подтверждения купирования."
-                else "Severe low launches Patient Rescue Screen with giant sugar, drop arrow, and SOS timer. Below 2.8 mmol/L Coma Guard caps snooze to 5 mins, repeating siren until safe recovery is confirmed."
+                if (isRu) "При сахаре <3.0 ммоль/л (или затяжной гипо >20 мин) TIRUp пробуждает спящий телефон и разворачивает поверх пароля боевой интерфейс спасения с крупными цифрами сахара, стрелкой падения, таймером SOS SMS и кнопкой купирования. При сахаре ниже 2.8 ммоль/л включается Coma Guard: снуз ограничен 5 мин, сирена повторяется каждые 5 мин до подтверждения."
+                else "On glucose <3.0 mmol/L (or prolonged hypo >20m) TIRUp wakes screen over lockscreen with giant glucose, trend arrow, and SOS timer. Below 2.8 mmol/L Coma Guard caps snooze to 5 mins, repeating siren every 5 mins until confirmed."
             )
             y2 = drawCallout(
                 c2, y2, CalloutType.CRITICAL,
