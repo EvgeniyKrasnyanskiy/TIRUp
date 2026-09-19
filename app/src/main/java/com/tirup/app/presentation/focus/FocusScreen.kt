@@ -2617,9 +2617,9 @@ private fun DailyAlertLogsDialog(
                                 }
                                 val pauseBtnLabel = if (selectedMinutes >= 60) {
                                     val h = selectedMinutes / 60
-                                    if (isRu) "$h ч" else "${h}h"
+                                    if (isRu) "${h}ч" else "${h}h"
                                 } else {
-                                    if (isRu) "$selectedMinutes м" else "${selectedMinutes}m"
+                                    if (isRu) "${selectedMinutes}м" else "${selectedMinutes}m"
                                 }
                                 OutlinedButton(
                                     onClick = { onPauseAlerts(selectedMinutes * 60_000L) },
@@ -2629,7 +2629,7 @@ private fun DailyAlertLogsDialog(
                                     modifier = Modifier.height(32.dp)
                                 ) {
                                     Text(
-                                        text = if (isRu) "Пауза $pauseBtnLabel ⏸️" else "Pause $pauseBtnLabel ⏸️",
+                                        text = if (isRu) "Пауза $pauseBtnLabel" else "Pause $pauseBtnLabel",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = ActionBlue

@@ -539,9 +539,10 @@ private fun LiveReportCard(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                        val displayDays = minOf(stats.daysCount, state.livePeriod.days)
                         Text(
-                            text = if (isRu) "${state.liveReadings.size} измерений • ${stats.daysCount} дн. (нажмите для предпросмотра)"
-                                   else "${state.liveReadings.size} readings • ${stats.daysCount} days (tap to preview)",
+                            text = if (isRu) "${state.liveReadings.size} измерений • $displayDays дн. (нажмите для предпросмотра)"
+                                   else "${state.liveReadings.size} readings • $displayDays days (tap to preview)",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

@@ -2317,8 +2317,8 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = if (isRu) "При получении SOS-SMS от подопечного будит сиреной (24 сек) на 100% громкости, стробоскопом и окном поверх экрана"
-                                    else "On incoming SOS SMS from patient, wakes up with 24s siren at 100% vol, strobe, and lockscreen window",
+                                    text = if (isRu) "При получении SOS-SMS от подопечного будит сиреной (24 сек) на 100% громкости, стробоскопом и окном поверх экрана. Важно: номер телефона подопечного должен быть указан в экстренных контактах выше (белый список анти-спам)."
+                                    else "On incoming SOS SMS from patient, wakes up with 24s siren at 100% vol, strobe, and lockscreen window. Note: patient phone must be set in emergency contacts above (anti-spam whitelist).",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

@@ -511,8 +511,8 @@ class UserManualPdfGenerator(private val context: Context) {
             y2 = drawBulletPoint(
                 c2, y2,
                 if (isRu) "Режим опекуна (Caregiver SOS Alert)" else "Caregiver SOS Alert Mode",
-                if (isRu) "Если на телефоне родителя установлен TIRUp, входящее SMS с префиксом «SOS! У...» активирует экран спасения опекуна (CaregiverSosActivity). Телефон громко проигрывает сирену в обход беззвучного режима, выводя имя, сахар, время и кнопку навигатора к месту происшествия."
-                else "If TIRUp is installed on parent's phone, incoming 'SOS! ...' SMS launches CaregiverSosActivity. Sounds a loud siren bypassing silent mode, showing patient name, glucose, and GPS navigation button."
+                if (isRu) "Если на телефоне опекуна установлен TIRUp, входящее SMS с префиксом «SOS! У...» активирует сирену и экран спасения (CaregiverSosActivity). Важно: номер подопечного должен быть внесён в экстренные контакты на телефоне опекуна (анти-спам). Требуются права RECEIVE_SMS и «Поверх других приложений»."
+                else "If TIRUp is installed on caregiver phone, incoming 'SOS! ...' SMS launches siren and CaregiverSosActivity. Note: caregiver device must have patient's phone in emergency contacts (anti-spam whitelist), with RECEIVE_SMS and 'Display over other apps' permissions."
             )
             y2 = drawSectionHeading(c2, y2, if (isRu) "4.2. Настройка разрешений SMS и кэширование Android" else "4.2. SMS Permissions & Cache Recovery")
             y2 = drawParagraph(
@@ -562,8 +562,8 @@ class UserManualPdfGenerator(private val context: Context) {
             y3 = drawBulletPoint(
                 c3, y3,
                 if (isRu) "GRI, GVI, PGS, eA1c / GMI" else "GRI, GVI, PGS, eA1c / GMI",
-                if (isRu) "Индекс гликемического риска GRI (0–100), индекс гликемической вариабельности GVI, показатель суточного профиля PGS и расчётный гликированный гемоглобин GMI."
-                else "Glycemia Risk Index GRI (0-100), Glycemic Variability Index GVI, Personal Glycemic State PGS, and estimated GMI."
+                if (isRu) "Индекс риска GRI (0–100), индекс гликемической вариабельности GVI (отношение длины кривой к идеальной; адаптивен к пропускам броадкаста), статус PGS и расчётный GMI."
+                else "Glycemia Risk Index GRI (0-100), Glycemic Variability Index GVI (curve length to ideal line ratio; adaptive to missing samples), PGS, and estimated GMI."
             )
             y3 = drawBulletPoint(
                 c3, y3,

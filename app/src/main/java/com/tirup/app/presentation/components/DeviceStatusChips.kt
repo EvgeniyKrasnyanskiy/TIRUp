@@ -11,6 +11,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -21,6 +24,7 @@ import com.tirup.app.domain.model.LancetStatus
 import com.tirup.app.domain.model.PumpSetStatus
 import com.tirup.app.domain.model.SensorStatus
 import com.tirup.app.domain.model.daysRemaining
+import com.tirup.app.domain.model.expiresAt
 import com.tirup.app.domain.model.isExpired
 import com.tirup.app.domain.model.millisRemaining
 import com.tirup.app.presentation.theme.ActionBlue
@@ -40,6 +44,17 @@ fun DeviceStatusChips(
     isRu: Boolean,
     onClick: () -> Unit
 ) {
+    val now by produceState(initialValue = System.currentTimeMillis()) {
+        while (true) {
+            delay(30_000L)
+            value = System.currentTimeMillis()
+        }
+    }
+
+    val sensorMillis = if (sensorStatus.installedAt > 0L) sensorStatus.expiresAt - now else 0L
+    val pumpMillis = if (pumpSetStatus.installedAt > 0L) pumpSetStatus.expiresAt - now else 0L
+    val lancetMillis = if (lancetStatus.installedAt > 0L) lancetStatus.expiresAt - now else 0L
+
     val items = mutableListOf<@Composable () -> Unit>()
 
     if (showSensor) {
@@ -47,7 +62,7 @@ fun DeviceStatusChips(
             DeviceTextPart(
                 emoji = "◉",
                 installedAt = sensorStatus.installedAt,
-                millisRemaining = sensorStatus.millisRemaining,
+                millisRemaining = sensorMillis,
                 daysRemaining = sensorStatus.daysRemaining,
                 isRu = isRu
             )
@@ -59,7 +74,7 @@ fun DeviceStatusChips(
             DeviceTextPart(
                 emoji = "▣",
                 installedAt = pumpSetStatus.installedAt,
-                millisRemaining = pumpSetStatus.millisRemaining,
+                millisRemaining = pumpMillis,
                 daysRemaining = pumpSetStatus.daysRemaining,
                 isRu = isRu
             )
@@ -71,7 +86,7 @@ fun DeviceStatusChips(
             DeviceTextPart(
                 emoji = "📍",
                 installedAt = lancetStatus.installedAt,
-                millisRemaining = lancetStatus.millisRemaining,
+                millisRemaining = lancetMillis,
                 daysRemaining = lancetStatus.daysRemaining,
                 isRu = isRu
             )
