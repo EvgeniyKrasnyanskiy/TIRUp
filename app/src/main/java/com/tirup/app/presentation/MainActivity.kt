@@ -810,7 +810,7 @@ fun MainPagerScaffold(
                                                         var isLongPressed = false
 
                                                         val longPressJob = coroutineScope.launch {
-                                                            delay(1100L) // 1.1 seconds hold
+                                                            delay(330L) // 0.33 seconds hold
                                                             isLongPressed = true
                                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                             showQuickHud = true
@@ -938,18 +938,18 @@ fun MainPagerScaffold(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Surface(
-                                shape = RoundedCornerShape(14.dp),
+                                shape = RoundedCornerShape(16.dp),
                                 color = PrimaryEmerald.copy(alpha = 0.16f),
                                 border = BorderStroke(1.5.dp, PrimaryEmerald.copy(alpha = 0.5f))
                             ) {
                                 Text(
                                     text = "🎯 $tirFormatted TIR",
-                                    fontSize = 22.sp,
+                                    fontSize = 24.sp,
                                     fontWeight = FontWeight.Black,
                                     color = PrimaryEmerald,
                                     maxLines = 1,
                                     softWrap = false,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
                                 )
                             }
 
@@ -961,84 +961,90 @@ fun MainPagerScaffold(
                                 ) {
                                     Text(
                                         text = rateStr,
-                                        fontSize = 16.sp,
+                                        fontSize = 17.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = ActionBlue,
                                         maxLines = 1,
                                         softWrap = false,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
                                     )
                                 }
                             }
                         }
 
-                        // 2. Huge Central Hero: Glucose value + Arrow + Unit
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
+                        // 2. Huge Central Hero: Glucose value + Arrow on top, Unit centered below
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                text = glucoseValStr,
-                                fontSize = 82.sp,
-                                fontWeight = FontWeight.Black,
-                                color = glucoseColor,
-                                letterSpacing = (-2).sp,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                            if (trendArrow.isNotBlank()) {
-                                Spacer(modifier = Modifier.width(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
                                 Text(
-                                    text = trendArrow,
-                                    fontSize = 60.sp,
+                                    text = glucoseValStr,
+                                    fontSize = 108.sp,
                                     fontWeight = FontWeight.Black,
                                     color = glucoseColor,
+                                    letterSpacing = (-3).sp,
+                                    lineHeight = 108.sp,
                                     maxLines = 1,
                                     softWrap = false
                                 )
+                                if (trendArrow.isNotBlank()) {
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = trendArrow,
+                                        fontSize = 78.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = glucoseColor,
+                                        lineHeight = 78.sp,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
                             }
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = unitStr,
-                                fontSize = 22.sp,
+                                fontSize = 24.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                                 maxLines = 1,
                                 softWrap = false
                             )
                         }
 
-                        // 3. IOB & COB Big Cards (Vertical layout inside each card avoids cramped wrapping)
+                        // 3. IOB & COB Big Cards (Vertical layout inside each card)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Surface(
-                                shape = RoundedCornerShape(18.dp),
+                                shape = RoundedCornerShape(20.dp),
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                                     verticalArrangement = Arrangement.Center
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(text = "💉", fontSize = 16.sp)
+                                        Text(text = "💉", fontSize = 20.sp)
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = if (isRu) "Инсулин" else "Insulin",
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Medium,
+                                            fontSize = 17.sp,
+                                            fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
                                             softWrap = false
                                         )
                                     }
-                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = iobStr,
-                                        fontSize = 26.sp,
+                                        fontSize = 34.sp,
                                         fontWeight = FontWeight.Black,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
@@ -1048,30 +1054,30 @@ fun MainPagerScaffold(
                             }
 
                             Surface(
-                                shape = RoundedCornerShape(18.dp),
+                                shape = RoundedCornerShape(20.dp),
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                                     verticalArrangement = Arrangement.Center
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(text = "🥖", fontSize = 16.sp)
+                                        Text(text = "🥖", fontSize = 20.sp)
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = if (isRu) "Углеводы" else "Carbs",
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Medium,
+                                            fontSize = 17.sp,
+                                            fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
                                             softWrap = false
                                         )
                                     }
-                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = cobStr,
-                                        fontSize = 26.sp,
+                                        fontSize = 34.sp,
                                         fontWeight = FontWeight.Black,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
@@ -1093,12 +1099,12 @@ fun MainPagerScaffold(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.weight(1f, fill = false)
                             ) {
-                                Text(text = "⏱️", fontSize = 16.sp)
+                                Text(text = "⏱️", fontSize = 20.sp)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "${if (isRu) "Сенсор" else "Sensor"}: $sensorRemaining",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 19.sp,
+                                    fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     softWrap = false
@@ -1113,7 +1119,7 @@ fun MainPagerScaffold(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = telemetryParts.joinToString("  "),
-                                    fontSize = 15.sp,
+                                    fontSize = 19.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
