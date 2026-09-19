@@ -717,7 +717,7 @@ fun MainPagerScaffold(
         millisRemaining = focusState.sensorStatus.millisRemaining,
         installedAt = focusState.sensorStatus.installedAt,
         isRu = isRu,
-        isCompact = false
+        isCompact = true
     )
 
     val bleSettings = userSettings.bleBridgeSettings
@@ -938,16 +938,18 @@ fun MainPagerScaffold(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Surface(
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(14.dp),
                                 color = PrimaryEmerald.copy(alpha = 0.16f),
                                 border = BorderStroke(1.5.dp, PrimaryEmerald.copy(alpha = 0.5f))
                             ) {
                                 Text(
                                     text = "🎯 $tirFormatted TIR",
-                                    fontSize = 26.sp,
+                                    fontSize = 22.sp,
                                     fontWeight = FontWeight.Black,
                                     color = PrimaryEmerald,
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                                 )
                             }
 
@@ -959,10 +961,12 @@ fun MainPagerScaffold(
                                 ) {
                                     Text(
                                         text = rateStr,
-                                        fontSize = 20.sp,
+                                        fontSize = 16.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = ActionBlue,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                                     )
                                 }
                             }
@@ -976,30 +980,36 @@ fun MainPagerScaffold(
                         ) {
                             Text(
                                 text = glucoseValStr,
-                                fontSize = 90.sp,
+                                fontSize = 82.sp,
                                 fontWeight = FontWeight.Black,
                                 color = glucoseColor,
-                                letterSpacing = (-2).sp
+                                letterSpacing = (-2).sp,
+                                maxLines = 1,
+                                softWrap = false
                             )
                             if (trendArrow.isNotBlank()) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = trendArrow,
-                                    fontSize = 68.sp,
+                                    fontSize = 60.sp,
                                     fontWeight = FontWeight.Black,
-                                    color = glucoseColor
+                                    color = glucoseColor,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = unitStr,
-                                fontSize = 24.sp,
+                                fontSize = 22.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
 
-                        // 3. IOB & COB Big Cards
+                        // 3. IOB & COB Big Cards (Vertical layout inside each card avoids cramped wrapping)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -1009,26 +1019,30 @@ fun MainPagerScaffold(
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalArrangement = Arrangement.Center
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(text = "💉", fontSize = 24.sp)
+                                        Text(text = "💉", fontSize = 16.sp)
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = if (isRu) "Инсулин" else "Insulin",
-                                            fontSize = 18.sp,
+                                            fontSize = 14.sp,
                                             fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            softWrap = false
                                         )
                                     }
+                                    Spacer(modifier = Modifier.height(2.dp))
                                     Text(
                                         text = iobStr,
-                                        fontSize = 28.sp,
+                                        fontSize = 26.sp,
                                         fontWeight = FontWeight.Black,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
                             }
@@ -1038,26 +1052,30 @@ fun MainPagerScaffold(
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalArrangement = Arrangement.Center
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(text = "🥖", fontSize = 24.sp)
+                                        Text(text = "🥖", fontSize = 16.sp)
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = if (isRu) "Углеводы" else "Carbs",
-                                            fontSize = 18.sp,
+                                            fontSize = 14.sp,
                                             fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            softWrap = false
                                         )
                                     }
+                                    Spacer(modifier = Modifier.height(2.dp))
                                     Text(
                                         text = cobStr,
-                                        fontSize = 28.sp,
+                                        fontSize = 26.sp,
                                         fontWeight = FontWeight.Black,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
                             }
@@ -1071,14 +1089,19 @@ fun MainPagerScaffold(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = "⏱️", fontSize = 22.sp)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f, fill = false)
+                            ) {
+                                Text(text = "⏱️", fontSize = 16.sp)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "${if (isRu) "Сенсор" else "Sensor"}: $sensorRemaining",
-                                    fontSize = 22.sp,
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
 
@@ -1087,11 +1110,14 @@ fun MainPagerScaffold(
                                 rssiStr.ifBlank { null }
                             )
                             if (telemetryParts.isNotEmpty()) {
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = telemetryParts.joinToString("  "),
-                                    fontSize = 22.sp,
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                         }
