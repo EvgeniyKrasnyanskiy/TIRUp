@@ -148,15 +148,15 @@ class GuidebookPdfGenerator(private val context: Context) {
                 listOf(
                     Triple(
                         if (isRu) "Mean Glucose (Средний сахар)" else "Mean Glucose (Average)",
-                        if (isRu) "Цель: ≤7.8 ммоль/л (≤140 мг/дл)" else "Target: ≤7.8 mmol/L (≤140 mg/dL)",
-                        if (isRu) "Среднее арифметическое всех измерений. Фундаментальный показатель общего уровня компенсации. У здоровых людей без диабета составляет 4.5–5.8 ммоль/л (80–105 мг/дл)."
-                        else "Arithmetic mean of all readings. Reflects overall baseline. Healthy non-diabetic average is 4.5–5.8 mmol/L (80–105 mg/dL)."
+                        if (isRu) "Цель: ≤7.8 (здоровые 4.5–5.8)" else "Target: ≤7.8 (non-diab 4.5–5.8)",
+                        if (isRu) "Среднее всех измерений. У людей без диабета натощак: 3.9–5.5 ммоль/л, после еды ≤7.8. При диабете средний 8.5 ≈ eA1c 7.5%, а 10.0 ≈ eA1c 8.6%."
+                        else "Arithmetic mean of all readings. Fasting non-diabetic range is 3.9–5.5 mmol/L, postprandial ≤7.8. Mean 8.5 ≈ eA1c 7.5%, Mean 10.0 ≈ eA1c 8.6%."
                     ),
                     Triple(
                         if (isRu) "eA1c / GMI (Расчётный гликированный гемоглобин)" else "eA1c / GMI (Estimated HbA1c)",
-                        if (isRu) "Цель: ≤7.0% (≤53 ммоль/моль)" else "Target: ≤7.0% (≤53 mmol/mol)",
-                        if (isRu) "Математическая экстраполяция лабораторного HbA1c по формуле ADAG. Отражает средний уровень глюкозы за 2–3 месяца. Не зависит от гемоглобинопатий (в отличие от лабораторного HbA1c). У людей без диабета: 4.0–5.6%."
-                        else "Mathematical projection of laboratory HbA1c based on ADAG formula. Non-diabetic reference range: 4.0–5.6%."
+                        if (isRu) "Цель: ≤7.0% (норма 4.0–5.6%)" else "Target: ≤7.0% (normal 4.0–5.6%)",
+                        if (isRu) "Проекция HbA1c по формуле ADAG за 2–3 мес. Не искажается анемией и кровопотерями. Для детей цель может быть <6.5%, для пожилых <7.5–8.0%."
+                        else "ADAG formula projection over 2-3 months. Free from anemia distortions. Pediatric/pregnancy target <6.5%, elderly target <7.5-8.0%."
                     ),
                     Triple(
                         if (isRu) "Min / Max (Экстремумы сахара за период)" else "Min / Max (Observed Glycemic Range)",
@@ -174,27 +174,27 @@ class GuidebookPdfGenerator(private val context: Context) {
                 listOf(
                     Triple(
                         if (isRu) "TIR (Целевой диапазон 3.9–10.0 ммоль/л)" else "TIR (Target Range 3.9–10.0 mmol/L)",
-                        if (isRu) "Норма: ≥70% (>16 ч 48 мин)" else "Target: ≥70% (>16h 48m/day)",
-                        if (isRu) "Главный маркер компенсации. Каждые дополнительные 10% TIR снижают риск ретинопатии и нефропатии на 40%! У здоровых людей без диабета составляет 96–99%."
-                        else "Gold standard metric. Every 10% increase in TIR reduces microvascular complications risk by 40%. Non-diabetic baseline: 96–99%."
+                        if (isRu) "Цель: ≥70.0% (>16ч 48м/сут)" else "Target: ≥70.0% (>16h 48m/day)",
+                        if (isRu) "Золотой стандарт ATTD/ADA. Каждые +10% снижают риск ретинопатии на 64% и нефропатии на 40%! Здоровые люди: 96–99%. Беременность (СД1): ≥70% в 3.5–7.8."
+                        else "Gold standard metric. Every +10% TIR reduces microvascular complications risk by 40-64%. Non-diabetic baseline: 96–99%. Pregnancy: ≥70% in 3.5–7.8."
                     ),
                     Triple(
                         if (isRu) "TING (Узкий диапазон нормы 3.9–7.8 ммоль/л)" else "TING (Tight Range 3.9–7.8 mmol/L)",
-                        if (isRu) "Ориентир: ≥50% (>12 ч)" else "Advanced Goal: ≥50% (>12h/day)",
-                        if (isRu) "Time in Tight Range — физиологический коридор здорового человека. Оценивает ювелирную точность компенсации и отсутствие скачков после приёма пищи."
-                        else "Physiological tight corridor. Evaluates precision of postprandial glycemic excursions blunting and AID algorithm performance."
+                        if (isRu) "Цель: ≥50.0% (>12 ч/сут)" else "Target: ≥50.0% (>12h/day)",
+                        if (isRu) "Time in Tight Range — физиологический коридор здоровой поджелудочной железы. Максимальная защита сосудов от окислительного стресса."
+                        else "Physiological tight corridor. Evaluates precision of postprandial glycemic excursions blunting and peak insulin therapy precision."
                     ),
                     Triple(
                         if (isRu) "TBR (Время в гипогликемии <3.9 ммоль/л)" else "TBR (Hypoglycemia <3.9 mmol/L)",
-                        if (isRu) "Безопасность: <4% (<1 ч), <3.0: <1%" else "Safety: <4% (<1h), <3.0: <15m",
-                        if (isRu) "Критический лимит безопасности. Гипогликемия провоцирует аритмии и нейрогликопению. Уровень 2 (<3.0 ммоль/л) должен быть сведён к абсолютному минимуму."
-                        else "Critical safety boundary. Hypoglycemia triggers arrhythmias and cognitive impairment. Level 2 (<3.0 mmol/L) must be <1%."
+                        if (isRu) "<3.9: <4% (<1ч), <3.0: <1%" else "<3.9: <4% (<1h), <3.0: <1%",
+                        if (isRu) "Главный приоритет безопасности. Сахар <3.0 несёт риск аритмий и комы. При сниженном распознавании гипогликемии цель ужесточается до TBR <1% суммарно."
+                        else "Critical safety boundary. Hypoglycemia triggers arrhythmias and cognitive impairment. Level 2 (<3.0 mmol/L) must stay <1% (<14 min/day)."
                     ),
                     Triple(
                         if (isRu) "TAR (Время в гипергликемии >10.0 ммоль/л)" else "TAR (Hyperglycemia >10.0 mmol/L)",
-                        if (isRu) "Цель: <25% (<6 ч), >13.9: <5%" else "Target: <25% (<6h), >13.9: <5%",
-                        if (isRu) "Высокий сахар повреждает эндотелий сосудов и форсирует образование конечных продуктов гликирования. Уровень 2 (>13.9 ммоль/л) должен быть <5% (<1 ч 12 мин)."
-                        else "Prolonged elevation damages microvasculature and drives advanced glycation end-products. Level 2 (>13.9 mmol/L) must stay <5%."
+                        if (isRu) ">10.0: <25% (<6ч), >13.9: <5%" else ">10.0: <25% (<6h), >13.9: <5%",
+                        if (isRu) "Высокий сахар повреждает эндотелий капилляров. Сахар выше 13.9 ммоль/л — критическая зона кетоацидоза и глюкозотоксичности (лимит: <1 ч 12 мин/сут)."
+                        else "Prolonged elevation damages microvasculature. Values >13.9 mmol/L present acute DKA risk and should strictly stay below 5% (<1h 12m/day)."
                     )
                 ),
                 cardHeight = 39f
@@ -206,21 +206,21 @@ class GuidebookPdfGenerator(private val context: Context) {
                 listOf(
                     Triple(
                         if (isRu) "%CV (Коэффициент вариации) и SD (Разброс)" else "%CV (Variability) & SD (Dispersion)",
-                        if (isRu) "Норма: %CV ≤36.0%, SD ≤2.0 ммоль/л" else "Target: %CV ≤36.0%, SD ≤36 mg/dL",
-                        if (isRu) "%CV = SD / Mean × 100%. При %CV > 36% компенсация считается нестабильной (резко возрастает риск скрытых гипогликемий). У людей без диабета %CV составляет 14–22%."
-                        else "%CV = SD / Mean * 100%. Values >36% denote high glycemic variability and heightened vulnerability to unexpected hypoglycemia."
+                        if (isRu) "CV: ≤36.0%, SD: ≤2.0 ммоль/л" else "CV: ≤36.0%, SD: ≤2.0 mmol/L",
+                        if (isRu) "%CV = SD / Mean × 100%. При %CV > 36% риск тяжёлой гипо возрастает в 4 раза. Клиническое правило трети: SD не должно превышать 1/3 от величины среднего сахара."
+                        else "%CV = SD / Mean * 100%. Values >36% denote high volatility and quadruple severe hypoglycemia risk. Target SD is less than 1/3 of Mean."
                     ),
                     Triple(
                         if (isRu) "GVI (Индекс лабильности) и GRI (Индекс риска)" else "GVI (Glycemic Variability) & GRI (Risk)",
-                        if (isRu) "GVI: ≤1.20, GRI: Зона A (≤20)" else "GVI: ≤1.20, GRI: Zone A (≤20)",
-                        if (isRu) "GVI оценивает «зигзагообразность» сахарной кривой за период. GRI (0–100) — композитная шкала риска ATTD с повышенным штрафом за гипогликемию."
-                        else "GVI measures actual glucose curve zigzag length. GRI (0–100) scores overall glycemic safety with higher penalties for hypoglycemia."
+                        if (isRu) "GVI: ≤1.20, GRI: Зона A/B (≤40)" else "GVI: ≤1.20, GRI: Zone A/B (≤40)",
+                        if (isRu) "GVI оценивает «зигзагообразность» кривой (идеал 1.00–1.20). GRI (0–100) штрафует гипогликемию с весом 3.0, а гипергликемию — 1.6 (безопасная зона ≤40)."
+                        else "GVI measures glucose curve length (ideal 1.00-1.20). GRI (0-100, Klonoff 2022) weights hypo risk 3.0x and hyper risk 1.6x (target ≤40)."
                     ),
                     Triple(
                         if (isRu) "PGS (Персональный балл стабильности)" else "PGS (Personal Glycemic Score)",
-                        if (isRu) "Норма: ≤35.0 баллов" else "Target: ≤35.0 points",
-                        if (isRu) "Комплексный штрафной балл на основе дистанции от целевого диапазона, лабильности и частоты пиков. Чем ниже балл, тем ближе профиль к идеалу."
-                        else "Comprehensive penalty scoring system accounting for target deviations, volatility, and extremes. Lower score denotes superior control."
+                        if (isRu) "Отлично: ≤35.0, Хорошо: ≤70" else "Optimal: ≤35.0, Good: ≤70",
+                        if (isRu) "Интегральный балл качества компенсации, объединяющий средний сахар, вариабельность GVI и TIR. Чем ниже балл, тем ближе профиль к физиологическому идеалу."
+                        else "Comprehensive clinical score combining mean glucose, trajectory variability (GVI), and time in target (TIR). Lower score reflects superior control."
                     )
                 ),
                 cardHeight = 39f

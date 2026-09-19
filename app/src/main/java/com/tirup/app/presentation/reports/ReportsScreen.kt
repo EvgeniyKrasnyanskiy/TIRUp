@@ -1325,21 +1325,21 @@ private fun ParametersGuidebookModal(
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             GuidebookItemCard(
                                 title = if (isRu) "Активное время сенсора (Sensor Active Time)" else "Sensor Active Time (Wear Time)",
-                                target = if (isRu) "Норма: ≥70.0% времени (≥10 из 14 дней)" else "Target: ≥70.0% (≥10 of 14 days)",
-                                desc = if (isRu) "Международный стандарт ATTD/ADA: если активное время работы сенсора составляет менее 70%, накопленных данных статистически недостаточно. Отчёт считается нерепрезентативным, и на его основе нельзя принимать клинические решения по коррекции доз инсулина или терапии (риск пропущенных скрытых гипогликемий в слепых окнах)."
-                                       else "International clinical consensus (ATTD/ADA): if active sensor wear time is <70%, data is statistically insufficient and non-representative. Clinical decisions and therapy adjustments should not be made based on such reports (risk of missed occult hypoglycemia)."
+                                target = if (isRu) "Цель: ≥70.0% (≥10 из 14 дней) • Идеал: ≥90%" else "Target: ≥70.0% (≥10 of 14 days) • Ideal: ≥90%",
+                                desc = if (isRu) "Международный консенсус ATTD/ADA: если активное время работы сенсора составляет менее 70%, накопленных данных статистически недостаточно. Отчёт считается нерепрезентативным, и на его основе нельзя принимать клинические решения по коррекции доз инсулина или схемы терапии (высокий риск пропущенных скрытых гипогликемий в слепых окнах). Для надёжного расчёта eA1c/GMI требуется непрерывный мониторинг не менее 14 дней."
+                                       else "International ATTD/ADA consensus: wear time <70% is statistically insufficient and clinically non-representative. Therapy adjustments should not be made based on such reports due to risk of undetected occult hypoglycemia. Robust eA1c/GMI calculation requires at least 14 days of continuous wear."
                             )
                             GuidebookItemCard(
                                 title = if (isRu) "Mean BG (Средняя гликемия)" else "Mean BG (Average Glucose)",
-                                target = if (isRu) "Цель: ≤7.8 ммоль/л (≤140 мг/дл)" else "Target: ≤7.8 mmol/L (≤140 mg/dL)",
-                                desc = if (isRu) "Среднее арифметическое всех измерений. Отражает генеральный уровень гликемии и служит фундаментальной базой для расчёта большинства комплексных параметров."
-                                       else "Arithmetic mean of all readings. Reflects overall glycemic baseline."
+                                target = if (isRu) "Цель: ≤7.8 ммоль/л (≤140 мг/дл) • Норма здоровых: 4.5–5.8 ммоль/л" else "Target: ≤7.8 mmol/L (≤140 mg/dL) • Non-diabetic: 4.5–5.8 mmol/L",
+                                desc = if (isRu) "Среднее арифметическое всех измерений. У людей без диабета уровень глюкозы натощак составляет 3.9–5.5 ммоль/л, а после еды не превышает 7.8 ммоль/л. При диабете средний сахар 8.5 ммоль/л соответствует eA1c ~7.5%, а 10.0 ммоль/л — eA1c ~8.6%. Служит фундаментом расчёта вариабельности и гликированного гемоглобина."
+                                       else "Arithmetic mean of all readings. In healthy individuals, fasting glucose is 3.9–5.5 mmol/L and postprandial peak stays ≤7.8 mmol/L. For diabetes, an average of 8.5 mmol/L corresponds to ~7.5% eA1c, while 10.0 mmol/L corresponds to ~8.6% eA1c."
                             )
                             GuidebookItemCard(
                                 title = if (isRu) "eA1c (Расчётный гликированный гемоглобин)" else "eA1c (Estimated A1c)",
-                                target = if (isRu) "Цель: ≤7.0% (≤53 ммоль/моль)" else "Target: ≤7.0% (≤53 mmol/mol)",
-                                desc = if (isRu) "Математическая экстраполяция лабораторного HbA1c по формуле ADAG. Отражает средний уровень глюкозы за 2–3 месяца. Не зависит от гемоглобинопатий (в отличие от лабораторного HbA1c)."
-                                       else "Mathematical projection of laboratory HbA1c based on the ADAG formula."
+                                target = if (isRu) "Цель: ≤7.0% (≤53 ммоль/моль) • Норма: 4.0–5.6% • Предиабет: 5.7–6.4%" else "Target: ≤7.0% (≤53 mmol/mol) • Normal: 4.0–5.6% • Prediabetes: 5.7–6.4%",
+                                desc = if (isRu) "Математическая экстраполяция лабораторного HbA1c по формуле ADAG. Отражает средний уровень глюкозы за 2–3 месяца. В отличие от лабораторного анализа крови, CGM-расчёт не искажается анемией, гемоглобинопатиями или частыми кровопотерями. Для детей и при планировании беременности цель может снижаться до <6.5%, а для пожилых пациентов с риском гипогликемий — смягчаться до <7.5–8.0% по назначению врача."
+                                       else "Mathematical projection of laboratory HbA1c based on the ADAG formula over 2-3 months. Unlike blood tests, CGM calculation is not distorted by anemia or hemoglobin variants. Individual targets may vary: <6.5% in pregnancy or pediatric care, or relaxed to <7.5-8.0% for frail elderly patients."
                             )
                         }
                     }
@@ -1353,27 +1353,27 @@ private fun ParametersGuidebookModal(
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             GuidebookItemCard(
                                 title = if (isRu) "TIR (3.9–10.0 ммоль/л)" else "TIR (70–180 mg/dL)",
-                                target = if (isRu) "Норма: ≥70.0% (>16 ч 48 мин/сут)" else "Target: ≥70.0% (>16h 48m/day)",
-                                desc = if (isRu) "Золотой международный стандарт компенсации диабета. Каждые +10% TIR достоверно снижают риск ретинопатии на 64% и микроальбуминурии на 40%."
-                                       else "Gold standard metric. Every 10% increase significantly reduces vascular complications."
+                                target = if (isRu) "Цель: ≥70.0% (>16 ч 48 мин/сут) • Здоровые: 96–99%" else "Target: ≥70.0% (>16h 48m/day) • Non-diabetic: 96–99%",
+                                desc = if (isRu) "Золотой международный стандарт компенсации диабета. Каждые +10% TIR достоверно снижают риск диабетической ретинопатии на 64% и микроальбуминурии на 40%. У здоровых людей без диабета TIR составляет 96–99%. Для беременных с СД1 целевой коридор сужается до 3.5–7.8 ммоль/л (норма ≥70%). У пациентов старшей возрастной группы с высоким риском гипогликемий цель может быть снижена до ≥50%."
+                                       else "Gold standard metric of diabetes management. Every +10% TIR reduces retinopathy risk by 64% and microalbuminuria by 40%. Non-diabetic individuals spend 96-99% in this range. In T1D pregnancy, the target corridor is tightened to 3.5–7.8 mmol/L (≥70%). For high-risk or frail elderly patients, target may be relaxed to ≥50%."
                             )
                             GuidebookItemCard(
                                 title = if (isRu) "TING (3.9–7.8 ммоль/л)" else "TING (70–140 mg/dL)",
-                                target = if (isRu) "Норма: ≥50.0% (>12 ч/сут)" else "Target: ≥50.0% (>12h/day)",
-                                desc = if (isRu) "Узкий целевой диапазон физиологической нормы здорового человека. Отражает ювелирную точность компенсации и минимальный риск сосудистого старения."
-                                       else "Time in tight physiological norm. Demonstrates advanced metabolic control."
+                                target = if (isRu) "Цель: ≥50.0% (>12 ч/сут) • Здоровые: >90% времени" else "Target: ≥50.0% (>12h/day) • Non-diabetic: >90%",
+                                desc = if (isRu) "Время в узкой физиологической норме (Tight in Normal Glucose). Отражает функционирование здоровой поджелудочной железы и ювелирную точность инсулинотерапии. Нахождение в диапазоне 3.9–7.8 ммоль/л максимально защищает сосудистый эндотелий от окислительного стресса и снижает сердечно-сосудистые риски."
+                                       else "Time in Tight Physiological Norm. Reflects non-diabetic glucose levels and peak insulin therapy precision. Staying within 3.9–7.8 mmol/L protects vascular endothelium from oxidative damage and reduces long-term cardiovascular risks."
                             )
                             GuidebookItemCard(
                                 title = if (isRu) "TBR (<3.9 ммоль/л и <3.0 ммоль/л)" else "TBR (<70 mg/dL and <54 mg/dL)",
-                                target = if (isRu) "Норма: <4.0% (<1 ч/сут), <3.0 ммоль/л: <1.0%" else "Target: <4.0% (<1h/day), <54 mg/dL: <1.0%",
-                                desc = if (isRu) "Главный параметр безопасности. Тяжёлая гипогликемия (<3.0) вызывает аритмии и неврологические нарушения. Должна быть сведена к минимуму."
-                                       else "Safety priority. Low glucose triggers arrhythmias and cognitive impairment."
+                                target = if (isRu) "Суммарно: <4.0% (<58 мин/сут) • Тяжёлая (<3.0): <1.0% (<14 мин)" else "Total: <4.0% (<58m/day) • Severe (<3.0): <1.0% (<14m)",
+                                desc = if (isRu) "Главный приоритет безопасности. Уровень 1 (3.0–3.8 ммоль/л) требует купирования быстрыми углеводами (15 г). Уровень 2 (<3.0 ммоль/л) — критическая гипогликемия, провоцирующая сердечные аритмии, судороги и потерю сознания. Для пациентов с синдромом нарушенного распознавания гипогликемии (hypo-unawareness) цель ужесточается до TBR <1% суммарно (<14 мин/сут)."
+                                       else "Primary safety priority. Level 1 (3.0–3.8 mmol/L) requires fast-acting carbohydrates. Level 2 (<3.0 mmol/L) is severe clinical hypoglycemia carrying risks of cardiac arrhythmia and loss of consciousness. For patients with impaired hypoglycemia awareness, target is tightened to <1% total (<14 min/day)."
                             )
                             GuidebookItemCard(
                                 title = if (isRu) "TAR (>10.0 ммоль/л и >13.9 ммоль/л)" else "TAR (>180 mg/dL and >250 mg/dL)",
-                                target = if (isRu) "Норма: <25.0% (<6 ч/сут), >13.9 ммоль/л: <5.0%" else "Target: <25.0% (<6h/day), >250 mg/dL: <5.0%",
-                                desc = if (isRu) "Время в гипергликемии. Длительный высокий сахар повреждает гликокаликс капилляров, ведёт к дегидратации и накоплению токсичных метаболитов."
-                                       else "Time in hyperglycemia. Sustained high glucose damages vascular endothelium."
+                                target = if (isRu) "Суммарно: <25.0% (<6 ч/сут) • Тяжёлая (>13.9): <5.0% (<1 ч 12 мин)" else "Total: <25.0% (<6h/day) • Severe (>13.9): <5.0% (<1h 12m)",
+                                desc = if (isRu) "Время в гипергликемии. Уровень 1 (10.1–13.9 ммоль/л) ускоряет гликирование белков и утомляемость. Уровень 2 (>13.9 ммоль/л) — критическая зона глюкозотоксичности, резкой дегидратации и риска диабетического кетоацидоза (ДКА). Снижение TAR достигается точным расчётом углеводных коэффициентов и факторов чувствительности к инсулину."
+                                       else "Time above range. Level 1 (10.1–13.9 mmol/L) accelerates protein glycation and microvascular strain. Level 2 (>13.9 mmol/L) represents severe hyperglycemia with acute dehydration and diabetic ketoacidosis (DKA) risks. Minimizing TAR requires accurate carb counting and insulin sensitivity factor tuning."
                             )
                         }
                     }
@@ -1387,21 +1387,21 @@ private fun ParametersGuidebookModal(
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             GuidebookItemCard(
                                 title = if (isRu) "%CV (Коэффициент вариации)" else "%CV (Coefficient of Variation)",
-                                target = if (isRu) "Норма: ≤36.0%" else "Target: ≤36.0%",
-                                desc = if (isRu) "Относительный разброс сахара (%CV = SD / Mean * 100%). При %CV > 36% компенсация считается нестабильной: резко возрастает риск скрытых гипогликемий."
-                                       else "Relative glucose swing indicator. %CV > 36% strongly correlates with hypoglycemia risk."
+                                target = if (isRu) "Стабильный профиль: ≤36.0% • Высокая вариабельность: >36.0% • Здоровые: 15–25%" else "Stable Profile: ≤36.0% • High Variability: >36.0% • Non-diabetic: 15–25%",
+                                desc = if (isRu) "Относительный размах колебаний сахара (%CV = SD / Mean * 100%). Клинический консенсус ATTD: при %CV > 36% компенсация считается лабильной и нестабильной — риск тяжёлой ночной гипогликемии возрастает в 4 раза даже при нормальном среднем сахаре. Снижение %CV достигается сглаживанием постпрандиальных пиков и стабильным базальным профилем."
+                                       else "Relative glycemic spread (%CV = SD / Mean * 100%). International ATTD consensus: %CV > 36% indicates unstable glycemic control, escalating severe nocturnal hypoglycemia risk fourfold even with normal average glucose. Target stability is achieved by curbing post-meal spikes."
                             )
                             GuidebookItemCard(
                                 title = if (isRu) "SD (Стандартное отклонение)" else "SD (Standard Deviation)",
-                                target = if (isRu) "Норма: ≤2.0 ммоль/л (≤36 мг/дл)" else "Target: ≤2.0 mmol/L (≤36 mg/dL)",
-                                desc = if (isRu) "Абсолютная ширина разброса сахаров вокруг средней. Чем ниже SD, тем более гладкая и предсказуемая суточная кривая."
-                                       else "Absolute spread around mean glucose. Lower SD means higher stability."
+                                target = if (isRu) "Цель: ≤2.0 ммоль/л (≤36 мг/дл) • Идеал: ≤1.4 ммоль/л" else "Target: ≤2.0 mmol/L (≤36 mg/dL) • Ideal: ≤1.4 mmol/L",
+                                desc = if (isRu) "Абсолютная ширина разброса сахаров вокруг средней арифметической. Практическое клиническое «правило трети»: SD не должно превышать 1/3 от величины среднего сахара (например, при Mean 6.0 ммоль/л SD должно быть ≤2.0). Чем меньше SD, тем ближе суточный график к ровной горизонтальной линии без резких перепадов."
+                                       else "Absolute dispersion of glucose values around the mean. Clinical 'one-third rule': SD should not exceed 1/3 of mean glucose (e.g. at Mean 6.0 mmol/L, target SD ≤2.0). Lower SD values reflect a smooth, predictable glucose curve without sudden cliffs or spikes."
                             )
                             GuidebookItemCard(
                                 title = if (isRu) "GVI (Индекс гликемической лабильности)" else "GVI (Glycemic Variability Index)",
-                                target = if (isRu) "Идеал здорового человека: ≤1.20" else "Healthy baseline: ≤1.20",
-                                desc = if (isRu) "Отношение реальной длины кривой сахара к идеальной гладкой траектории. Оценивает «зигзагообразность» сахарной кривой за период."
-                                       else "Trajectory distance ratio. Uncovers sharp up-and-down glucose rollercoasters."
+                                target = if (isRu) "Идеал здоровых: 1.00–1.20 • Умеренная: 1.21–1.50 • Лабильная (качели): >1.50" else "Healthy Baseline: 1.00–1.20 • Moderate: 1.21–1.50 • High Lability: >1.50",
+                                desc = if (isRu) "Отношение фактической суммарной длины кривой сахара к идеальной гладкой траектории (алгоритм Service/Kovatchev). Оценивает микро-извилистость и «зигзагообразность» суточной кривой. Выявляет скрытые частые колебания (глюкозные американские горки), которые не всегда улавливаются средним сахаром и HbA1c."
+                                       else "Ratio of actual continuous glucose curve length to the theoretical ideal flat trajectory (Service/Kovatchev algorithm). Unmasks rapid micro-oscillations and rollercoaster dynamics that may remain hidden behind an ostensibly normal HbA1c or mean glucose."
                             )
                         }
                     }
@@ -1415,15 +1415,15 @@ private fun ParametersGuidebookModal(
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             GuidebookItemCard(
                                 title = if (isRu) "PGS (Гликемический статус пациента)" else "PGS (Patient Glycemic Status)",
-                                target = if (isRu) "Отличный контроль: ≤35.0 баллов" else "Optimal control: ≤35.0 points",
-                                desc = if (isRu) "Интегральная формула качества компенсации, объединяющая Mean BG, %CV и TIR в единый балл. Чем ниже балл, тем ближе гликемия к норме."
-                                       else "Multi-factor status combining Mean BG, %CV, and TIR. Lower scores reflect better control."
+                                target = if (isRu) "Отличный: ≤35.0 • Хороший: 35.1–70.0 • Удовлетворительный: 70.1–100.0 • Внимание: >100" else "Optimal: ≤35.0 • Good: 35.1–70.0 • Fair: 70.1–100.0 • Needs Action: >100",
+                                desc = if (isRu) "Интегральный клинический балл качества компенсации, объединяющий средний уровень гликемии (Mean BG), вариабельность GVI и время в целевом диапазоне (TIR). Чем меньше балл PGS, тем ближе показатели к идеальному физиологическому профилю здорового человека. Позволяет одним числом отслеживать суммарную динамику от месяца к месяцу."
+                                       else "Integrated clinical score combining average glucose (Mean BG), trajectory variability (GVI), and time in target (TIR). Lower values reflect superior glycemic control. Provides a single unified metric to track month-over-month clinical progress."
                             )
                             GuidebookItemCard(
                                 title = if (isRu) "GRI (Индекс гликемического риска)" else "GRI (Glycemia Risk Index)",
-                                target = if (isRu) "Зона A (низкий риск): ≤20 баллов" else "Zone A (low risk): ≤20 points",
-                                desc = if (isRu) "Современный валидированный индекс (0–100), учитывающий удельный вес гипо- и гипергликемий. Позволяет врачу мгновенно оценить безопасность терапии."
-                                       else "Clinically validated index (0–100) weighting hypo- and hyperglycemia risks."
+                                target = if (isRu) "Зона A (0–20): очень низкий • B (21–40): низкий • C (41–60): средний • D–E (>60): высокий" else "Zone A (0–20): Very Low • B (21–40): Low • C (41–60): Moderate • D–E (>60): High",
+                                desc = if (isRu) "Современный валидированный индекс риска (0–100), разработанный международным консорциумом диабетологов (Klonoff et al. 2022). Штрафует гипогликемию с повышенным коэффициентом 3.0, а гипергликемию — 1.6. Клиническая цель: нахождение в Зонах A и B (GRI ≤ 40.0 баллов), что гарантирует максимальную безопасность сахароснижающей терапии и отсутствие риска комы."
+                                       else "Validated clinical risk index (0–100) established by international consensus (Klonoff et al. 2022). Emphasizes safety by weighting hypoglycemia with a 3.0 factor and hyperglycemia with 1.6. Clinical target is staying in Zones A & B (GRI ≤ 40.0 points), signifying high therapeutic safety."
                             )
                         }
                     }
