@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -162,12 +163,18 @@ fun StreakBadge(
         }
     }
 
+    val isDark = isSystemInDarkTheme()
+    val amberBase = Color(0xFFF59E0B) // Amber
+    val amberBg = amberBase.copy(alpha = if (isDark) 0.22f else 0.16f)
+    val amberBorder = amberBase.copy(alpha = if (isDark) 0.60f else 0.55f)
+    val amberText = if (isDark) Color(0xFFFBBF24) else Color(0xFFD97706)
+
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = if (streakDays > 0) PrimaryEmerald.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        color = if (streakDays > 0) amberBg else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         border = BorderStroke(
             1.dp,
-            if (streakDays > 0) PrimaryEmerald.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+            if (streakDays > 0) amberBorder else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
         ),
         modifier = if (onClick != null) Modifier.clickable { onClick() } else Modifier
     ) {
@@ -199,7 +206,7 @@ fun StreakBadge(
                     if (isNumber) {
                         Text(
                             text = "$streakDays",
-                            color = PrimaryEmerald,
+                            color = amberText,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp,
                             textAlign = TextAlign.Center
