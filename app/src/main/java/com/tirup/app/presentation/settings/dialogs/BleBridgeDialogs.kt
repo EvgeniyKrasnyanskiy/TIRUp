@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -363,3 +364,65 @@ fun BleLongRangeConfirmDialog(
         }
     )
 }
+
+@Composable
+fun BleRangeHelpDialog(
+    isRu: Boolean,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = null,
+                tint = ActionBlue,
+                modifier = Modifier.size(28.dp)
+            )
+        },
+        title = {
+            Text(
+                text = if (isRu) "Тест дальности BLE-моста" else "BLE Bridge Range Test",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = if (isRu)
+                        "Как тестировать дальность связи на открытой местности:\n\n" +
+                        "1. На смартфоне пациента (Вещатель) запустите «Тест дальности: передача».\n\n" +
+                        "2. На смартфоне опекуна (Приёмник) запустите «Тест дальности: приём».\n\n" +
+                        "3. Отойдите друг от друга на открытом пространстве (до 30–50 метров).\n\n" +
+                        "4. При приёме пакета на экране приёмника на 6 секунд появится баннер со значением сахара и мощностью сигнала RSSI:\n" +
+                        "   • От -50 до -75 dBm: отличная связь\n" +
+                        "   • От -75 до -85 dBm: средний сигнал\n" +
+                        "   • Ниже -85 dBm: предел дальности"
+                    else
+                        "How to test BLE range outdoors:\n\n" +
+                        "1. On patient phone (Broadcaster), tap 'Range Test: Broadcast'.\n\n" +
+                        "2. On caregiver phone (Observer), tap 'Range Test: Receive'.\n\n" +
+                        "3. Walk away from each other in an open area (up to 30–50 meters).\n\n" +
+                        "4. When a packet is received, the caregiver phone shows a banner for 6s with glucose and signal strength (RSSI):\n" +
+                        "   • -50 to -75 dBm: excellent signal\n" +
+                        "   • -75 to -85 dBm: moderate signal\n" +
+                        "   • Below -85 dBm: range limit",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 18.sp
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
+            ) {
+                Text(if (isRu) "Понятно" else "Got it")
+            }
+        }
+    )
+}
+
