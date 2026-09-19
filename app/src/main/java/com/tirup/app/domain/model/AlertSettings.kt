@@ -59,5 +59,8 @@ data class AlertSettings(
     val isSmsQueryReplyEnabled: Boolean = true,
 
     // Caregiver SOS Wakeup Alarm (Экстренное пробуждение опекуна при входящем SOS)
-    val isCaregiverSosWakeupEnabled: Boolean = true
+    val isCaregiverSosWakeupEnabled: Boolean = true,
+
+    // Emergency SMS mode: false = Patient (SOS sender), true = Caregiver (SOS receiver & alarm)
+    val isCaregiverRole: Boolean = false
 )

@@ -617,6 +617,21 @@ class SettingsViewModel(
         com.tirup.app.data.alert.CaregiverSosAlarmManager.triggerCaregiverSos(context, testData)
     }
 
+    private var caregiverSosCountdownJob: kotlinx.coroutines.Job? = null
+
+    fun startCaregiverSosTestCountdown(delaySec: Int = 5) {
+        caregiverSosCountdownJob?.cancel()
+        caregiverSosCountdownJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(delaySec * 1000L)
+            testCaregiverSosScreen()
+        }
+    }
+
+    fun cancelCaregiverSosTest() {
+        caregiverSosCountdownJob?.cancel()
+        caregiverSosCountdownJob = null
+    }
+
     fun playTestSound(volumePercent: Int) {
         com.tirup.app.data.alert.MedicalSoundPlayer.playTestSound(volumePercent)
     }
