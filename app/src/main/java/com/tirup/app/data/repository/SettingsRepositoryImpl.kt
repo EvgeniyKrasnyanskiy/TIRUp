@@ -140,6 +140,7 @@ class SettingsRepositoryImpl(
             .putLong(KEY_ALERT_LAST_EMERGENCY_TIMESTAMP, settings.alertSettings.lastEmergencySmsTimestamp)
             .putBoolean(KEY_ALERT_SMS_QUERY_REPLY_ENABLED, settings.alertSettings.isSmsQueryReplyEnabled)
             .putBoolean(KEY_ALERT_CAREGIVER_SOS_WAKEUP_ENABLED, settings.alertSettings.isCaregiverSosWakeupEnabled)
+            .putBoolean(KEY_ALERT_EMERGENCY_IS_CAREGIVER_ROLE, settings.alertSettings.isCaregiverRole)
             .putString(KEY_BLE_BRIDGE_ROLE, settings.bleBridgeSettings.role.name)
             .putBoolean(KEY_BLE_BRIDGE_IS_ENABLED, settings.bleBridgeSettings.isEnabled)
             .putString(KEY_BLE_BRIDGE_PIN, settings.bleBridgeSettings.familyPin)
@@ -339,7 +340,8 @@ class SettingsRepositoryImpl(
                 includeLocationInEmergencySms = prefs.getBoolean(KEY_ALERT_EMERGENCY_LOCATION, true),
                 lastEmergencySmsTimestamp = prefs.getLong(KEY_ALERT_LAST_EMERGENCY_TIMESTAMP, 0L),
                 isSmsQueryReplyEnabled = prefs.getBoolean(KEY_ALERT_SMS_QUERY_REPLY_ENABLED, true),
-                isCaregiverSosWakeupEnabled = prefs.getBoolean(KEY_ALERT_CAREGIVER_SOS_WAKEUP_ENABLED, true)
+                isCaregiverSosWakeupEnabled = prefs.getBoolean(KEY_ALERT_CAREGIVER_SOS_WAKEUP_ENABLED, true),
+                isCaregiverRole = prefs.getBoolean(KEY_ALERT_EMERGENCY_IS_CAREGIVER_ROLE, false)
             ),
             bleBridgeSettings = BleBridgeSettings(
                 role = try {
@@ -539,6 +541,7 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_LAST_EMERGENCY_TIMESTAMP = "key_alert_last_emergency_timestamp"
         private const val KEY_ALERT_SMS_QUERY_REPLY_ENABLED = "key_alert_sms_query_reply_enabled"
         private const val KEY_ALERT_CAREGIVER_SOS_WAKEUP_ENABLED = "key_alert_caregiver_sos_wakeup_enabled"
+        private const val KEY_ALERT_EMERGENCY_IS_CAREGIVER_ROLE = "key_alert_emergency_is_caregiver_role"
 
         private const val KEY_BLE_BRIDGE_ROLE = "key_ble_bridge_role"
         private const val KEY_BLE_BRIDGE_IS_ENABLED = "key_ble_bridge_is_enabled"

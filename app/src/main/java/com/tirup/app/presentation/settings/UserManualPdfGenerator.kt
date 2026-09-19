@@ -511,8 +511,8 @@ class UserManualPdfGenerator(private val context: Context) {
             y2 = drawBulletPoint(
                 c2, y2,
                 if (isRu) "Режим опекуна (активация и белый список)" else "Caregiver Mode & Anti-Spam Whitelist",
-                if (isRu) "Активируется выбором «📻 Приёмник» в блоке BLE-моста. В блоке «Экстренное SMS» укажите телефон(ы) подопечных: сирена сработает только с этих номеров. Требуются права RECEIVE_SMS и «Поверх других приложений». Кнопка «Проверить сирену и экран» тестирует тревогу без SMS."
-                else "Enabled by choosing '📻 Observer' in BLE Bridge. In Emergency SMS set patient numbers: siren triggers only from them. Requires RECEIVE_SMS & 'Display over other apps'. Use 'Test Caregiver Siren & Screen' to verify."
+                if (isRu) "Активируется чекбоксом «Опекун» в блоке «Экстренное SMS». Укажите телефон(ы) подопечных: сирена сработает только с этих номеров. Требуются права RECEIVE_SMS и «Поверх других приложений». Кнопка «Проверить сирену и экран» запускает тревогу через 5 с, чтобы успеть заблокировать телефон."
+                else "Enabled by checking 'Caregiver' in Emergency SMS. Set patient numbers: siren triggers only from them. Requires RECEIVE_SMS and overlay permission. Test button triggers alarm after 5s to let you lock screen."
             )
             y2 = drawSectionHeading(c2, y2, if (isRu) "4.2. Настройка разрешений SMS и экрана блокировки" else "4.2. SMS & Lockscreen Permissions")
             y2 = drawParagraph(
