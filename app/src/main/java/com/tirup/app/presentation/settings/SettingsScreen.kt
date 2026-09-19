@@ -1317,6 +1317,7 @@ fun SettingsScreen(
                         ) {
                             // Section: Local BLE Bridge (Broadcaster / Observer)
                             val ble = settings.bleBridgeSettings
+                            val isBridgeActive = ble.isEnabled && ble.role != BleBridgeRole.DISABLED
                     BentoCard(
                         modifier = Modifier.fillMaxWidth(),
                         borderColor = if (highlightBle) ActionBlue.copy(alpha = highlightBorderAlpha) else MaterialTheme.colorScheme.outline,
@@ -1353,9 +1354,10 @@ fun SettingsScreen(
                                         color = MaterialTheme.colorScheme.onSurface,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    val (roleBadgeEmoji, roleBadgeColor) = when (ble.role) {
-                                        BleBridgeRole.BROADCASTER -> Pair("📡", ActionBlue)
-                                        BleBridgeRole.OBSERVER -> Pair("📻", PrimaryEmerald)
+                                    val (roleBadgeEmoji, roleBadgeColor) = when {
+                                        !isBridgeActive -> Pair("✖️", MaterialTheme.colorScheme.onSurfaceVariant)
+                                        ble.role == BleBridgeRole.BROADCASTER -> Pair("📡", ActionBlue)
+                                        ble.role == BleBridgeRole.OBSERVER -> Pair("📻", PrimaryEmerald)
                                         else -> Pair("✖️", MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     Surface(
@@ -1437,7 +1439,6 @@ fun SettingsScreen(
                                     )
                                 }
                             }
-
                     // Role Selector: 3 options (Off, Broadcaster, Observer)
                     val roles = listOf(
                         Triple(BleBridgeRole.DISABLED, if (isRu) "✖️ Выкл" else "✖️ Off", "gray"),
@@ -1450,7 +1451,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         roles.forEach { (role, label, colorType) ->
-                            val isSelected = ble.role == role
+                            val isSelected = if (role == BleBridgeRole.DISABLED) !isBridgeActive else (isBridgeActive && ble.role == role)
                             val (bg, textColor, borderColor) = when (colorType) {
                                 "blue" -> if (isSelected) {
                                     Triple(ActionBlue.copy(alpha = 0.2f), ActionBlue, ActionBlue)
@@ -1476,12 +1477,13 @@ fun SettingsScreen(
                                         if (role != BleBridgeRole.DISABLED) {
                                             checkAndRequestBlePermissions(role)
                                         }
-                                        val newPin = if (role != BleBridgeRole.DISABLED && (ble.familyPin.length != 3 || !ble.familyPin.all { it in 'A'..'Z' })) {
+                                        val newEnabled = role != BleBridgeRole.DISABLED
+                                        val newPin = if (newEnabled && (ble.familyPin.length != 3 || !ble.familyPin.all { it in 'A'..'Z' })) {
                                             BlePacketCodec.generateRandomPin()
                                         } else {
                                             ble.familyPin
                                         }
-                                        viewModel.updateBleBridgeSettings(ble.copy(role = role, familyPin = newPin))
+                                        viewModel.updateBleBridgeSettings(ble.copy(role = role, isEnabled = newEnabled, familyPin = newPin))
                                     },
                                 shape = RoundedCornerShape(8.dp),
                                 color = bg,
@@ -1499,7 +1501,7 @@ fun SettingsScreen(
                         }
                     }
 
-                    if (ble.role != BleBridgeRole.DISABLED) {
+                    if (isBridgeActive) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
                         // Family PIN code (Compact row with masked PIN & modal trigger)

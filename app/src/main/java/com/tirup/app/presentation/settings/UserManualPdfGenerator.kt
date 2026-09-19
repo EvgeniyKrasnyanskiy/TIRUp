@@ -366,6 +366,12 @@ class UserManualPdfGenerator(private val context: Context) {
                 if (isRu) "На чипсетах Bluetooth 5.0+ режим Coded PHY (S=8) повышает потенциал радиолинии на 8–10 dBm, расширяя дальность в 2–4 раза (до 30–50 м сквозь стены). При отсутствии поддержки аппаратно откатывается на Legacy 1M. Сканер приёмника слушает оба диапазона автоматически."
                 else "On Bluetooth 5.0+, Coded PHY (S=8) boosts link budget by 8-10 dBm, extending range 2-4x (up to 30-50m through walls). Observer operates in dual-mode automatically."
             )
+            y1 = drawBulletPoint(
+                c1, y1,
+                if (isRu) "Разница технологий: BLE-мост TIRUp vs Зеркало Juggluco" else "TIRUp BLE vs Juggluco Mirroring",
+                if (isRu) "TIRUp работает как автономный радиомаяк (Broadcast): без сопряжения, расход <1% батареи, свободен BT-канал для помпы и часов (без квитирования ACK). Juggluco держит постоянный сокет (RFCOMM/Wi-Fi) с гарантией доставки ACK и выкачкой всей истории SQLite, но требует сопряжения и держит постоянное соединение."
+                else "TIRUp uses connectionless BLE broadcast: zero-pairing, <1% battery, free BT slot for pump/watch (no ACK). Juggluco maintains a persistent socket (RFCOMM/Wi-Fi) with delivery ACKs and SQLite history backfill, but requires device pairing and holds connection."
+            )
             y1 = drawCallout(
                 c1, y1, CalloutType.INFO,
                 if (isRu) "📡 ДИАГНОСТИКА СИГНАЛА И БАТАРЕИ ПЕРЕДАТЧИКА:" else "📡 TRANSMITTER SIGNAL & BATTERY:",
@@ -374,7 +380,7 @@ class UserManualPdfGenerator(private val context: Context) {
             )
 
             // 3x CHAPTER SPACING
-            y1 += 22f
+            y1 += 12f
 
             // CHAPTER 2
             y1 = drawChapterHeading(

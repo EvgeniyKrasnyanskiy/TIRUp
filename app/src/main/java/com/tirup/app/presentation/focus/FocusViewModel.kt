@@ -374,8 +374,18 @@ class FocusViewModel(
     fun toggleBleBridgeEnabled() {
         val currentSettings = _uiState.value.userSettings
         val currentBle = currentSettings.bleBridgeSettings
-        val newEnabled = !currentBle.isEnabled
-        val updatedBle = currentBle.copy(isEnabled = newEnabled)
+        val isCurrentlyActive = currentBle.isEnabled && currentBle.role != com.tirup.app.domain.model.BleBridgeRole.DISABLED
+        val newEnabled = !isCurrentlyActive
+        val newRole = if (newEnabled) {
+            if (currentBle.role == com.tirup.app.domain.model.BleBridgeRole.DISABLED) {
+                com.tirup.app.domain.model.BleBridgeRole.BROADCASTER
+            } else {
+                currentBle.role
+            }
+        } else {
+            com.tirup.app.domain.model.BleBridgeRole.DISABLED
+        }
+        val updatedBle = currentBle.copy(isEnabled = newEnabled, role = newRole)
         viewModelScope.launch {
             settingsRepository.updateSettings(currentSettings.copy(bleBridgeSettings = updatedBle))
             if (!newEnabled) {
