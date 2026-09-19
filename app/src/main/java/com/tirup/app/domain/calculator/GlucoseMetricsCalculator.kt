@@ -152,8 +152,8 @@ object GlucoseMetricsCalculator {
 
         val nightStability = calculateNightStability(nightReadings, targetRanges)
 
-        // 3. GVI calculation on raw filtered mg/dL readings with true time intervals
-        val gvi = computeGviXdripStyle(validReadings)
+        // 3. GVI calculation on raw filtered mg/dL readings
+        val gvi = computeGviXdripStyle(rawMgdl)
 
         // 4. PGS calculation: GVI * floor(mean_mgdl) * (1 - floor(TIR)/100)
         val glucoseTotal = rawMgdl.sum()
@@ -275,31 +275,26 @@ object GlucoseMetricsCalculator {
     }
 
     /**
-     * Exact xDrip & DiaKiaBot GVI calculation, adaptive to actual sampling interval dt.
-     * For standard 5-minute sampling, dt = 5.0 min (dt^2 = 25.0), perfectly matching reference.
-     * When broadcast readings have gaps or 1-minute intervals, calculates true path length without distortion.
+     * Exact xDrip & DiaKiaBot GVI calculation.
      */
-    private fun computeGviXdripStyle(readings: List<GlucoseReading>): Double {
-        if (readings.size < 2) return 1.0
+    private fun computeGviXdripStyle(valuesMgdl: List<Double>): Double {
+        if (valuesMgdl.size < 2) return 1.0
 
-        val glucoseFirst = readings.first().valueMmol * MGDL_FACTOR
+        val glucoseFirst = valuesMgdl.first()
         var glucoseLast = glucoseFirst
         var gviTotal = 0.0
-        var totalTimeMinutes = 0.0
+        var usedRecords = 1
 
-        for (i in 1 until readings.size) {
-            val currMgdl = readings[i].valueMmol * MGDL_FACTOR
-            val delta = currMgdl - glucoseLast
-            val rawDtMinutes = (readings[i].timestamp - readings[i - 1].timestamp) / 60000.0
-            val dtMinutes = if (rawDtMinutes <= 0.0) 5.0 else rawDtMinutes.coerceIn(0.5, 30.0)
-            gviTotal += sqrt((dtMinutes * dtMinutes) + (delta * delta))
-            totalTimeMinutes += dtMinutes
-            glucoseLast = currMgdl
+        for (i in 1 until valuesMgdl.size) {
+            val curr = valuesMgdl[i]
+            val delta = curr - glucoseLast
+            gviTotal += sqrt(25.0 + (delta * delta))
+            usedRecords++
+            glucoseLast = curr
         }
 
         val gviDelta = abs(glucoseLast - glucoseFirst)
-        val avgInterval = if (readings.size > 1) totalTimeMinutes / (readings.size - 1) else 5.0
-        val timeComponent = totalTimeMinutes + avgInterval
+        val timeComponent = (usedRecords * 5).toDouble()
         val gviIdeal = sqrt((timeComponent * timeComponent) + (gviDelta * gviDelta))
 
         if (gviIdeal == 0.0) return 1.0

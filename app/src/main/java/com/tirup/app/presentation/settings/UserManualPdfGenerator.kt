@@ -510,21 +510,21 @@ class UserManualPdfGenerator(private val context: Context) {
             )
             y2 = drawBulletPoint(
                 c2, y2,
-                if (isRu) "Режим опекуна (Caregiver SOS Alert)" else "Caregiver SOS Alert Mode",
-                if (isRu) "Если на телефоне опекуна установлен TIRUp, входящее SMS с префиксом «SOS! У...» активирует сирену и экран спасения (CaregiverSosActivity). Важно: номер подопечного должен быть внесён в экстренные контакты на телефоне опекуна (анти-спам). Требуются права RECEIVE_SMS и «Поверх других приложений»."
-                else "If TIRUp is installed on caregiver phone, incoming 'SOS! ...' SMS launches siren and CaregiverSosActivity. Note: caregiver device must have patient's phone in emergency contacts (anti-spam whitelist), with RECEIVE_SMS and 'Display over other apps' permissions."
+                if (isRu) "Режим опекуна (активация и белый список)" else "Caregiver Mode & Anti-Spam Whitelist",
+                if (isRu) "Активируется выбором «📻 Приёмник» в блоке BLE-моста. В блоке «Экстренное SMS» укажите телефон(ы) подопечных: сирена сработает только с этих номеров. Требуются права RECEIVE_SMS и «Поверх других приложений». Кнопка «Проверить сирену и экран» тестирует тревогу без SMS."
+                else "Enabled by choosing '📻 Observer' in BLE Bridge. In Emergency SMS set patient numbers: siren triggers only from them. Requires RECEIVE_SMS & 'Display over other apps'. Use 'Test Caregiver Siren & Screen' to verify."
             )
-            y2 = drawSectionHeading(c2, y2, if (isRu) "4.2. Настройка разрешений SMS и кэширование Android" else "4.2. SMS Permissions & Cache Recovery")
+            y2 = drawSectionHeading(c2, y2, if (isRu) "4.2. Настройка разрешений SMS и экрана блокировки" else "4.2. SMS & Lockscreen Permissions")
             y2 = drawParagraph(
                 c2, y2,
-                if (isRu) "Для работы требуются системные разрешения SEND_SMS и RECEIVE_SMS. При повторной выдаче прав в Android может возникать кэширование отказа: в TIRUp встроен алгоритм автоматической перепроверки системных дескрипторов."
-                else "Requires SEND_SMS and RECEIVE_SMS permissions. TIRUp incorporates automatic descriptor re-verification to bypass Android permission caching issues."
+                if (isRu) "Пациенту требуется разрешение SEND_SMS, опекуну — RECEIVE_SMS и показ поверх других окон. В TIRUp встроен алгоритм автоматической перепроверки системных дескрипторов при возврате из настроек Android."
+                else "Patient requires SEND_SMS; caregiver requires RECEIVE_SMS and overlay permission. TIRUp incorporates automatic descriptor re-verification upon returning from Android Settings."
             )
             drawCallout(
                 c2, y2, CalloutType.TIP,
                 if (isRu) "📱 БЕЗОПАСНОСТЬ И ПРОВЕРКА ЭКСТРЕННОГО SMS:" else "📱 EMERGENCY SMS VERIFICATION:",
-                if (isRu) "В настройках в блоке «Экстренное SMS» нажмите «Отправить тестовое SMS». Убедитесь, что номера доверенных контактов внесены в международном формате (+7...)."
-                else "In Settings ➔ 'Emergency SMS' tap 'Send Test SMS'. Ensure caregiver phone numbers include country code (+1...)."
+                if (isRu) "Пациент может нажать «Отправить тестовое SMS» для проверки отправки. Опекун нажимает «Проверить сирену и экран» и блокирует телефон для проверки пробуждения дисплея."
+                else "Patient taps 'Send Test SMS' to test sending. Caregiver taps 'Test Siren & Screen' and locks phone to verify screen wakeup."
             )
             document.finishPage(page2)
 
