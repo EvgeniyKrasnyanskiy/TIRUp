@@ -375,14 +375,16 @@ fun ReportsScreen(
                         "3️⃣ Выберите пункт «Import / Export features» (Функции импорта / экспорта).\n\n" +
                         "4️⃣ Нажмите «Export CSV (SiDiary format)» (Импорт файлов xDrip+).\n\n" +
                         "5️⃣ Выберите дату начала экспорта данных. Приложение автоматически сформирует архив.\n\n" +
-                        "📂 Где найти готовый файл:\nВнутренняя память смартфона → папка xdrip → файл с именем exportCSV...zip"
+                        "📂 Где найти готовый файл:\nВнутренняя память смартфона → папка xdrip → файл с именем exportCSV...zip\n\n" +
+                        "💡 Поддержка пакетов: можно выбрать сразу несколько файлов или ZIP-архивов одновременно (рекомендуется до 50–100 файлов за раз для стабильности). TIRUp объединит их без дубликатов."
                     } else {
                         "1️⃣ Open the xDrip+ application on your phone.\n\n" +
                         "2️⃣ Tap the three dots ⋮ (Menu) in the upper right corner.\n\n" +
                         "3️⃣ Select 'Import / Export features'.\n\n" +
                         "4️⃣ Tap 'Export CSV (SiDiary format)' to export xDrip+ files.\n\n" +
                         "5️⃣ Choose the start date. xDrip+ will automatically generate the export archive.\n\n" +
-                        "📂 File location:\nInternal storage → xdrip → file named exportCSV...zip"
+                        "📂 File location:\nInternal storage → xdrip → file named exportCSV...zip\n\n" +
+                        "💡 Batch import: you can select multiple files or ZIP archives at once (recommended up to 50–100 files per batch for performance). TIRUp will merge them without duplicates."
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
