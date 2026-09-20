@@ -132,9 +132,6 @@ fun DeviceStatusModal(
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f)
                     )
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
-                    }
                 }
 
                 // --- SENSOR SECTION ---

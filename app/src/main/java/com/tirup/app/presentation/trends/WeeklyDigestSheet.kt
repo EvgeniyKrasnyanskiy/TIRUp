@@ -251,14 +251,14 @@ fun WeeklyDigestSheet(
                     } else {
                         (digest.previousStats.meanMmol * 18.0182).roundToInt().toString()
                     }
-                    val unitLabel = if (isMmol) (if (isRu) "ммоль/л" else "mmol/L") else "mg/dL"
+                    val unitLabel = if (isMmol) (if (isRu) "мм/л" else "mmol/L") else "mg/dL"
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (isRu) "Средний сахар" else "Mean Glucose",
+                            text = if (isRu) "Ср. сахар" else "Mean Glucose",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1.3f)

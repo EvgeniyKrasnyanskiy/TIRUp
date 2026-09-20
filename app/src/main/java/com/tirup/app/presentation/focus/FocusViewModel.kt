@@ -70,7 +70,7 @@ class FocusViewModel(
     private fun startPeriodicForegroundSync() {
         viewModelScope.launch {
             while (true) {
-                kotlinx.coroutines.delay(30_000L)
+                kotlinx.coroutines.delay(60_000L)
                 com.tirup.app.data.receiver.DexdripBroadcastReceiver.syncFromLocalXdrip(context)
             }
         }

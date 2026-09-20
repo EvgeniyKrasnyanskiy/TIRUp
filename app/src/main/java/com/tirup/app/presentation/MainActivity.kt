@@ -1038,7 +1038,7 @@ fun MainPagerScaffold(
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = if (isRu) "Инсулин" else "Insulin",
-                                            fontSize = 17.sp,
+                                            fontSize = 18.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
@@ -1071,7 +1071,7 @@ fun MainPagerScaffold(
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = if (isRu) "Углеводы" else "Carbs",
-                                            fontSize = 17.sp,
+                                            fontSize = 18.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
@@ -1103,11 +1103,11 @@ fun MainPagerScaffold(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.weight(1f, fill = false)
                             ) {
-                                Text(text = "⏱️", fontSize = 20.sp)
+                                Text(text = "⏱️", fontSize = 18.sp)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "${if (isRu) "Сенсор" else "Sensor"}: $sensorRemaining",
-                                    fontSize = 19.sp,
+                                    text = "${if (isRu) "Сенс." else "Sens."}: $sensorRemaining",
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
@@ -1123,7 +1123,7 @@ fun MainPagerScaffold(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = telemetryParts.joinToString("  "),
-                                    fontSize = 19.sp,
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,

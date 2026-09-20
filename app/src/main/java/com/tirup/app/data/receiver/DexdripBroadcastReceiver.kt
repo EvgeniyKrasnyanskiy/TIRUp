@@ -1134,30 +1134,35 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         }
                     }
 
-                    // 2. Fetch /sgv.json?count=24 to backfill any missing historical points
-                    val sgvJsonStr = queryLocalEndpoint("sgv.json?count=24")
+                    // 2. Fetch /sgv.json?count=24 to backfill any missing historical points (only if forced or gap > 5 min)
+                    val latestInDbBefore = app.glucoseRepository.getLatestReading().first()
+                    val needsHistoryBackfill = force || latestInDbBefore == null || (now - latestInDbBefore.timestamp > 300_000L)
                     val backfilledReadings = mutableListOf<GlucoseReading>()
-                    if (!sgvJsonStr.isNullOrBlank()) {
-                        try {
-                            val array = org.json.JSONArray(sgvJsonStr)
-                            for (i in (array.length() - 1) downTo 0) {
-                                val item = array.optJSONObject(i) ?: continue
-                                val dt = item.optLong("date")
-                                val rawSgv = item.optDouble("sgv", Double.NaN)
-                                val dir = item.optString("direction")
-                                if (dt > 0L && !rawSgv.isNaN() && rawSgv > 0.0) {
-                                    val valueMmol = if (rawSgv > 35.0) rawSgv / 18.0182 else rawSgv
-                                    backfilledReadings.add(
-                                        GlucoseReading(
-                                            timestamp = dt,
-                                            valueMmol = valueMmol,
-                                            trendArrow = slopeToArrow(dir)
+
+                    if (needsHistoryBackfill) {
+                        val sgvJsonStr = queryLocalEndpoint("sgv.json?count=24")
+                        if (!sgvJsonStr.isNullOrBlank()) {
+                            try {
+                                val array = org.json.JSONArray(sgvJsonStr)
+                                for (i in (array.length() - 1) downTo 0) {
+                                    val item = array.optJSONObject(i) ?: continue
+                                    val dt = item.optLong("date")
+                                    val rawSgv = item.optDouble("sgv", Double.NaN)
+                                    val dir = item.optString("direction")
+                                    if (dt > 0L && !rawSgv.isNaN() && rawSgv > 0.0) {
+                                        val valueMmol = if (rawSgv > 35.0) rawSgv / 18.0182 else rawSgv
+                                        backfilledReadings.add(
+                                            GlucoseReading(
+                                                timestamp = dt,
+                                                valueMmol = valueMmol,
+                                                trendArrow = slopeToArrow(dir)
+                                            )
                                         )
-                                    )
+                                    }
                                 }
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Error parsing /sgv.json: ${e.message}")
                             }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Error parsing /sgv.json: ${e.message}")
                         }
                     }
 
