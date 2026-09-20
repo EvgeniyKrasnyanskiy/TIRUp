@@ -1347,8 +1347,14 @@ private fun BleBridgeBadge(
     } else {
         // OBSERVER mode (Receiver)
         var isReceivingAnimation by remember { mutableStateOf(false) }
+        var lastAnimationStartAt by remember { mutableStateOf(0L) }
+
         LaunchedEffect(blePacketReceivedAt) {
-            if (blePacketReceivedAt > 0L && (System.currentTimeMillis() - blePacketReceivedAt) < 4000L) {
+            val now = System.currentTimeMillis()
+            // Only start animation if this is a fresh packet and at least 3.5s elapsed since last animation start
+            // (prevents repeated restarts while broadcaster transmits continuous burst packets for 15s)
+            if (blePacketReceivedAt > 0L && (now - blePacketReceivedAt) < 4000L && (now - lastAnimationStartAt) >= 3500L) {
+                lastAnimationStartAt = now
                 isReceivingAnimation = true
                 kotlinx.coroutines.delay(3500L)
                 isReceivingAnimation = false

@@ -19,6 +19,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -163,7 +164,7 @@ fun StreakBadge(
         }
     }
 
-    val isDark = isSystemInDarkTheme()
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val amberBase = Color(0xFFF59E0B) // Amber
     val amberBg = amberBase.copy(alpha = if (isDark) 0.25f else 0.18f)
     val amberBorder = amberBase.copy(alpha = if (isDark) 0.65f else 0.70f)
