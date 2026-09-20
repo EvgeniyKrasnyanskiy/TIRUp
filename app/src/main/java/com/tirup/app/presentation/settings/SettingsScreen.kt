@@ -3125,11 +3125,11 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Live Interactive Preview Box on simulated wallpaper
+                    // Live Interactive Preview Box on simulated wallpaper (5x1 Strip Widget)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(105.dp)
+                            .height(96.dp)
                             .clip(RoundedCornerShape(16.dp))
                             .background(
                                 Brush.verticalGradient(
@@ -3140,7 +3140,7 @@ fun SettingsScreen(
                                     )
                                 )
                             )
-                            .padding(10.dp),
+                            .padding(horizontal = 8.dp, vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Surface(
@@ -3152,59 +3152,140 @@ fun SettingsScreen(
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(76.dp)
+                                .height(58.dp)
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                                    .padding(horizontal = 10.dp, vertical = 4.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(verticalArrangement = Arrangement.Center) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = "5.8",
-                                            fontSize = 22.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
+                                // 1. Left: Glucose + stacked [ Arrow / Delta ]
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "5.8",
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF10B981)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text(
                                             text = "→",
-                                            fontSize = 17.sp,
+                                            fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF4ADE80)
+                                            color = Color(0xFF10B981)
                                         )
-                                        Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = "+0.2",
-                                            fontSize = 11.sp,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
                                             color = Color(0xFF94A3B8)
                                         )
                                     }
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = if (isRu) "В норме ещё 2ч 15м" else "In range 2h 15m left",
-                                        fontSize = 11.sp,
-                                        color = Color(0xFF38BDF8)
-                                    )
                                 }
 
+                                // Divider
+                                Box(
+                                    modifier = Modifier
+                                        .width(1.dp)
+                                        .height(28.dp)
+                                        .background(Color.White.copy(alpha = 0.15f))
+                                )
+
+                                // 2. TIR & Compensator
+                                Column(verticalArrangement = Arrangement.Center) {
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = Color(0xFF10B981).copy(alpha = 0.2f)
+                                    ) {
+                                        Text(
+                                            text = "TIR: 84%",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF10B981),
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = Color(0xFF38BDF8).copy(alpha = 0.2f)
+                                    ) {
+                                        Text(
+                                            text = if (isRu) "+1ч 45м" else "+1h 45m",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF38BDF8),
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                }
+
+                                // 3. Ranges TBR / TAR
+                                Column(verticalArrangement = Arrangement.Center) {
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = Color(0xFFEF4444).copy(alpha = 0.18f)
+                                    ) {
+                                        Text(
+                                            text = "TBR: 1%",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFEF4444),
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = Color(0xFFF59E0B).copy(alpha = 0.18f)
+                                    ) {
+                                        Text(
+                                            text = "TAR: 15%",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFF59E0B),
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                }
+
+                                // 4. Treatments IoB & CoB
                                 Column(
                                     horizontalAlignment = Alignment.End,
                                     verticalArrangement = Arrangement.Center
                                 ) {
                                     Text(
-                                        text = "TIR 84%",
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = PrimaryEmerald
+                                        text = "💉 1.2 U",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFFCBD5E1)
                                     )
                                     Text(
-                                        text = "IoB 1.2 U",
-                                        fontSize = 11.sp,
+                                        text = "🍞 25g",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = Color(0xFFCBD5E1)
+                                    )
+                                }
+
+                                // 5. Telemetry: Age & Battery
+                                Column(
+                                    horizontalAlignment = Alignment.End,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = if (isRu) "2м наз." else "2m ago",
+                                        fontSize = 9.sp,
+                                        color = Color(0xFF94A3B8)
+                                    )
+                                    Text(
+                                        text = "🔋 95%",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF10B981)
                                     )
                                 }
                             }

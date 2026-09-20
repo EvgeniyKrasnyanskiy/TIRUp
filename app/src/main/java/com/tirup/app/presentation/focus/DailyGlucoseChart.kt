@@ -5,6 +5,11 @@ import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -910,18 +915,47 @@ fun DailyGlucoseChart(
                         }
                     }
                     .pointerInput(Unit) {
-                        detectTransformGestures { centroid, pan, zoom, _ ->
-                            // 1. Zoom (pinch)
-                            val newVisible = (visibleMinutes / zoom).coerceIn(120f, 1440f)
-                            val chartWidth = (size.width - 70f).coerceAtLeast(10f)
-                            val centroidRatio = (centroid.x / chartWidth).coerceIn(0f, 1f)
-                            val centerMinute = windowStartMinute + centroidRatio * visibleMinutes
-                            windowStartMinute = (centerMinute - centroidRatio * newVisible).coerceIn(0f, 1440f - newVisible)
-                            visibleMinutes = newVisible
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            do {
+                                val event = awaitPointerEvent()
+                                val pressedCount = event.changes.count { it.pressed }
 
-                            // 2. Pan (horizontal drag)
-                            val minutesPerPx = visibleMinutes / chartWidth
-                            windowStartMinute = (windowStartMinute - pan.x * minutesPerPx).coerceIn(0f, 1440f - visibleMinutes)
+                                if (pressedCount >= 2) {
+                                    // 1. Multi-touch zoom & pan (pinch)
+                                    val zoomChange = event.calculateZoom()
+                                    val panChange = event.calculatePan()
+
+                                    if (zoomChange != 1f || panChange != Offset.Zero) {
+                                        val newVisible = (visibleMinutes / zoomChange).coerceIn(120f, 1440f)
+                                        val chartWidth = (size.width - 70f).coerceAtLeast(10f)
+                                        val centroid = event.calculateCentroid(useCurrent = true)
+                                        val centroidRatio = (centroid.x / chartWidth).coerceIn(0f, 1f)
+                                        val centerMinute = windowStartMinute + centroidRatio * visibleMinutes
+                                        windowStartMinute = (centerMinute - centroidRatio * newVisible).coerceIn(0f, 1440f - newVisible)
+                                        visibleMinutes = newVisible
+
+                                        val minutesPerPx = visibleMinutes / chartWidth
+                                        windowStartMinute = (windowStartMinute - panChange.x * minutesPerPx).coerceIn(0f, 1440f - visibleMinutes)
+
+                                        event.changes.forEach { it.consume() }
+                                    }
+                                } else if (pressedCount == 1) {
+                                    // 2. Single-finger drag:
+                                    // If scale is <= 5h (<= 300 minutes), scroll the chart horizontally.
+                                    // If scale is > 5h (default 6h, 8h, 24h, etc.), do NOT consume drag,
+                                    // allowing parent HorizontalPager to swipe between screens.
+                                    if (visibleMinutes <= 300f) {
+                                        val panChange = event.calculatePan()
+                                        if (panChange.x != 0f) {
+                                            val chartWidth = (size.width - 70f).coerceAtLeast(10f)
+                                            val minutesPerPx = visibleMinutes / chartWidth
+                                            windowStartMinute = (windowStartMinute - panChange.x * minutesPerPx).coerceIn(0f, 1440f - visibleMinutes)
+                                            event.changes.forEach { it.consume() }
+                                        }
+                                    }
+                                }
+                            } while (event.changes.any { it.pressed })
                         }
                     }
             ) {

@@ -479,8 +479,26 @@ object AutoBackupManager {
                 writer.endObject()
             }
         }
-        if (file.exists()) file.delete()
-        tmp.renameTo(file)
+        safeReplaceFile(tmp, file)
+    }
+
+    private fun safeReplaceFile(tmp: File, target: File) {
+        if (!tmp.exists()) return
+        val renamed = try {
+            if (target.exists()) target.delete()
+            tmp.renameTo(target)
+        } catch (_: Exception) {
+            false
+        }
+        if (!renamed && tmp.exists()) {
+            try {
+                tmp.copyTo(target, overwrite = true)
+                tmp.delete()
+                Log.d(TAG, "safeReplaceFile: replaced ${target.name} via copyTo fallback")
+            } catch (e: Exception) {
+                Log.e(TAG, "safeReplaceFile: failed to replace ${target.name}: ${e.message}")
+            }
+        }
     }
 
     private fun writeSettingsObject(writer: JsonWriter, settings: UserSettings) {
@@ -685,8 +703,7 @@ object AutoBackupManager {
             }
             bw.flush()
         }
-        if (file.exists()) file.delete()
-        tmp.renameTo(file)
+        safeReplaceFile(tmp, file)
     }
 
     private suspend fun writeTreatmentsCsvFile(
@@ -723,8 +740,7 @@ object AutoBackupManager {
             }
             bw.flush()
         }
-        if (file.exists()) file.delete()
-        tmp.renameTo(file)
+        safeReplaceFile(tmp, file)
     }
 
     private suspend fun writeLegacyBackupJsonFile(
@@ -779,8 +795,7 @@ object AutoBackupManager {
                 writer.endObject()
             }
         }
-        if (file.exists()) file.delete()
-        tmp.renameTo(file)
+        safeReplaceFile(tmp, file)
     }
 
     private fun escapeCsv(value: String): String {
@@ -795,23 +810,46 @@ object AutoBackupManager {
      * Reads quick header summary from the backup directory.
      */
     fun getBackupSummary(context: Context? = null): BackupSummary? {
-        val pubDir = getPublicBackupDirectory()
-        val intDir = getInternalBackupDirectory(context)
+        val pubDoc = getPublicBackupDirectory()
+        val pubDown = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "TIRUp/$BACKUP_DIR_NAME")
+        val extRoot = Environment.getExternalStorageDirectory()
+        val altDirs = listOf(
+            pubDoc,
+            pubDown,
+            File(extRoot, "TIRUp/$BACKUP_DIR_NAME"),
+            File(extRoot, "Download/TIRUp/$BACKUP_DIR_NAME"),
+            File(extRoot, "Documents/TIRUp/$BACKUP_DIR_NAME"),
+            getInternalBackupDirectory(context)
+        ).distinctBy { it.absolutePath }
 
-        val candidateDirs = listOf(pubDir, intDir).distinctBy { it.absolutePath }
-        for (dir in candidateDirs) {
-            val settingsFile = File(dir, SETTINGS_FILE_NAME)
-            val readingsFile = File(dir, READINGS_FILE_NAME)
-            val legacyFile = File(dir, LEGACY_BACKUP_FILE_NAME)
+        for (dir in altDirs) {
+            try {
+                if (!dir.exists()) continue
 
-            if (settingsFile.exists() && settingsFile.length() > 0L) {
-                val summary = readSummaryFromFiles(dir, settingsFile, readingsFile)
-                if (summary != null) return summary
-            }
+                // Auto-promote any pending .tmp files if target file is missing or older
+                listOf(SETTINGS_FILE_NAME, READINGS_FILE_NAME, TREATMENTS_FILE_NAME, LEGACY_BACKUP_FILE_NAME).forEach { name ->
+                    val tmp = File(dir, "$name.tmp")
+                    val target = File(dir, name)
+                    if (tmp.exists() && (!target.exists() || tmp.lastModified() > target.lastModified())) {
+                        safeReplaceFile(tmp, target)
+                    }
+                }
 
-            if (legacyFile.exists() && legacyFile.length() > 0L) {
-                val summary = readSummaryFromLegacyJson(legacyFile)
-                if (summary != null) return summary
+                val settingsFile = File(dir, SETTINGS_FILE_NAME)
+                val readingsFile = File(dir, READINGS_FILE_NAME)
+                val legacyFile = File(dir, LEGACY_BACKUP_FILE_NAME)
+
+                if (settingsFile.exists() && settingsFile.length() > 0L) {
+                    val summary = readSummaryFromFiles(dir, settingsFile, readingsFile)
+                    if (summary != null) return summary
+                }
+
+                if (legacyFile.exists() && legacyFile.length() > 0L) {
+                    val summary = readSummaryFromLegacyJson(legacyFile)
+                    if (summary != null) return summary
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error reading backup summary from ${dir.absolutePath}: ${e.message}")
             }
         }
         return null
