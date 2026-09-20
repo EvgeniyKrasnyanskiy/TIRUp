@@ -7,6 +7,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Science
@@ -97,6 +100,7 @@ fun ReportsScreen(
     val context = LocalContext.current
     var showGuidebookModal by remember { mutableStateOf(false) }
     var showXdripExportHelp by remember { mutableStateOf(false) }
+    var showLiveDivergenceInfo by remember { mutableStateOf(false) }
     var showMetricsOrderDialog by remember { mutableStateOf(false) }
     var importErrorMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -257,6 +261,7 @@ fun ReportsScreen(
                     state = state,
                     viewModel = viewModel,
                     onCardClick = { viewModel.showLiveDetails(true) },
+                    onInfoClick = { showLiveDivergenceInfo = true },
                     onReorderClick = { showMetricsOrderDialog = true }
                 )
             }
@@ -398,6 +403,65 @@ fun ReportsScreen(
         )
     }
 
+    if (showLiveDivergenceInfo) {
+        AlertDialog(
+            onDismissRequest = { showLiveDivergenceInfo = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = ActionBlue,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isRu) "Статистика TIRUp и xDrip+" else "TIRUp & xDrip+ Statistics",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = if (isRu) {
+                            "Почему показатели TIR, Mean и др. могут незначительно отличаться от цифр в xDrip+:\n\n" +
+                            "1️⃣ Скользящее окно vs Календарные сутки:\n" +
+                            "xDrip+ считает статистику за последние 24 скользящих часа от текущей секунды назад. TIRUp рассчитывает отчёт по фиксированным суткам (00:00–23:59) выбранного периода, что даёт строгие и воспроизводимые границы.\n\n" +
+                            "2️⃣ Количество точек и дубликаты:\n" +
+                            "При разрывах связи или пакетной выгрузке TIRUp устраняет дубликаты замеров с одинаковым временем. Также в xDrip+ могут учитываться калибровочные замеры глюкометра.\n\n" +
+                            "3️⃣ Математическое усреднение:\n" +
+                            "При переменном интервале точек (1 мин vs 5 мин) простое среднее арифметическое и средневзвешенное по времени могут расходиться на 0.1–0.3 ммоль/л.\n\n" +
+                            "4️⃣ Сглаживание шума:\n" +
+                            "xDrip+ на лету применяет фильтр Калмана (Kalman filter) к кривой, тогда как TIRUp считает аналитику по фактическим подтверждённым замерам сенсора."
+                        } else {
+                            "Why TIR, Mean and other metrics may slightly differ from xDrip+:\n\n" +
+                            "1️⃣ Rolling 24h Window vs Calendar Days:\n" +
+                            "xDrip+ computes statistics over a sliding 24-hour window from the current moment backward. TIRUp aligns reports to strict astronomical calendar days (00:00–23:59), ensuring reproducible clinical boundaries.\n\n" +
+                            "2️⃣ Reading Counts & Deduplication:\n" +
+                            "During reconnection bursts or signal gaps, TIRUp filters duplicate timestamps. xDrip+ may also incorporate fingerstick blood meter calibrations.\n\n" +
+                            "3️⃣ Mathematical Averaging:\n" +
+                            "With variable sampling rates (1 min vs 5 min), simple arithmetic mean and time-weighted mean can deviate by 0.1–0.3 mmol/L.\n\n" +
+                            "4️⃣ Noise Filtering:\n" +
+                            "xDrip+ applies real-time Kalman filtering to displayed curves, while TIRUp calculates metrics strictly from verified sensor readings."
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLiveDivergenceInfo = false }) {
+                    Text(text = if (isRu) "Понятно" else "Got it", color = ActionBlue, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
     if (importErrorMessage != null) {
         AlertDialog(
             onDismissRequest = { importErrorMessage = null },
@@ -500,6 +564,7 @@ private fun LiveReportCard(
     state: ReportsUiState,
     viewModel: ReportsViewModel,
     onCardClick: () -> Unit,
+    onInfoClick: () -> Unit,
     onReorderClick: () -> Unit
 ) {
     val stats = state.liveStatistics
@@ -513,13 +578,16 @@ private fun LiveReportCard(
         backgroundColor = MaterialTheme.colorScheme.surfaceVariant
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            // Header Row: Title & PDF Icon
+            // Header Row: Title & PDF Icon & Info Icon
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -551,12 +619,26 @@ private fun LiveReportCard(
                     }
                 }
 
-                if (state.isGeneratingLive) {
-                    CircularProgressIndicator(
-                        color = PrimaryEmerald,
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onInfoClick,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Info",
+                            tint = ActionBlue,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    if (state.isGeneratingLive) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        CircularProgressIndicator(
+                            color = PrimaryEmerald,
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
                 }
             }
 
@@ -1360,10 +1442,10 @@ private fun ParametersGuidebookModal(
                                        else "Gold standard metric of diabetes management. Every +10% TIR reduces retinopathy risk by 64% and microalbuminuria by 40%. Non-diabetic individuals spend 96-99% in this range. In T1D pregnancy, the target corridor is tightened to 3.5–7.8 mmol/L (≥70%). For high-risk or frail elderly patients, target may be relaxed to ≥50%."
                             )
                             GuidebookItemCard(
-                                title = if (isRu) "TING (3.9–7.8 ммоль/л)" else "TING (70–140 mg/dL)",
+                                title = if (isRu) "TITR / TING (3.9–7.8 ммоль/л)" else "TITR / TING (70–140 mg/dL)",
                                 target = if (isRu) "Цель: ≥50.0% (>12 ч/сут) • Здоровые: >90% времени" else "Target: ≥50.0% (>12h/day) • Non-diabetic: >90%",
-                                desc = if (isRu) "Время в узкой физиологической норме (Tight in Normal Glucose). Отражает функционирование здоровой поджелудочной железы и ювелирную точность инсулинотерапии. Нахождение в диапазоне 3.9–7.8 ммоль/л максимально защищает сосудистый эндотелий от окислительного стресса и снижает сердечно-сосудистые риски."
-                                       else "Time in Tight Physiological Norm. Reflects non-diabetic glucose levels and peak insulin therapy precision. Staying within 3.9–7.8 mmol/L protects vascular endothelium from oxidative damage and reduces long-term cardiovascular risks."
+                                desc = if (isRu) "Время в узком целевом диапазоне (Time in Tight Range — TITR / TING). Физиологический коридор здоровой поджелудочной железы. Отражает ювелирную точность инсулинотерапии и сглаживание постпрандиальных пиков. Нахождение в диапазоне 3.9–7.8 ммоль/л максимально защищает эндотелий сосудов от окислительного стресса и снижает сердечно-сосудистые риски."
+                                       else "Time in Tight Range (TITR / TING). Euglycemic corridor of a healthy pancreas. Evaluates peak insulin therapy precision and blunting of postprandial excursions. Staying within 3.9–7.8 mmol/L (70–140 mg/dL) protects vascular endothelium from oxidative stress and mitigates cardiovascular risks."
                             )
                             GuidebookItemCard(
                                 title = if (isRu) "TBR (<3.9 ммоль/л и <3.0 ммоль/л)" else "TBR (<70 mg/dL and <54 mg/dL)",
