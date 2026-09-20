@@ -179,10 +179,10 @@ class GuidebookPdfGenerator(private val context: Context) {
                         else "Gold standard metric. Every +10% TIR reduces microvascular complications risk by 40-64%. Non-diabetic baseline: 96–99%. Pregnancy: ≥70% in 3.5–7.8."
                     ),
                     Triple(
-                        if (isRu) "TING (Узкий диапазон нормы 3.9–7.8 ммоль/л)" else "TING (Tight Range 3.9–7.8 mmol/L)",
+                        if (isRu) "TITR / TING (Узкий диапазон нормы 3.9–7.8 ммоль/л)" else "TITR / TING (Tight Range 3.9–7.8 mmol/L)",
                         if (isRu) "Цель: ≥50.0% (>12 ч/сут)" else "Target: ≥50.0% (>12h/day)",
-                        if (isRu) "Time in Tight Range — физиологический коридор здоровой поджелудочной железы. Максимальная защита сосудов от окислительного стресса."
-                        else "Physiological tight corridor. Evaluates precision of postprandial glycemic excursions blunting and peak insulin therapy precision."
+                        if (isRu) "Time in Tight Range (TITR) — физиологический коридор здоровой поджелудочной железы. Максимальная защита сосудов от окислительного стресса."
+                        else "Time in Tight Range (TITR) — physiological tight corridor. Evaluates precision of postprandial glycemic excursions blunting and peak insulin therapy precision."
                     ),
                     Triple(
                         if (isRu) "TBR (Время в гипогликемии <3.9 ммоль/л)" else "TBR (Hypoglycemia <3.9 mmol/L)",
