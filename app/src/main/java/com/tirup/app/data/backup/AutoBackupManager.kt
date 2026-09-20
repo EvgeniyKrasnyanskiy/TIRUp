@@ -105,6 +105,19 @@ object AutoBackupManager {
     fun isWritableDirectory(dir: File): Boolean {
         return try {
             if (!dir.exists()) dir.mkdirs()
+            val keyFiles = listOf(SETTINGS_FILE_NAME, "$SETTINGS_FILE_NAME.tmp", LEGACY_BACKUP_FILE_NAME)
+            for (kf in keyFiles) {
+                val f = File(dir, kf)
+                if (f.exists()) {
+                    val canWriteFile = try {
+                        FileOutputStream(f, true).close()
+                        true
+                    } catch (_: Exception) {
+                        false
+                    }
+                    if (!canWriteFile) return false
+                }
+            }
             val testFile = File(dir, ".perm_test_${System.currentTimeMillis()}")
             if (testFile.createNewFile()) {
                 testFile.delete()
@@ -842,11 +855,13 @@ object AutoBackupManager {
                 if (!dir.exists()) continue
 
                 // Auto-promote any pending .tmp files if target file is missing or older
-                listOf(SETTINGS_FILE_NAME, READINGS_FILE_NAME, TREATMENTS_FILE_NAME, LEGACY_BACKUP_FILE_NAME).forEach { name ->
-                    val tmp = File(dir, "$name.tmp")
-                    val target = File(dir, name)
-                    if (tmp.exists() && (!target.exists() || tmp.lastModified() > target.lastModified())) {
-                        safeReplaceFile(tmp, target)
+                if (isWritableDirectory(dir)) {
+                    listOf(SETTINGS_FILE_NAME, READINGS_FILE_NAME, TREATMENTS_FILE_NAME, LEGACY_BACKUP_FILE_NAME).forEach { name ->
+                        val tmp = File(dir, "$name.tmp")
+                        val target = File(dir, name)
+                        if (tmp.exists() && (!target.exists() || tmp.lastModified() > target.lastModified())) {
+                            safeReplaceFile(tmp, target)
+                        }
                     }
                 }
 
