@@ -367,6 +367,33 @@ fun AppNavigationRoot(
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val app = context.applicationContext as TirupApplication
+    val isAppRu = settingsState.userSettings.language.equals("RU", ignoreCase = true)
+
+    val backupRestorePicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            coroutineScope.launch {
+                val res = AutoBackupManager.restoreFromUri(
+                    context = context,
+                    uri = uri,
+                    database = app.database,
+                    settingsRepository = app.settingsRepository
+                )
+                if (res.isSuccess) {
+                    val r = res.getOrNull()
+                    val count = r?.readingsRestored ?: 0
+                    val toastMsg = if (isAppRu) "Восстановлено: $count замеров" else "Restored: $count readings"
+                    android.widget.Toast.makeText(context, toastMsg, android.widget.Toast.LENGTH_LONG).show()
+                    settingsViewModel.setHasSeenOnboarding(true)
+                } else {
+                    val err = res.exceptionOrNull()?.message ?: "Unknown error"
+                    val toastMsg = if (isAppRu) "Ошибка восстановления: $err" else "Restore failed: $err"
+                    android.widget.Toast.makeText(context, toastMsg, android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         if (!settingsState.userSettings.hasSeenOnboarding && !hasCheckedBackup) {
@@ -478,6 +505,9 @@ fun AppNavigationRoot(
         HelpAndDisclaimerDialog(
             isRu = isRu,
             onSaveManual = { settingsViewModel.saveUserManualToDownloads() },
+            onRestoreBackup = {
+                backupRestorePicker.launch(arrayOf("application/json", "text/csv", "text/comma-separated-values", "application/zip", "*/*"))
+            },
             onDismiss = {
                 settingsViewModel.setHasSeenOnboarding(true)
             }

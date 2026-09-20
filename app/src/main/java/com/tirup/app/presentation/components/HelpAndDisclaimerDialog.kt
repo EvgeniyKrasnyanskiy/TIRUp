@@ -51,6 +51,7 @@ import com.tirup.app.presentation.theme.PrimaryEmerald
 fun HelpAndDisclaimerDialog(
     isRu: Boolean,
     onSaveManual: () -> Unit = {},
+    onRestoreBackup: (() -> Unit)? = null,
     snackbarHostState: SnackbarHostState? = null,
     onDismiss: () -> Unit
 ) {
@@ -207,6 +208,31 @@ fun HelpAndDisclaimerDialog(
                 if (snackbarHostState != null) {
                     SnackbarHost(hostState = snackbarHostState)
                 }
+                if (onRestoreBackup != null) {
+                    Button(
+                        onClick = onRestoreBackup,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Backup,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isRu) "Восстановить историю из бэкапа" else "Restore history from backup",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.5.sp,
+                            color = Color.White
+                        )
+                    }
+                }
+
                 OutlinedButton(
                     onClick = onSaveManual,
                     modifier = Modifier
@@ -238,7 +264,7 @@ fun HelpAndDisclaimerDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
                 ) {
                     Text(
-                        text = if (isRu) "Понятно" else "Got it",
+                        text = if (isRu) "Начать работу" else "Start using app",
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         color = Color.White
