@@ -28,9 +28,9 @@ class UserManualPdfGenerator(private val context: Context) {
         try {
             val totalPages = 3
             val appVersion = try {
-                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "2.2.1"
+                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "2.2.3"
             } catch (_: Exception) {
-                "2.2.1"
+                "2.2.3"
             }
 
             // Typography Paints
@@ -380,7 +380,7 @@ class UserManualPdfGenerator(private val context: Context) {
             )
 
             // 3x CHAPTER SPACING
-            y1 += 12f
+            y1 += 8f
 
             // CHAPTER 2
             y1 = drawChapterHeading(
@@ -489,7 +489,7 @@ class UserManualPdfGenerator(private val context: Context) {
             )
 
             // 3x CHAPTER SPACING
-            y2 += 24f
+            y2 += 14f
 
             // CHAPTER 4
             y2 = drawChapterHeading(
@@ -597,7 +597,7 @@ class UserManualPdfGenerator(private val context: Context) {
             )
 
             // 3x CHAPTER SPACING
-            y3 += 24f
+            y3 += 14f
 
             // CHAPTER 6
             y3 = drawChapterHeading(
