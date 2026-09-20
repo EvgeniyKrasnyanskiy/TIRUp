@@ -287,6 +287,7 @@ class MainActivity : ComponentActivity() {
         }
         GlucoseAlertManager.dismissCriticalAlarm(this, fromUser = true)
         DexdripBroadcastReceiver.syncFromLocalXdrip(this@MainActivity)
+        com.tirup.app.data.worker.AutoBackupWorker.enqueue(applicationContext, force = false)
 
         // Ensure floating bubble is active if enabled in settings
         val app = applicationContext as? TirupApplication
