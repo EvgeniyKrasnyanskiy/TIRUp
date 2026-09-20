@@ -604,12 +604,12 @@ fun AppNavigationRoot(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
-                .padding(top = 10.dp, start = 16.dp, end = 16.dp)
+                .padding(top = 64.dp, start = 16.dp, end = 16.dp)
                 .zIndex(999f)
         ) {
             Surface(
                 shape = RoundedCornerShape(14.dp),
-                color = Color(0xFF0F172A).copy(alpha = 0.95f),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
                 border = BorderStroke(1.5.dp, PrimaryEmerald),
                 shadowElevation = 8.dp
             ) {
@@ -622,7 +622,7 @@ fun AppNavigationRoot(
                         text = bleSignalBannerText ?: "",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
