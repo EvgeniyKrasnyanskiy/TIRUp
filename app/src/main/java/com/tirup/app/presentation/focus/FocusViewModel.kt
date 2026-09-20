@@ -65,6 +65,11 @@ class FocusViewModel(
         checkAndRefreshIobCob()
         com.tirup.app.data.receiver.DexdripBroadcastReceiver.syncFromLocalXdrip(context)
         startPeriodicForegroundSync()
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            (context.applicationContext as? com.tirup.app.TirupApplication)?.database?.let { db ->
+                com.tirup.app.data.receiver.DexdripBroadcastReceiver.purgeDuplicateTreatments(db)
+            }
+        }
     }
 
     private fun startPeriodicForegroundSync() {

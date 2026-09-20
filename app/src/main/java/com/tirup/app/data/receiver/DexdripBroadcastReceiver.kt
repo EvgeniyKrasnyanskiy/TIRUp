@@ -738,15 +738,100 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
         suspend fun saveTreatmentIfNew(database: AppDatabase, treatment: Treatment) {
             val dao = database.treatmentDao()
-            val minTime = treatment.timestamp - 60_000L
-            val maxTime = treatment.timestamp + 60_000L
-            val count = dao.countSimilar(minTime, maxTime, treatment.insulinUnits, treatment.carbsGrams)
-            if (count == 0) {
-                dao.insert(TreatmentEntity.fromDomain(treatment))
-                Log.i(TAG, "Persisted new treatment: insulin=${treatment.insulinUnits} U, carbs=${treatment.carbsGrams} g, notes=${treatment.notes} at ${treatment.timestamp}")
-            } else {
-                Log.d(TAG, "Skipped duplicate treatment within 60s window: insulin=${treatment.insulinUnits}, carbs=${treatment.carbsGrams}")
+            val windowMs = 5 * 60_000L // 5-minute window bridges broadcast vs web-server sync latencies
+            val existing = dao.getTreatmentsBetweenSync(treatment.timestamp - windowMs, treatment.timestamp + windowMs)
+
+            val duplicate = existing.firstOrNull { entity ->
+                val sameInsulin = when {
+                    treatment.insulinUnits == null && entity.insulinUnits == null -> true
+                    treatment.insulinUnits != null && entity.insulinUnits != null ->
+                        kotlin.math.abs(treatment.insulinUnits - entity.insulinUnits) < 0.05
+                    else -> false
+                }
+                val sameCarbs = when {
+                    treatment.carbsGrams == null && entity.carbsGrams == null -> true
+                    treatment.carbsGrams != null && entity.carbsGrams != null ->
+                        kotlin.math.abs(treatment.carbsGrams - entity.carbsGrams) < 0.5
+                    else -> false
+                }
+                val tHasDose = (treatment.insulinUnits != null && treatment.insulinUnits > 0.0) || (treatment.carbsGrams != null && treatment.carbsGrams > 0.0)
+                val eHasDose = (entity.insulinUnits != null && entity.insulinUnits > 0.0) || (entity.carbsGrams != null && entity.carbsGrams > 0.0)
+                val sameNotes = when {
+                    treatment.notes.isNullOrBlank() && entity.notes.isNullOrBlank() -> true
+                    !treatment.notes.isNullOrBlank() && !entity.notes.isNullOrBlank() ->
+                        treatment.notes.trim().equals(entity.notes.trim(), ignoreCase = true)
+                    else -> false
+                }
+                sameInsulin && sameCarbs && (sameNotes || (tHasDose && eHasDose))
             }
+
+            if (duplicate != null) {
+                // If existing treatment didn't have notes but incoming does, enrich it
+                if (duplicate.notes.isNullOrBlank() && !treatment.notes.isNullOrBlank()) {
+                    dao.insert(duplicate.copy(notes = treatment.notes))
+                }
+                Log.d(TAG, "Skipped duplicate treatment within 5m window: insulin=${treatment.insulinUnits}, carbs=${treatment.carbsGrams}")
+                return
+            }
+
+            dao.insert(TreatmentEntity.fromDomain(treatment))
+            Log.i(TAG, "Persisted new treatment: insulin=${treatment.insulinUnits} U, carbs=${treatment.carbsGrams} g, notes=${treatment.notes} at ${treatment.timestamp}")
+        }
+
+        suspend fun purgeDuplicateTreatments(database: AppDatabase): Int {
+            val dao = database.treatmentDao()
+            val all = dao.getAllTreatments()
+            if (all.size <= 1) return 0
+
+            var deleted = 0
+            val windowMs = 5 * 60_000L
+            val toDelete = mutableSetOf<Long>()
+
+            for (i in 0 until all.size) {
+                val t1 = all[i]
+                if (t1.id in toDelete) continue
+                for (j in (i + 1) until all.size) {
+                    val t2 = all[j]
+                    if (t2.id in toDelete) continue
+                    if (t2.timestamp - t1.timestamp > windowMs) break
+
+                    val sameInsulin = when {
+                        t1.insulinUnits == null && t2.insulinUnits == null -> true
+                        t1.insulinUnits != null && t2.insulinUnits != null ->
+                            kotlin.math.abs(t1.insulinUnits - t2.insulinUnits) < 0.05
+                        else -> false
+                    }
+                    val sameCarbs = when {
+                        t1.carbsGrams == null && t2.carbsGrams == null -> true
+                        t1.carbsGrams != null && t2.carbsGrams != null ->
+                            kotlin.math.abs(t1.carbsGrams - t2.carbsGrams) < 0.5
+                        else -> false
+                    }
+                    val t1HasDose = (t1.insulinUnits != null && t1.insulinUnits > 0.0) || (t1.carbsGrams != null && t1.carbsGrams > 0.0)
+                    val t2HasDose = (t2.insulinUnits != null && t2.insulinUnits > 0.0) || (t2.carbsGrams != null && t2.carbsGrams > 0.0)
+                    val sameNotes = when {
+                        t1.notes.isNullOrBlank() && t2.notes.isNullOrBlank() -> true
+                        !t1.notes.isNullOrBlank() && !t2.notes.isNullOrBlank() ->
+                            t1.notes.trim().equals(t2.notes.trim(), ignoreCase = true)
+                        else -> false
+                    }
+
+                    if (sameInsulin && sameCarbs && (sameNotes || (t1HasDose && t2HasDose))) {
+                        toDelete.add(t2.id)
+                        if (t1.notes.isNullOrBlank() && !t2.notes.isNullOrBlank()) {
+                            dao.insert(t1.copy(notes = t2.notes))
+                        }
+                        deleted++
+                    }
+                }
+            }
+            for (id in toDelete) {
+                dao.deleteById(id)
+            }
+            if (deleted > 0) {
+                Log.i(TAG, "Purged $deleted duplicate treatments from database")
+            }
+            return deleted
         }
 
         fun parseTreatmentsJson(jsonStr: String): List<Treatment> {
@@ -759,12 +844,33 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                     val insulin = parseJsonDouble(obj, "insulin") ?: parseJsonDouble(obj, "insulin_units")
                     val notes = obj.optString("notes").takeIf { it.isNotBlank() }
                     val ts = when {
-                        obj.has("timestamp") -> obj.optLong("timestamp")
+                        obj.has("mills") -> obj.optLong("mills")
+                        obj.has("timestamp") -> {
+                            val raw = obj.optLong("timestamp")
+                            if (raw in 1..99_999_999_999L) raw * 1000L else raw
+                        }
                         obj.has("created_at") -> {
                             val cat = obj.opt("created_at")
                             when (cat) {
-                                is Number -> cat.toLong()
-                                is String -> cat.toLongOrNull() ?: 0L
+                                is Number -> {
+                                    val raw = cat.toLong()
+                                    if (raw in 1..99_999_999_999L) raw * 1000L else raw
+                                }
+                                is String -> {
+                                    cat.toLongOrNull()?.let { raw ->
+                                        if (raw in 1..99_999_999_999L) raw * 1000L else raw
+                                    } ?: run {
+                                        try {
+                                            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US).apply {
+                                                timeZone = java.util.TimeZone.getTimeZone("UTC")
+                                            }
+                                            val cleanStr = cat.substringBefore(".")
+                                            sdf.parse(cleanStr)?.time ?: 0L
+                                        } catch (_: Exception) {
+                                            0L
+                                        }
+                                    }
+                                }
                                 else -> 0L
                             }
                         }
@@ -837,7 +943,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                             for (local in recentLocal) {
                                 if (local.source == "XDRIP" && local.timestamp >= oldestXdripTs) {
                                     val stillExistsInXdrip = treatments.any { xt ->
-                                        kotlin.math.abs(xt.timestamp - local.timestamp) < 60_000L
+                                        kotlin.math.abs(xt.timestamp - local.timestamp) < 5 * 60_000L
                                     }
                                     if (!stillExistsInXdrip) {
                                         db.treatmentDao().deleteById(local.id)
@@ -852,6 +958,9 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         for (t in treatments) {
                             saveTreatmentIfNew(db, t)
                         }
+
+                        // Purge any duplicate records in DB
+                        purgeDuplicateTreatments(db)
 
                         // Auto-recover pump cannula installation timestamp if user logged "канюля" in xDrip
                         val cannulaTreatment = treatments
