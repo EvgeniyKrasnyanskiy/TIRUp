@@ -155,8 +155,8 @@ class GuidebookPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "eA1c / GMI (Расчётный гликированный гемоглобин)" else "eA1c / GMI (Estimated HbA1c)",
                         if (isRu) "Цель: ≤7.0% (норма 4.0–5.6%)" else "Target: ≤7.0% (normal 4.0–5.6%)",
-                        if (isRu) "Проекция HbA1c по формуле ADAG за 2–3 мес. Не искажается анемией и кровопотерями. Для детей цель может быть <6.5%, для пожилых <7.5–8.0%."
-                        else "ADAG formula projection over 2-3 months. Free from anemia distortions. Pediatric/pregnancy target <6.5%, elderly target <7.5-8.0%."
+                        if (isRu) "Проекция HbA1c по формуле GMI = 3.31 + 0.431 × Mean(ммоль/л) за 2–3 мес. Не искажается анемией. Для детей цель может быть <6.5%, для пожилых <7.5–8.0%."
+                        else "GMI formula (3.31 + 0.431 × MeanGlucose mmol/L) projection over 2-3 months. Free from anemia distortions. Pediatric/pregnancy target <6.5%, elderly target <7.5-8.0%."
                     ),
                     Triple(
                         if (isRu) "Min / Max (Экстремумы сахара за период)" else "Min / Max (Observed Glycemic Range)",
@@ -246,8 +246,10 @@ class GuidebookPdfGenerator(private val context: Context) {
                 cardHeight = 39f
             )
 
-            // Footer Disclaimer Banner (Pinned gracefully at the bottom)
-            val warnRect = RectF(30f, 726f, 565f, 812f)
+            // Footer Disclaimer Banner (dynamic position — fills remaining space)
+            val disclaimerHeight = 86f
+            val footerTop = maxOf(y + 8f, 842f - 30f - disclaimerHeight) // pin to bottom, but never overlap content
+            val warnRect = RectF(30f, footerTop, 565f, footerTop + disclaimerHeight)
             canvas.drawRoundRect(warnRect, 7f, 7f, warningBgPaint)
             canvas.drawRoundRect(warnRect, 7f, 7f, warningBorderPaint)
 
@@ -255,7 +257,7 @@ class GuidebookPdfGenerator(private val context: Context) {
                 if (isRu) "⚠️ Важные клинические примечания к системам CGM:"
                 else "⚠️ Important Clinical Notes Regarding Continuous Glucose Monitoring (CGM):",
                 38f,
-                739f,
+                footerTop + 13f,
                 itemTitlePaint.apply { color = Color.rgb(180, 83, 9) }
             )
             val discText1 = if (isRu) {
@@ -278,10 +280,10 @@ class GuidebookPdfGenerator(private val context: Context) {
             } else {
                 "• Medical Decisions: verify unexpected sensor readings with a capillary blood glucose fingerstick before corrective action."
             }
-            canvas.drawText(discText1, 38f, 752f, warningTextPaint)
-            canvas.drawText(discText2, 38f, 764f, warningTextPaint)
-            canvas.drawText(discText3, 38f, 776f, warningTextPaint)
-            canvas.drawText(discText4, 38f, 788f, warningTextPaint)
+            canvas.drawText(discText1, 38f, footerTop + 26f, warningTextPaint)
+            canvas.drawText(discText2, 38f, footerTop + 38f, warningTextPaint)
+            canvas.drawText(discText3, 38f, footerTop + 50f, warningTextPaint)
+            canvas.drawText(discText4, 38f, footerTop + 62f, warningTextPaint)
 
             document.finishPage(page)
 

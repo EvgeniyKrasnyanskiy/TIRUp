@@ -235,7 +235,7 @@ class YearEndReportPdfGenerator(private val context: Context) {
             achY += 20f
 
             canvas.drawText(if (isRu) "📈 Всего измерений сенсора:" else "📈 Total Sensor Readings:", margin + 14f, achY, boldTextPaint)
-            canvas.drawText("${stats.totalReadings} точек в базе данных", margin + 220f, achY, textPaint)
+            canvas.drawText(if (isRu) "${stats.totalReadings} точек в базе данных" else "${stats.totalReadings} readings stored", margin + 220f, achY, textPaint)
             achY += 20f
 
             canvas.drawText(if (isRu) "🏆 Лучший месяц года:" else "🏆 Best Month of Year:", margin + 14f, achY, boldTextPaint)
