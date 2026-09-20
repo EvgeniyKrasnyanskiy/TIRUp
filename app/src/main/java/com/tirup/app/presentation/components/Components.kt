@@ -165,9 +165,9 @@ fun StreakBadge(
 
     val isDark = isSystemInDarkTheme()
     val amberBase = Color(0xFFF59E0B) // Amber
-    val amberBg = amberBase.copy(alpha = if (isDark) 0.22f else 0.16f)
-    val amberBorder = amberBase.copy(alpha = if (isDark) 0.60f else 0.55f)
-    val amberText = if (isDark) Color(0xFFFBBF24) else Color(0xFFD97706)
+    val amberBg = amberBase.copy(alpha = if (isDark) 0.25f else 0.16f)
+    val amberBorder = amberBase.copy(alpha = if (isDark) 0.65f else 0.55f)
+    val amberText = if (isDark) Color.White else Color(0xFF78350F) // Crisp white in dark theme, deep dark amber in light theme
 
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -207,8 +207,8 @@ fun StreakBadge(
                         Text(
                             text = "$streakDays",
                             color = amberText,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 13.sp,
                             textAlign = TextAlign.Center
                         )
                     } else {

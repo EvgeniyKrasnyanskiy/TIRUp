@@ -75,7 +75,11 @@ class SettingsViewModel(
     init {
         viewModelScope.launch {
             settingsRepository.getSettings().collect { settings ->
+                val prevTs = _uiState.value.userSettings.lastBackupTimestamp
                 _uiState.update { it.copy(userSettings = settings) }
+                if (settings.lastBackupTimestamp != prevTs && prevTs > 0L) {
+                    loadBackupSummary()
+                }
             }
         }
         loadBackupSummary()
