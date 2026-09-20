@@ -286,6 +286,7 @@ class MainActivity : ComponentActivity() {
             intent.removeExtra(EXTRA_GOTO_YEAR_END)
         }
         GlucoseAlertManager.dismissCriticalAlarm(this, fromUser = true)
+        DexdripBroadcastReceiver.syncFromLocalXdrip(this@MainActivity)
 
         // Ensure floating bubble is active if enabled in settings
         val app = applicationContext as? TirupApplication
