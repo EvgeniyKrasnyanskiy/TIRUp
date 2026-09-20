@@ -63,6 +63,17 @@ class FocusViewModel(
         observeData()
         observeBlePackets()
         checkAndRefreshIobCob()
+        com.tirup.app.data.receiver.DexdripBroadcastReceiver.syncFromLocalXdrip(context)
+        startPeriodicForegroundSync()
+    }
+
+    private fun startPeriodicForegroundSync() {
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(30_000L)
+                com.tirup.app.data.receiver.DexdripBroadcastReceiver.syncFromLocalXdrip(context)
+            }
+        }
     }
 
     private fun observeBlePackets() {

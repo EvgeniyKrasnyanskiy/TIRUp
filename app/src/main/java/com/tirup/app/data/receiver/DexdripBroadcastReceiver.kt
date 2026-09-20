@@ -209,105 +209,14 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 }
 
                 Log.i(TAG, "Saving glucose: $valueMmol mmol/L at $timestamp (trend: $trendArrow, iob: $iob, cob: $cob)")
-
-                val app = context.applicationContext as? TirupApplication
-                val repository = app?.glucoseRepository
-                if (repository != null) {
-                    if (treatment != null) {
-                        saveTreatmentIfNew(app.database, treatment)
-                    }
-                    repository.insertReading(
-                        GlucoseReading(
-                            timestamp = timestamp,
-                            valueMmol = valueMmol,
-                            trendArrow = trendArrow,
-                            iob = iob,
-                            cob = cob
-                        )
-                    )
-                    Log.i(TAG, "Successfully persisted reading into database.")
-                    val recentEntities = app.database.glucoseReadingDao().getRecentReadingsSync(25)
-                    val recentDomain = recentEntities.map { it.toDomain() }
-                    val userSettings = app.settingsRepository.getSettings().first()
-                    com.tirup.app.data.alert.GlucoseAlertManager.checkAndAlert(
-                        context = context.applicationContext,
-                        recentReadings = recentDomain,
-                        settings = userSettings
-                    )
-                    val calendar = java.util.Calendar.getInstance().apply {
-                        set(java.util.Calendar.HOUR_OF_DAY, 0)
-                        set(java.util.Calendar.MINUTE, 0)
-                        set(java.util.Calendar.SECOND, 0)
-                        set(java.util.Calendar.MILLISECOND, 0)
-                    }
-                    val todayEntities = app.database.glucoseReadingDao().getReadingsBetweenSync(
-                        calendar.timeInMillis,
-                        System.currentTimeMillis() + 60_000L
-                    )
-                    val todayDomain = todayEntities.map { it.toDomain() }
-
-                    if (userSettings.alertSettings.isLastChanceAlertEnabled && todayDomain.isNotEmpty()) {
-                        com.tirup.app.data.alert.GlucoseAlertManager.checkLastChanceAlert(
-                            context = context.applicationContext,
-                            todayReadings = todayDomain,
-                            latestReading = todayDomain.last(),
-                            settings = userSettings
-                        )
-                    }
-
-                    // Update Lockscreen status notification if enabled
-                    com.tirup.app.data.alert.GlucoseAlertManager.updateLockscreenNotification(
-                        context = context.applicationContext,
-                        latestReading = todayDomain.lastOrNull() ?: recentDomain.lastOrNull(),
-                        todayReadings = todayDomain,
-                        settings = userSettings,
-                        streakDays = app.glucoseRepository.getStreakDays().first()
-                    )
-
-                    if (userSettings.isFloatingBubbleEnabled && android.provider.Settings.canDrawOverlays(context)) {
-                        com.tirup.app.presentation.overlay.FloatingBubbleService.start(context.applicationContext)
-                    }
-
-                    // BLE Bridge Broadcaster: pulse advertising if role is BROADCASTER and enabled
-                    if (userSettings.bleBridgeSettings.isEnabled && userSettings.bleBridgeSettings.role == com.tirup.app.domain.model.BleBridgeRole.BROADCASTER) {
-                        val latest = todayDomain.lastOrNull() ?: recentDomain.firstOrNull()
-                        if (latest != null) {
-                            val prev = recentDomain.getOrNull(1)
-                            val rate = if (prev != null && latest.timestamp > prev.timestamp) {
-                                val dtMin = (latest.timestamp - prev.timestamp) / 60000.0
-                                if (dtMin in 1.0..15.0) (latest.valueMmol - prev.valueMmol) / dtMin else 0.0
-                            } else 0.0
-
-                            // Adaptive burst duration (Variant B):
-                            // 5s for 1-minute cadence (dt <= 2.5 min), 10s for standard 5-minute cadence
-                            val burstDuration = if (prev != null && (latest.timestamp - prev.timestamp) <= 150_000L) {
-                                com.tirup.app.data.ble.BleBroadcaster.BURST_1MIN_MS
-                            } else {
-                                com.tirup.app.data.ble.BleBroadcaster.BURST_5MIN_MS
-                            }
-
-                            com.tirup.app.data.ble.BleBroadcaster.broadcastReading(
-                                context = context.applicationContext,
-                                reading = latest,
-                                rateOfChange = rate,
-                                iob = latest.iob ?: 0.0,
-                                settings = userSettings.bleBridgeSettings,
-                                burstDurationMs = burstDuration,
-                                cob = latest.cob ?: 0.0
-                            )
-                        }
-                    }
-
-                    com.tirup.app.data.backup.AutoBackupManager.maybeTriggerAutoBackup(
-                        context = context.applicationContext,
-                        database = app.database,
-                        settingsRepository = app.settingsRepository
-                    )
-                    com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context.applicationContext)
-                    syncIobCobFromPebble(context.applicationContext)
-                } else {
-                    Log.e(TAG, "TirupApplication or repository instance is null.")
-                }
+                val reading = GlucoseReading(
+                    timestamp = timestamp,
+                    valueMmol = valueMmol,
+                    trendArrow = trendArrow,
+                    iob = iob,
+                    cob = cob
+                )
+                persistAndDistributeReading(context, reading, treatment)
             } catch (e: Exception) {
                 Log.e(TAG, "Error saving broadcast glucose reading", e)
             } finally {
@@ -613,24 +522,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun slopeToArrow(slopeName: String?): String {
-        val trimmed = slopeName?.trim() ?: return "→"
-        if (trimmed == "↑↑" || trimmed == "⇈") return "⇈"
-        if (trimmed == "↓↓" || trimmed == "⇊") return "⇊"
-        if (trimmed in listOf("↑", "↗", "→", "↘", "↓")) {
-            return trimmed
-        }
-        return when (trimmed.lowercase()) {
-            "doubleup", "double_up", "tripleup", "triple_up" -> "⇈"
-            "singleup", "single_up", "up", "rapidly increasing" -> "↑"
-            "fortyfiveup", "forty_five_up", "up45", "increasing" -> "↗"
-            "flat", "constant", "not changing" -> "→"
-            "fortyfivedown", "forty_five_down", "down45", "decreasing" -> "↘"
-            "singledown", "single_down", "down", "rapidly decreasing" -> "↓"
-            "doubledown", "double_down", "tripledown", "triple_down" -> "⇊"
-            else -> "→"
-        }
-    }
+    private fun slopeToArrow(slopeName: String?): String = Companion.slopeToArrow(slopeName)
 
 
     private fun extractTreatment(extras: Bundle, defaultTimestamp: Long): Treatment? {
@@ -692,6 +584,25 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         private var cachedCobTimestamp: Long = 0L
 
         private val companionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        fun slopeToArrow(slopeName: String?): String {
+            val trimmed = slopeName?.trim() ?: return "→"
+            if (trimmed == "↑↑" || trimmed == "⇈") return "⇈"
+            if (trimmed == "↓↓" || trimmed == "⇊") return "⇊"
+            if (trimmed in listOf("↑", "↗", "→", "↘", "↓")) {
+                return trimmed
+            }
+            return when (trimmed.lowercase()) {
+                "doubleup", "double_up", "tripleup", "triple_up" -> "⇈"
+                "singleup", "single_up", "up", "rapidly increasing" -> "↑"
+                "fortyfiveup", "forty_five_up", "up45", "increasing" -> "↗"
+                "flat", "constant", "not changing" -> "→"
+                "fortyfivedown", "forty_five_down", "down45", "decreasing" -> "↘"
+                "singledown", "single_down", "down", "rapidly decreasing" -> "↓"
+                "doubledown", "double_down", "tripledown", "triple_down" -> "⇊"
+                else -> "→"
+            }
+        }
 
         fun parseJsonDouble(obj: org.json.JSONObject, key: String): Double? {
             if (!obj.has(key) || obj.isNull(key)) return null
@@ -1071,6 +982,213 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to send xDrip handshake: ${e.message}")
+            }
+        }
+
+        suspend fun persistAndDistributeReading(
+            context: Context,
+            reading: GlucoseReading,
+            treatment: Treatment? = null
+        ) {
+            val app = context.applicationContext as? TirupApplication ?: return
+            val repository = app.glucoseRepository
+            if (treatment != null) {
+                saveTreatmentIfNew(app.database, treatment)
+            }
+            repository.insertReading(reading)
+            Log.i(TAG, "Successfully persisted reading: ${reading.valueMmol} mmol/L at ${reading.timestamp}")
+
+            val recentEntities = app.database.glucoseReadingDao().getRecentReadingsSync(25)
+            val recentDomain = recentEntities.map { it.toDomain() }
+            val userSettings = app.settingsRepository.getSettings().first()
+            com.tirup.app.data.alert.GlucoseAlertManager.checkAndAlert(
+                context = context.applicationContext,
+                recentReadings = recentDomain,
+                settings = userSettings
+            )
+            val calendar = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            val todayEntities = app.database.glucoseReadingDao().getReadingsBetweenSync(
+                calendar.timeInMillis,
+                System.currentTimeMillis() + 60_000L
+            )
+            val todayDomain = todayEntities.map { it.toDomain() }
+
+            if (userSettings.alertSettings.isLastChanceAlertEnabled && todayDomain.isNotEmpty()) {
+                com.tirup.app.data.alert.GlucoseAlertManager.checkLastChanceAlert(
+                    context = context.applicationContext,
+                    todayReadings = todayDomain,
+                    latestReading = todayDomain.last(),
+                    settings = userSettings
+                )
+            }
+
+            // Update Lockscreen status notification if enabled
+            com.tirup.app.data.alert.GlucoseAlertManager.updateLockscreenNotification(
+                context = context.applicationContext,
+                latestReading = todayDomain.lastOrNull() ?: recentDomain.lastOrNull(),
+                todayReadings = todayDomain,
+                settings = userSettings,
+                streakDays = app.glucoseRepository.getStreakDays().first()
+            )
+
+            if (userSettings.isFloatingBubbleEnabled && android.provider.Settings.canDrawOverlays(context)) {
+                com.tirup.app.presentation.overlay.FloatingBubbleService.start(context.applicationContext)
+            }
+
+            // BLE Bridge Broadcaster: pulse advertising if role is BROADCASTER and enabled
+            if (userSettings.bleBridgeSettings.isEnabled && userSettings.bleBridgeSettings.role == com.tirup.app.domain.model.BleBridgeRole.BROADCASTER) {
+                val latest = todayDomain.lastOrNull() ?: recentDomain.firstOrNull()
+                if (latest != null) {
+                    val prev = recentDomain.getOrNull(1)
+                    val rate = if (prev != null && latest.timestamp > prev.timestamp) {
+                        val dtMin = (latest.timestamp - prev.timestamp) / 60000.0
+                        if (dtMin in 1.0..15.0) (latest.valueMmol - prev.valueMmol) / dtMin else 0.0
+                    } else 0.0
+
+                    // Adaptive burst duration: 5s for 1-minute cadence, 10s for standard 5-minute cadence
+                    val burstDuration = if (prev != null && (latest.timestamp - prev.timestamp) <= 150_000L) {
+                        com.tirup.app.data.ble.BleBroadcaster.BURST_1MIN_MS
+                    } else {
+                        com.tirup.app.data.ble.BleBroadcaster.BURST_5MIN_MS
+                    }
+
+                    com.tirup.app.data.ble.BleBroadcaster.broadcastReading(
+                        context = context.applicationContext,
+                        reading = latest,
+                        rateOfChange = rate,
+                        iob = latest.iob ?: 0.0,
+                        settings = userSettings.bleBridgeSettings,
+                        burstDurationMs = burstDuration,
+                        cob = latest.cob ?: 0.0
+                    )
+                }
+            }
+
+            com.tirup.app.data.backup.AutoBackupManager.maybeTriggerAutoBackup(
+                context = context.applicationContext,
+                database = app.database,
+                settingsRepository = app.settingsRepository
+            )
+            com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context.applicationContext)
+            syncIobCobFromPebble(context.applicationContext)
+        }
+
+        @Volatile
+        private var isSyncingFromLocal = false
+        @Volatile
+        private var lastLocalSyncAttempt = 0L
+
+        fun syncFromLocalXdrip(context: Context, force: Boolean = false) {
+            val now = System.currentTimeMillis()
+            if (!force && isSyncingFromLocal && (now - lastLocalSyncAttempt < 5000L)) return
+            if (!force && (now - lastLocalSyncAttempt < 15000L)) return
+            lastLocalSyncAttempt = now
+
+            companionScope.launch {
+                if (isSyncingFromLocal) return@launch
+                isSyncingFromLocal = true
+                try {
+                    val app = context.applicationContext as? TirupApplication ?: return@launch
+
+                    // 1. Fetch /pebble endpoint (instant live reading with iob/cob)
+                    val pebbleJsonStr = queryLocalEndpoint("pebble")
+                    var latestReadingFromPebble: GlucoseReading? = null
+
+                    if (!pebbleJsonStr.isNullOrBlank()) {
+                        try {
+                            val root = org.json.JSONObject(pebbleJsonStr)
+                            val bgs = root.optJSONArray("bgs")
+                            if (bgs != null && bgs.length() > 0) {
+                                val first = bgs.optJSONObject(0)
+                                if (first != null) {
+                                    val rawSgv = first.optString("sgv").replace(',', '.').trim()
+                                    val numSgv = rawSgv.toDoubleOrNull() ?: first.optDouble("sgv", Double.NaN).takeIf { !it.isNaN() }
+                                    val dt = first.optLong("datetime").takeIf { it > 0L }
+                                        ?: root.optJSONArray("status")?.optJSONObject(0)?.optLong("now")
+                                        ?: System.currentTimeMillis()
+                                    val dir = first.optString("direction")
+                                    val arrow = slopeToArrow(dir)
+
+                                    val iobVal = parseJsonDouble(first, "iob") ?: parseJsonDouble(root, "iob")
+                                    val cobVal = parseJsonDouble(first, "cob") ?: parseJsonDouble(root, "cob")
+
+                                    if (numSgv != null && numSgv > 0.0) {
+                                        val valueMmol = if (numSgv > 35.0) numSgv / 18.0182 else numSgv
+                                        latestReadingFromPebble = GlucoseReading(
+                                            timestamp = dt,
+                                            valueMmol = valueMmol,
+                                            trendArrow = arrow,
+                                            iob = if (iobVal != null && iobVal > 0.05) iobVal else null,
+                                            cob = if (cobVal != null && cobVal > 0.5) cobVal else null
+                                        )
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error parsing /pebble: ${e.message}")
+                        }
+                    }
+
+                    // 2. Fetch /sgv.json?count=24 to backfill any missing historical points
+                    val sgvJsonStr = queryLocalEndpoint("sgv.json?count=24")
+                    val backfilledReadings = mutableListOf<GlucoseReading>()
+                    if (!sgvJsonStr.isNullOrBlank()) {
+                        try {
+                            val array = org.json.JSONArray(sgvJsonStr)
+                            for (i in (array.length() - 1) downTo 0) {
+                                val item = array.optJSONObject(i) ?: continue
+                                val dt = item.optLong("date")
+                                val rawSgv = item.optDouble("sgv", Double.NaN)
+                                val dir = item.optString("direction")
+                                if (dt > 0L && !rawSgv.isNaN() && rawSgv > 0.0) {
+                                    val valueMmol = if (rawSgv > 35.0) rawSgv / 18.0182 else rawSgv
+                                    backfilledReadings.add(
+                                        GlucoseReading(
+                                            timestamp = dt,
+                                            valueMmol = valueMmol,
+                                            trendArrow = slopeToArrow(dir)
+                                        )
+                                    )
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error parsing /sgv.json: ${e.message}")
+                        }
+                    }
+
+                    // 3. Batch insert missing historical points into repository
+                    if (backfilledReadings.isNotEmpty()) {
+                        app.glucoseRepository.insertReadingsBatch(backfilledReadings)
+                    }
+
+                    // 4. Ingest latest point with full alert and widget lifecycle
+                    val readingToPersist = latestReadingFromPebble ?: backfilledReadings.lastOrNull()
+                    if (readingToPersist != null) {
+                        val latestInDb = app.glucoseRepository.getLatestReading().first()
+                        val isNewer = latestInDb == null || (readingToPersist.timestamp - latestInDb.timestamp > 30_000L)
+
+                        if (isNewer) {
+                            persistAndDistributeReading(context, readingToPersist)
+                        } else if (latestInDb != null && readingToPersist.timestamp == latestInDb.timestamp &&
+                            (readingToPersist.iob != latestInDb.iob || readingToPersist.cob != latestInDb.cob)
+                        ) {
+                            app.database.glucoseReadingDao().updateIobCob(latestInDb.id, readingToPersist.iob, readingToPersist.cob)
+                            com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context)
+                        }
+                    }
+
+                    // 5. Also sync treatments and notes from treatments.json
+                    syncIobCobFromPebble(context)
+                } catch (e: Exception) {
+                    Log.w(TAG, "syncFromLocalXdrip error: ${e.message}")
+                } finally {
+                    isSyncingFromLocal = false
+                }
             }
         }
     }

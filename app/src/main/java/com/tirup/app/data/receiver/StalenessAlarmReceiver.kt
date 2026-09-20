@@ -24,6 +24,9 @@ class StalenessAlarmReceiver : BroadcastReceiver() {
 
         scope.launch {
             try {
+                // Attempt to recover fresh data from local xDrip service (port 17580)
+                DexdripBroadcastReceiver.syncFromLocalXdrip(context, force = true)
+
                 val app = context.applicationContext as? TirupApplication ?: return@launch
                 val settings = app.settingsRepository.getSettings().firstOrNull() ?: return@launch
                 val latest = app.glucoseRepository.getLatestReading().firstOrNull() ?: return@launch
