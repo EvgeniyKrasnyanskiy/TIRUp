@@ -293,7 +293,7 @@ fun RangeDistributionBar(
 fun BentoMetricCompact(
     title: String,
     value: String,
-    unit: String = "",
+    @Suppress("UNUSED_PARAMETER") unit: String = "",
     valueColor: Color,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
