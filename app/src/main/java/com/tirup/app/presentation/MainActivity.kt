@@ -604,7 +604,7 @@ fun AppNavigationRoot(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
-                .padding(top = 64.dp, start = 16.dp, end = 16.dp)
+                .padding(top = 47.dp, start = 16.dp, end = 16.dp)
                 .zIndex(999f)
         ) {
             Surface(
@@ -614,7 +614,7 @@ fun AppNavigationRoot(
                 shadowElevation = 8.dp
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
