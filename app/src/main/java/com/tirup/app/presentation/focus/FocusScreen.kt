@@ -105,6 +105,7 @@ import com.tirup.app.domain.model.daysRemaining
 import com.tirup.app.presentation.components.DeviceStatusChips
 import com.tirup.app.presentation.components.DeviceStatusModal
 import com.tirup.app.presentation.components.DeviceExpiredAlertDialog
+import com.tirup.app.domain.model.NightStability
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.presentation.components.BentoMetricCompact
@@ -893,75 +894,30 @@ fun FocusScreen(
                 activeMonitoringMinutes = goal.activeMonitoringMinutes,
                 unit = unit,
                 isRu = isRu,
-                onModeChange = { mode -> viewModel.setTargetMode(mode) },
-                onClick = {
-                    val observedPtsStr = "${goal.observedPointsCount}"
-                    val activeMonStr = TargetCompensatorCalculator.formatHoursMins(goal.activeMonitoringMinutes, isRu)
-                    val inRangeStr = TargetCompensatorCalculator.formatHoursMins(goal.inRangeMinutes, isRu)
-                    val targetMinsStr = TargetCompensatorCalculator.formatHoursMins(goal.targetGoalMinutes, isRu)
-                    val outOfRangeStr = TargetCompensatorCalculator.formatHoursMins(goal.outOfRangeMinutes, isRu)
-                    val allowedOutStr = TargetCompensatorCalculator.formatHoursMins(goal.allowedOutMinutes, isRu)
-                    val remainingDayStr = TargetCompensatorCalculator.formatHoursMins(goal.remainingMinutesToday, isRu)
+                nightStability = state.statistics.nightStability,
+                onNightClick = {
+                    val nightStability = state.statistics.nightStability
+                    val hasNightData = nightStability.nightDurationMinutes >= 45 || (nightStability.nightReadingsCount >= 10 && nightStability.nightDurationMinutes >= 30)
 
-                    val dialogBody = if (isRu) {
-                        "Текущий ${targetMode.name}: ${String.format(Locale.US, "%.1f%%", currentScore)} (Цель: ≥$targetGoal%)\n\n" +
-                        "• Замеров за сутки: $observedPtsStr точек ($activeMonStr данных)\n" +
-                        "• В диапазоне за сегодня: $inRangeStr (норма ≥$targetMinsStr)\n" +
-                        "• Вне диапазона за сегодня: $outOfRangeStr (допустимый лимит: $allowedOutStr)\n" +
-                        "• До конца суток осталось: $remainingDayStr\n\n" +
-                        "Рекомендация: $compMessage"
-                    } else {
-                        "Current ${targetMode.name}: ${String.format(Locale.US, "%.1f%%", currentScore)} (Target: ≥$targetGoal%)\n\n" +
-                        "• Readings today: $observedPtsStr pts ($activeMonStr data)\n" +
-                        "• In range today: $inRangeStr (target ≥$targetMinsStr)\n" +
-                        "• Out of range today: $outOfRangeStr (allowed limit: $allowedOutStr)\n" +
-                        "• Remaining today: $remainingDayStr\n\n" +
-                        "Recommendation: $compMessage"
+                    val sdFormatted = if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.2f", nightStability.sdMmol)
+                    else "${(nightStability.sdMmol * 18.0182).toInt()}"
+                    val sdTarget = if (unit == GlucoseUnit.MMOL_L) 1.5 else (1.5 * 18.0182)
+
+                    val nightStatusText = when {
+                        !hasNightData -> if (isRu) "Недостаточно данных (<1 ч сна)" else "Insufficient data (<1h sleep)"
+                        nightStability.isGrowthHormoneSpike -> if (isRu) "Всплеск сна (СТГ): max ${String.format(Locale.US, "%.1f", nightStability.maxMmol)}"
+                                                               else "Deep-sleep surge (GH): max ${String.format(Locale.US, "%.1f", nightStability.maxMmol)}"
+                        nightStability.tbrPercent > 1.0 -> if (isRu) "Риск ночных гипо: TBR ${String.format(Locale.US, "%.1f%%", nightStability.tbrPercent)}"
+                                                           else "Night hypo risk: TBR ${String.format(Locale.US, "%.1f%%", nightStability.tbrPercent)}"
+                        nightStability.tarPercent > 25.0 -> if (isRu) "Ночные подъёмы: TAR ${String.format(Locale.US, "%.1f%%", nightStability.tarPercent)} • SD $sdFormatted"
+                                                            else "Night highs: TAR ${String.format(Locale.US, "%.1f%%", nightStability.tarPercent)} • SD $sdFormatted"
+                        nightStability.sdMmol > sdTarget -> if (isRu) "Разброс (SD): $sdFormatted"
+                                                            else "Variability (SD): $sdFormatted"
+                        nightStability.isStable -> if (isRu) "Стабильно: TIR ${String.format(Locale.US, "%.1f%%", nightStability.tirPercent)} • SD $sdFormatted"
+                                                   else "Stable: TIR ${String.format(Locale.US, "%.1f%%", nightStability.tirPercent)} • SD $sdFormatted"
+                        else -> if (isRu) "Колебания сахара" else "Glucose fluctuations"
                     }
 
-                    detailDialogInfo = Pair(
-                        if (isRu) "Достижение цели дня" else "Daily Goal Achievement",
-                        dialogBody
-                    )
-                }
-            )
-        }
-
-        // 3. Night Stability Indicator
-        item {
-            val nightStability = state.statistics.nightStability
-            val hasNightData = nightStability.nightDurationMinutes >= 45 || (nightStability.nightReadingsCount >= 10 && nightStability.nightDurationMinutes >= 30)
-
-            val sdFormatted = if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.2f", nightStability.sdMmol)
-            else "${(nightStability.sdMmol * 18.0182).toInt()}"
-            val sdTarget = if (unit == GlucoseUnit.MMOL_L) 1.5 else (1.5 * 18.0182)
-
-            val nightStatusText = when {
-                !hasNightData -> if (isRu) "Недостаточно данных (<1 ч сна)" else "Insufficient data (<1h sleep)"
-                nightStability.isGrowthHormoneSpike -> if (isRu) "Всплеск сна (СТГ): max ${String.format(Locale.US, "%.1f", nightStability.maxMmol)}"
-                                                       else "Deep-sleep surge (GH): max ${String.format(Locale.US, "%.1f", nightStability.maxMmol)}"
-                nightStability.tbrPercent > 1.0 -> if (isRu) "Риск ночных гипо: TBR ${String.format(Locale.US, "%.1f%%", nightStability.tbrPercent)}"
-                                                   else "Night hypo risk: TBR ${String.format(Locale.US, "%.1f%%", nightStability.tbrPercent)}"
-                nightStability.tarPercent > 25.0 -> if (isRu) "Ночные подъёмы: TAR ${String.format(Locale.US, "%.1f%%", nightStability.tarPercent)} • SD $sdFormatted"
-                                                    else "Night highs: TAR ${String.format(Locale.US, "%.1f%%", nightStability.tarPercent)} • SD $sdFormatted"
-                nightStability.sdMmol > sdTarget -> if (isRu) "Разброс (SD): $sdFormatted"
-                                                    else "Variability (SD): $sdFormatted"
-                nightStability.isStable -> if (isRu) "Стабильно: TIR ${String.format(Locale.US, "%.1f%%", nightStability.tirPercent)} • SD $sdFormatted"
-                                           else "Stable: TIR ${String.format(Locale.US, "%.1f%%", nightStability.tirPercent)} • SD $sdFormatted"
-                else -> if (isRu) "Колебания сахара" else "Glucose fluctuations"
-            }
-
-            val statusColor = when {
-                !hasNightData -> onSurfaceVariant
-                nightStability.isStable -> PrimaryEmerald
-                nightStability.isGrowthHormoneSpike -> ActionBlue
-                nightStability.tbrPercent > 1.0 -> ColorVeryLow
-                else -> ColorHigh
-            }
-
-            BentoCard(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
                     detailDialogInfo = Pair(
                         if (isRu) "Ночной профиль сна" else "Night Sleep Profile",
                         if (!hasNightData) {
@@ -1008,49 +964,39 @@ fun FocusScreen(
                             }
                         }
                     )
-                }
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Bedtime,
-                            contentDescription = null,
-                            tint = onSurfaceVariant,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (isRu) "Ночной профиль" else "Night Sleep Profile",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = onSurfaceVariant
-                            )
-                            Text(
-                                text = nightStatusText,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = statusColor,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
+                },
+                onModeChange = { mode -> viewModel.setTargetMode(mode) },
+                onClick = {
+                    val observedPtsStr = "${goal.observedPointsCount}"
+                    val activeMonStr = TargetCompensatorCalculator.formatHoursMins(goal.activeMonitoringMinutes, isRu)
+                    val inRangeStr = TargetCompensatorCalculator.formatHoursMins(goal.inRangeMinutes, isRu)
+                    val targetMinsStr = TargetCompensatorCalculator.formatHoursMins(goal.targetGoalMinutes, isRu)
+                    val outOfRangeStr = TargetCompensatorCalculator.formatHoursMins(goal.outOfRangeMinutes, isRu)
+                    val allowedOutStr = TargetCompensatorCalculator.formatHoursMins(goal.allowedOutMinutes, isRu)
+                    val remainingDayStr = TargetCompensatorCalculator.formatHoursMins(goal.remainingMinutesToday, isRu)
+
+                    val dialogBody = if (isRu) {
+                        "Текущий ${targetMode.name}: ${String.format(Locale.US, "%.1f%%", currentScore)} (Цель: ≥$targetGoal%)\n\n" +
+                        "• Замеров за сутки: $observedPtsStr точек ($activeMonStr данных)\n" +
+                        "• В диапазоне за сегодня: $inRangeStr (норма ≥$targetMinsStr)\n" +
+                        "• Вне диапазона за сегодня: $outOfRangeStr (допустимый лимит: $allowedOutStr)\n" +
+                        "• До конца суток осталось: $remainingDayStr\n\n" +
+                        "Рекомендация: $compMessage"
+                    } else {
+                        "Current ${targetMode.name}: ${String.format(Locale.US, "%.1f%%", currentScore)} (Target: ≥$targetGoal%)\n\n" +
+                        "• Readings today: $observedPtsStr pts ($activeMonStr data)\n" +
+                        "• In range today: $inRangeStr (target ≥$targetMinsStr)\n" +
+                        "• Out of range today: $outOfRangeStr (allowed limit: $allowedOutStr)\n" +
+                        "• Remaining today: $remainingDayStr\n\n" +
+                        "Recommendation: $compMessage"
                     }
 
-                    Icon(
-                        imageVector = if (hasNightData && nightStability.isStable) Icons.Default.CheckCircle else Icons.Default.Info,
-                        contentDescription = null,
-                        tint = statusColor,
-                        modifier = Modifier.size(22.dp)
+                    detailDialogInfo = Pair(
+                        if (isRu) "Достижение цели дня" else "Daily Goal Achievement",
+                        dialogBody
                     )
                 }
-            }
+            )
         }
 
         item { Spacer(modifier = Modifier.height(20.dp)) }
@@ -1264,7 +1210,7 @@ private fun BleBridgeBadge(
             }
         }
     } else if (bleSettings.role == BleBridgeRole.BROADCASTER) {
-        if (isBleBroadcasting) {
+        if (isBleBroadcasting && broadcastRemainingSec in 11..15) {
             val transition = rememberInfiniteTransition(label = "BleWaves")
             val wave1Progress by transition.animateFloat(
                 initialValue = 0f,
@@ -1497,17 +1443,19 @@ private fun BleBridgeBadge(
                 }
             }
         } else {
-            // Observer Idle: Bluetooth icon + age of last radio contact
-            val contactTs = if (bleSettings.lastRadioContactMs > 0L) bleSettings.lastRadioContactMs else bleSettings.lastPacketTimestamp
+            // Observer Idle: Bluetooth icon + age of last radio contact / glucose reading
+            val readingTs = bleSettings.lastPacketTimestamp
+            val contactTs = bleSettings.lastRadioContactMs
             val nowMs = System.currentTimeMillis()
-            val ageMin = if (contactTs > 0L) ((nowMs - contactTs) / 60_000L).toInt() else -1
-
-            val isStale = ageMin >= 5
+            val readingAgeMin = if (readingTs > 0L) ((nowMs - readingTs) / 60_000L).toInt() else -1
+            val contactAgeMin = if (contactTs > 0L) ((nowMs - contactTs) / 60_000L).toInt() else -1
+            val displayAgeMin = if (readingAgeMin >= 0) readingAgeMin else contactAgeMin
+            val isStale = displayAgeMin >= 5 || (contactAgeMin >= 5 && contactAgeMin != -1)
             val badgeText = when {
-                ageMin < 0 -> "RX"
-                ageMin < 1 -> "<1м"
-                ageMin < 60 -> "${ageMin}м"
-                else -> "${ageMin / 60}ч"
+                displayAgeMin < 0 -> "RX"
+                displayAgeMin < 1 -> "<1м"
+                displayAgeMin < 60 -> "${displayAgeMin}м"
+                else -> "${displayAgeMin / 60}ч"
             }
             val containerColor = if (isStale) Color(0xFF94A3B8) else ActionBlue
             val textColor = if (isStale) Color(0xFF94A3B8) else ActionBlue
@@ -1928,23 +1876,23 @@ private fun HeroGlucoseCard(
                 v > 10.0 -> Pair(if (isRu) "🔺 Выше целевого диапазона" else "🔺 Above target range", ColorHigh)
                 rate <= -0.11 -> Pair(
                     if (unit == GlucoseUnit.MMOL_L) {
-                        if (isRu) String.format(Locale.US, "⚡ Сахар быстро падает (%.2f ммоль/л/мин)", rate)
-                        else String.format(Locale.US, "⚡ Dropping fast (%.2f mmol/L/min)", rate)
+                        if (isRu) String.format(Locale.US, "⚡ Падение (%.2f/мин)", rate)
+                        else String.format(Locale.US, "⚡ Dropping (%.2f/min)", rate)
                     } else {
                         val rateMg = rate * 18.0182
-                        if (isRu) String.format(Locale.US, "⚡ Сахар быстро падает (%.1f мг/дл/мин)", rateMg)
-                        else String.format(Locale.US, "⚡ Dropping fast (%.1f mg/dL/min)", rateMg)
+                        if (isRu) String.format(Locale.US, "⚡ Падение (%.1f/мин)", rateMg)
+                        else String.format(Locale.US, "⚡ Dropping (%.1f/min)", rateMg)
                     },
                     ColorLow
                 )
                 rate >= 0.11 -> Pair(
                     if (unit == GlucoseUnit.MMOL_L) {
-                        if (isRu) String.format(Locale.US, "⚡ Сахар быстро растёт (+%.2f ммоль/л/мин)", rate)
-                        else String.format(Locale.US, "⚡ Rising fast (+%.2f mmol/L/min)", rate)
+                        if (isRu) String.format(Locale.US, "⚡ Рост (+%.2f/мин)", rate)
+                        else String.format(Locale.US, "⚡ Rising (+%.2f/min)", rate)
                     } else {
                         val rateMg = rate * 18.0182
-                        if (isRu) String.format(Locale.US, "⚡ Сахар быстро растёт (+%.1f мг/дл/мин)", rateMg)
-                        else String.format(Locale.US, "⚡ Rising fast (+%.1f mg/dL/min)", rateMg)
+                        if (isRu) String.format(Locale.US, "⚡ Рост (+%.1f/мин)", rateMg)
+                        else String.format(Locale.US, "⚡ Rising (+%.1f/min)", rateMg)
                     },
                     ColorHigh
                 )
@@ -2291,7 +2239,9 @@ private fun HeroGlucoseCard(
                             text = statusInfo.first,
                             style = MaterialTheme.typography.bodySmall,
                             color = statusInfo.second,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                     if (statusInfo != null && timeLabel.isNotEmpty()) {
@@ -2305,7 +2255,8 @@ private fun HeroGlucoseCard(
                         Text(
                             text = timeLabel,
                             style = MaterialTheme.typography.bodySmall,
-                            color = onSurfaceVariant
+                            color = onSurfaceVariant,
+                            maxLines = 1
                         )
                     }
                 }
@@ -2375,6 +2326,8 @@ private fun TargetCompensatorCard(
     activeMonitoringMinutes: Int,
     unit: GlucoseUnit,
     isRu: Boolean,
+    nightStability: NightStability? = null,
+    onNightClick: (() -> Unit)? = null,
     onModeChange: (TargetMode) -> Unit,
     onClick: () -> Unit
 ) {
@@ -2488,6 +2441,72 @@ private fun TargetCompensatorCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = onSurfaceVariant
             )
+
+            // Compact Integrated Night Profile Chip
+            if (nightStability != null && onNightClick != null) {
+                val hasNightData = nightStability.nightDurationMinutes >= 45 || (nightStability.nightReadingsCount >= 10 && nightStability.nightDurationMinutes >= 30)
+                val sdFormatted = if (unit == GlucoseUnit.MMOL_L) String.format(Locale.US, "%.2f", nightStability.sdMmol)
+                else "${(nightStability.sdMmol * 18.0182).toInt()}"
+                val sdTarget = if (unit == GlucoseUnit.MMOL_L) 1.5 else (1.5 * 18.0182)
+
+                val nightChipText = if (!hasNightData) {
+                    if (isRu) "🌙 Ночь: недостаточно данных (<1 ч)" else "🌙 Night: insufficient data (<1h)"
+                } else {
+                    val tirText = "${nightStability.tirPercent.toInt()}% TIR"
+                    val status = when {
+                        nightStability.isGrowthHormoneSpike -> if (isRu) "Всплеск СТГ" else "GH surge"
+                        nightStability.tbrPercent > 1.0 -> if (isRu) "Риск гипо" else "Hypo risk"
+                        nightStability.tarPercent > 25.0 -> if (isRu) "Подъёмы" else "Highs"
+                        nightStability.sdMmol > sdTarget -> if (isRu) "Разброс" else "Variable"
+                        nightStability.isStable -> if (isRu) "Стабильно" else "Stable"
+                        else -> if (isRu) "Колебания" else "Fluctuations"
+                    }
+                    "🌙 ${if (isRu) "Ночь" else "Night"}: $tirText • $status • SD $sdFormatted"
+                }
+
+                val chipColor = when {
+                    !hasNightData -> onSurfaceVariant
+                    nightStability.isStable -> PrimaryEmerald
+                    nightStability.isGrowthHormoneSpike -> ActionBlue
+                    nightStability.tbrPercent > 1.0 -> ColorVeryLow
+                    else -> ColorHigh
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = chipColor.copy(alpha = 0.10f),
+                    border = BorderStroke(0.8.dp, chipColor.copy(alpha = 0.35f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onNightClick() }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = nightChipText,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = chipColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = chipColor.copy(alpha = 0.7f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }
