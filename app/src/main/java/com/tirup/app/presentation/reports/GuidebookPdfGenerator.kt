@@ -271,19 +271,25 @@ class GuidebookPdfGenerator(private val context: Context) {
                 "• Physiological Lag: CGM sensors measure interstitial fluid; physiological lag relative to blood glucose is typically 5–15 minutes."
             }
             val discText3 = if (isRu) {
-                "• Погрешность MARD: стандартная клиническая погрешность систем CGM составляет 8–10%. Возможны ложные занижения показаний при сдавливании сенсора во сне (compression lows)."
+                "• Погрешность MARD: стандартная клиническая погрешность систем CGM составляет 8–10%."
             } else {
-                "• MARD Accuracy: standard mean absolute relative difference is 8–10%. Sleep compression lows may occasionally occur."
+                "• MARD Accuracy: standard mean absolute relative difference is 8–10%."
+            }
+            val discText3b = if (isRu) {
+                "  Возможны ложные занижения показаний при сдавливании сенсора во сне (compression lows)."
+            } else {
+                "  Sleep compression lows (pressure-induced false readings) may occasionally occur."
             }
             val discText4 = if (isRu) {
                 "• Принятие решений: при выраженном расхождении самочувствия с показаниями CGM выполните контрольный замер по капле крови."
             } else {
                 "• Medical Decisions: verify unexpected sensor readings with a capillary blood glucose fingerstick before corrective action."
             }
-            canvas.drawText(discText1, 38f, footerTop + 26f, warningTextPaint)
-            canvas.drawText(discText2, 38f, footerTop + 38f, warningTextPaint)
-            canvas.drawText(discText3, 38f, footerTop + 50f, warningTextPaint)
-            canvas.drawText(discText4, 38f, footerTop + 62f, warningTextPaint)
+            canvas.drawText(discText1, 38f, footerTop + 24f, warningTextPaint)
+            canvas.drawText(discText2, 38f, footerTop + 35f, warningTextPaint)
+            canvas.drawText(discText3, 38f, footerTop + 46f, warningTextPaint)
+            canvas.drawText(discText3b, 38f, footerTop + 56f, warningTextPaint)
+            canvas.drawText(discText4, 38f, footerTop + 67f, warningTextPaint)
 
             document.finishPage(page)
 

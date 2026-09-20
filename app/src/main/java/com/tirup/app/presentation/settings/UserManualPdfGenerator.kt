@@ -14,8 +14,8 @@ import java.io.FileOutputStream
 
 /**
  * Professional Clinical & Technical User Manual PDF Generator.
- * Generates an exhaustive 3-page A4 manual with classic book typography (2 chapters per page,
- * in-depth explanatory paragraphs, non-overlapping bullet lists with bold titles, and dynamic clinical callout boxes).
+ * Generates an exhaustive A4 manual with classic book typography, natural content flow across pages
+ * (no artificial chapter page breaks), non-overlapping bullet lists with bold titles, and dynamic clinical callout boxes.
  */
 class UserManualPdfGenerator(private val context: Context) {
 
@@ -23,10 +23,31 @@ class UserManualPdfGenerator(private val context: Context) {
         INFO, TIP, WARNING, CRITICAL
     }
 
+    private data class ParagraphLayout(
+        val lines: List<String>,
+        val height: Float
+    )
+
+    private data class BulletLayout(
+        val titleColon: String,
+        val titleWidth: Float,
+        val firstLine: String,
+        val subLines: List<String>,
+        val height: Float
+    )
+
+    private data class CalloutLayout(
+        val type: CalloutType,
+        val title: String,
+        val lines: List<String>,
+        val boxWidth: Float,
+        val totalHeight: Float,
+        val advanceY: Float
+    )
+
     suspend fun generateUserManualPdf(isRu: Boolean): Result<File> = withContext(Dispatchers.IO) {
         val document = PdfDocument()
         try {
-            val totalPages = 3
             val appVersion = try {
                 context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "2.2.3"
             } catch (_: Exception) {
@@ -108,8 +129,7 @@ class UserManualPdfGenerator(private val context: Context) {
                 style = Paint.Style.FILL
             }
 
-            // Running header & footer: strictly non-overlapping
-            fun drawRunningHeaderAndFooter(canvas: Canvas, pageNum: Int) {
+            fun drawRunningHeaderAndFooter(canvas: Canvas, pageNum: Int, totalPages: Int) {
                 val headerDocTitle = if (isRu) "TIRUp • Руководство пользователя и клинический справочник"
                 else "TIRUp • User Manual & Clinical Reference"
                 canvas.drawText(headerDocTitle, 36f, 24f, docHeaderTitlePaint)
@@ -129,21 +149,7 @@ class UserManualPdfGenerator(private val context: Context) {
                 canvas.drawText(appStamp, 559f - stampWidth, 826f, docHeaderSubPaint)
             }
 
-            fun drawChapterHeading(canvas: Canvas, startY: Float, title: String, subtitle: String): Float {
-                var y = startY + 3f
-                canvas.drawText(title, 36f, y + 9f, chapterTitlePaint)
-                y += 12.0f
-                canvas.drawText(subtitle, 36f, y + 7f, chapterSubtitlePaint)
-                return y + 11.5f
-            }
-
-            fun drawSectionHeading(canvas: Canvas, startY: Float, heading: String): Float {
-                val y = startY + 2f
-                canvas.drawText(heading, 36f, y + 8f, sectionHeadingPaint)
-                return y + 11.0f
-            }
-
-            fun drawParagraph(canvas: Canvas, startY: Float, text: String, maxWidth: Float = 523f, lineHeight: Float = 10.4f): Float {
+            fun measureParagraph(text: String, maxWidth: Float = 523f, lineHeight: Float = 10.4f): ParagraphLayout {
                 val words = text.split(" ")
                 val lines = mutableListOf<String>()
                 var currentLine = ""
@@ -159,31 +165,17 @@ class UserManualPdfGenerator(private val context: Context) {
                 if (currentLine.isNotEmpty()) {
                     lines.add(currentLine)
                 }
-
-                var y = startY + 8.0f
-                for (l in lines) {
-                    canvas.drawText(l, 36f, y, bodyPaint)
-                    y += lineHeight
-                }
-                return (y - lineHeight) + 4.0f
+                val height = if (lines.isEmpty()) 0f else 12.0f + (lines.size - 1) * lineHeight
+                return ParagraphLayout(lines, height)
             }
 
-            fun drawBulletPoint(
-                canvas: Canvas,
-                startY: Float,
+            fun layoutBulletPoint(
                 title: String,
                 desc: String,
                 maxWidth: Float = 523f,
                 lineHeight: Float = 10.4f
-            ): Float {
-                var y = startY + 8.0f
-
-                // Bullet dot
-                canvas.drawText("•", 38f, y, bulletSymbolPaint)
-
-                // Title
+            ): BulletLayout {
                 val titleColon = "$title: "
-                canvas.drawText(titleColon, 47f, y, bulletTitlePaint)
                 val titleWidth = bulletTitlePaint.measureText(titleColon)
 
                 val words = desc.split(" ")
@@ -204,12 +196,8 @@ class UserManualPdfGenerator(private val context: Context) {
                     }
                 }
 
-                if (firstLine.isNotEmpty()) {
-                    canvas.drawText(firstLine, 47f + titleWidth, y, bodyPaint)
-                }
-
-                // Subsequent wrapped lines indented to 47f
                 val subAvail = maxWidth - 11f
+                val subLines = mutableListOf<String>()
                 var subLine = ""
                 while (wordIdx < words.size) {
                     val w = words[wordIdx]
@@ -218,42 +206,25 @@ class UserManualPdfGenerator(private val context: Context) {
                         subLine = test
                         wordIdx++
                     } else {
-                        y += lineHeight
-                        canvas.drawText(subLine, 47f, y, bodyPaint)
+                        subLines.add(subLine)
                         subLine = w
                         wordIdx++
                     }
                 }
-
                 if (subLine.isNotEmpty()) {
-                    y += lineHeight
-                    canvas.drawText(subLine, 47f, y, bodyPaint)
+                    subLines.add(subLine)
                 }
 
-                return y + 3.0f
+                val height = 11.0f + (subLines.size * lineHeight)
+                return BulletLayout(titleColon, titleWidth, firstLine, subLines, height)
             }
 
-            fun drawCallout(
-                canvas: Canvas,
-                startY: Float,
+            fun layoutCallout(
                 type: CalloutType,
                 title: String,
                 text: String,
                 boxWidth: Float = 523f
-            ): Float {
-                val y = startY + 2f
-                val (bgColor, borderColor, accentColor, textColor) = when (type) {
-                    CalloutType.INFO -> listOf(Color.rgb(239, 246, 255), Color.rgb(191, 219, 254), Color.rgb(37, 99, 235), Color.rgb(30, 64, 175))
-                    CalloutType.TIP -> listOf(Color.rgb(236, 253, 245), Color.rgb(167, 243, 208), Color.rgb(16, 185, 129), Color.rgb(6, 95, 70))
-                    CalloutType.WARNING -> listOf(Color.rgb(254, 252, 232), Color.rgb(254, 240, 138), Color.rgb(245, 158, 11), Color.rgb(146, 64, 14))
-                    CalloutType.CRITICAL -> listOf(Color.rgb(254, 242, 242), Color.rgb(254, 202, 202), Color.rgb(239, 68, 68), Color.rgb(153, 27, 27))
-                }
-                calloutBgPaint.color = bgColor
-                calloutBorderPaint.color = borderColor
-                calloutAccentBarPaint.color = accentColor
-                calloutTitlePaint.color = textColor
-                calloutBodyPaint.color = textColor
-
+            ): CalloutLayout {
                 val textMaxWidth = boxWidth - 20f
                 val words = text.split(" ")
                 val lines = mutableListOf<String>()
@@ -273,369 +244,491 @@ class UserManualPdfGenerator(private val context: Context) {
 
                 val lineHeight = 9.0f
                 val totalHeight = 13f + (lines.size * lineHeight) + 3f
-                val boxRect = RectF(36f, y, 36f + boxWidth, y + totalHeight)
-                canvas.drawRoundRect(boxRect, 4f, 4f, calloutBgPaint)
-                canvas.drawRoundRect(boxRect, 4f, 4f, calloutBorderPaint)
-
-                // Left accent bar
-                val barRect = RectF(36f, y, 40f, y + totalHeight)
-                canvas.drawRoundRect(barRect, 2f, 2f, calloutAccentBarPaint)
-
-                canvas.drawText(title, 46f, y + 9.5f, calloutTitlePaint)
-
-                var lineY = y + 19.0f
-                for (l in lines) {
-                    canvas.drawText(l, 46f, lineY, calloutBodyPaint)
-                    lineY += lineHeight
-                }
-
-                return y + totalHeight + 4.2f
+                val advanceY = 2f + totalHeight + 4.2f
+                return CalloutLayout(type, title, lines, boxWidth, totalHeight, advanceY)
             }
 
-            // =========================================================================
-            // PAGE 1: Введение, Содержание, Быстрый старт + ГЛАВА 1 + ГЛАВА 2
-            // =========================================================================
-            val page1 = document.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
-            val c1 = page1.canvas
-            drawRunningHeaderAndFooter(c1, 1)
+            // Dynamic Flow Engine for Natural Content Flow Across Pages
+            class ManualFlowContext(
+                val isDryRun: Boolean,
+                val totalPages: Int,
+                val chapterPages: IntArray
+            ) {
+                var currentPageIndex = 1
+                var currentPage: PdfDocument.Page? = null
+                var currentCanvas: Canvas? = null
+                val startY = 44f
+                val maxY = 804f // 10pt safety margin before footer rule at 814f
+                var y = startY
 
-            var y1 = 44f
-            c1.drawText(if (isRu) "TIRUp • РУКОВОДСТВО ПОЛЬЗОВАТЕЛЯ" else "TIRUp • USER MANUAL", 36f, y1 + 10f, docTitlePaint)
-            y1 += 13.5f
+                fun startDocument() {
+                    currentPageIndex = 1
+                    y = startY
+                    if (!isDryRun) {
+                        val pageInfo = PdfDocument.PageInfo.Builder(595, 842, currentPageIndex).create()
+                        val page = document.startPage(pageInfo)
+                        currentPage = page
+                        currentCanvas = page.canvas
+                        drawRunningHeaderAndFooter(page.canvas, currentPageIndex, totalPages)
+                    }
+                }
 
-            c1.drawText(
-                if (isRu) "Клинический справочник, автономная архитектура, тревоги и защита безопасности"
-                else "Clinical reference, zero-cloud architecture, safety alarms and device integration",
-                36f, y1 + 7f, chapterSubtitlePaint
-            )
-            y1 += 11.5f
+                fun ensureSpace(neededHeight: Float) {
+                    if (y + neededHeight > maxY) {
+                        currentPageIndex++
+                        if (!isDryRun) {
+                            currentPage?.let { document.finishPage(it) }
+                            val pageInfo = PdfDocument.PageInfo.Builder(595, 842, currentPageIndex).create()
+                            val page = document.startPage(pageInfo)
+                            currentPage = page
+                            currentCanvas = page.canvas
+                            drawRunningHeaderAndFooter(page.canvas, currentPageIndex, totalPages)
+                        }
+                        y = startY
+                    }
+                }
 
-            // TOC Box
-            val tocRect = RectF(36f, y1, 559f, y1 + 29f)
-            calloutBgPaint.color = Color.rgb(248, 250, 252)
-            calloutBorderPaint.color = Color.rgb(203, 213, 225)
-            c1.drawRoundRect(tocRect, 4f, 4f, calloutBgPaint)
-            c1.drawRoundRect(tocRect, 4f, 4f, calloutBorderPaint)
-            c1.drawText(if (isRu) "СОДЕРЖАНИЕ РУКОВОДСТВА:" else "TABLE OF CONTENTS:", 44f, y1 + 9.5f, tocTitlePaint)
-            c1.drawText(
-                if (isRu) "Гл. 1: Связь и BLE-мост • Гл. 2: Надежность в фоне и OEM (Стр. 1) | Гл. 3: Тревоги и Спасение • Гл. 4: SOS SMS и Опекун (Стр. 2)"
-                else "Ch. 1: Connectivity & BLE • Ch. 2: Background Reliability & OEM (p. 1) | Ch. 3: Safety Alarms & Rescue • Ch. 4: Emergency SOS & Caregiver (p. 2)",
-                44f, y1 + 17.5f, tocBodyPaint
-            )
-            c1.drawText(
-                if (isRu) "Гл. 5: Клиническая аналитика AGP и HbA1c • Гл. 6: HUD 108sp, Виджеты, Расходники и Архивация (Стр. 3)"
-                else "Ch. 5: Clinical AGP & HbA1c • Ch. 6: Quick Glance HUD, Widgets, Supplies & Maintenance (p. 3)",
-                44f, y1 + 25.5f, tocBodyPaint
-            )
-            y1 += 33.5f
+                fun chapter(chapNum: Int, title: String, subtitle: String) {
+                    val headingHeight = 26.5f
+                    val orphanPreview = 40f
+                    val spacing = if (y > startY + 1f) 10f else 0f
+                    if (y + spacing + headingHeight + orphanPreview > maxY) {
+                        ensureSpace(maxY + 100f) // Force clean page break
+                    } else {
+                        y += spacing
+                    }
+                    chapterPages[chapNum] = currentPageIndex
+                    val canvas = currentCanvas
+                    if (canvas != null) {
+                        var cy = y + 3f
+                        canvas.drawText(title, 36f, cy + 9f, chapterTitlePaint)
+                        cy += 12.0f
+                        canvas.drawText(subtitle, 36f, cy + 7f, chapterSubtitlePaint)
+                    }
+                    y += headingHeight
+                }
 
-            // Quick Start Callout
-            y1 = drawCallout(
-                c1, y1, CalloutType.TIP,
-                if (isRu) "🚀 БЫСТРЫЙ СТАРТ ЗА 3 ШАГА (ДЛЯ НОВЫХ ПОЛЬЗОВАТЕЛЕЙ):" else "🚀 3-STEP QUICK START GUIDE:",
-                if (isRu) "1) В xDrip+ («Настройки ➔ Межпрограммная интеграция») включите «Широковещательные передачи». 2) В настройках Android отключите оптимизацию батареи («Без ограничений»). 3) Задайте целевой диапазон сахара в Настройках TIRUp."
-                else "1) In xDrip+ enable 'Broadcast locally'. 2) Disable Android battery optimization for TIRUp ('Unrestricted'). 3) Set your target glucose range in TIRUp Settings."
-            )
+                fun section(heading: String) {
+                    val headingHeight = 13.0f
+                    val orphanPreview = 35f
+                    if (y + headingHeight + orphanPreview > maxY) {
+                        ensureSpace(maxY + 100f) // Keep section header with its first content item
+                    }
+                    val canvas = currentCanvas
+                    if (canvas != null) {
+                        val cy = y + 2f
+                        canvas.drawText(heading, 36f, cy + 8f, sectionHeadingPaint)
+                    }
+                    y += headingHeight
+                }
 
-            // CHAPTER 1
-            y1 = drawChapterHeading(
-                c1, y1,
-                if (isRu) "ГЛАВА 1. АРХИТЕКТУРА СВЯЗИ, ИСТОЧНИКИ ДАННЫХ И BLE-МОСТ" else "CHAPTER 1. CONNECTIVITY, DATA SOURCES & FAMILY BLE BRIDGE",
-                if (isRu) "Zero-Cloud принцип, локальные интенты и автономный семейный Bluetooth-мост" else "Zero-Cloud principle, local Android intents and offline Family BLE Bridge"
-            )
-            y1 = drawParagraph(
-                c1, y1,
-                if (isRu) "Приложение TIRUp создано по принципу максимальной автономности (Zero-Cloud). В отличие от облачных CGM-систем, TIRUp никогда не требует подключения к интернету, внешних серверов или передачи личных данных. Все вычисления компенсации и тревоги выполняются на 100% локально на смартфоне."
-                else "TIRUp operates on the Zero-Cloud principle without internet dependencies, external servers, or data uploads. All calculations and alarms execute 100% locally on your smartphone."
-            )
-            y1 = drawBulletPoint(
-                c1, y1,
-                if (isRu) "xDrip+, GDH и Juggluco" else "xDrip+, GDH & Juggluco",
-                if (isRu) "В настройках источника перейдите в «Межпрограммная интеграция» и включите «Широковещательные передачи» и «Поддержку широковещательной службы» (для мгновенной передачи доз IoB/CoB). TIRUp принимает замеры через локальные Intents с задержкой <0.1 с."
-                else "Enable 'Broadcast locally' and 'Broadcast service support' for IoB/CoB in your source. TIRUp captures streaming readings via low-latency Android Intents (<0.1s)."
-            )
-            y1 = drawBulletPoint(
-                c1, y1,
-                if (isRu) "Семейный BLE-мост (Вещатель — Приёмник)" else "Family BLE Bridge",
-                if (isRu) "Передача сахара ребёнка родителю по Bluetooth LE без Wi-Fi и SIM. Телефон ребёнка настраивается как «Вещатель» (импульс 15 с на замер, микропотребление <0.8% батареи/сутки), телефон родителя — как «Приёмник». Пакет шифруется 4-значным Family PIN."
-                else "Stream patient glucose to parent over BLE without Wi-Fi or SIM. Broadcaster pulses 15s bursts (<0.8% battery/day), Observer receives. Secured with 4-digit PIN."
-            )
-            y1 = drawBulletPoint(
-                c1, y1,
-                if (isRu) "Режим Long Range (LE Coded PHY)" else "Long Range Mode (LE Coded PHY)",
-                if (isRu) "На чипсетах Bluetooth 5.0+ режим Coded PHY (S=8) повышает потенциал радиолинии на 8–10 dBm, расширяя дальность в 2–4 раза (до 30–50 м сквозь стены). При отсутствии поддержки аппаратно откатывается на Legacy 1M. Сканер приёмника слушает оба диапазона автоматически."
-                else "On Bluetooth 5.0+, Coded PHY (S=8) boosts link budget by 8-10 dBm, extending range 2-4x (up to 30-50m through walls). Observer operates in dual-mode automatically."
-            )
-            y1 = drawBulletPoint(
-                c1, y1,
-                if (isRu) "Разница технологий: BLE-мост TIRUp vs Зеркало Juggluco" else "TIRUp BLE vs Juggluco Mirroring",
-                if (isRu) "TIRUp работает как автономный радиомаяк (Broadcast): без сопряжения, расход <1% батареи, свободен BT-канал для помпы и часов (без квитирования ACK). Juggluco держит постоянный сокет (RFCOMM/Wi-Fi) с гарантией доставки ACK и выкачкой всей истории SQLite, но требует сопряжения и держит постоянное соединение."
-                else "TIRUp uses connectionless BLE broadcast: zero-pairing, <1% battery, free BT slot for pump/watch (no ACK). Juggluco maintains a persistent socket (RFCOMM/Wi-Fi) with delivery ACKs and SQLite history backfill, but requires device pairing and holds connection."
-            )
-            y1 = drawCallout(
-                c1, y1, CalloutType.INFO,
-                if (isRu) "📡 ДИАГНОСТИКА СИГНАЛА И БАТАРЕИ ПЕРЕДАТЧИКА:" else "📡 TRANSMITTER SIGNAL & BATTERY:",
-                if (isRu) "В шторке уведомлений и в HUD приёмника отображаются уровень радиосигнала (RSSI dBm) и процент заряда батареи подопечного. Для быстрой проверки используйте «Тест дальности (5с)»."
-                else "Notification and HUD widget display real-time transmitter RSSI (dBm) and battery %. Use 'Range Test (5s)' in Observer settings for immediate verification."
-            )
+                fun paragraph(text: String) {
+                    val layout = measureParagraph(text)
+                    ensureSpace(layout.height)
+                    val canvas = currentCanvas
+                    if (canvas != null) {
+                        var lineY = y + 8.0f
+                        for (l in layout.lines) {
+                            canvas.drawText(l, 36f, lineY, bodyPaint)
+                            lineY += 10.4f
+                        }
+                    }
+                    y += layout.height
+                }
 
-            // 3x CHAPTER SPACING
-            y1 += 8f
+                fun bullet(title: String, desc: String) {
+                    val layout = layoutBulletPoint(title, desc)
+                    ensureSpace(layout.height)
+                    val canvas = currentCanvas
+                    if (canvas != null) {
+                        var lineY = y + 8.0f
+                        canvas.drawText("•", 38f, lineY, bulletSymbolPaint)
+                        canvas.drawText(layout.titleColon, 47f, lineY, bulletTitlePaint)
+                        if (layout.firstLine.isNotEmpty()) {
+                            canvas.drawText(layout.firstLine, 47f + layout.titleWidth, lineY, bodyPaint)
+                        }
+                        for (sub in layout.subLines) {
+                            lineY += 10.4f
+                            canvas.drawText(sub, 47f, lineY, bodyPaint)
+                        }
+                    }
+                    y += layout.height
+                }
 
-            // CHAPTER 2
-            y1 = drawChapterHeading(
-                c1, y1,
-                if (isRu) "ГЛАВА 2. НАДЕЖНОСТЬ В ФОНЕ И НАСТРОЙКА OEM-ПРОШИВОК" else "CHAPTER 2. BACKGROUND RELIABILITY & OEM-SPECIFIC GUIDES",
-                if (isRu) "Преодоление Doze Mode, App Standby и пошаговые чек-листы для вендоров" else "Overcoming Doze Mode, App Standby and step-by-step checklists for major OEMs"
-            )
-            y1 = drawSectionHeading(c1, y1, if (isRu) "2.1. Чек-листы фоновой работы для популярных смартфонов" else "2.1. Background Reliability Checklists for Major OEMs")
-            y1 = drawBulletPoint(
-                c1, y1,
-                if (isRu) "Samsung (OneUI)" else "Samsung (OneUI)",
-                if (isRu) "1) Настройки ➔ Приложения ➔ TIRUp ➔ Батарея ➔ «Не ограничено». 2) Настройки ➔ Батарея ➔ «Ограничения в фоновом режиме» ➔ «Никогда не спящие приложения» ➔ добавьте TIRUp и источник. 3) Закрепите замочком в меню недавних."
-                else "1) Settings ➔ Apps ➔ TIRUp ➔ Battery ➔ 'Unrestricted'. 2) Battery ➔ Background limits ➔ 'Never sleeping apps' ➔ Add TIRUp. 3) Lock app card in Recents."
-            )
-            y1 = drawBulletPoint(
-                c1, y1,
-                if (isRu) "Xiaomi, Redmi, POCO (MIUI / HyperOS)" else "Xiaomi (MIUI / HyperOS)",
-                if (isRu) "1) Включите «Автозапуск» и «Разрешить запуск другими приложениями». 2) «Контроль активности» ➔ «Нет ограничений». 3) «Другие разрешения» ➔ «Экран блокировки» и «Всплывающие окна». 4) Закрепите замочком в Недавних."
-                else "1) Enable 'Autostart'. 2) Battery saver ➔ 'No restrictions'. 3) Other permissions ➔ Allow 'Lock screen' & 'Pop-up windows'. 4) Lock app in Recents."
-            )
-            y1 = drawBulletPoint(
-                c1, y1,
-                if (isRu) "BBK: Realme, Oppo, OnePlus (ColorOS)" else "BBK: Realme, Oppo, OnePlus",
-                if (isRu) "1) Управление приложениями ➔ TIRUp ➔ «Расход батареи» ➔ разрешите фоновую активность и автозапуск. 2) «Оптимизация режима ожидания» ➔ отключите «Ультра-режим ожидания». 3) Заблокируйте в Недавних."
-                else "1) App management ➔ TIRUp ➔ Battery ➔ Allow background & auto-launch. 2) Disable sleep standby optimization. 3) Lock app in Recents."
-            )
-            y1 = drawBulletPoint(
-                c1, y1,
-                if (isRu) "Huawei, Honor (EMUI / MagicOS)" else "Huawei, Honor (EMUI / MagicOS)",
-                if (isRu) "Настройки ➔ Приложения ➔ Запуск приложений ➔ для TIRUp отключите автоуправление и включите: «Автозапуск», «Косвенный запуск», «Работа в фоне». Закрепите замочком в Недавних."
-                else "Apps ➔ App launch ➔ Disable automatic for TIRUp, enable 'Auto-launch', 'Secondary launch', 'Run in background'. Lock in Recents."
-            )
-            y1 = drawBulletPoint(
-                c1, y1,
-                if (isRu) "Google Pixel (Stock Android)" else "Google Pixel (Stock Android)",
-                if (isRu) "Настройки ➔ Батарея ➔ Адаптивные настройки ➔ отключите «Адаптивный расход». В свойствах TIRUp выберите «Использование батареи ➔ Без ограничений»."
-                else "Battery ➔ Adaptive preferences ➔ Disable 'Adaptive Battery'. In TIRUp app info set 'Battery ➔ Unrestricted'."
-            )
-            y1 = drawSectionHeading(c1, y1, if (isRu) "2.2. Полноэкранные интенты и пробуждение дисплея" else "2.2. Full-Screen Intents & Display Wakeup")
-            y1 = drawParagraph(
-                c1, y1,
-                if (isRu) "При критической ночной гипогликемии дисплей заблокирован. Экран спасения использует аппаратный WakeLock (ACQUIRE_CAUSES_WAKEUP) и флаги FLAG_SHOW_WHEN_LOCKED, гарантированно включая дисплей с сиреной. Предоставьте права «Поверх других приложений»."
-                else "During severe low, Rescue Screen utilizes hardware WakeLock and FLAG_SHOW_WHEN_LOCKED to reliably awaken the screen. Grant 'Display over other apps' permission."
-            )
-            drawCallout(
-                c1, y1, CalloutType.WARNING,
-                if (isRu) "⚠️ КОНТРОЛЬНЫЙ ЧЕК-ЛИСТ ПЕРЕД ПЕРВОЙ НОЧЬЮ:" else "⚠️ PRE-FLIGHT CHECKLIST BEFORE NIGHT:",
-                if (isRu) "Внизу экрана настроек выполните 5 быстрых тапов по строке «TIRUp • Версия ...» для открытия скрытого блока тестирования. Нажмите «Тест экрана спасения» и заблокируйте телефон. Через 5 с дисплей должен сам проснуться с сиреной."
-                else "Tap 'TIRUp • Version ...' at the bottom of Settings 5 times to reveal tests. Run 'Test Patient Rescue Screen' and lock phone. Within 5s display must wake up with siren."
-            )
-            document.finishPage(page1)
+                fun callout(type: CalloutType, title: String, text: String) {
+                    val layout = layoutCallout(type, title, text)
+                    ensureSpace(layout.advanceY)
+                    val canvas = currentCanvas
+                    if (canvas != null) {
+                        val cy = y + 2f
+                        val (bgColor, borderColor, accentColor, textColor) = when (layout.type) {
+                            CalloutType.INFO -> listOf(Color.rgb(239, 246, 255), Color.rgb(191, 219, 254), Color.rgb(37, 99, 235), Color.rgb(30, 64, 175))
+                            CalloutType.TIP -> listOf(Color.rgb(236, 253, 245), Color.rgb(167, 243, 208), Color.rgb(16, 185, 129), Color.rgb(6, 95, 70))
+                            CalloutType.WARNING -> listOf(Color.rgb(254, 252, 232), Color.rgb(254, 240, 138), Color.rgb(245, 158, 11), Color.rgb(146, 64, 14))
+                            CalloutType.CRITICAL -> listOf(Color.rgb(254, 242, 242), Color.rgb(254, 202, 202), Color.rgb(239, 68, 68), Color.rgb(153, 27, 27))
+                        }
+                        calloutBgPaint.color = bgColor
+                        calloutBorderPaint.color = borderColor
+                        calloutAccentBarPaint.color = accentColor
+                        calloutTitlePaint.color = textColor
+                        calloutBodyPaint.color = textColor
 
-            // =========================================================================
-            // PAGE 2: ГЛАВА 3 + ГЛАВА 4
-            // =========================================================================
-            val page2 = document.startPage(PdfDocument.PageInfo.Builder(595, 842, 2).create())
-            val c2 = page2.canvas
-            drawRunningHeaderAndFooter(c2, 2)
+                        val boxRect = RectF(36f, cy, 36f + layout.boxWidth, cy + layout.totalHeight)
+                        canvas.drawRoundRect(boxRect, 4f, 4f, calloutBgPaint)
+                        canvas.drawRoundRect(boxRect, 4f, 4f, calloutBorderPaint)
 
-            var y2 = 44f
-            y2 = drawChapterHeading(
-                c2, y2,
-                if (isRu) "ГЛАВА 3. МНОГОУРОВНЕВАЯ СИСТЕМА ТРЕВОГ И ЭКРАН СПАСЕНИЯ" else "CHAPTER 3. 4-TIER ALARMS, COMA GUARD & RESCUE SCREEN",
-                if (isRu) "Клиническая градация Tier 1–4, предиктивный тренд на 25 минут, обход DND и Coma Guard" else "Tier 1-4 escalation, 25-min predictive trend, DND bypass and Coma Guard protocol"
-            )
-            y2 = drawParagraph(
-                c2, y2,
-                if (isRu) "Одной из главных проблем пользователей CGM является «усталость от тревог» (Alarm Fatigue), когда частые ложные сигналы приводят к отключению звука. В TIRUp реализована адаптивная 4-уровневая система безопасности, которая отсекает шум и включает сирены только тогда, когда существует реальная клиническая угроза здоровью:"
-                else "To resolve CGM alarm fatigue, TIRUp incorporates an adaptive 4-tier safety model that filters transient sensor artifacts and escalates alerts only for verified clinical hazards:"
-            )
-            y2 = drawBulletPoint(
-                c2, y2,
-                if (isRu) "Уровень 1: Предиктивный тренд на 25 минут" else "Tier 1: 25-Min Predictive Trend",
-                if (isRu) "Регрессионный анализ скользящего окна точек с экспоненциальным затуханием проецирует траекторию на 25 мин вперёд (фиолетовые точки на суточном графике). Мягкий сигнал звучит за 15 мин до расчётной гипогликемии, позволяя принять углеводы заранее."
-                else "Linear regression with exponential damping projects glucose 25 mins ahead (purple dots on daily chart). Gentle chime warns 15 mins before calculated low, allowing timely carb intake."
-            )
-            y2 = drawBulletPoint(
-                c2, y2,
-                if (isRu) "Уровень 2: Подтверждённое отклонение (3–5 точек)" else "Tier 2: Confirmed Departure (3-5 Points)",
-                if (isRu) "Классический тройной сигнал при выходе за пределы нормы (3 точки для 5-мин датчиков, 5 точек для 1-мин). Дисплей принудительно НЕ зажигается (только звук и шторка). При гипергликемии сигнал глушится, если сахар падает и есть активный инсулин (IoB)."
-                else "Triple tone when outside target (3 points on 5-min CGM, 5 points on 1-min). Display does NOT forcibly turn on (audio & shade only). Auto-mutes on high if dropping with active IoB."
-            )
-            y2 = drawBulletPoint(
-                c2, y2,
-                if (isRu) "Уровень 3: Критическая сирена и пробуждение дисплея" else "Tier 3: Critical Siren & Screen Wakeup",
-                if (isRu) "Экран принудительно загорается поверх блокировки при критических порогах (<3.0 или >13.9 ммоль/л) и затяжной гипо (>20 мин). Тревога обходит режим «Не беспокоить» (DND bypass), играет через USAGE_ALARM на 100% громкости и включает стробоскоп вспышки."
-                else "Screen forcibly turns on over lockscreen upon critical thresholds (<3.0 or >13.9 mmol/L) or prolonged hypo (>20m). Bypasses DND, sounds via ALARM stream at 100% volume, and pulses camera LED flash."
-            )
-            y2 = drawBulletPoint(
-                c2, y2,
-                if (isRu) "Уровень 4: Потеря сигнала (20–25 мин) и ночной профиль" else "Tier 4: Signal Loss & Night Profile",
-                if (isRu) "При отсутствии точек >20 мин подаётся сигнал будильника. В Настройках задаются «Часы ночного сна» (по умолчанию 23:00–07:00), в этот период действуют отдельные ночные пороги тревог и строгий контроль связи."
-                else "Alarm sounds if readings stop for >20 mins. Configurable Night Sleep Window (default 23:00-07:00) applies dedicated nocturnal thresholds and strict signal checks."
-            )
-            y2 = drawSectionHeading(c2, y2, if (isRu) "3.2. Экран спасения и защита от комы (Coma Guard <2.8 ммоль/л)" else "3.2. Patient Rescue Screen & Coma Guard (<2.8 mmol/L)")
-            y2 = drawParagraph(
-                c2, y2,
-                if (isRu) "При сахаре <3.0 ммоль/л (или затяжной гипо >20 мин) TIRUp пробуждает спящий телефон и разворачивает поверх пароля боевой интерфейс спасения с крупными цифрами сахара, стрелкой падения, таймером SOS SMS и кнопкой купирования. При сахаре ниже 2.8 ммоль/л включается Coma Guard: снуз ограничен 5 мин, сирена повторяется каждые 5 мин до подтверждения."
-                else "On glucose <3.0 mmol/L (or prolonged hypo >20m) TIRUp wakes screen over lockscreen with giant glucose, trend arrow, and SOS timer. Below 2.8 mmol/L Coma Guard caps snooze to 5 mins, repeating siren every 5 mins until confirmed."
-            )
-            y2 = drawCallout(
-                c2, y2, CalloutType.CRITICAL,
-                if (isRu) "🚨 КЛИНИЧЕСКИЙ ПРОТОКОЛ КУПИРОВАНИЯ (ПРАВИЛО 15):" else "🚨 CLINICAL HYPO PROTOCOL (RULE OF 15):",
-                if (isRu) "При гипогликемии примите 15 г быстрых углеводов (сок, декстроза). Нажмите кнопку «Углеводы приняты» на экране спасения — это заглушит сирену и отменит отправку экстренного SOS SMS родственникам."
-                else "Take 15g fast-acting carbs (juice, dextrose). Press 'Carbs Taken' on Rescue Screen to silence siren and cancel emergency SOS SMS dispatch."
-            )
+                        // Left accent bar
+                        val barRect = RectF(36f, cy, 40f, cy + layout.totalHeight)
+                        canvas.drawRoundRect(barRect, 2f, 2f, calloutAccentBarPaint)
 
-            // 3x CHAPTER SPACING
-            y2 += 14f
+                        canvas.drawText(layout.title, 46f, cy + 9.5f, calloutTitlePaint)
 
-            // CHAPTER 4
-            y2 = drawChapterHeading(
-                c2, y2,
-                if (isRu) "ГЛАВА 4. ЭКСТРЕННЫЕ SMS, РЕЖИМ ОПЕКУНА И ТЕЛЕМЕТРИЯ" else "CHAPTER 4. EMERGENCY SOS SMS, CAREGIVER MODE & TELEMETRY",
-                if (isRu) "Автономные оповещения с GPS, двусторонний запрос сахара и сирена на телефоне родителя" else "Offline GPS distress SMS, two-way glucose queries and caregiver alarm sirens"
-            )
-            y2 = drawParagraph(
-                c2, y2,
-                if (isRu) "Если пациент находится в состоянии тяжёлой гипогликемии и не отключает сирену в течение заданного времени (по умолчанию 3 мин), TIRUp расценивает это как возможную потерю сознания. Приложение запрашивает координаты GPS и автоматически отправляет экстренное SMS доверенным лицам:"
-                else "If hypo alarm is unacknowledged for the delay (default 3 mins), TIRUp retrieves device GPS and transmits emergency distress SMS to caregiver phones:"
-            )
-            y2 = drawBulletPoint(
-                c2, y2,
-                if (isRu) "Содержание тревожного SOS SMS" else "Distress SOS SMS Format",
-                if (isRu) "«SOS! У [Имя] критический сахар: 2.5 ммоль/л ⇊. Нет реакции на сирену 3 мин. Геолокация: maps.google.com/?q=55.75,37.61». Близкие получают координаты и могут оперативно вызвать скорую помощь."
-                else "'SOS! [Name] critical glucose: 2.5 mmol/L ⇊. Unresponsive 3 min. Location: maps.google.com/?q=55.75,37.61'. Caregivers can instantly dispatch emergency medical services."
-            )
-            y2 = drawBulletPoint(
-                c2, y2,
-                if (isRu) "Двусторонняя оффлайн-телеметрия" else "Two-Way Offline Telemetry",
-                if (isRu) "Родственник может отправить обычное SMS «сахар», «?», «tir» со своего доверенного номера на телефон подопечного без интернета. TIRUp мгновенно ответит в фоне: «[Имя]: 6.4 ммоль/л → (TIR 89%, 15м назад, батарея 85%)»."
-                else "Caregivers can text 'sugar', '?', or 'tir' from whitelisted phones without internet. TIRUp replies immediately: '[Name]: 6.4 mmol/L → (TIR 89%, 15m ago, battery 85%)'."
-            )
-            y2 = drawBulletPoint(
-                c2, y2,
-                if (isRu) "Режим опекуна (активация и белый список)" else "Caregiver Mode & Anti-Spam Whitelist",
-                if (isRu) "Активируется чекбоксом «Опекун» в блоке «Экстренное SMS». Укажите телефон(ы) подопечных: сирена сработает только с этих номеров. Требуются права RECEIVE_SMS и «Поверх других приложений». Кнопка «Проверить сирену и экран» запускает тревогу через 5 с, чтобы успеть заблокировать телефон."
-                else "Enabled by checking 'Caregiver' in Emergency SMS. Set patient numbers: siren triggers only from them. Requires RECEIVE_SMS and overlay permission. Test button triggers alarm after 5s to let you lock screen."
-            )
-            y2 = drawSectionHeading(c2, y2, if (isRu) "4.2. Настройка разрешений SMS и экрана блокировки" else "4.2. SMS & Lockscreen Permissions")
-            y2 = drawParagraph(
-                c2, y2,
-                if (isRu) "Пациенту требуется разрешение SEND_SMS, опекуну — RECEIVE_SMS и показ поверх других окон. В TIRUp встроен алгоритм автоматической перепроверки системных дескрипторов при возврате из настроек Android."
-                else "Patient requires SEND_SMS; caregiver requires RECEIVE_SMS and overlay permission. TIRUp incorporates automatic descriptor re-verification upon returning from Android Settings."
-            )
-            drawCallout(
-                c2, y2, CalloutType.TIP,
-                if (isRu) "📱 БЕЗОПАСНОСТЬ И ПРОВЕРКА ЭКСТРЕННОГО SMS:" else "📱 EMERGENCY SMS VERIFICATION:",
-                if (isRu) "Пациент может нажать «Отправить тестовое SMS» для проверки отправки. Опекун нажимает «Проверить сирену и экран» и блокирует телефон для проверки пробуждения дисплея."
-                else "Patient taps 'Send Test SMS' to test sending. Caregiver taps 'Test Siren & Screen' and locks phone to verify screen wakeup."
-            )
-            document.finishPage(page2)
+                        var lineY = cy + 19.0f
+                        for (l in layout.lines) {
+                            canvas.drawText(l, 46f, lineY, calloutBodyPaint)
+                            lineY += 9.0f
+                        }
+                    }
+                    y += layout.advanceY
+                }
 
-            // =========================================================================
-            // PAGE 3: ГЛАВА 5 + ГЛАВА 6
-            // =========================================================================
-            val page3 = document.startPage(PdfDocument.PageInfo.Builder(595, 842, 3).create())
-            val c3 = page3.canvas
-            drawRunningHeaderAndFooter(c3, 3)
+                fun finishDocument() {
+                    if (!isDryRun) {
+                        currentPage?.let { document.finishPage(it) }
+                        currentPage = null
+                        currentCanvas = null
+                    }
+                }
+            }
 
-            var y3 = 44f
-            y3 = drawChapterHeading(
-                c3, y3,
-                if (isRu) "ГЛАВА 5. КЛИНИЧЕСКАЯ АНАЛИТИКА, AGP, ПАТТЕРНЫ И HbA1c" else "CHAPTER 5. CLINICAL AGP, PATTERNS, HbA1c & COMPENSATOR",
-                if (isRu) "Стандарты ATTD/ADA, 12 параметров AGP, лабораторный HbA1c и суточный компенсатор TIR" else "ATTD/ADA consensus, 12 AGP metrics, laboratory HbA1c and daily target compensator"
-            )
-            y3 = drawSectionHeading(c3, y3, if (isRu) "5.1. Амбулаторный гликемический профиль (AGP) и 12 параметров" else "5.1. Ambulatory Glucose Profile (AGP) & 12 Clinical Metrics")
-            y3 = drawParagraph(
-                c3, y3,
-                if (isRu) "В разделе «Отчёты» формируется стандартизированный отчёт AGP по стандартам консенсуса ATTD/ADA за 7, 14, 30 или 90 дней с расчётом ключевых биомаркеров для эндокринолога:"
-                else "The Reports tab generates standardized AGP reports compliant with ATTD/ADA consensus across 7, 14, 30, or 90 days with core biomarkers:"
-            )
-            y3 = drawBulletPoint(
-                c3, y3,
-                if (isRu) "TIR, TBR, TAR" else "TIR, TBR, TAR",
-                if (isRu) "Время в целевом диапазоне (TIR 3.9–10.0, норма ≥70%), время ниже диапазона (TBR <3.9, норма <4%, из них <3.0 <1%), время выше диапазона (TAR >10.0, норма <25%)."
-                else "Time in Range (TIR 3.9-10.0, target ≥70%), Time Below Range (TBR <3.9, target <4%, severe <3.0 <1%), Time Above Range (TAR >10.0, target <25%)."
-            )
-            y3 = drawBulletPoint(
-                c3, y3,
-                if (isRu) "Вариабельность (CV, SD)" else "Variability (CV, SD)",
-                if (isRu) "Коэффициент вариации CV (целевой ≤36%) и стандартное отклонение SD отражают стабильность сахаров и защиту от внезапных ночных гипогликемий."
-                else "Coefficient of Variation CV (target ≤36%) and SD quantify glycemic stability and nocturnal resilience."
-            )
-            y3 = drawBulletPoint(
-                c3, y3,
-                if (isRu) "GRI, GVI, PGS, eA1c / GMI" else "GRI, GVI, PGS, eA1c / GMI",
-                if (isRu) "Индекс риска GRI (0–100), индекс гликемической вариабельности GVI (отношение длины кривой к идеальной; адаптивен к пропускам броадкаста), статус PGS и расчётный GMI."
-                else "Glycemia Risk Index GRI (0-100), Glycemic Variability Index GVI (curve length to ideal line ratio; adaptive to missing samples), PGS, and estimated GMI."
-            )
-            y3 = drawBulletPoint(
-                c3, y3,
-                if (isRu) "Детектор скрытых клинических паттернов" else "Hidden Patterns Recognition",
-                if (isRu) "Алгоритм выявляет ночные провалы в часы сна, феномен утренней зари и постпрандиальные всплески. Тревожные карточки скрываются через 48 ч, информационные — через 24 ч. Доступен раскрывающийся архив скрытых событий."
-                else "Detects nocturnal dips, dawn phenomenon, and meal spikes. High-priority cards auto-expire after 48h, informational after 24h, with an expandable archive."
-            )
-            y3 = drawBulletPoint(
-                c3, y3,
-                if (isRu) "Журнал HbA1c и квартальные напоминания (раз в 90 дн.)" else "HbA1c Journal & Quarterly Reminders (every 90d)",
-                if (isRu) "Журнал сопоставляет анализы крови с датчиком (GMI). Каждые 90 дней срабатывает квартальное напоминание о сдаче крови (макс. 2 раза за цикл с шагом 14 дней, кнопка «Пропустить +90д»). Цвета: <6.1% (норма), 6.1–7.0% (цель), 7.0–8.0% (суб), >8.0% (риск)."
-                else "Logs HbA1c vs sensor GMI. Quarterly reminder fires every 90 days (max 2 per cycle with 14d step, 'Skip +90d' button). Colors: <6.1% (norm), 6.1-7.0% (target), 7.0-8.0% (sub), >8.0% (risk)."
-            )
-            y3 = drawBulletPoint(
-                c3, y3,
-                if (isRu) "Суточный компенсатор и воскресный дайджест" else "Daily Compensator & Sunday Digest",
-                if (isRu) "Компенсатор рассчитывает время для цели (TIR ≥70%). За 1–2 ч до точки невозврата звучит «Последний шанс для TIR». Каждое воскресенье в 20:00 формируется аналитический Sunday Digest со сравнением параметров (±Δ%)."
-                else "Calculates in-range time for daily goal (TIR ≥70%). Emits 'Last Chance for TIR' 1-2h before point of no return. Generates Sunday Digest every Sunday at 20:00 (±Δ%)."
-            )
-            y3 = drawCallout(
-                c3, y3, CalloutType.INFO,
-                if (isRu) "📊 ЭКСПОРТ AGP ОТЧЁТА ДЛЯ ВРАЧА:" else "📊 EXPORTING AGP REPORTS FOR PHYSICIANS:",
-                if (isRu) "На вкладке «Отчёты» выберите период (например, 14 дней) и нажмите «Создать AGP отчёт (PDF)». Файл можно сохранить в память или мгновенно отправить лечащему врачу в Telegram, WhatsApp или по почте."
-                else "On Reports tab select period and tap 'Create AGP Report (PDF)'. Share directly with your endocrinologist via Telegram, WhatsApp or email."
-            )
+            // Sequential Content Flow
+            fun renderManual(flow: ManualFlowContext) {
+                // Page 1: Header, Subtitle & TOC
+                val canvas = flow.currentCanvas
+                if (canvas != null) {
+                    canvas.drawText(
+                        if (isRu) "TIRUp • РУКОВОДСТВО ПОЛЬЗОВАТЕЛЯ" else "TIRUp • USER MANUAL",
+                        36f, flow.y + 10f, docTitlePaint
+                    )
+                }
+                flow.y += 13.5f
 
-            // 3x CHAPTER SPACING
-            y3 += 14f
+                if (canvas != null) {
+                    canvas.drawText(
+                        if (isRu) "Клинический справочник, автономная архитектура, тревоги и защита безопасности"
+                        else "Clinical reference, zero-cloud architecture, safety alarms and device integration",
+                        36f, flow.y + 7f, chapterSubtitlePaint
+                    )
+                }
+                flow.y += 11.5f
 
-            // CHAPTER 6
-            y3 = drawChapterHeading(
-                c3, y3,
-                if (isRu) "ГЛАВА 6. ИНТЕРФЕЙС HUD, ВИДЖЕТЫ, УЧЁТ РАСХОДНИКОВ И АРХИВЫ" else "CHAPTER 6. QUICK GLANCE HUD, WIDGETS, SUPPLIES & MAINTENANCE",
-                if (isRu) "Quick Glance HUD 108sp, виджеты рабочего стола, учёт расходников и Zero-Lag база" else "Quick Glance HUD 108sp, desktop widgets, supplies tracking and Zero-Lag database"
+                // TOC Box
+                if (canvas != null) {
+                    val tocRect = RectF(36f, flow.y, 559f, flow.y + 29f)
+                    calloutBgPaint.color = Color.rgb(248, 250, 252)
+                    calloutBorderPaint.color = Color.rgb(203, 213, 225)
+                    canvas.drawRoundRect(tocRect, 4f, 4f, calloutBgPaint)
+                    canvas.drawRoundRect(tocRect, 4f, 4f, calloutBorderPaint)
+                    canvas.drawText(if (isRu) "СОДЕРЖАНИЕ РУКОВОДСТВА:" else "TABLE OF CONTENTS:", 44f, flow.y + 9.5f, tocTitlePaint)
+
+                    val cp = flow.chapterPages
+                    canvas.drawText(
+                        if (isRu) "Гл. 1: Связь и BLE (с. ${cp[1]}) • Гл. 2: Фон и OEM (с. ${cp[2]}) • Гл. 3: Тревоги и Спасение (с. ${cp[3]})"
+                        else "Ch. 1: Connectivity & BLE (p. ${cp[1]}) • Ch. 2: Background & OEM (p. ${cp[2]}) • Ch. 3: Alarms & Rescue (p. ${cp[3]})",
+                        44f, flow.y + 17.5f, tocBodyPaint
+                    )
+                    canvas.drawText(
+                        if (isRu) "Гл. 4: SOS SMS и Опекун (с. ${cp[4]}) • Гл. 5: AGP и HbA1c (с. ${cp[5]}) • Гл. 6: HUD и Расходники (с. ${cp[6]})"
+                        else "Ch. 4: SOS SMS & Caregiver (p. ${cp[4]}) • Ch. 5: Clinical AGP (p. ${cp[5]}) • Ch. 6: HUD & Supplies (p. ${cp[6]})",
+                        44f, flow.y + 25.5f, tocBodyPaint
+                    )
+                }
+                flow.y += 33.5f
+
+                // Quick Start Callout
+                flow.callout(
+                    CalloutType.TIP,
+                    if (isRu) "🚀 БЫСТРЫЙ СТАРТ ЗА 3 ШАГА (ДЛЯ НОВЫХ ПОЛЬЗОВАТЕЛЕЙ):" else "🚀 3-STEP QUICK START GUIDE:",
+                    if (isRu) "1) В xDrip+ («Настройки ➔ Межпрограммная интеграция») включите «Широковещательные передачи». 2) В настройках Android отключите оптимизацию батареи («Без ограничений»). 3) Задайте целевой диапазон сахара в Настройках TIRUp."
+                    else "1) In xDrip+ enable 'Broadcast locally'. 2) Disable Android battery optimization for TIRUp ('Unrestricted'). 3) Set your target glucose range in TIRUp Settings."
+                )
+
+                // =========================================================================
+                // CHAPTER 1: CONNECTIVITY & BLE BRIDGE
+                // =========================================================================
+                flow.chapter(
+                    1,
+                    if (isRu) "ГЛАВА 1. АРХИТЕКТУРА СВЯЗИ, ИСТОЧНИКИ ДАННЫХ И BLE-МОСТ" else "CHAPTER 1. CONNECTIVITY, DATA SOURCES & FAMILY BLE BRIDGE",
+                    if (isRu) "Zero-Cloud принцип, локальные интенты и автономный семейный Bluetooth-мост" else "Zero-Cloud principle, local Android intents and offline Family BLE Bridge"
+                )
+                flow.paragraph(
+                    if (isRu) "Приложение TIRUp создано по принципу максимальной автономности (Zero-Cloud). В отличие от облачных CGM-систем, TIRUp никогда не требует подключения к интернету, внешних серверов или передачи личных данных. Все вычисления компенсации и тревоги выполняются на 100% локально на смартфоне."
+                    else "TIRUp operates on the Zero-Cloud principle without internet dependencies, external servers, or data uploads. All calculations and alarms execute 100% locally on your smartphone."
+                )
+                flow.bullet(
+                    if (isRu) "xDrip+, GDH и Juggluco" else "xDrip+, GDH & Juggluco",
+                    if (isRu) "В настройках источника перейдите в «Межпрограммная интеграция» и включите «Широковещательные передачи» и «Поддержку широковещательной службы» (для мгновенной передачи доз IoB/CoB). TIRUp принимает замеры через локальные Intents с задержкой <0.1 с."
+                    else "Enable 'Broadcast locally' and 'Broadcast service support' for IoB/CoB in your source. TIRUp captures streaming readings via low-latency Android Intents (<0.1s)."
+                )
+                flow.bullet(
+                    if (isRu) "Семейный BLE-мост (Вещатель — Приёмник)" else "Family BLE Bridge",
+                    if (isRu) "Передача сахара ребёнка родителю по Bluetooth LE без Wi-Fi и SIM. Телефон ребёнка настраивается как «Вещатель» (импульс 15 с на замер, микропотребление <0.8% батареи/сутки), телефон родителя — как «Приёмник». Пакет шифруется 4-значным Family PIN."
+                    else "Stream patient glucose to parent over BLE without Wi-Fi or SIM. Broadcaster pulses 15s bursts (<0.8% battery/day), Observer receives. Secured with 4-digit PIN."
+                )
+                flow.bullet(
+                    if (isRu) "Режим Long Range (LE Coded PHY)" else "Long Range Mode (LE Coded PHY)",
+                    if (isRu) "На чипсетах Bluetooth 5.0+ режим Coded PHY (S=8) повышает потенциал радиолинии на 8–10 dBm, расширяя дальность в 2–4 раза (до 30–50 м сквозь стены). При отсутствии поддержки аппаратно откатывается на Legacy 1M. Сканер приёмника слушает оба диапазона автоматически."
+                    else "On Bluetooth 5.0+, Coded PHY (S=8) boosts link budget by 8-10 dBm, extending range 2-4x (up to 30-50m through walls). Observer operates in dual-mode automatically."
+                )
+                flow.bullet(
+                    if (isRu) "Разница технологий: BLE-мост TIRUp vs Зеркало Juggluco" else "TIRUp BLE vs Juggluco Mirroring",
+                    if (isRu) "TIRUp работает как автономный радиомаяк (Broadcast): без сопряжения, расход <1% батареи, свободен BT-канал для помпы и часов (без квитирования ACK). Juggluco держит постоянный сокет (RFCOMM/Wi-Fi) с гарантией доставки ACK и выкачкой всей истории SQLite, но требует сопряжения и держит постоянное соединение."
+                    else "TIRUp uses connectionless BLE broadcast: zero-pairing, <1% battery, free BT slot for pump/watch (no ACK). Juggluco maintains a persistent socket (RFCOMM/Wi-Fi) with delivery ACKs and SQLite history backfill, but requires device pairing and holds connection."
+                )
+                flow.callout(
+                    CalloutType.INFO,
+                    if (isRu) "📡 ДИАГНОСТИКА СИГНАЛА И БАТАРЕИ ПЕРЕДАТЧИКА:" else "📡 TRANSMITTER SIGNAL & BATTERY:",
+                    if (isRu) "В шторке уведомлений и в HUD приёмника отображаются уровень радиосигнала (RSSI dBm) и процент заряда батареи подопечного. Для быстрой проверки используйте «Тест дальности (5с)»."
+                    else "Notification and HUD widget display real-time transmitter RSSI (dBm) and battery %. Use 'Range Test (5s)' in Observer settings for immediate verification."
+                )
+
+                // =========================================================================
+                // CHAPTER 2: BACKGROUND RELIABILITY & OEM-SPECIFIC GUIDES
+                // =========================================================================
+                flow.chapter(
+                    2,
+                    if (isRu) "ГЛАВА 2. НАДЕЖНОСТЬ В ФОНЕ И НАСТРОЙКА OEM-ПРОШИВОК" else "CHAPTER 2. BACKGROUND RELIABILITY & OEM-SPECIFIC GUIDES",
+                    if (isRu) "Преодоление Doze Mode, App Standby и пошаговые чек-листы для вендоров" else "Overcoming Doze Mode, App Standby and step-by-step checklists for major OEMs"
+                )
+                flow.section(if (isRu) "2.1. Чек-листы фоновой работы для популярных смартфонов" else "2.1. Background Reliability Checklists for Major OEMs")
+                flow.bullet(
+                    if (isRu) "Samsung (OneUI)" else "Samsung (OneUI)",
+                    if (isRu) "1) Настройки ➔ Приложения ➔ TIRUp ➔ Батарея ➔ «Не ограничено». 2) Настройки ➔ Батарея ➔ «Ограничения в фоновом режиме» ➔ «Никогда не спящие приложения» ➔ добавьте TIRUp и источник. 3) Закрепите замочком в меню недавних."
+                    else "1) Settings ➔ Apps ➔ TIRUp ➔ Battery ➔ 'Unrestricted'. 2) Battery ➔ Background limits ➔ 'Never sleeping apps' ➔ Add TIRUp. 3) Lock app card in Recents."
+                )
+                flow.bullet(
+                    if (isRu) "Xiaomi, Redmi, POCO (MIUI / HyperOS)" else "Xiaomi (MIUI / HyperOS)",
+                    if (isRu) "1) Включите «Автозапуск» и «Разрешить запуск другими приложениями». 2) «Контроль активности» ➔ «Нет ограничений». 3) «Другие разрешения» ➔ «Экран блокировки» и «Всплывающие окна». 4) Закрепите замочком в Недавних."
+                    else "1) Enable 'Autostart'. 2) Battery saver ➔ 'No restrictions'. 3) Other permissions ➔ Allow 'Lock screen' & 'Pop-up windows'. 4) Lock app in Recents."
+                )
+                flow.bullet(
+                    if (isRu) "BBK: Realme, Oppo, OnePlus (ColorOS)" else "BBK: Realme, Oppo, OnePlus",
+                    if (isRu) "1) Управление приложениями ➔ TIRUp ➔ «Расход батареи» ➔ разрешите фоновую активность и автозапуск. 2) «Оптимизация режима ожидания» ➔ отключите «Ультра-режим ожидания». 3) Заблокируйте в Недавних."
+                    else "1) App management ➔ TIRUp ➔ Battery ➔ Allow background & auto-launch. 2) Disable sleep standby optimization. 3) Lock app in Recents."
+                )
+                flow.bullet(
+                    if (isRu) "Huawei, Honor (EMUI / MagicOS)" else "Huawei, Honor (EMUI / MagicOS)",
+                    if (isRu) "Настройки ➔ Приложения ➔ Запуск приложений ➔ для TIRUp отключите автоуправление и включите: «Автозапуск», «Косвенный запуск», «Работа в фоне». Закрепите замочком в Недавних."
+                    else "Apps ➔ App launch ➔ Disable automatic for TIRUp, enable 'Auto-launch', 'Secondary launch', 'Run in background'. Lock in Recents."
+                )
+                flow.bullet(
+                    if (isRu) "Google Pixel (Stock Android)" else "Google Pixel (Stock Android)",
+                    if (isRu) "Настройки ➔ Батарея ➔ Адаптивные настройки ➔ отключите «Адаптивный расход». В свойствах TIRUp выберите «Использование батареи ➔ Без ограничений»."
+                    else "Battery ➔ Adaptive preferences ➔ Disable 'Adaptive Battery'. In TIRUp app info set 'Battery ➔ Unrestricted'."
+                )
+                flow.section(if (isRu) "2.2. Полноэкранные интенты и пробуждение дисплея" else "2.2. Full-Screen Intents & Display Wakeup")
+                flow.paragraph(
+                    if (isRu) "При критической ночной гипогликемии дисплей заблокирован. Экран спасения использует аппаратный WakeLock (ACQUIRE_CAUSES_WAKEUP) и флаги FLAG_SHOW_WHEN_LOCKED, гарантированно включая дисплей с сиреной. Предоставьте права «Поверх других приложений»."
+                    else "During severe low, Rescue Screen utilizes hardware WakeLock and FLAG_SHOW_WHEN_LOCKED to reliably awaken the screen. Grant 'Display over other apps' permission."
+                )
+                flow.callout(
+                    CalloutType.WARNING,
+                    if (isRu) "⚠️ КОНТРОЛЬНЫЙ ЧЕК-ЛИСТ ПЕРЕД ПЕРВОЙ НОЧЬЮ:" else "⚠️ PRE-FLIGHT CHECKLIST BEFORE NIGHT:",
+                    if (isRu) "Внизу экрана настроек выполните 5 быстрых тапов по строке «TIRUp • Версия ...» для открытия скрытого блока тестирования. Нажмите «Тест экрана спасения» и заблокируйте телефон. Через 5 с дисплей должен сам проснуться с сиреной."
+                    else "Tap 'TIRUp • Version ...' at the bottom of Settings 5 times to reveal tests. Run 'Test Patient Rescue Screen' and lock phone. Within 5s display must wake up with siren."
+                )
+
+                // =========================================================================
+                // CHAPTER 3: MULTI-TIER ALARMS & RESCUE SCREEN
+                // =========================================================================
+                flow.chapter(
+                    3,
+                    if (isRu) "ГЛАВА 3. МНОГОУРОВНЕВАЯ СИСТЕМА ТРЕВОГ И ЭКРАН СПАСЕНИЯ" else "CHAPTER 3. 4-TIER ALARMS, COMA GUARD & RESCUE SCREEN",
+                    if (isRu) "Клиническая градация Tier 1–4, предиктивный тренд на 25 минут, обход DND и Coma Guard" else "Tier 1-4 escalation, 25-min predictive trend, DND bypass and Coma Guard protocol"
+                )
+                flow.paragraph(
+                    if (isRu) "Одной из главных проблем пользователей CGM является «усталость от тревог» (Alarm Fatigue), когда частые ложные сигналы приводят к отключению звука. В TIRUp реализована адаптивная 4-уровневая система безопасности, которая отсекает шум и включает сирены только тогда, когда существует реальная клиническая угроза здоровью:"
+                    else "To resolve CGM alarm fatigue, TIRUp incorporates an adaptive 4-tier safety model that filters transient sensor artifacts and escalates alerts only for verified clinical hazards:"
+                )
+                flow.bullet(
+                    if (isRu) "Уровень 1: Предиктивный тренд на 25 минут" else "Tier 1: 25-Min Predictive Trend",
+                    if (isRu) "Регрессионный анализ скользящего окна точек с экспоненциальным затуханием проецирует траекторию на 25 мин вперёд (фиолетовые точки на суточном графике). Мягкий сигнал звучит за 15 мин до расчётной гипогликемии, позволяя принять углеводы заранее."
+                    else "Linear regression with exponential damping projects glucose 25 mins ahead (purple dots on daily chart). Gentle chime warns 15 mins before calculated low, allowing timely carb intake."
+                )
+                flow.bullet(
+                    if (isRu) "Уровень 2: Подтверждённое отклонение (3–5 точек)" else "Tier 2: Confirmed Departure (3-5 Points)",
+                    if (isRu) "Классический тройной сигнал при выходе за пределы нормы (3 точки для 5-мин датчиков, 5 точек для 1-мин). Дисплей принудительно НЕ зажигается (только звук и шторка). При гипергликемии сигнал глушится, если сахар падает и есть активный инсулин (IoB)."
+                    else "Triple tone when outside target (3 points on 5-min CGM, 5 points on 1-min). Display does NOT forcibly turn on (audio & shade only). Auto-mutes on high if dropping with active IoB."
+                )
+                flow.bullet(
+                    if (isRu) "Уровень 3: Критическая сирена и пробуждение дисплея" else "Tier 3: Critical Siren & Screen Wakeup",
+                    if (isRu) "Экран принудительно загорается поверх блокировки при критических порогах (<3.0 или >13.9 ммоль/л) и затяжной гипо (>20 мин). Тревога обходит режим «Не беспокоить» (DND bypass), играет через USAGE_ALARM на 100% громкости и включает стробоскоп вспышки."
+                    else "Screen forcibly turns on over lockscreen upon critical thresholds (<3.0 or >13.9 mmol/L) or prolonged hypo (>20m). Bypasses DND, sounds via ALARM stream at 100% volume, and pulses camera LED flash."
+                )
+                flow.bullet(
+                    if (isRu) "Уровень 4: Потеря сигнала (20–25 мин) и ночной профиль" else "Tier 4: Signal Loss & Night Profile",
+                    if (isRu) "При отсутствии точек >20 мин подаётся сигнал будильника. В Настройках задаются «Часы ночного сна» (по умолчанию 23:00–07:00), в этот период действуют отдельные ночные пороги тревог и строгий контроль связи."
+                    else "Alarm sounds if readings stop for >20 mins. Configurable Night Sleep Window (default 23:00-07:00) applies dedicated nocturnal thresholds and strict signal checks."
+                )
+                flow.section(if (isRu) "3.2. Экран спасения и защита от комы (Coma Guard <2.8 ммоль/л)" else "3.2. Patient Rescue Screen & Coma Guard (<2.8 mmol/L)")
+                flow.paragraph(
+                    if (isRu) "При сахаре <3.0 ммоль/л (или затяжной гипо >20 мин) TIRUp пробуждает спящий телефон и разворачивает поверх пароля боевой интерфейс спасения с крупными цифрами сахара, стрелкой падения, таймером SOS SMS и кнопкой купирования. При сахаре ниже 2.8 ммоль/л включается Coma Guard: снуз ограничен 5 мин, сирена повторяется каждые 5 мин до подтверждения."
+                    else "On glucose <3.0 mmol/L (or prolonged hypo >20m) TIRUp wakes screen over lockscreen with giant glucose, trend arrow, and SOS timer. Below 2.8 mmol/L Coma Guard caps snooze to 5 mins, repeating siren every 5 mins until confirmed."
+                )
+                flow.callout(
+                    CalloutType.CRITICAL,
+                    if (isRu) "🚨 КЛИНИЧЕСКИЙ ПРОТОКОЛ КУПИРОВАНИЯ (ПРАВИЛО 15):" else "🚨 CLINICAL HYPO PROTOCOL (RULE OF 15):",
+                    if (isRu) "При гипогликемии примите 15 г быстрых углеводов (сок, декстроза). Нажмите кнопку «Углеводы приняты» на экране спасения — это заглушит сирену и отменит отправку экстренного SOS SMS родственникам."
+                    else "Take 15g fast-acting carbs (juice, dextrose). Press 'Carbs Taken' on Rescue Screen to silence siren and cancel emergency SOS SMS dispatch."
+                )
+
+                // =========================================================================
+                // CHAPTER 4: EMERGENCY SOS SMS, CAREGIVER MODE & TELEMETRY
+                // =========================================================================
+                flow.chapter(
+                    4,
+                    if (isRu) "ГЛАВА 4. ЭКСТРЕННЫЕ SMS, РЕЖИМ ОПЕКУНА И ТЕЛЕМЕТРИЯ" else "CHAPTER 4. EMERGENCY SOS SMS, CAREGIVER MODE & TELEMETRY",
+                    if (isRu) "Автономные оповещения с GPS, двусторонний запрос сахара и сирена на телефоне родителя" else "Offline GPS distress SMS, two-way glucose queries and caregiver alarm sirens"
+                )
+                flow.paragraph(
+                    if (isRu) "Если пациент находится в состоянии тяжёлой гипогликемии и не отключает сирену в течение заданного времени (по умолчанию 3 мин), TIRUp расценивает это как возможную потерю сознания. Приложение запрашивает координаты GPS и автоматически отправляет экстренное SMS доверенным лицам:"
+                    else "If hypo alarm is unacknowledged for the delay (default 3 mins), TIRUp retrieves device GPS and transmits emergency distress SMS to caregiver phones:"
+                )
+                flow.bullet(
+                    if (isRu) "Содержание тревожного SOS SMS" else "Distress SOS SMS Format",
+                    if (isRu) "«SOS! У [Имя] критический сахар: 2.5 ммоль/л ⇊. Нет реакции на сирену 3 мин. Геолокация: maps.google.com/?q=55.75,37.61». Близкие получают координаты и могут оперативно вызвать скорую помощь."
+                    else "'SOS! [Name] critical glucose: 2.5 mmol/L ⇊. Unresponsive 3 min. Location: maps.google.com/?q=55.75,37.61'. Caregivers can instantly dispatch emergency medical services."
+                )
+                flow.bullet(
+                    if (isRu) "Двусторонняя оффлайн-телеметрия" else "Two-Way Offline Telemetry",
+                    if (isRu) "Родственник может отправить обычное SMS «сахар», «?», «tir» со своего доверенного номера на телефон подопечного без интернета. TIRUp мгновенно ответит в фоне: «[Имя]: 6.4 ммоль/л → (TIR 89%, 15м назад, батарея 85%)»."
+                    else "Caregivers can text 'sugar', '?', or 'tir' from whitelisted phones without internet. TIRUp replies immediately: '[Name]: 6.4 mmol/L → (TIR 89%, 15m ago, battery 85%)'."
+                )
+                flow.bullet(
+                    if (isRu) "Режим опекуна (активация и белый список)" else "Caregiver Mode & Anti-Spam Whitelist",
+                    if (isRu) "Активируется чекбоксом «Опекун» в блоке «Экстренное SMS». Укажите телефон(ы) подопечных: сирена сработает только с этих номеров. Требуются права RECEIVE_SMS и «Поверх других приложений». Кнопка «Проверить сирену и экран» запускает тревогу через 5 с, чтобы успеть заблокировать телефон."
+                    else "Enabled by checking 'Caregiver' in Emergency SMS. Set patient numbers: siren triggers only from them. Requires RECEIVE_SMS and overlay permission. Test button triggers alarm after 5s to let you lock screen."
+                )
+                flow.section(if (isRu) "4.2. Настройка разрешений SMS и экрана блокировки" else "4.2. SMS & Lockscreen Permissions")
+                flow.paragraph(
+                    if (isRu) "Пациенту требуется разрешение SEND_SMS, опекуну — RECEIVE_SMS и показ поверх других окон. В TIRUp встроен алгоритм автоматической перепроверки системных дескрипторов при возврате из настроек Android."
+                    else "Patient requires SEND_SMS; caregiver requires RECEIVE_SMS and overlay permission. TIRUp incorporates automatic descriptor re-verification upon returning from Android Settings."
+                )
+                flow.callout(
+                    CalloutType.TIP,
+                    if (isRu) "📱 БЕЗОПАСНОСТЬ И ПРОВЕРКА ЭКСТРЕННОГО SMS:" else "📱 EMERGENCY SMS VERIFICATION:",
+                    if (isRu) "Пациент может нажать «Отправить тестовое SMS» для проверки отправки. Опекун нажимает «Проверить сирену и экран» и блокирует телефон для проверки пробуждения дисплея."
+                    else "Patient taps 'Send Test SMS' to test sending. Caregiver taps 'Test Siren & Screen' and locks phone to verify screen wakeup."
+                )
+
+                // =========================================================================
+                // CHAPTER 5: CLINICAL AGP, PATTERNS, HbA1c & COMPENSATOR
+                // =========================================================================
+                flow.chapter(
+                    5,
+                    if (isRu) "ГЛАВА 5. КЛИНИЧЕСКАЯ АНАЛИТИКА, AGP, ПАТТЕРНЫ И HbA1c" else "CHAPTER 5. CLINICAL AGP, PATTERNS, HbA1c & COMPENSATOR",
+                    if (isRu) "Стандарты ATTD/ADA, 12 параметров AGP, лабораторный HbA1c и суточный компенсатор TIR" else "ATTD/ADA consensus, 12 AGP metrics, laboratory HbA1c and daily target compensator"
+                )
+                flow.section(if (isRu) "5.1. Амбулаторный гликемический профиль (AGP) и 12 параметров" else "5.1. Ambulatory Glucose Profile (AGP) & 12 Clinical Metrics")
+                flow.paragraph(
+                    if (isRu) "В разделе «Отчёты» формируется стандартизированный отчёт AGP по стандартам консенсуса ATTD/ADA за 7, 14, 30 или 90 дней с расчётом ключевых биомаркеров для эндокринолога:"
+                    else "The Reports tab generates standardized AGP reports compliant with ATTD/ADA consensus across 7, 14, 30, or 90 days with core biomarkers:"
+                )
+                flow.bullet(
+                    if (isRu) "TIR, TBR, TAR" else "TIR, TBR, TAR",
+                    if (isRu) "Время в целевом диапазоне (TIR 3.9–10.0, норма ≥70%), время ниже диапазона (TBR <3.9, норма <4%, из них <3.0 <1%), время выше диапазона (TAR >10.0, норма <25%)."
+                    else "Time in Range (TIR 3.9-10.0, target ≥70%), Time Below Range (TBR <3.9, target <4%, severe <3.0 <1%), Time Above Range (TAR >10.0, target <25%)."
+                )
+                flow.bullet(
+                    if (isRu) "Вариабельность (CV, SD)" else "Variability (CV, SD)",
+                    if (isRu) "Коэффициент вариации CV (целевой ≤36%) и стандартное отклонение SD отражают стабильность сахаров и защиту от внезапных ночных гипогликемий."
+                    else "Coefficient of Variation CV (target ≤36%) and SD quantify glycemic stability and nocturnal resilience."
+                )
+                flow.bullet(
+                    if (isRu) "GRI, GVI, PGS, eA1c / GMI" else "GRI, GVI, PGS, eA1c / GMI",
+                    if (isRu) "Индекс риска GRI (0–100), индекс гликемической вариабельности GVI (отношение длины кривой к идеальной; адаптивен к пропускам броадкаста), статус PGS и расчётный GMI."
+                    else "Glycemia Risk Index GRI (0-100), Glycemic Variability Index GVI (curve length to ideal line ratio; adaptive to missing samples), PGS, and estimated GMI."
+                )
+                flow.bullet(
+                    if (isRu) "Детектор скрытых клинических паттернов" else "Hidden Patterns Recognition",
+                    if (isRu) "Алгоритм выявляет ночные провалы в часы сна, феномен утренней зари и постпрандиальные всплески. Тревожные карточки скрываются через 48 ч, информационные — через 24 ч. Доступен раскрывающийся архив скрытых событий."
+                    else "Detects nocturnal dips, dawn phenomenon, and meal spikes. High-priority cards auto-expire after 48h, informational after 24h, with an expandable archive."
+                )
+                flow.bullet(
+                    if (isRu) "Журнал HbA1c и квартальные напоминания (раз в 90 дн.)" else "HbA1c Journal & Quarterly Reminders (every 90d)",
+                    if (isRu) "Журнал сопоставляет анализы крови с датчиком (GMI). Каждые 90 дней срабатывает квартальное напоминание о сдаче крови (макс. 2 раза за цикл с шагом 14 дней, кнопка «Пропустить +90д»). Цвета: <6.1% (норма), 6.1–7.0% (цель), 7.0–8.0% (суб), >8.0% (риск)."
+                    else "Logs HbA1c vs sensor GMI. Quarterly reminder fires every 90 days (max 2 per cycle with 14d step, 'Skip +90d' button). Colors: <6.1% (norm), 6.1-7.0% (target), 7.0-8.0% (sub), >8.0% (risk)."
+                )
+                flow.bullet(
+                    if (isRu) "Суточный компенсатор и воскресный дайджест" else "Daily Compensator & Sunday Digest",
+                    if (isRu) "Компенсатор рассчитывает время для цели (TIR ≥70%). За 1–2 ч до точки невозврата звучит «Последний шанс для TIR». Каждое воскресенье в 20:00 формируется аналитический Sunday Digest со сравнением параметров (±Δ%)."
+                    else "Calculates in-range time for daily goal (TIR ≥70%). Emits 'Last Chance for TIR' 1-2h before point of no return. Generates Sunday Digest every Sunday at 20:00 (±Δ%)."
+                )
+                flow.callout(
+                    CalloutType.INFO,
+                    if (isRu) "📊 ЭКСПОРТ AGP ОТЧЁТА ДЛЯ ВРАЧА:" else "📊 EXPORTING AGP REPORTS FOR PHYSICIANS:",
+                    if (isRu) "На вкладке «Отчёты» выберите период (например, 14 дней) и нажмите «Создать AGP отчёт (PDF)». Файл можно сохранить в память или мгновенно отправить лечащему врачу в Telegram, WhatsApp или по почте."
+                    else "On Reports tab select period and tap 'Create AGP Report (PDF)'. Share directly with your endocrinologist via Telegram, WhatsApp or email."
+                )
+
+                // =========================================================================
+                // CHAPTER 6: QUICK GLANCE HUD, WIDGETS, SUPPLIES & MAINTENANCE
+                // =========================================================================
+                flow.chapter(
+                    6,
+                    if (isRu) "ГЛАВА 6. ИНТЕРФЕЙС HUD, ВИДЖЕТЫ, УЧЁТ РАСХОДНИКОВ И АРХИВЫ" else "CHAPTER 6. QUICK GLANCE HUD, WIDGETS, SUPPLIES & MAINTENANCE",
+                    if (isRu) "Quick Glance HUD 108sp, виджеты рабочего стола, учёт расходников и Zero-Lag база" else "Quick Glance HUD 108sp, desktop widgets, supplies tracking and Zero-Lag database"
+                )
+                flow.bullet(
+                    if (isRu) "Quick Glance HUD и автоскрытие" else "Quick Glance HUD & Auto-Hiding",
+                    if (isRu) "Удержание центральной кнопки 0.33 с открывает центрированный HUD: сахар 108sp, стрелка 78sp, единицы по центру, карточки инсулина/углеводов (34sp) и телеметрия в одну строку (19sp). Нижняя панель автоскрывается через 2.2 с и просыпается по тапу."
+                    else "Hold center button 0.33s to summon centered HUD: 108sp glucose, 78sp arrow, centered units, 34sp insulin/carb tiles, and 19sp single-line telemetry. Navigation auto-hides after 2.2s."
+                )
+                flow.bullet(
+                    if (isRu) "Виджеты рабочего стола, экран блокировки/AOD и Пузырёк" else "Widgets, Lockscreen & Floating Bubble",
+                    if (isRu) "5 форматов виджетов рабочего стола (полоса 5х1, Canvas-график 4х2/3х2, квадрат 2х2, стек 1х2). На экране блокировки доступна регулировка прозрачности (0–100%). Плавающий «Пузырёк» виден поверх всех приложений и пульсирует волнами при гипо."
+                    else "5 homescreen widget sizes (strip 5x1, Canvas graph 4x2/3x2, square 2x2, vertical 1x2). Lockscreen opacity slider 0-100%. Floating Bubble pulses ripple waves during hypo."
+                )
+                flow.bullet(
+                    if (isRu) "Сроки службы расходников и напоминания о замене" else "Supplies Tracking & Expiry Reminders",
+                    if (isRu) "Раздельный учёт датчика (10–14д), канюли (3д) и ланцета. Напоминания о замене приходят за 2 дня, за 1 день и по окончании срока. При просрочке счётчик уходит в минус: до 24 ч (-Xч), 1–30 дней (-Xд), >30 дней (-Xм)."
+                    else "Separate tracking for sensor (10-14d), cannula (3d), and lancet. Expiry alerts arrive 2 days before, 1 day before, and when overdue (<24h: -Xh, 1-30d: -Xd, >30d: -Xm)."
+                )
+                flow.bullet(
+                    if (isRu) "Новогодний дайджест 31 декабря, Zero-Lag и автобэкап" else "Dec 31 Year-End Digest, Zero-Lag & Backups",
+                    if (isRu) "31 декабря в 20:00 формируется новогодний дайджест 🥂 с PDF-открыткой, а замеры года запечатываются в tirup_readings_YYYY.csv (Zero-Lag база). Каждые сутки в 23:59:59 создаётся локальный автобэкап, доступен экспорт ZIP."
+                    else "On Dec 31 at 20:00, Year-End Digest 🥂 exports a PDF holiday card, sealing year readings into tirup_readings_YYYY.csv (Zero-Lag). Nightly auto-backup at 23:59:59 plus ZIP export."
+                )
+                flow.callout(
+                    CalloutType.INFO,
+                    if (isRu) "⚖️ ЮРИДИЧЕСКИЙ МЕДИЦИНСКИЙ ОТКАЗ ОТ ОТВЕТСТВЕННОСТИ:" else "⚖️ LEGAL MEDICAL DISCLAIMER NOTICE:",
+                    if (isRu) "TIRUp является программным средством для информационного самоконтроля образа жизни при диабете. Приложение не является сертифицированным медицинским прибором. Всегда проверяйте показания глюкометром по капле крови перед принятием решений о дозах инсулина."
+                    else "TIRUp is an auxiliary lifestyle self-monitoring tool. It is not an officially certified medical device. Always verify CGM readings with a capillary blood meter prior to therapeutic insulin adjustments."
+                )
+            }
+
+            // Step 1: Pass 1 (Dry run layout to determine totalPages and accurate chapter start pages)
+            val pass1Context = ManualFlowContext(
+                isDryRun = true,
+                totalPages = 1,
+                chapterPages = IntArray(7) { 1 }
             )
-            y3 = drawBulletPoint(
-                c3, y3,
-                if (isRu) "Quick Glance HUD и автоскрытие" else "Quick Glance HUD & Auto-Hiding",
-                if (isRu) "Удержание центральной кнопки 0.33 с открывает центрированный HUD: сахар 108sp, стрелка 78sp, единицы по центру, карточки инсулина/углеводов (34sp) и телеметрия в одну строку (19sp). Нижняя панель автоскрывается через 2.2 с и просыпается по тапу."
-                else "Hold center button 0.33s to summon centered HUD: 108sp glucose, 78sp arrow, centered units, 34sp insulin/carb tiles, and 19sp single-line telemetry. Navigation auto-hides after 2.2s."
+            pass1Context.startDocument()
+            renderManual(pass1Context)
+            pass1Context.finishDocument()
+
+            val calculatedTotalPages = pass1Context.currentPageIndex
+            val calculatedChapterPages = pass1Context.chapterPages.clone()
+
+            // Step 2: Pass 2 (Actual render to PdfDocument with accurate totalPages & chapterPages in TOC)
+            val pass2Context = ManualFlowContext(
+                isDryRun = false,
+                totalPages = calculatedTotalPages,
+                chapterPages = calculatedChapterPages
             )
-            y3 = drawBulletPoint(
-                c3, y3,
-                if (isRu) "Виджеты рабочего стола, экран блокировки/AOD и Пузырёк" else "Widgets, Lockscreen & Floating Bubble",
-                if (isRu) "5 форматов виджетов рабочего стола (полоса 5х1, Canvas-график 4х2/3х2, квадрат 2х2, стек 1х2). На экране блокировки доступна регулировка прозрачности (0–100%). Плавающий «Пузырёк» виден поверх всех приложений и пульсирует волнами при гипо."
-                else "5 homescreen widget sizes (strip 5x1, Canvas graph 4x2/3x2, square 2x2, vertical 1x2). Lockscreen opacity slider 0-100%. Floating Bubble pulses ripple waves during hypo."
-            )
-            y3 = drawBulletPoint(
-                c3, y3,
-                if (isRu) "Сроки службы расходников и напоминания о замене" else "Supplies Tracking & Expiry Reminders",
-                if (isRu) "Раздельный учёт датчика (10–14д), канюли (3д) и ланцета. Напоминания о замене приходят за 2 дня, за 1 день и по окончании срока. При просрочке счётчик уходит в минус: до 24 ч (-Xч), 1–30 дней (-Xд), >30 дней (-Xм)."
-                else "Separate tracking for sensor (10-14d), cannula (3d), and lancet. Expiry alerts arrive 2 days before, 1 day before, and when overdue (<24h: -Xh, 1-30d: -Xd, >30d: -Xm)."
-            )
-            y3 = drawBulletPoint(
-                c3, y3,
-                if (isRu) "Новогодний дайджест 31 декабря, Zero-Lag и автобэкап" else "Dec 31 Year-End Digest, Zero-Lag & Backups",
-                if (isRu) "31 декабря в 20:00 формируется новогодний дайджест 🥂 с PDF-открыткой, а замеры года запечатываются в tirup_readings_YYYY.csv (Zero-Lag база). Каждые сутки в 23:59:59 создаётся локальный автобэкап, доступен экспорт ZIP."
-                else "On Dec 31 at 20:00, Year-End Digest 🥂 exports a PDF holiday card, sealing year readings into tirup_readings_YYYY.csv (Zero-Lag). Nightly auto-backup at 23:59:59 plus ZIP export."
-            )
-            drawCallout(
-                c3, y3, CalloutType.INFO,
-                if (isRu) "⚖️ ЮРИДИЧЕСКИЙ МЕДИЦИНСКИЙ ОТКАЗ ОТ ОТВЕТСТВЕННОСТИ:" else "⚖️ LEGAL MEDICAL DISCLAIMER NOTICE:",
-                if (isRu) "TIRUp является программным средством для информационного самоконтроля образа жизни при диабете. Приложение не является сертифицированным медицинским прибором. Всегда проверяйте показания глюкометром по капле крови перед принятием решений о дозах инсулина."
-                else "TIRUp is an auxiliary lifestyle self-monitoring tool. It is not an officially certified medical device. Always verify CGM readings with a capillary blood meter prior to therapeutic insulin adjustments."
-            )
-            document.finishPage(page3)
+            pass2Context.startDocument()
+            renderManual(pass2Context)
+            pass2Context.finishDocument()
 
             val outputDir = File(context.cacheDir, "reports").apply { mkdirs() }
             val outputFile = File(outputDir, "TIRUp_User_Manual.pdf")

@@ -111,7 +111,7 @@ class GlucoseRepositoryImpl(
 
     override suspend fun insertReadingsBatch(readings: List<GlucoseReading>) = withContext(Dispatchers.IO) {
         if (readings.isEmpty()) return@withContext
-        val windowMs = 60_000L
+        val windowMs = 25_000L // 25s window prevents false deduplication of 1-minute CGM readings while eliminating duplicate echoes
         val filtered = mutableListOf<GlucoseReading>()
         
         for (r in readings) {
