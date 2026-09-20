@@ -92,15 +92,32 @@ object TargetCompensatorCalculator {
         val inRangeMinutes = (currentTirFraction * activeMonitoringMinutes).roundToInt().coerceIn(0, activeMonitoringMinutes)
         val outOfRangeMinutes = activeMonitoringMinutes - inRangeMinutes
 
+        // Dynamically estimate remaining data points based on actual sampling rate today
+        // (natively handles 1-minute, 5-minute sensors, and real communication dropouts gracefully)
+        val expectedRemainingPoints = if (elapsedMinutesToday > 0 && totalCount > 0) {
+            ((totalCount.toDouble() / elapsedMinutesToday.toDouble()) * remainingMinutesToday).roundToInt().coerceAtLeast(0)
+        } else {
+            (remainingMinutesToday / 5).coerceAtLeast(0)
+        }
+        val expectedTotalPoints = totalCount + expectedRemainingPoints
+
+        // Max possible TIR if in-range 100% of remaining points / continuous time
+        val maxPossibleTirByPoints = if (expectedTotalPoints > 0) {
+            ((inCount + expectedRemainingPoints).toDouble() / expectedTotalPoints.toDouble() * 100.0).coerceIn(0.0, 100.0)
+        } else {
+            currentScore
+        }
+        val maxPossibleTirByMinutes = ((inRangeMinutes + remainingMinutesToday).toDouble() / 1440.0 * 100.0).coerceIn(0.0, 100.0)
+
+        // The true achievable ceiling is the higher of points projection and continuous minutes projection
+        val maxPossibleTir = kotlin.math.max(maxPossibleTirByPoints, maxPossibleTirByMinutes).coerceIn(0.0, 100.0)
+
         // Target thresholds for the full 24 hours (1440 minutes)
         val targetGoalMinutes = ((targetPercent / 100.0) * 1440.0).roundToInt()
         val allowedOutMinutes = 1440 - targetGoalMinutes
 
         // Needed in-range minutes to reach the daily target
         val neededMinutesToday = (targetGoalMinutes - inRangeMinutes).coerceAtLeast(0)
-
-        // Max possible TIR if in-range 100% of remaining time
-        val maxPossibleTir = ((inRangeMinutes + remainingMinutesToday).toDouble() / 1440.0 * 100.0).coerceIn(0.0, 100.0)
 
         // Current status of latest reading
         val isCurrentlyInRange = latestReading?.let(inRangeCheck) ?: true
@@ -113,6 +130,11 @@ object TargetCompensatorCalculator {
         val status: CompensatorStatus
         val recRu: String
         val recEn: String
+
+        // A goal is realistically unattainable only if remaining minutes are insufficient
+        // AND projected maximum TIR is strictly below the target goal (accounting for decimal precision)
+        val isUnrealistic = neededMinutesToday > remainingMinutesToday && maxPossibleTir < (targetPercent - 0.05)
+        val maxTirStr = if (maxPossibleTir >= 99.95) "100%" else String.format(Locale.US, "%.1f%%", maxPossibleTir)
 
         when {
             // Scenario 1: Out of range right now -> urgent clinical priority
@@ -129,9 +151,8 @@ object TargetCompensatorCalculator {
                     status = CompensatorStatus.EXCEEDING
                     recRu = "Сахар вне диапазона$suffHintRu. Суточная цель (≥$targetPctInt%) уже выполнена досрочно! Вернитесь в норму для улучшения результата текущих суток."
                     recEn = "Glucose is out of range$suffHintEn. Daily target (≥$targetPctInt%) is already achieved! Return to range to improve your score for today."
-                } else if (neededMinutesToday > remainingMinutesToday) {
+                } else if (isUnrealistic) {
                     status = CompensatorStatus.UNREALISTIC
-                    val maxTirStr = String.format(Locale.US, "%.0f%%", maxPossibleTir)
                     recRu = "Сахар вне диапазона$suffHintRu. До конца суток осталось $remainStrRu (макс. $targetName сегодня: $maxTirStr). Вернитесь в норму, чтобы завершить день с лучшим счётом."
                     recEn = "Glucose is out of range$suffHintEn. $remainStrEn left today (max $targetName today: $maxTirStr). Return to target to finish with highest score."
                 } else {
@@ -152,8 +173,7 @@ object TargetCompensatorCalculator {
                 val remainStrEn = formatHoursMins(remainingMinutesToday, false)
                 val targetPctInt = targetPercent.toInt()
 
-                if (neededMinutesToday > remainingMinutesToday) {
-                    val maxTirStr = String.format(Locale.US, "%.0f%%", maxPossibleTir)
+                if (isUnrealistic) {
                     recRu = "Сбор данных за сегодня ($observedPointsCount точек, $coveredStrRu). До конца суток $remainStrRu (макс. $targetName сегодня: $maxTirStr). Полный 24ч расчёт цели начнётся с завтрашнего дня."
                     recEn = "Collecting daily data ($observedPointsCount pts, $coveredStrEn). $remainStrEn left today (max $targetName today: $maxTirStr). Full 24h target tracking starts tomorrow."
                 } else {
@@ -177,9 +197,8 @@ object TargetCompensatorCalculator {
             }
 
             // Scenario 2: Unrealistic to reach targetPercent today (out-of-range time limit exceeded)
-            neededMinutesToday > remainingMinutesToday -> {
+            isUnrealistic -> {
                 status = CompensatorStatus.UNREALISTIC
-                val maxTirStr = String.format(Locale.US, "%.0f%%", maxPossibleTir)
                 recRu = "Лимит времени вне нормы исчерпан (макс. $targetName за сегодня: $maxTirStr). Удерживайте диапазон до полуночи, чтобы завершить день с лучшим счётом."
                 recEn = "Out of range limit exceeded (max $targetName today: $maxTirStr). Keep in range until midnight to finish the day with highest score."
             }
