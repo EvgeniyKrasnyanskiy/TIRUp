@@ -195,6 +195,49 @@ internal fun clusterNoteTreatments(
     return clusters
 }
 
+internal fun deduplicateTreatmentsInMemory(treatments: List<Treatment>, windowMs: Long = 5 * 60_000L): List<Treatment> {
+    if (treatments.size <= 1) return treatments
+    val result = mutableListOf<Treatment>()
+    for (tr in treatments) {
+        val existingIndex = result.indexOfFirst { existing ->
+            abs(tr.timestamp - existing.timestamp) <= windowMs && areTreatmentsDuplicate(tr, existing)
+        }
+        if (existingIndex < 0) {
+            result.add(tr)
+        } else {
+            val existing = result[existingIndex]
+            if (existing.notes.isNullOrBlank() && !tr.notes.isNullOrBlank()) {
+                result[existingIndex] = existing.copy(notes = tr.notes)
+            }
+        }
+    }
+    return result
+}
+
+private fun areTreatmentsDuplicate(t1: Treatment, t2: Treatment): Boolean {
+    val sameInsulin = when {
+        t1.insulinUnits == null && t2.insulinUnits == null -> true
+        t1.insulinUnits != null && t2.insulinUnits != null ->
+            abs(t1.insulinUnits - t2.insulinUnits) < 0.05
+        else -> false
+    }
+    val sameCarbs = when {
+        t1.carbsGrams == null && t2.carbsGrams == null -> true
+        t1.carbsGrams != null && t2.carbsGrams != null ->
+            abs(t1.carbsGrams - t2.carbsGrams) < 0.5
+        else -> false
+    }
+    val t1HasDose = (t1.insulinUnits != null && t1.insulinUnits > 0.0) || (t1.carbsGrams != null && t1.carbsGrams > 0.0)
+    val t2HasDose = (t2.insulinUnits != null && t2.insulinUnits > 0.0) || (t2.carbsGrams != null && t2.carbsGrams > 0.0)
+    val sameNotes = when {
+        t1.notes.isNullOrBlank() && t2.notes.isNullOrBlank() -> true
+        !t1.notes.isNullOrBlank() && !t2.notes.isNullOrBlank() ->
+            t1.notes.trim().equals(t2.notes.trim(), ignoreCase = true)
+        else -> false
+    }
+    return sameInsulin && sameCarbs && (sameNotes || (t1HasDose && t2HasDose))
+}
+
 /**
  * Interactive 24-hour daily glucose chart for the Focus screen.
  * Supports:
@@ -244,8 +287,9 @@ fun DailyGlucoseChart(
     val todayTreatments = remember(treatments, startOfDay, showTreatments) {
         if (!showTreatments) return@remember emptyList()
         val filtered = treatments.filter { it.timestamp >= startOfDay }
-        if (filtered.isNotEmpty()) filtered.sortedBy { it.timestamp }
+        val sorted = if (filtered.isNotEmpty()) filtered.sortedBy { it.timestamp }
         else treatments.sortedBy { it.timestamp }
+        deduplicateTreatmentsInMemory(sorted)
     }
 
     val insulinClusters = remember(todayTreatments) {
@@ -464,120 +508,124 @@ fun DailyGlucoseChart(
                         border = androidx.compose.foundation.BorderStroke(1.dp, bannerColor.copy(alpha = 0.4f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 10.dp, vertical = 5.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.weight(1f, fill = false)
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = "⏱ $trTime",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = onSurface
-                                )
-
-                                if (cluster.isNoteOnly) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f, fill = false)
+                                ) {
                                     Text(
-                                        text = "💬 ${cluster.notes ?: ""}",
+                                        text = "⏱ $trTime",
                                         style = MaterialTheme.typography.bodySmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF8B5CF6),
-                                        maxLines = 2,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                    )
-                                } else if (cluster.isInsulin) {
-                                    val totalIns = cluster.totalInsulin
-                                    val totalStr = if (totalIns == totalIns.toInt().toDouble()) "${totalIns.toInt()}" else String.format(Locale.US, "%.1f", totalIns)
-                                    val insDetail = if (cluster.isSingle) {
-                                        if (isRu) "💉 $totalStr Ед" else "💉 $totalStr U"
-                                    } else {
-                                        val breakdown = cluster.treatments.mapNotNull { it.insulinUnits }.joinToString("+") {
-                                            if (it == it.toInt().toDouble()) "${it.toInt()}" else String.format(Locale.US, "%.1f", it)
-                                        }
-                                        if (isRu) "💉 $breakdown=$totalStr Ед (${cluster.treatments.size} подколки)"
-                                        else "💉 $breakdown=${totalStr}U (${cluster.treatments.size} boluses)"
-                                    }
-                                    Text(
-                                        text = insDetail,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = ActionBlue
+                                        color = onSurface
                                     )
 
-                                    if (cluster.isCombo) {
-                                        val carbsG = cluster.treatments.first().carbsGrams ?: 0.0
-                                        val xeStr = String.format(Locale.US, "%.1f", carbsG / 12.0)
+                                    if (cluster.isNoteOnly) {
                                         Text(
-                                            text = if (isRu) "🍽️ ${carbsG.toInt()} г ($xeStr ХЕ)" else "🍽️ ${carbsG.toInt()} g ($xeStr XE)",
+                                            text = if (isRu) "💬 Заметка" else "💬 Note",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF8B5CF6)
+                                        )
+                                    } else if (cluster.isInsulin) {
+                                        val totalIns = cluster.totalInsulin
+                                        val totalStr = if (totalIns == totalIns.toInt().toDouble()) "${totalIns.toInt()}" else String.format(Locale.US, "%.1f", totalIns)
+                                        val insDetail = if (cluster.isSingle) {
+                                            if (isRu) "💉 $totalStr Ед" else "💉 $totalStr U"
+                                        } else {
+                                            val breakdown = cluster.treatments.mapNotNull { it.insulinUnits }.joinToString("+") {
+                                                if (it == it.toInt().toDouble()) "${it.toInt()}" else String.format(Locale.US, "%.1f", it)
+                                            }
+                                            if (isRu) "💉 $breakdown=$totalStr Ед (${cluster.treatments.size} подколки)"
+                                            else "💉 $breakdown=${totalStr}U (${cluster.treatments.size} boluses)"
+                                        }
+                                        Text(
+                                            text = insDetail,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = ActionBlue
+                                        )
+
+                                        if (cluster.isCombo) {
+                                            val carbsG = cluster.treatments.first().carbsGrams ?: 0.0
+                                            val xeStr = String.format(Locale.US, "%.1f", carbsG / 12.0)
+                                            Text(
+                                                text = if (isRu) "🍽️ ${carbsG.toInt()} г ($xeStr ХЕ)" else "🍽️ ${carbsG.toInt()} g ($xeStr XE)",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFF59E0B)
+                                            )
+                                        }
+                                    } else {
+                                        val totalCarbs = cluster.totalCarbs
+                                        val xeStr = String.format(Locale.US, "%.1f", totalCarbs / 12.0)
+                                        val carbsDetail = if (cluster.isSingle) {
+                                            if (isRu) "🍽️ ${totalCarbs.toInt()} г ($xeStr ХЕ)" else "🍽️ ${totalCarbs.toInt()} g ($xeStr XE)"
+                                        } else {
+                                            val breakdown = cluster.treatments.mapNotNull { it.carbsGrams }.joinToString("+") { "${it.toInt()}" }
+                                            if (isRu) "🍽️ $breakdown=${totalCarbs.toInt()} г ($xeStr ХЕ, ${cluster.treatments.size} приёма)"
+                                            else "🍽️ $breakdown=${totalCarbs.toInt()} g ($xeStr XE, ${cluster.treatments.size} meals)"
+                                        }
+                                        Text(
+                                            text = carbsDetail,
                                             style = MaterialTheme.typography.bodySmall,
                                             fontWeight = FontWeight.Bold,
                                             color = Color(0xFFF59E0B)
                                         )
                                     }
-                                } else {
-                                    val totalCarbs = cluster.totalCarbs
-                                    val xeStr = String.format(Locale.US, "%.1f", totalCarbs / 12.0)
-                                    val carbsDetail = if (cluster.isSingle) {
-                                        if (isRu) "🍽️ ${totalCarbs.toInt()} г ($xeStr ХЕ)" else "🍽️ ${totalCarbs.toInt()} g ($xeStr XE)"
-                                    } else {
-                                        val breakdown = cluster.treatments.mapNotNull { it.carbsGrams }.joinToString("+") { "${it.toInt()}" }
-                                        if (isRu) "🍽️ $breakdown=${totalCarbs.toInt()} г ($xeStr ХЕ, ${cluster.treatments.size} приёма)"
-                                        else "🍽️ $breakdown=${totalCarbs.toInt()} g ($xeStr XE, ${cluster.treatments.size} meals)"
-                                    }
-                                    Text(
-                                        text = carbsDetail,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFF59E0B)
-                                    )
                                 }
 
-                                val noteText = cluster.notes
-                                if (!noteText.isNullOrBlank()) {
-                                    val truncatedNote = if (noteText.length > 14) noteText.take(13) + "…" else noteText
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    if (onDeleteTreatment != null) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = if (isRu) "Удалить метку" else "Delete mark",
+                                            tint = Color(0xFFEF4444),
+                                            modifier = Modifier
+                                                .size(18.dp)
+                                                .clickable {
+                                                    cluster.treatments.forEach { onDeleteTreatment(it.id) }
+                                                    selectedTreatmentCluster = null
+                                                }
+                                        )
+                                    }
+
                                     Text(
-                                        text = "• $truncatedNote",
-                                        style = MaterialTheme.typography.bodySmall,
+                                        text = "✕",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
                                         color = onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                        modifier = Modifier
+                                            .clickable { selectedTreatmentCluster = null }
+                                            .padding(horizontal = 4.dp)
                                     )
                                 }
                             }
 
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                if (onDeleteTreatment != null) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = if (isRu) "Удалить метку" else "Delete mark",
-                                        tint = Color(0xFFEF4444),
-                                        modifier = Modifier
-                                            .size(18.dp)
-                                            .clickable {
-                                                cluster.treatments.forEach { onDeleteTreatment(it.id) }
-                                                selectedTreatmentCluster = null
-                                            }
-                                    )
-                                }
-
+                            val fullNote = cluster.notes
+                            if (!fullNote.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "✕",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = onSurfaceVariant,
-                                    modifier = Modifier
-                                        .clickable { selectedTreatmentCluster = null }
-                                        .padding(horizontal = 4.dp)
+                                    text = if (cluster.isNoteOnly) fullNote else "💬 $fullNote",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (cluster.isNoteOnly) Color(0xFF8B5CF6) else onSurfaceVariant,
+                                    softWrap = true,
+                                    maxLines = 10,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                             }
                         }
@@ -699,49 +747,35 @@ fun DailyGlucoseChart(
                         border = androidx.compose.foundation.BorderStroke(1.dp, selColor.copy(alpha = 0.4f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 10.dp, vertical = 5.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
                         ) {
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f, fill = false)
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = "⏱ $selTime",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = onSurface
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "$selVal $selUnit ${sel.trendArrow}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = selColor
-                                )
-
-                                val nearbyNote = todayTreatments.filter {
-                                    abs(it.timestamp - sel.timestamp) <= 15 * 60_000L && !it.notes.isNullOrBlank()
-                                }.minByOrNull { abs(it.timestamp - sel.timestamp) }
-
-                                if (nearbyNote != null && !nearbyNote.notes.isNullOrBlank()) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                ) {
+                                    Text(
+                                        text = "⏱ $selTime",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = onSurface
+                                    )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "💬 ${nearbyNote.notes}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFF8B5CF6),
-                                        maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                        text = "$selVal $selUnit ${sel.trendArrow}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = selColor
                                     )
                                 }
-                            }
 
-                            if ((sel.iob != null && sel.iob > 0.0) || (sel.cob != null && sel.cob > 0.0)) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -762,7 +796,34 @@ fun DailyGlucoseChart(
                                             color = Color(0xFFF59E0B)
                                         )
                                     }
+
+                                    Text(
+                                        text = "✕",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = onSurfaceVariant,
+                                        modifier = Modifier
+                                            .clickable { selectedReading = null }
+                                            .padding(start = 4.dp, end = 2.dp)
+                                    )
                                 }
+                            }
+
+                            val nearbyNote = todayTreatments.filter {
+                                abs(it.timestamp - sel.timestamp) <= 15 * 60_000L && !it.notes.isNullOrBlank()
+                            }.minByOrNull { abs(it.timestamp - sel.timestamp) }
+
+                            if (nearbyNote != null && !nearbyNote.notes.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "💬 ${nearbyNote.notes}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF8B5CF6),
+                                    softWrap = true,
+                                    maxLines = 10,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             }
                         }
                     }

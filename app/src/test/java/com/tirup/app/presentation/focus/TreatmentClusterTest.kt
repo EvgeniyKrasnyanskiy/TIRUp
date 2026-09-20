@@ -142,4 +142,21 @@ class TreatmentClusterTest {
         assertEquals("💬 тест", cluster.displayText)
         assertEquals("тест", cluster.notes)
     }
+
+    @Test
+    fun testDeduplicateTreatmentsInMemory() {
+        val baseTime = 1000000L
+        val listWithDuplicates = listOf(
+            Treatment(id = 1L, timestamp = baseTime, insulinUnits = 2.0),
+            Treatment(id = 2L, timestamp = baseTime + 30_000L, insulinUnits = 2.0), // Duplicate within 30s
+            Treatment(id = 3L, timestamp = baseTime + 60_000L, insulinUnits = 2.0, notes = "Болюс"), // Duplicate with notes enrichment
+            Treatment(id = 4L, timestamp = baseTime + 10 * 60_000L, insulinUnits = 2.0) // Separate bolus 10m later
+        )
+
+        val deduplicated = deduplicateTreatmentsInMemory(listWithDuplicates)
+        assertEquals(2, deduplicated.size)
+        assertEquals(1L, deduplicated[0].id)
+        assertEquals("Болюс", deduplicated[0].notes)
+        assertEquals(4L, deduplicated[1].id)
+    }
 }
