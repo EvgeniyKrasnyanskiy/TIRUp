@@ -1134,13 +1134,20 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         }
                     }
 
-                    // 2. Fetch /sgv.json?count=24 to backfill any missing historical points (only if forced or gap > 5 min)
+                    // 2. Fetch /sgv.json?count=... to backfill any missing historical points (adaptive depth up to 24h)
                     val latestInDbBefore = app.glucoseRepository.getLatestReading().first()
                     val needsHistoryBackfill = force || latestInDbBefore == null || (now - latestInDbBefore.timestamp > 300_000L)
                     val backfilledReadings = mutableListOf<GlucoseReading>()
 
                     if (needsHistoryBackfill) {
-                        val sgvJsonStr = queryLocalEndpoint("sgv.json?count=24")
+                        val countToFetch = if (latestInDbBefore == null || force) {
+                            288 // Full 24 hours (288 * 5 min)
+                        } else {
+                            val gapMs = (now - latestInDbBefore.timestamp).coerceAtLeast(0L)
+                            val missingPoints = (gapMs / 300_000L).toInt() + 2
+                            missingPoints.coerceIn(12, 288)
+                        }
+                        val sgvJsonStr = queryLocalEndpoint("sgv.json?count=$countToFetch")
                         if (!sgvJsonStr.isNullOrBlank()) {
                             try {
                                 val array = org.json.JSONArray(sgvJsonStr)
