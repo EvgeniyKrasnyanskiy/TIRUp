@@ -165,15 +165,15 @@ fun StreakBadge(
 
     val isDark = isSystemInDarkTheme()
     val amberBase = Color(0xFFF59E0B) // Amber
-    val amberBg = amberBase.copy(alpha = if (isDark) 0.25f else 0.16f)
-    val amberBorder = amberBase.copy(alpha = if (isDark) 0.65f else 0.55f)
-    val amberText = if (isDark) Color.White else Color(0xFF78350F) // Crisp white in dark theme, deep dark amber in light theme
+    val amberBg = amberBase.copy(alpha = if (isDark) 0.25f else 0.18f)
+    val amberBorder = amberBase.copy(alpha = if (isDark) 0.65f else 0.70f)
+    val amberText = if (isDark) Color.White else Color.Black // Crisp white in dark theme, pure black in light theme
 
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = if (streakDays > 0) amberBg else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         border = BorderStroke(
-            1.dp,
+            1.2.dp,
             if (streakDays > 0) amberBorder else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
         ),
         modifier = if (onClick != null) Modifier.clickable { onClick() } else Modifier
@@ -182,7 +182,7 @@ fun StreakBadge(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .widthIn(min = 34.dp)
-                .height(28.dp)
+                .height(30.dp)
                 .padding(horizontal = 8.dp)
         ) {
             if (streakDays == 0) {
