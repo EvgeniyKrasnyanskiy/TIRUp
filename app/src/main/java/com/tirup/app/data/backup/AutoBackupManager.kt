@@ -102,10 +102,23 @@ object AutoBackupManager {
         return dir
     }
 
+    fun isWritableDirectory(dir: File): Boolean {
+        return try {
+            if (!dir.exists()) dir.mkdirs()
+            val testFile = File(dir, ".perm_test_${System.currentTimeMillis()}")
+            if (testFile.createNewFile()) {
+                testFile.delete()
+                true
+            } else false
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun getBackupDirectory(context: Context? = null): File {
         try {
             val pub = getPublicBackupDirectory()
-            if (pub.exists() && pub.canWrite()) {
+            if (isWritableDirectory(pub)) {
                 return pub
             }
         } catch (_: Exception) {}
@@ -320,7 +333,7 @@ object AutoBackupManager {
         try {
             val pubDir = getPublicBackupDirectory()
             val internalDir = getInternalBackupDirectory(context)
-            val primaryDir = if (pubDir.exists() && pubDir.canWrite()) pubDir else internalDir
+            val primaryDir = if (isWritableDirectory(pubDir)) pubDir else internalDir
 
             val yearReadingsFile = File(primaryDir, "tirup_readings_$year.csv")
             val yearTreatmentsFile = File(primaryDir, "tirup_treatments_$year.csv")
@@ -343,10 +356,11 @@ object AutoBackupManager {
                     writeTreatmentsCsvFile(yearTreatmentsFile, database, tCount, startOfYear, endOfYear)
                 }
 
-                if (primaryDir.absolutePath != internalDir.absolutePath && internalDir.exists()) {
+                val mirrorDir = if (primaryDir.absolutePath == pubDir.absolutePath) internalDir else pubDir
+                if (isWritableDirectory(mirrorDir)) {
                     try {
-                        if (yearReadingsFile.exists()) yearReadingsFile.copyTo(File(internalDir, yearReadingsFile.name), overwrite = true)
-                        if (yearTreatmentsFile.exists()) yearTreatmentsFile.copyTo(File(internalDir, yearTreatmentsFile.name), overwrite = true)
+                        if (yearReadingsFile.exists()) yearReadingsFile.copyTo(File(mirrorDir, yearReadingsFile.name), overwrite = true)
+                        if (yearTreatmentsFile.exists()) yearTreatmentsFile.copyTo(File(mirrorDir, yearTreatmentsFile.name), overwrite = true)
                     } catch (e: Exception) {
                         Log.w(TAG, "Error mirroring year archive $year: ${e.message}")
                     }
@@ -391,7 +405,7 @@ object AutoBackupManager {
         try {
             val pubDir = getPublicBackupDirectory()
             val internalDir = getInternalBackupDirectory(context)
-            val primaryDir = if (pubDir.exists() && pubDir.canWrite()) pubDir else internalDir
+            val primaryDir = if (isWritableDirectory(pubDir)) pubDir else internalDir
 
             // Step 0: Ensure past completed years are archived
             archiveCompletedYears(context, database)
@@ -445,15 +459,16 @@ object AutoBackupManager {
                 activeEndTime
             )
 
-            // 5. Mirror to internalDir if primaryDir is public
-            if (primaryDir.absolutePath != internalDir.absolutePath && internalDir.exists()) {
+            // 5. Mirror to secondary directory if writable
+            val mirrorDir = if (primaryDir.absolutePath == pubDir.absolutePath) internalDir else pubDir
+            if (isWritableDirectory(mirrorDir)) {
                 try {
-                    if (settingsFile.exists()) settingsFile.copyTo(File(internalDir, SETTINGS_FILE_NAME), overwrite = true)
-                    if (readingsFile.exists()) readingsFile.copyTo(File(internalDir, READINGS_FILE_NAME), overwrite = true)
-                    if (treatmentsFile.exists()) treatmentsFile.copyTo(File(internalDir, TREATMENTS_FILE_NAME), overwrite = true)
-                    if (legacyFile.exists()) legacyFile.copyTo(File(internalDir, LEGACY_BACKUP_FILE_NAME), overwrite = true)
+                    if (settingsFile.exists()) settingsFile.copyTo(File(mirrorDir, SETTINGS_FILE_NAME), overwrite = true)
+                    if (readingsFile.exists()) readingsFile.copyTo(File(mirrorDir, READINGS_FILE_NAME), overwrite = true)
+                    if (treatmentsFile.exists()) treatmentsFile.copyTo(File(mirrorDir, TREATMENTS_FILE_NAME), overwrite = true)
+                    if (legacyFile.exists()) legacyFile.copyTo(File(mirrorDir, LEGACY_BACKUP_FILE_NAME), overwrite = true)
                 } catch (e: Exception) {
-                    Log.w(TAG, "Mirroring backup to internal storage encountered warning: ${e.message}")
+                    Log.w(TAG, "Mirroring backup encountered warning: ${e.message}")
                 }
             }
 

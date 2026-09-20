@@ -3404,6 +3404,47 @@ fun SettingsScreen(
                         )
                     }
 
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R && !android.os.Environment.isExternalStorageManager()) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = ActionBlue.copy(alpha = 0.08f),
+                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.25f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = if (isRu) "ℹ️ Для бэкапа в общедоступную папку Documents/TIRUp/Backups предоставьте доступ к файлам"
+                                    else "ℹ️ To access backups in public Documents/TIRUp/Backups grant all files access",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                OutlinedButton(
+                                    onClick = {
+                                        try {
+                                            val intent = android.content.Intent(
+                                                android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                                android.net.Uri.parse("package:${context.packageName}")
+                                            )
+                                            context.startActivity(intent)
+                                        } catch (_: Exception) {
+                                            val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                                            context.startActivity(intent)
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = if (isRu) "Предоставить доступ к файлам" else "Grant all files access",
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     if (state.isBackupInProgress) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
