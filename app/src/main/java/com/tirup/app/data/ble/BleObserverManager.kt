@@ -580,7 +580,6 @@ object BleObserverManager {
             if (now - lastHeartbeatLogMs >= 3000L) {
                 lastHeartbeatLogMs = now
                 Log.i(TAG, "Heartbeat received: ts=${packet.timestamp}, bg=${packet.valueMmol}, rssi=$rssi (duplicate, connection alive)")
-                _packetReceivedEvent.tryEmit(Pair(packet, rssi))
             }
             scope.launch {
                 try {
