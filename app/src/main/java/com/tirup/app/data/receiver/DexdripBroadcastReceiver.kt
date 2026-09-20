@@ -1076,12 +1076,19 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             )
             com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context.applicationContext)
             syncIobCobFromPebble(context.applicationContext)
+
+            // Periodically trigger history sync (every 15 min) to guarantee 100% reading alignment with xDrip
+            if (System.currentTimeMillis() - lastPeriodicHistorySync >= 15 * 60_000L) {
+                syncFromLocalXdrip(context.applicationContext)
+            }
         }
 
         @Volatile
         private var isSyncingFromLocal = false
         @Volatile
         private var lastLocalSyncAttempt = 0L
+        @Volatile
+        private var lastPeriodicHistorySync = 0L
 
         fun syncFromLocalXdrip(context: Context, force: Boolean = false) {
             val now = System.currentTimeMillis()
@@ -1136,16 +1143,21 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
                     // 2. Fetch /sgv.json?count=... to backfill any missing historical points (adaptive depth up to 24h)
                     val latestInDbBefore = app.glucoseRepository.getLatestReading().first()
-                    val needsHistoryBackfill = force || latestInDbBefore == null || (now - latestInDbBefore.timestamp > 300_000L)
+                    val isPeriodicDue = (now - lastPeriodicHistorySync >= 15 * 60_000L)
+                    val needsHistoryBackfill = force || latestInDbBefore == null || (now - latestInDbBefore.timestamp > 300_000L) || isPeriodicDue
                     val backfilledReadings = mutableListOf<GlucoseReading>()
 
                     if (needsHistoryBackfill) {
+                        if (isPeriodicDue) {
+                            lastPeriodicHistorySync = now
+                        }
                         val countToFetch = if (latestInDbBefore == null || force) {
                             288 // Full 24 hours (288 * 5 min)
                         } else {
                             val gapMs = (now - latestInDbBefore.timestamp).coerceAtLeast(0L)
                             val missingPoints = (gapMs / 300_000L).toInt() + 2
-                            missingPoints.coerceIn(12, 288)
+                            val minPoints = if (isPeriodicDue) 72 else 12 // Periodic pull fetches up to 6h of history to ensure 100% sync
+                            missingPoints.coerceIn(minPoints, 288)
                         }
                         val sgvJsonStr = queryLocalEndpoint("sgv.json?count=$countToFetch")
                         if (!sgvJsonStr.isNullOrBlank()) {
