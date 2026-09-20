@@ -539,7 +539,8 @@ fun AppNavigationRoot(
                                  (packet.timestamp == 0L || packet.valueMmol <= 0.1)
 
             val now = System.currentTimeMillis()
-            if ((ble.showPacketBanner || isSearchOrTest) && (now - lastBleBannerShownAt >= 60_000L)) {
+            val minCooldown = if (isSearchOrTest) 2000L else 10_000L
+            if ((ble.showPacketBanner || isSearchOrTest) && (now - lastBleBannerShownAt >= minCooldown)) {
                 lastBleBannerShownAt = now
                 val signalDot = if (rssi >= -75) "🟢" else if (rssi >= -85) "🟡" else "🔴"
                 val batStr = if (packet.batteryPercent in 0..100) ", 🔋${packet.batteryPercent}%" else ""

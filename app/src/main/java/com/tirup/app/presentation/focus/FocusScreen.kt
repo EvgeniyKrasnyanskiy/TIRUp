@@ -1362,13 +1362,15 @@ private fun BleBridgeBadge(
 
         LaunchedEffect(blePacketReceivedAt) {
             val now = System.currentTimeMillis()
-            // Only start animation if this is a fresh packet and at least 45s elapsed since last animation start
-            // (prevents continuous re-triggering during the 15-second BLE broadcast burst window)
-            if (blePacketReceivedAt > 0L && (now - blePacketReceivedAt) < 4000L && (now - lastAnimationStartAt) >= 45_000L) {
+            // Only start animation if this is a fresh packet and at least 10s elapsed since last animation start
+            if (blePacketReceivedAt > 0L && (now - blePacketReceivedAt) < 4000L && (now - lastAnimationStartAt) >= 10_000L) {
                 lastAnimationStartAt = now
-                isReceivingAnimation = true
-                kotlinx.coroutines.delay(3500L)
-                isReceivingAnimation = false
+                try {
+                    isReceivingAnimation = true
+                    kotlinx.coroutines.delay(3500L)
+                } finally {
+                    isReceivingAnimation = false
+                }
             }
         }
 
