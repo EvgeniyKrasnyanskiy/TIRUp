@@ -35,6 +35,7 @@ class TrendsViewModel(
         const val DISMISSAL_COOLDOWN_MS = 14L * 24 * 60 * 60 * 1000L // 14 days
         private const val PREFS_NAME = "tirup_trends_dismissed"
         private const val PREFIX_PATTERN = "dismissed_pattern_"
+        private const val PREFIX_DELETED_PATTERN = "deleted_pattern_"
         private const val PREFIX_INSIGHT = "dismissed_insight_"
         private const val PREFIX_FIRST_SEEN = "pattern_first_seen_"
     }
@@ -46,6 +47,9 @@ class TrendsViewModel(
 
     private val _expiredPatternIds = MutableStateFlow<Set<String>>(emptySet())
     val expiredPatternIds: StateFlow<Set<String>> = _expiredPatternIds.asStateFlow()
+
+    private val _deletedPatternIds = MutableStateFlow<Set<String>>(emptySet())
+    val deletedPatternIds: StateFlow<Set<String>> = _deletedPatternIds.asStateFlow()
 
     private val _dismissedInsightIds = MutableStateFlow<Set<String>>(emptySet())
     val dismissedInsightIds: StateFlow<Set<String>> = _dismissedInsightIds.asStateFlow()
@@ -76,6 +80,7 @@ class TrendsViewModel(
         val allEntries = sp.all
         val activePatterns = mutableSetOf<String>()
         val activeInsights = mutableSetOf<String>()
+        val deletedPatterns = mutableSetOf<String>()
 
         allEntries.forEach { (key, value) ->
             val timestamp = (value as? Long) ?: return@forEach
@@ -84,11 +89,14 @@ class TrendsViewModel(
                     activePatterns.add(key.removePrefix(PREFIX_PATTERN))
                 } else if (key.startsWith(PREFIX_INSIGHT)) {
                     activeInsights.add(key.removePrefix(PREFIX_INSIGHT))
+                } else if (key.startsWith(PREFIX_DELETED_PATTERN)) {
+                    deletedPatterns.add(key.removePrefix(PREFIX_DELETED_PATTERN))
                 }
             }
         }
         _dismissedPatternIds.value = activePatterns
         _dismissedInsightIds.value = activeInsights
+        _deletedPatternIds.value = deletedPatterns
 
         val cal = Calendar.getInstance()
         val currentWeek = cal.get(Calendar.WEEK_OF_YEAR)
@@ -145,10 +153,30 @@ class TrendsViewModel(
         val sp = prefs ?: return
         sp.edit()
             .remove("$PREFIX_PATTERN$id")
+            .remove("$PREFIX_DELETED_PATTERN$id")
             .putLong("$PREFIX_FIRST_SEEN$id", System.currentTimeMillis())
             .apply()
         _dismissedPatternIds.value = _dismissedPatternIds.value - id
         _expiredPatternIds.value = _expiredPatternIds.value - id
+        _deletedPatternIds.value = _deletedPatternIds.value - id
+    }
+
+    fun deleteArchivedPattern(id: String) {
+        val sp = prefs ?: return
+        val now = System.currentTimeMillis()
+        sp.edit().putLong("$PREFIX_DELETED_PATTERN$id", now).apply()
+        _deletedPatternIds.value = _deletedPatternIds.value + id
+    }
+
+    fun clearArchivedPatterns(patternIds: List<String>) {
+        val sp = prefs ?: return
+        val editor = sp.edit()
+        val now = System.currentTimeMillis()
+        patternIds.forEach { id ->
+            editor.putLong("$PREFIX_DELETED_PATTERN$id", now)
+        }
+        editor.apply()
+        _deletedPatternIds.value = _deletedPatternIds.value + patternIds
     }
 
     fun dismissInsight(id: String) {

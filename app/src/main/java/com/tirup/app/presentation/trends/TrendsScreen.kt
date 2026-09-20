@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -81,6 +82,7 @@ fun TrendsScreen(
     var detailDialogInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
     val dismissedPatternIds by viewModel.dismissedPatternIds.collectAsState()
     val expiredPatternIds by viewModel.expiredPatternIds.collectAsState()
+    val deletedPatternIds by viewModel.deletedPatternIds.collectAsState()
     val dismissedInsightIds by viewModel.dismissedInsightIds.collectAsState()
     var agpCardMode by rememberSaveable { mutableStateOf(0) } // 0 = Chart, 1 = Metrics
     var showArchivedPatterns by rememberSaveable { mutableStateOf(false) }
@@ -110,12 +112,12 @@ fun TrendsScreen(
         }
     }
 
-    val visiblePatterns = remember(detectedPatterns, dismissedPatternIds, expiredPatternIds) {
-        detectedPatterns.filter { it.id !in dismissedPatternIds && it.id !in expiredPatternIds }
+    val visiblePatterns = remember(detectedPatterns, dismissedPatternIds, expiredPatternIds, deletedPatternIds) {
+        detectedPatterns.filter { it.id !in dismissedPatternIds && it.id !in expiredPatternIds && it.id !in deletedPatternIds }
     }
 
-    val archivedPatterns = remember(detectedPatterns, dismissedPatternIds, expiredPatternIds) {
-        detectedPatterns.filter { it.id in dismissedPatternIds || it.id in expiredPatternIds }
+    val archivedPatterns = remember(detectedPatterns, dismissedPatternIds, expiredPatternIds, deletedPatternIds) {
+        detectedPatterns.filter { (it.id in dismissedPatternIds || it.id in expiredPatternIds) && it.id !in deletedPatternIds }
     }
 
     val tirInsights = remember(state.percentileBins, state.statistics, dismissedInsightIds) {
@@ -355,12 +357,27 @@ fun TrendsScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = onSurfaceVariant
                                 )
-                                Text(
-                                    text = if (showArchivedPatterns) (if (isRu) "Скрыть" else "Hide") else (if (isRu) "Показать" else "Show"),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = ActionBlue
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (showArchivedPatterns) {
+                                        Text(
+                                            text = if (isRu) "Очистить" else "Clear",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .clickable { viewModel.clearArchivedPatterns(archivedPatterns.map { it.id }) }
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    }
+                                    Text(
+                                        text = if (showArchivedPatterns) (if (isRu) "Скрыть" else "Hide") else (if (isRu) "Показать" else "Show"),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = ActionBlue
+                                    )
+                                }
                             }
 
                             if (showArchivedPatterns) {
@@ -397,16 +414,30 @@ fun TrendsScreen(
                                                         lineHeight = 16.sp
                                                     )
                                                 }
-                                                IconButton(
-                                                    onClick = { viewModel.restorePattern(pattern.id) },
-                                                    modifier = Modifier.size(28.dp)
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Refresh,
-                                                        contentDescription = "Restore",
-                                                        tint = ActionBlue,
-                                                        modifier = Modifier.size(16.dp)
-                                                    )
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    IconButton(
+                                                        onClick = { viewModel.restorePattern(pattern.id) },
+                                                        modifier = Modifier.size(28.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Refresh,
+                                                            contentDescription = "Restore",
+                                                            tint = ActionBlue,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                    }
+                                                    Spacer(modifier = Modifier.width(2.dp))
+                                                    IconButton(
+                                                        onClick = { viewModel.deleteArchivedPattern(pattern.id) },
+                                                        modifier = Modifier.size(28.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.DeleteOutline,
+                                                            contentDescription = "Delete",
+                                                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
