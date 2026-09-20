@@ -1210,7 +1210,18 @@ private fun BleBridgeBadge(
             }
         }
     } else if (bleSettings.role == BleBridgeRole.BROADCASTER) {
-        if (isBleBroadcasting && broadcastRemainingSec in 11..15) {
+        var broadcastAnimActive by remember { mutableStateOf(false) }
+        LaunchedEffect(isBleBroadcasting) {
+            if (isBleBroadcasting) {
+                broadcastAnimActive = true
+                kotlinx.coroutines.delay(3500L)
+                broadcastAnimActive = false
+            } else {
+                broadcastAnimActive = false
+            }
+        }
+
+        if (broadcastAnimActive) {
             val transition = rememberInfiniteTransition(label = "BleWaves")
             val wave1Progress by transition.animateFloat(
                 initialValue = 0f,
@@ -1351,9 +1362,9 @@ private fun BleBridgeBadge(
 
         LaunchedEffect(blePacketReceivedAt) {
             val now = System.currentTimeMillis()
-            // Only start animation if this is a fresh packet and at least 3.5s elapsed since last animation start
-            // (prevents repeated restarts while broadcaster transmits continuous burst packets for 15s)
-            if (blePacketReceivedAt > 0L && (now - blePacketReceivedAt) < 4000L && (now - lastAnimationStartAt) >= 3500L) {
+            // Only start animation if this is a fresh packet and at least 45s elapsed since last animation start
+            // (prevents continuous re-triggering during the 15-second BLE broadcast burst window)
+            if (blePacketReceivedAt > 0L && (now - blePacketReceivedAt) < 4000L && (now - lastAnimationStartAt) >= 45_000L) {
                 lastAnimationStartAt = now
                 isReceivingAnimation = true
                 kotlinx.coroutines.delay(3500L)

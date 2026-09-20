@@ -183,7 +183,7 @@ fun StreakBadge(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .widthIn(min = 34.dp)
-                .height(30.dp)
+                .height(32.dp)
                 .padding(horizontal = 8.dp)
         ) {
             if (streakDays == 0) {
