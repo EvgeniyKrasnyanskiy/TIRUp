@@ -81,6 +81,14 @@
             android:launchMode="singleTop"
             android:theme="@style/Theme.TIRUp" />
 
+        <activity
+            android:name=".presentation.alert.HeadsUpMessageActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.TIRUp" />
+
         <!-- BroadcastReceiver for xDrip+ / Juggluco / Nightscout / GlucoDataHandler local broadcasts -->
         <receiver
             android:name=".data.receiver.DexdripBroadcastReceiver"

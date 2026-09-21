@@ -67,11 +67,6 @@ class SmsQueryReceiver : BroadcastReceiver() {
         }
 
         // 2. Check if SMS query auto-reply is enabled in settings
-        if (!alerts.isSmsQueryReplyEnabled) {
-            Log.d(TAG, "SMS query reply is disabled in settings, ignoring.")
-            return
-        }
-
         if (trustedPhones.isEmpty()) {
             Log.d(TAG, "No emergency contact phone configured, ignoring incoming SMS.")
             return
@@ -84,13 +79,26 @@ class SmsQueryReceiver : BroadcastReceiver() {
             return
         }
 
-        // 3. Keyword Check: Ensure message is an intentional glucose request
-        if (!isQueryTrigger(messageBody)) {
-            Log.d(TAG, "Incoming SMS from trusted contact does not contain a query keyword. Ignoring.")
+        // 3. Show Heads-Up HUD screen with gentle vibration over lockscreen
+        val contactName = if (isMatchingPhone(senderPhone, trustedPhone1)) {
+            alerts.emergencyContactName.ifBlank { if (alerts.isCaregiverRole) "Мастер" else "Фоловер" }
+        } else {
+            alerts.secondaryEmergencyContactName.ifBlank { if (alerts.isCaregiverRole) "Мастер" else "Фоловер" }
+        }
+        launchHeadsUpMessage(
+            context = context,
+            senderName = contactName,
+            senderPhone = senderPhone,
+            messageText = messageBody,
+            isSenderMaster = alerts.isCaregiverRole
+        )
+
+        // 4. If message is a glucose query trigger and query reply is enabled, send auto-reply
+        if (!alerts.isSmsQueryReplyEnabled || !isQueryTrigger(messageBody)) {
             return
         }
 
-        // 4. Anti-loop / Anti-spam Cooldown (1 minute)
+        // 5. Anti-loop / Anti-spam Cooldown (1 minute)
         val now = System.currentTimeMillis()
         if (now - lastReplyTimestamp < COOLDOWN_MS) {
             Log.w(TAG, "SMS reply cooldown active (${(now - lastReplyTimestamp) / 1000}s < 60s). Skipping duplicate reply.")
@@ -213,6 +221,27 @@ class SmsQueryReceiver : BroadcastReceiver() {
                     clean.contains("сахар") ||
                     clean.contains("глюкоз") ||
                     clean.contains("sugar")
+        }
+        fun launchHeadsUpMessage(
+            context: Context,
+            senderName: String,
+            senderPhone: String,
+            messageText: String,
+            isSenderMaster: Boolean
+        ) {
+            try {
+                val intent = Intent(context, com.tirup.app.presentation.alert.HeadsUpMessageActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    putExtra(com.tirup.app.presentation.alert.HeadsUpMessageActivity.EXTRA_SENDER_NAME, senderName)
+                    putExtra(com.tirup.app.presentation.alert.HeadsUpMessageActivity.EXTRA_SENDER_PHONE, senderPhone)
+                    putExtra(com.tirup.app.presentation.alert.HeadsUpMessageActivity.EXTRA_MESSAGE_TEXT, messageText)
+                    putExtra(com.tirup.app.presentation.alert.HeadsUpMessageActivity.EXTRA_TIMESTAMP, System.currentTimeMillis())
+                    putExtra(com.tirup.app.presentation.alert.HeadsUpMessageActivity.EXTRA_IS_SENDER_MASTER, isSenderMaster)
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Could not launch HeadsUpMessageActivity: ${e.message}", e)
+            }
         }
     }
 }

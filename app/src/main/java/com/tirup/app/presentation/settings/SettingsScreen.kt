@@ -3851,6 +3851,24 @@ fun SettingsScreen(
                             )
                         }
 
+                        // Test: Heads-Up Message Screen preview
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.testHeadsUpMessageScreen()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.7f))
+                        ) {
+                            Text(text = "💬", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isRu) "Тест важного сообщения (Heads-Up)" else "Test Heads-Up SMS Screen",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = ActionBlue
+                            )
+                        }
+
                         // Test 4: BLE Bridge range test (5 sec)
                         val bleRole = settings.bleBridgeSettings.role
                         val bleRangeButtonText = when {
