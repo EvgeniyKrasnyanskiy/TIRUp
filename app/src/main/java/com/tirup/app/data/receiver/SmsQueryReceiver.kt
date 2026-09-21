@@ -79,7 +79,71 @@ class SmsQueryReceiver : BroadcastReceiver() {
             return
         }
 
-        // 3. Show Heads-Up HUD screen with gentle vibration over lockscreen
+        // 3. Automated Glucose Query Trigger ("?", "сахар", "bg", etc.): process silently under the hood
+        if (isQueryTrigger(messageBody)) {
+            if (!alerts.isSmsQueryReplyEnabled) {
+                Log.d(TAG, "SMS query reply is disabled in settings, ignoring query silently.")
+                return
+            }
+
+            // Anti-loop / Anti-spam Cooldown (1 minute)
+            val now = System.currentTimeMillis()
+            if (now - lastReplyTimestamp < COOLDOWN_MS) {
+                Log.w(TAG, "SMS reply cooldown active (${(now - lastReplyTimestamp) / 1000}s < 60s). Skipping duplicate reply.")
+                return
+            }
+
+            val isRu = settings.language.equals("RU", ignoreCase = true)
+            val db = AppDatabase.getInstance(context)
+            val recentEntities = db.glucoseReadingDao().getRecentReadingsSync(2)
+            val latestEntity = recentEntities.firstOrNull()
+
+            val replyText = if (latestEntity == null || (now - latestEntity.timestamp > 30 * 60_000L)) {
+                EmergencySmsBuilder.buildNoDataReplyMessage(
+                    patientName = settings.patientProfile.fullName,
+                    isRu = isRu
+                )
+            } else {
+                // Calculate delta from previous reading if available
+                val previousEntity = if (recentEntities.size > 1) recentEntities[1] else null
+                val delta = if (previousEntity != null && (latestEntity.timestamp - previousEntity.timestamp <= 15 * 60_000L)) {
+                    latestEntity.valueMmol - previousEntity.valueMmol
+                } else null
+
+                // Calculate today's TIR percent
+                val startOfDay = getStartOfDayMillis()
+                val todayReadings = db.glucoseReadingDao().getReadingsBetweenSync(startOfDay, now)
+                val tirPercent = if (todayReadings.isNotEmpty()) {
+                    val tirLow = settings.targetRanges.tirLowMmol
+                    val tirHigh = if (settings.targetMode.name == "TING") settings.targetRanges.tingHighMmol else settings.targetRanges.tirHighMmol
+                    val inRangeCount = todayReadings.count { it.valueMmol in tirLow..tirHigh }
+                    ((inRangeCount.toDouble() / todayReadings.size) * 100).toInt()
+                } else null
+
+                EmergencySmsBuilder.buildQueryReplyMessage(
+                    patientName = settings.patientProfile.fullName,
+                    glucoseValueMmol = latestEntity.valueMmol,
+                    trendArrow = latestEntity.trendArrow ?: "",
+                    deltaMmol = delta,
+                    readingTimestamp = latestEntity.timestamp,
+                    todayTirPercent = tirPercent,
+                    iob = latestEntity.iob,
+                    isRu = isRu,
+                    unit = settings.unit
+                )
+            }
+
+            try {
+                sendSmsDirect(context, senderPhone, replyText)
+                lastReplyTimestamp = now
+                Log.i(TAG, "Successfully replied silently under the hood to trusted contact SMS query: $replyText")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send query reply SMS: ${e.message}", e)
+            }
+            return
+        }
+
+        // 4. Human text message from trusted contact: Show Heads-Up HUD screen with gentle vibration over lockscreen
         val contactName = if (isMatchingPhone(senderPhone, trustedPhone1)) {
             alerts.emergencyContactName.ifBlank { if (alerts.isCaregiverRole) "Мастер" else "Фоловер" }
         } else {
@@ -92,66 +156,6 @@ class SmsQueryReceiver : BroadcastReceiver() {
             messageText = messageBody,
             isSenderMaster = alerts.isCaregiverRole
         )
-
-        // 4. If message is a glucose query trigger and query reply is enabled, send auto-reply
-        if (!alerts.isSmsQueryReplyEnabled || !isQueryTrigger(messageBody)) {
-            return
-        }
-
-        // 5. Anti-loop / Anti-spam Cooldown (1 minute)
-        val now = System.currentTimeMillis()
-        if (now - lastReplyTimestamp < COOLDOWN_MS) {
-            Log.w(TAG, "SMS reply cooldown active (${(now - lastReplyTimestamp) / 1000}s < 60s). Skipping duplicate reply.")
-            return
-        }
-
-        val isRu = settings.language.equals("RU", ignoreCase = true)
-        val db = AppDatabase.getInstance(context)
-        val recentEntities = db.glucoseReadingDao().getRecentReadingsSync(2)
-        val latestEntity = recentEntities.firstOrNull()
-
-        val replyText = if (latestEntity == null || (now - latestEntity.timestamp > 30 * 60_000L)) {
-            EmergencySmsBuilder.buildNoDataReplyMessage(
-                patientName = settings.patientProfile.fullName,
-                isRu = isRu
-            )
-        } else {
-            // Calculate delta from previous reading if available
-            val previousEntity = if (recentEntities.size > 1) recentEntities[1] else null
-            val delta = if (previousEntity != null && (latestEntity.timestamp - previousEntity.timestamp <= 15 * 60_000L)) {
-                latestEntity.valueMmol - previousEntity.valueMmol
-            } else null
-
-            // Calculate today's TIR percent
-            val startOfDay = getStartOfDayMillis()
-            val todayReadings = db.glucoseReadingDao().getReadingsBetweenSync(startOfDay, now)
-            val tirPercent = if (todayReadings.isNotEmpty()) {
-                val tirLow = settings.targetRanges.tirLowMmol
-                val tirHigh = if (settings.targetMode.name == "TING") settings.targetRanges.tingHighMmol else settings.targetRanges.tirHighMmol
-                val inRangeCount = todayReadings.count { it.valueMmol in tirLow..tirHigh }
-                ((inRangeCount.toDouble() / todayReadings.size) * 100).toInt()
-            } else null
-
-            EmergencySmsBuilder.buildQueryReplyMessage(
-                patientName = settings.patientProfile.fullName,
-                glucoseValueMmol = latestEntity.valueMmol,
-                trendArrow = latestEntity.trendArrow ?: "",
-                deltaMmol = delta,
-                readingTimestamp = latestEntity.timestamp,
-                todayTirPercent = tirPercent,
-                iob = latestEntity.iob,
-                isRu = isRu,
-                unit = settings.unit
-            )
-        }
-
-        try {
-            sendSmsDirect(context, senderPhone, replyText)
-            lastReplyTimestamp = now
-            Log.i(TAG, "Successfully replied to trusted contact SMS query: $replyText")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to send query reply SMS: ${e.message}", e)
-        }
     }
 
     private fun sendSmsDirect(context: Context, phone: String, message: String) {
