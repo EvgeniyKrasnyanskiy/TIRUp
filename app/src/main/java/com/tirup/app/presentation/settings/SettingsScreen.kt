@@ -602,6 +602,126 @@ fun SettingsScreen(
             )
         }
 
+        // Device Role Card: Master vs Follower
+        item {
+            val alerts = settings.alertSettings
+            val isFollower = alerts.isCaregiverRole
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column {
+                        Text(
+                            text = if (isRu) "Роль устройства в системе" else "Device Role in TIRUp",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (isFollower) {
+                                if (isRu) "Наблюдатель: приём данных, сирена при ночном SOS"
+                                else "Follower: telemetry reception, loud siren on night SOS"
+                            } else {
+                                if (isRu) "Ведущее: сенсор глюкозы, локальные тревоги, авто-SOS близким"
+                                else "Master: CGM sensor, local alarms, auto-SOS to contacts"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // Role Selectors: Master (👑) vs Follower (👁️)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Master button
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    if (isFollower) {
+                                        viewModel.updateAlertSettings(alerts.copy(isCaregiverRole = false))
+                                    }
+                                },
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (!isFollower) ActionBlue.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            border = BorderStroke(
+                                width = if (!isFollower) 1.5.dp else 0.8.dp,
+                                color = if (!isFollower) ActionBlue else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = "👑",
+                                    fontSize = 24.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (isRu) "Мастер" else "Master",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (!isFollower) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (!isFollower) ActionBlue else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isRu) "(Сенсор)" else "(Sensor)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (!isFollower) ActionBlue.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Follower button
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    if (!isFollower) {
+                                        viewModel.updateAlertSettings(alerts.copy(isCaregiverRole = true))
+                                    }
+                                },
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (isFollower) PrimaryEmerald.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            border = BorderStroke(
+                                width = if (isFollower) 1.5.dp else 0.8.dp,
+                                color = if (isFollower) PrimaryEmerald else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = "👁️",
+                                    fontSize = 24.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (isRu) "Фоловер" else "Follower",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (isFollower) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isFollower) PrimaryEmerald else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isRu) "(Наблюдатель)" else "(Observer)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isFollower) PrimaryEmerald.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Section 1: Display Settings (Always Visible at the Top)
         item {
             BentoCard(modifier = Modifier.fillMaxWidth()) {
@@ -1118,7 +1238,13 @@ fun SettingsScreen(
                             flash = alerts.isCriticalFlash,
                             onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalFlash = it)) },
                             accentColor = if (isCriticalInPauseState) ColorHigh else ColorVeryLow,
-                            onTestClick = { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.CRITICAL) },
+                            onTestClick = {
+                                if (alerts.isCaregiverRole) {
+                                    viewModel.testCaregiverSosScreen()
+                                } else {
+                                    viewModel.testAlert(com.tirup.app.data.alert.AlertTier.CRITICAL)
+                                }
+                            },
                             isRu = isRu,
                             timerBadge = criticalBadge,
                             isPaused = isCriticalInPauseState,
@@ -1965,7 +2091,7 @@ fun SettingsScreen(
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = if (isCaregiver) {
-                                        if (isRu) "Приём SOS и сирена опекуна" else "Caregiver SOS reception & siren"
+                                        if (isRu) "Приём SOS и сирена фоловера" else "Follower SOS reception & siren"
                                     } else {
                                         if (isRu) "Авто-отправка SMS близким при гипогликемии" else "Auto-send SMS to contacts"
                                     },
@@ -2021,74 +2147,6 @@ fun SettingsScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
-                            // Mutually Exclusive Role Checkboxes: Patient vs Caregiver
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(20.dp)
-                            ) {
-                                Text(
-                                    text = if (isRu) "Режим:" else "Role:",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-
-                                // Checkbox: Пациент
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.clickable {
-                                        if (alerts.isCaregiverRole) {
-                                            viewModel.updateAlertSettings(alerts.copy(isCaregiverRole = false))
-                                        }
-                                    }
-                                ) {
-                                    Checkbox(
-                                        checked = !alerts.isCaregiverRole,
-                                        onCheckedChange = { checked ->
-                                            if (checked) {
-                                                viewModel.updateAlertSettings(alerts.copy(isCaregiverRole = false))
-                                            }
-                                        },
-                                        colors = CheckboxDefaults.colors(checkedColor = ActionBlue)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = if (isRu) "Пациент" else "Patient",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (!alerts.isCaregiverRole) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (!alerts.isCaregiverRole) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-
-                                // Checkbox: Опекун
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.clickable {
-                                        if (!alerts.isCaregiverRole) {
-                                            viewModel.updateAlertSettings(alerts.copy(isCaregiverRole = true))
-                                        }
-                                    }
-                                ) {
-                                    Checkbox(
-                                        checked = alerts.isCaregiverRole,
-                                        onCheckedChange = { checked ->
-                                            if (checked) {
-                                                viewModel.updateAlertSettings(alerts.copy(isCaregiverRole = true))
-                                            }
-                                        },
-                                        colors = CheckboxDefaults.colors(checkedColor = PrimaryEmerald)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = if (isRu) "Опекун" else "Caregiver",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (alerts.isCaregiverRole) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (alerts.isCaregiverRole) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-
                             // Permissions Check & Warnings
                             val missingSend = !isCaregiver && alerts.isEmergencySmsEnabled && !hasSendSmsPermission
                             val missingReceive = (if (isCaregiver) alerts.isCaregiverSosWakeupEnabled else (alerts.isSmsQueryReplyEnabled || alerts.isCaregiverSosWakeupEnabled)) && !hasReceiveSmsPermission
@@ -2117,14 +2175,14 @@ fun SettingsScreen(
                                     if (isRu) "Доступ заблокирован системой Android. Нажмите кнопку ниже, чтобы включить доступ к SMS в настройках приложения."
                                     else "Permission was permanently denied. Tap below to enable SMS permission in App Settings."
                                 } else if (missingSend && missingReceive) {
-                                    if (isRu) "Для авто-отправки экстренных сообщений близким и пробуждения опекуна при входящем SOS требуются разрешения на отправку и приём SMS."
-                                    else "To send emergency alerts to contacts and wake up caregiver on incoming SOS, grant SMS permissions."
+                                    if (isRu) "Для авто-отправки экстренных сообщений близким и пробуждения фоловера при входящем SOS требуются разрешения на отправку и приём SMS."
+                                    else "SMS send and receive permissions required for auto-sending alerts to contacts and waking follower on SOS."
                                 } else if (missingSend) {
                                     if (isRu) "Для автоматической отправки экстренных сообщений близким при тяжёлой гипогликемии предоставьте системное разрешение на отправку SMS."
                                     else "To automatically send emergency SMS to trusted contacts on severe low, grant SMS sending permission."
                                 } else {
-                                    if (isRu) "Для распознавания входящих SOS-сообщений подопечного и включения сирены опекуна предоставьте разрешение на приём SMS."
-                                    else "To read incoming patient SOS messages and sound caregiver siren, grant SMS receiving permission."
+                                    if (isRu) "Для распознавания входящих SOS-сообщений подопечного и включения сирены фоловера предоставьте разрешение на приём SMS."
+                                    else "To read incoming patient SOS messages and sound follower siren, grant SMS receiving permission."
                                 }
 
                                 Surface(
@@ -2243,8 +2301,8 @@ fun SettingsScreen(
                                             )
                                         }
                                         Text(
-                                            text = if (isRu) "Без разрешения «Поверх других окон» экран спасения опекуна не сможет пробить экран блокировки и включить дисплей при ночном SOS."
-                                                   else "Without overlay permission, the caregiver alarm cannot wake and display over the locked screen during a nocturnal SOS.",
+                                            text = if (isRu) "Без разрешения «Поверх других окон» экран тревоги фоловера не сможет пробить экран блокировки и включить дисплей при ночном SOS."
+                                                   else "Without 'Draw over other apps' permission, follower rescue screen cannot wake the device and bypass lockscreen during night SOS.",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             lineHeight = 16.sp
@@ -2600,8 +2658,8 @@ fun SettingsScreen(
                                                 if (isRu) "Запуск через ${testCaregiverSosCountdownSec}с (заблокируйте экран)..."
                                                 else "Starting in ${testCaregiverSosCountdownSec}s (lock screen)..."
                                             } else {
-                                                if (isRu) "🔊 Проверить сирену и экран опекуна (5 сек)"
-                                                else "🔊 Test Caregiver Siren & Screen (5s)"
+                                                if (isRu) "🔊 Проверить сирену и экран фоловера (5 сек)"
+                                                else "🔊 Test follower screen & siren (5s)"
                                             },
                                             style = MaterialTheme.typography.labelLarge,
                                             fontWeight = FontWeight.Bold
@@ -3760,9 +3818,9 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = if (testSosSmsCooldownSec > 0) {
-                                    if (isRu) "Тест SOS для опекуна (${testSosSmsCooldownSec}с)" else "Test Caregiver SOS (${testSosSmsCooldownSec}s)"
+                                    if (isRu) "Тест SOS для фоловера (${testSosSmsCooldownSec}с)" else "Test Follower SOS (${testSosSmsCooldownSec}s)"
                                 } else {
-                                    if (isRu) "Тест SOS для опекуна (SMS)" else "Test Caregiver SOS (SMS)"
+                                    if (isRu) "Тест SOS для фоловера (SMS)" else "Test Follower SOS (SMS)"
                                 },
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
@@ -3770,7 +3828,7 @@ fun SettingsScreen(
                             )
                         }
 
-                        // Test 3: Caregiver SOS Screen & Siren preview
+                        // Test 3: Follower SOS Screen & Siren preview
                         OutlinedButton(
                             onClick = {
                                 viewModel.testCaregiverSosScreen()
@@ -3787,7 +3845,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = if (isRu) "Тест экрана и сирены опекуна" else "Test Caregiver Screen & Siren",
+                                text = if (isRu) "Тест экрана и сирены фоловера" else "Test Follower Screen & Siren",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = ColorVeryLow
                             )

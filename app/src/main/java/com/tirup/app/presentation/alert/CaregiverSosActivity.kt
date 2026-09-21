@@ -234,7 +234,7 @@ fun CaregiverSosScreen(
                 )
 
                 Text(
-                    text = if (isTest) "Проверка экстренного канала опекуна" else "Сирена на телефоне пациента $delayMinutes мин без ответа!",
+                    text = if (isTest) "Проверка экстренного канала фоловера" else "Сирена на телефоне мастера $delayMinutes мин без ответа!",
                     color = Color(0xFF94A3B8),
                     fontSize = 14.sp,
                     textAlign = TextAlign.Center,

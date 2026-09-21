@@ -569,9 +569,13 @@ class SettingsViewModel(
     }
 
     fun testAlert(tier: com.tirup.app.data.alert.AlertTier) {
-        val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
-        val vol = _uiState.value.userSettings.alertSettings.alertVolumePercent
         val alerts = _uiState.value.userSettings.alertSettings
+        if (tier == com.tirup.app.data.alert.AlertTier.CRITICAL && alerts.isCaregiverRole) {
+            testCaregiverSosScreen()
+            return
+        }
+        val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+        val vol = alerts.alertVolumePercent
         com.tirup.app.data.alert.GlucoseAlertManager.sendTestAlert(
             context,
             tier,
@@ -820,7 +824,7 @@ class SettingsViewModel(
             )
         }
         if (sentCount > 0) {
-            val msg = if (isRu) "🚨 Тестовое SOS-SMS отправлено опекуну ($sentCount ном.)" else "🚨 Test SOS SMS sent to caregiver ($sentCount number(s))"
+            val msg = if (isRu) "🚨 Тестовое SOS-SMS отправлено фоловеру ($sentCount ном.)" else "🚨 Test SOS SMS sent to follower ($sentCount number(s))"
             android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
             _uiState.update { it.copy(infoMessage = msg) }
         }
