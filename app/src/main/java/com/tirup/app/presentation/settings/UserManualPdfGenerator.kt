@@ -438,8 +438,8 @@ class UserManualPdfGenerator(private val context: Context) {
                         44f, flow.y + 17.5f, tocBodyPaint
                     )
                     canvas.drawText(
-                        if (isRu) "Гл. 4: SOS SMS и Опекун (с. ${cp[4]}) • Гл. 5: AGP и HbA1c (с. ${cp[5]}) • Гл. 6: HUD и Расходники (с. ${cp[6]})"
-                        else "Ch. 4: SOS SMS & Caregiver (p. ${cp[4]}) • Ch. 5: Clinical AGP (p. ${cp[5]}) • Ch. 6: HUD & Supplies (p. ${cp[6]})",
+                        if (isRu) "Гл. 4: SOS SMS и Фоловер (с. ${cp[4]}) • Гл. 5: AGP и HbA1c (с. ${cp[5]}) • Гл. 6: HUD и Расходники (с. ${cp[6]})"
+                        else "Ch. 4: SOS SMS & Follower (p. ${cp[4]}) • Ch. 5: Clinical AGP (p. ${cp[5]}) • Ch. 6: HUD & Supplies (p. ${cp[6]})",
                         44f, flow.y + 25.5f, tocBodyPaint
                     )
                 }
@@ -583,42 +583,47 @@ class UserManualPdfGenerator(private val context: Context) {
                 )
 
                 // =========================================================================
-                // CHAPTER 4: EMERGENCY SOS SMS, CAREGIVER MODE & TELEMETRY
+                // CHAPTER 4: EMERGENCY SOS SMS, FOLLOWER MODE & TELEMETRY
                 // =========================================================================
                 flow.chapter(
                     4,
-                    if (isRu) "ГЛАВА 4. ЭКСТРЕННЫЕ SMS, РЕЖИМ ОПЕКУНА И ТЕЛЕМЕТРИЯ" else "CHAPTER 4. EMERGENCY SOS SMS, CAREGIVER MODE & TELEMETRY",
-                    if (isRu) "Автономные оповещения с GPS, двусторонний запрос сахара и сирена на телефоне родителя" else "Offline GPS distress SMS, two-way glucose queries and caregiver alarm sirens"
+                    if (isRu) "ГЛАВА 4. ЭКСТРЕННЫЕ SMS, РЕЖИМ ФОЛОВЕРА И ТЕЛЕМЕТРИЯ" else "CHAPTER 4. EMERGENCY SOS SMS, FOLLOWER MODE & TELEMETRY",
+                    if (isRu) "Автономные оповещения с GPS, Heads-Up оверлей сообщений, запрос сахара и сирена фоловера" else "Offline GPS distress SMS, Heads-Up messaging overlay, glucose queries and follower alarms"
                 )
                 flow.paragraph(
-                    if (isRu) "Если пациент находится в состоянии тяжёлой гипогликемии и не отключает сирену в течение заданного времени (по умолчанию 3 мин), TIRUp расценивает это как возможную потерю сознания. Приложение запрашивает координаты GPS и автоматически отправляет экстренное SMS доверенным лицам:"
-                    else "If hypo alarm is unacknowledged for the delay (default 3 mins), TIRUp retrieves device GPS and transmits emergency distress SMS to caregiver phones:"
+                    if (isRu) "Если мастер находится в состоянии тяжёлой гипогликемии и не отключает сирену в течение заданного времени (по умолчанию 3 мин), TIRUp расценивает это как возможную потерю сознания. Приложение запрашивает координаты GPS и автоматически отправляет экстренное SMS доверенным лицам:"
+                    else "If hypo alarm is unacknowledged for the delay (default 3 mins), TIRUp retrieves device GPS and transmits emergency distress SMS to follower phones:"
                 )
                 flow.bullet(
                     if (isRu) "Содержание тревожного SOS SMS" else "Distress SOS SMS Format",
-                    if (isRu) "«SOS! У [Имя] критический сахар: 2.5 ммоль/л ⇊. Нет реакции на сирену 3 мин. Геолокация: maps.google.com/?q=55.75,37.61». Близкие получают координаты и могут оперативно вызвать скорую помощь."
-                    else "'SOS! [Name] critical glucose: 2.5 mmol/L ⇊. Unresponsive 3 min. Location: maps.google.com/?q=55.75,37.61'. Caregivers can instantly dispatch emergency medical services."
+                    if (isRu) "«SOS! У [Имя] критический сахар: 2.5 ммоль/л ⇊. Нет реакции на сирену 3 мин. Геолокация: maps.google.com/?q=55.75,37.61». Близкие получают координаты и могут оперативно прийти на помощь."
+                    else "'SOS! [Name] critical glucose: 2.5 mmol/L ⇊. Unresponsive 3 min. Location: maps.google.com/?q=55.75,37.61'. Followers instantly receive GPS coordinates."
                 )
                 flow.bullet(
-                    if (isRu) "Двусторонняя оффлайн-телеметрия" else "Two-Way Offline Telemetry",
-                    if (isRu) "Родственник может отправить обычное SMS «сахар», «?», «tir» со своего доверенного номера на телефон подопечного без интернета. TIRUp мгновенно ответит в фоне: «[Имя]: 6.4 ммоль/л → (TIR 89%, 15м назад, батарея 85%)»."
-                    else "Caregivers can text 'sugar', '?', or 'tir' from whitelisted phones without internet. TIRUp replies immediately: '[Name]: 6.4 mmol/L → (TIR 89%, 15m ago, battery 85%)'."
+                    if (isRu) "💬 Heads-Up оверлей важных сообщений (Мастер ⇄ Фоловер)" else "💬 Heads-Up Direct Messaging (Master ⇄ Follower)",
+                    if (isRu) "При получении важного текстового SMS от доверенного контакта экран смартфона мягко зажигается на 15 с поверх блокировки с пульсирующей синей каймой и тактильной вибрацией (без визжащей сирены!). Показывается крупный текст, кнопка «ОК!» и форма быстрого ответа (до 70 симв.) с готовыми чипами: «Выпил сок», «Уколол», «Принято»."
+                    else "When receiving a human text SMS from a trusted contact, the screen wakes for 15s over lockscreen with a pulsing cyan border and gentle haptic vibration. Features large text, 'OK!' button, and a quick-reply dialog (up to 70 chars) with one-tap templates."
                 )
                 flow.bullet(
-                    if (isRu) "Режим опекуна (активация и белый список)" else "Caregiver Mode & Anti-Spam Whitelist",
-                    if (isRu) "Активируется чекбоксом «Опекун» в блоке «Экстренное SMS». Укажите телефон(ы) подопечных: сирена сработает только с этих номеров. Требуются права RECEIVE_SMS и «Поверх других приложений». Кнопка «Проверить сирену и экран» запускает тревогу через 5 с, чтобы успеть заблокировать телефон."
-                    else "Enabled by checking 'Caregiver' in Emergency SMS. Set patient numbers: siren triggers only from them. Requires RECEIVE_SMS and overlay permission. Test button triggers alarm after 5s to let you lock screen."
+                    if (isRu) "Бесшумная телеметрия под капотом" else "Silent Under-The-Hood Telemetry",
+                    if (isRu) "Фоловер может отправить служебное SMS «сахар», «?», «tir» со своего номера. Телефон мастера обработает команду полностью бесшумно под капотом (не зажигая экран и не вибрируя) и мгновенно ответит свежими данными сахара, стрелкой тренда и TIR."
+                    else "Followers can text service queries like 'sugar', '?', or 'tir'. The master phone processes this silently under the hood without waking screen or vibrating, instantly replying with glucose, trend, and today's TIR."
+                )
+                flow.bullet(
+                    if (isRu) "Роли «Мастер» и «Фоловер» вверху настроек" else "Master & Follower Roles",
+                    if (isRu) "Переключатель роли расположен сразу под карточкой «Мой профиль». Для мастера кнопка «Тест» проверяет экран спасения при гипогликемии, а для фоловера — сирену и экран с карточкой подопечного."
+                    else "Device role is toggled at the very top of Settings under My Profile. Master role tests hypo rescue, while Follower role tests incoming distress sirens and patient telemetry card."
                 )
                 flow.section(if (isRu) "4.2. Настройка разрешений SMS и экрана блокировки" else "4.2. SMS & Lockscreen Permissions")
                 flow.paragraph(
-                    if (isRu) "Пациенту требуется разрешение SEND_SMS, опекуну — RECEIVE_SMS и показ поверх других окон. В TIRUp встроен алгоритм автоматической перепроверки системных дескрипторов при возврате из настроек Android."
-                    else "Patient requires SEND_SMS; caregiver requires RECEIVE_SMS and overlay permission. TIRUp incorporates automatic descriptor re-verification upon returning from Android Settings."
+                    if (isRu) "Мастеру требуется разрешение SEND_SMS, фоловеру — RECEIVE_SMS и показ поверх других окон. В TIRUp встроен алгоритм автоматической перепроверки системных дескрипторов при возврате из настроек Android."
+                    else "Master requires SEND_SMS; follower requires RECEIVE_SMS and overlay permission. TIRUp incorporates automatic descriptor re-verification upon returning from Android Settings."
                 )
                 flow.callout(
                     CalloutType.TIP,
-                    if (isRu) "📱 БЕЗОПАСНОСТЬ И ПРОВЕРКА ЭКСТРЕННОГО SMS:" else "📱 EMERGENCY SMS VERIFICATION:",
-                    if (isRu) "Пациент может нажать «Отправить тестовое SMS» для проверки отправки. Опекун нажимает «Проверить сирену и экран» и блокирует телефон для проверки пробуждения дисплея."
-                    else "Patient taps 'Send Test SMS' to test sending. Caregiver taps 'Test Siren & Screen' and locks phone to verify screen wakeup."
+                    if (isRu) "📱 БЕЗОПАСНОСТЬ И ТЕСТИРОВАНИЕ ЭКСТРЕННОГО КАНАЛА:" else "📱 EMERGENCY CHANNEL VERIFICATION:",
+                    if (isRu) "В блоке «Тестирование систем» доступны кнопки проверки: «Тест важного сообщения (Heads-Up)», «Тест экрана спасения» (для мастера) и «Тест экрана и сирены» (для фоловера)."
+                    else "In System Testing, use 'Test Heads-Up SMS Screen', 'Test Rescue Screen' (for master), and 'Test Follower Screen & Siren' (for follower)."
                 )
 
                 // =========================================================================
