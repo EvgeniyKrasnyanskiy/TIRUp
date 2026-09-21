@@ -187,8 +187,8 @@ fun CriticalThresholdDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text(
-                    text = if (isRu) "При выходе за эти границы включается громкая сирена, полноэкранное окно спасения поверх блокировки и отсчёт таймера SOS опекунам."
-                    else "Crossing these thresholds triggers maximum loud siren, full-screen rescue window over lockscreen, and caregiver SOS countdown.",
+                    text = if (isRu) "При выходе за эти границы включается громкая сирена, полноэкранное окно спасения поверх блокировки и отсчёт таймера SOS фоловерам."
+                    else "Crossing these thresholds triggers maximum loud siren, full-screen rescue window over lockscreen, and follower SOS countdown.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
