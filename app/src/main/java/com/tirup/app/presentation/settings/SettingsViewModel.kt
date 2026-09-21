@@ -643,6 +643,32 @@ class SettingsViewModel(
         caregiverSosCountdownJob = null
     }
 
+    fun testHeadsUpMessageScreen() {
+        val alerts = _uiState.value.userSettings.alertSettings
+        val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)
+        val isFollower = alerts.isCaregiverRole
+        val senderRole = if (isFollower) {
+            if (isRu) "Мастер" else "Master"
+        } else {
+            if (isRu) "Фоловер" else "Follower"
+        }
+        val sampleText = if (isFollower) {
+            if (isRu) "Выпил 200 мл апельсинового сока, перемеряю сахар через 15 минут!"
+            else "Drank 200 ml orange juice, rechecking glucose in 15 minutes!"
+        } else {
+            if (isRu) "Сахар 3.4 ммоль/л и стрелка вниз ⇊. Срочно выпей быстрые углеводы!"
+            else "Glucose is 3.4 mmol/L and falling ⇊. Drink fast carbs immediately!"
+        }
+        val phone = alerts.emergencyContactPhone.ifBlank { "+79991234567" }
+        com.tirup.app.data.receiver.SmsQueryReceiver.launchHeadsUpMessage(
+            context = context,
+            senderName = senderRole,
+            senderPhone = phone,
+            messageText = sampleText,
+            isSenderMaster = isFollower
+        )
+    }
+
     fun playTestSound(volumePercent: Int) {
         com.tirup.app.data.alert.MedicalSoundPlayer.playTestSound(volumePercent)
     }
