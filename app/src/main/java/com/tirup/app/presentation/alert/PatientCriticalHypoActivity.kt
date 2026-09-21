@@ -416,7 +416,7 @@ fun PatientCriticalHypoScreen(
                     ) {
                         Icon(Icons.Default.Call, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(10.dp))
-                        val contactLabel = primaryContactName.ifBlank { "опекуну" }
+                        val contactLabel = primaryContactName.ifBlank { "фоловеру" }
                         Text(
                             text = "Позвонить: $contactLabel",
                             fontSize = 17.sp,
