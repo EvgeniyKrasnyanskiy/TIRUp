@@ -78,14 +78,14 @@ class GlucoseRepositoryImpl(
     }
 
     override suspend fun insertReading(reading: GlucoseReading) = withContext(Dispatchers.IO) {
-        val windowMs = 60_000L
+        val windowMs = 25_000L // 25s window: safe for 1-min CGM cadence, still absorbs duplicate echoes from xDrip broadcast
         val existing = readingDao.getReadingsBetweenSync(
             reading.timestamp - windowMs,
             reading.timestamp + windowMs
         )
         if (existing.isNotEmpty()) {
             val closest = existing.minByOrNull { kotlin.math.abs(it.timestamp - reading.timestamp) }!!
-            // If already exists within 60s, enrich or update it if incoming reading has new or updated info
+            // If already exists within 25s, enrich or update it if incoming reading has new or updated info
             val shouldUpdate = (reading.iob != null && reading.iob != closest.iob) ||
                                (reading.cob != null && reading.cob != closest.cob) ||
                                (!reading.trendArrow.isNullOrBlank() && closest.trendArrow.isNullOrBlank())
