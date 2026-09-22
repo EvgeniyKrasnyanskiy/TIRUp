@@ -2668,8 +2668,8 @@ fun SettingsScreen(
                                                 if (isRu) "Запуск через ${testCaregiverSosCountdownSec}с (заблокируйте экран)..."
                                                 else "Starting in ${testCaregiverSosCountdownSec}s (lock screen)..."
                                             } else {
-                                                if (isRu) "🔊 Проверить сирену и экран фоловера (5 сек)"
-                                                else "🔊 Test follower screen & siren (5s)"
+                                                if (isRu) "Проверить SOS-режим (5 сек)"
+                                                else "Test SOS mode (5s)"
                                             },
                                             style = MaterialTheme.typography.labelLarge,
                                             fontWeight = FontWeight.Bold
