@@ -479,6 +479,14 @@ fun SettingsScreen(
         }
     }
 
+    var testHeadsUpCountdownSec by remember { mutableStateOf(0) }
+    LaunchedEffect(testHeadsUpCountdownSec) {
+        if (testHeadsUpCountdownSec > 0) {
+            delay(1000L)
+            testHeadsUpCountdownSec -= 1
+        }
+    }
+
     LaunchedEffect(state.infoMessage) {
         val msg = state.infoMessage
         if (!msg.isNullOrBlank()) {
@@ -3828,46 +3836,158 @@ fun SettingsScreen(
                             )
                         }
 
-                        // Test 3: Follower SOS Screen & Siren preview
-                        OutlinedButton(
-                            onClick = {
-                                viewModel.testCaregiverSosScreen()
-                            },
+                        // Test 3: Follower SOS Screen & Siren preview (5s countdown)
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, ColorVeryLow.copy(alpha = 0.6f))
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.NotificationsActive,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = ColorVeryLow
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isRu) "Тест экрана и сирены фоловера" else "Test Follower Screen & Siren",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = ColorVeryLow
-                            )
+                            OutlinedButton(
+                                onClick = {
+                                    if (testCaregiverSosCountdownSec == 0) {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
+                                            Toast.makeText(
+                                                context,
+                                                if (isRu) "⚠️ Разрешение «Поверх других приложений» не дано — экран может не открыться!"
+                                                else "⚠️ 'Display over other apps' not granted — screen may not open!",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                        Toast.makeText(
+                                            context,
+                                            if (isRu) "Заблокируйте экран! SOS-сирена включится через 5 секунд..."
+                                            else "Lock your screen! SOS siren in 5 seconds...",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        testCaregiverSosCountdownSec = 5
+                                        viewModel.startCaregiverSosTestCountdown(5)
+                                    }
+                                },
+                                enabled = testCaregiverSosCountdownSec == 0,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (testCaregiverSosCountdownSec == 0) ColorVeryLow.copy(alpha = 0.6f)
+                                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.NotificationsActive,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = if (testCaregiverSosCountdownSec == 0) ColorVeryLow
+                                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (testCaregiverSosCountdownSec > 0) {
+                                        if (isRu) "🔴 SOS через ${testCaregiverSosCountdownSec}с..."
+                                        else "🔴 SOS in ${testCaregiverSosCountdownSec}s..."
+                                    } else {
+                                        if (isRu) "🔴 SOS-экран фоловера (5 сек)" else "🔴 Follower SOS Screen (5s)"
+                                    },
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (testCaregiverSosCountdownSec == 0) ColorVeryLow
+                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
+                            }
+                            if (testCaregiverSosCountdownSec > 0) {
+                                OutlinedButton(
+                                    onClick = {
+                                        testCaregiverSosCountdownSec = 0
+                                        viewModel.cancelCaregiverSosTest()
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                                ) {
+                                    Text(
+                                        text = if (isRu) "Отмена" else "Cancel",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
                         }
 
-                        // Test: Heads-Up Message Screen preview
-                        OutlinedButton(
-                            onClick = {
-                                viewModel.testHeadsUpMessageScreen()
-                            },
+                        // Test: Heads-Up Message Screen preview (5s countdown)
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.7f))
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = "💬", fontSize = 16.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isRu) "Тест важного сообщения (Heads-Up)" else "Test Heads-Up SMS Screen",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = ActionBlue
-                            )
+                            OutlinedButton(
+                                onClick = {
+                                    if (testHeadsUpCountdownSec == 0) {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
+                                            Toast.makeText(
+                                                context,
+                                                if (isRu) "⚠️ Без разрешения «Полноэкранные уведомления» сообщение может не появиться!"
+                                                else "⚠️ Without 'Full-screen notifications' permission the overlay may not show!",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                        Toast.makeText(
+                                            context,
+                                            if (isRu) "Заблокируйте экран! Важное сообщение появится через 5 секунд..."
+                                            else "Lock your screen! Heads-Up message in 5 seconds...",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        testHeadsUpCountdownSec = 5
+                                        viewModel.startHeadsUpTestCountdown(5)
+                                    }
+                                },
+                                enabled = testHeadsUpCountdownSec == 0,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (testHeadsUpCountdownSec == 0) ActionBlue.copy(alpha = 0.7f)
+                                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                )
+                            ) {
+                                Text(
+                                    text = if (testHeadsUpCountdownSec > 0) "💬" else "💬",
+                                    fontSize = 16.sp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (testHeadsUpCountdownSec > 0) {
+                                        if (isRu) "Сообщение через ${testHeadsUpCountdownSec}с..."
+                                        else "Message in ${testHeadsUpCountdownSec}s..."
+                                    } else {
+                                        if (isRu) "💬 Важное сообщение (5 сек)" else "💬 Heads-Up Message (5s)"
+                                    },
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (testHeadsUpCountdownSec == 0) ActionBlue
+                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
+                            }
+                            if (testHeadsUpCountdownSec > 0) {
+                                OutlinedButton(
+                                    onClick = {
+                                        testHeadsUpCountdownSec = 0
+                                        viewModel.cancelHeadsUpTest()
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                                ) {
+                                    Text(
+                                        text = if (isRu) "Отмена" else "Cancel",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
                         }
+
+                        Text(
+                            text = if (isRu) "💡 Если окно не появляется на заблокированном экране — дайте разрешения: Приложения → Спец. доступ → Полноэкранные уведомления и Всплывающие окна в фоне."
+                                   else "💡 If the screen doesn't appear on lockscreen — grant: Apps → Special Access → Full-screen notifications & Background pop-ups.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
 
                         // Test 4: BLE Bridge range test (5 sec)
                         val bleRole = settings.bleBridgeSettings.role
