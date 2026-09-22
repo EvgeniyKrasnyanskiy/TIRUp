@@ -405,20 +405,20 @@ object GlucoseAlertManager {
 
         NotificationChannel(
             CHANNEL_DEVICE_REMINDER,
-            "Device Reminders",
+            "Напоминания об устройствах",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "CGM sensor and infusion set replacement reminders"
+            description = "Напоминания о замене сенсора CGM и инфузионного набора"
             enableLights(true)
             lightColor = Color.CYAN
         }.also { nm.createNotificationChannel(it) }
 
         NotificationChannel(
             CHANNEL_HBA1C_REMINDER,
-            "HbA1c Lab Reminders",
+            "Напоминания об анализах (HbA1c)",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "Quarterly HbA1c checkup reminders and sensor GMI correlation"
+            description = "Ежеквартальные напоминания о сдаче HbA1c и корреляция с GMI сенсора"
             enableLights(true)
             lightColor = Color.RED
         }.also { nm.createNotificationChannel(it) }

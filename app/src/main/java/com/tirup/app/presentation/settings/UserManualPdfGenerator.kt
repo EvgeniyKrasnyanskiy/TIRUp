@@ -620,11 +620,18 @@ class UserManualPdfGenerator(private val context: Context) {
                     else "Master requires SEND_SMS; follower requires RECEIVE_SMS and overlay permission. TIRUp incorporates automatic descriptor re-verification upon returning from Android Settings."
                 )
                 flow.callout(
-                    CalloutType.TIP,
-                    if (isRu) "📱 БЕЗОПАСНОСТЬ И ТЕСТИРОВАНИЕ ЭКСТРЕННОГО КАНАЛА:" else "📱 EMERGENCY CHANNEL VERIFICATION:",
-                    if (isRu) "В блоке «Тестирование систем» доступны кнопки проверки: «Тест важного сообщения (Heads-Up)», «Тест экрана спасения» (для мастера) и «Тест экрана и сирены» (для фоловера)."
-                    else "In System Testing, use 'Test Heads-Up SMS Screen', 'Test Rescue Screen' (for master), and 'Test Follower Screen & Siren' (for follower)."
+                    CalloutType.WARNING,
+                    if (isRu) "⚠️ ОБЯЗАТЕЛЬНЫЕ РАЗРЕШЕНИЯ ДЛЯ ЭКРАНА СПАСЕНИЯ И HEADS-UP СООБЩЕНИЙ:" else "⚠️ REQUIRED PERMISSIONS FOR RESCUE SCREEN & HEADS-UP MESSAGES:",
+                    if (isRu) "Чтобы экраны спасения и важных сообщений открывались поверх заблокированного экрана, необходимо выдать два специальных разрешения: 1) Настройки Андроид → Приложения → Специальный доступ → Отображать поверх других приложений → TIRUp → включить. 2) Настройки Андроид → Приложения → Специальный доступ → Отправлять полноэкранные уведомления → TIRUp → включить. Точные названия пунктов меню могут незначительно отличаться в зависимости от производителя."
+                    else "To allow Rescue and Heads-Up screens to appear over the locked display, grant two special permissions: 1) Android Settings → Apps → Special app access → Display over other apps → TIRUp → Enable. 2) Android Settings → Apps → Special app access → Send full-screen notifications → TIRUp → Enable. Exact menu names may vary by manufacturer."
                 )
+                flow.callout(
+                    CalloutType.TIP,
+                    if (isRu) "📱 ПРОВЕРКА ЭКРАНОВ НА ЗАБЛОКИРОВАННОМ УСТРОЙСТВЕ:" else "📱 VERIFY SCREENS ON A LOCKED DEVICE:",
+                    if (isRu) "В блоке «Тестирование систем» кнопки «SOS-экран фоловера (5 сек)» и «Важное сообщение (5 сек)» дают 5 секунд для блокировки телефона перед показом. Если экран не открылся — разрешения «Поверх других приложений» и «Полноэкранные уведомления» не предоставлены. Приложение покажет toast-подсказку при нажатии кнопки теста в этом случае."
+                    else "In System Testing, 'Follower SOS Screen (5s)' and 'Heads-Up Message (5s)' buttons provide 5 seconds to lock the phone before display. If screen doesn't wake — 'Display over other apps' and 'Full-screen notifications' permissions are missing. The app shows a toast hint when tapping the test button."
+                )
+
 
                 // =========================================================================
                 // CHAPTER 5: CLINICAL AGP, PATTERNS, HbA1c & COMPENSATOR
