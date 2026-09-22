@@ -127,6 +127,7 @@ private fun DeviceTextPart(
     emoji: String,
     installedAt: Long,
     millisRemaining: Long,
+    @Suppress("UNUSED_PARAMETER")
     daysRemaining: Int,
     isRu: Boolean
 ) {

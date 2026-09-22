@@ -487,6 +487,8 @@ fun SettingsScreen(
         }
     }
 
+    var showSosSmsSendConfirmDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(state.infoMessage) {
         val msg = state.infoMessage
         if (!msg.isNullOrBlank()) {
@@ -3791,6 +3793,8 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
+                        val TestButtonAmber = Color(0xFFEAB308)
+
                         // Test 1: Patient Rescue Screen (5 sec delay with Cancel)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -3800,6 +3804,12 @@ fun SettingsScreen(
                             OutlinedButton(
                                 onClick = {
                                     if (testRescueCountdownSec == 0) {
+                                        Toast.makeText(
+                                            context,
+                                            if (isRu) "Заблокируйте экран! Экран спасения появится через 5 секунд..."
+                                            else "Lock your screen! Rescue screen in 5 seconds...",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                         testRescueCountdownSec = 5
                                         viewModel.startPatientRescueTestCountdown(5)
                                     }
@@ -3807,7 +3817,7 @@ fun SettingsScreen(
                                 enabled = testRescueCountdownSec == 0,
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, ColorVeryLow.copy(alpha = 0.7f))
+                                border = BorderStroke(1.dp, TestButtonAmber.copy(alpha = 0.7f))
                             ) {
                                 Text(text = "🚨", fontSize = 16.sp)
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -3818,7 +3828,8 @@ fun SettingsScreen(
                                         if (isRu) "Экран спасения (5 сек)" else "Rescue Screen (5s)"
                                     },
                                     style = MaterialTheme.typography.labelLarge,
-                                    color = ColorVeryLow
+                                    color = if (testRescueCountdownSec == 0) TestButtonAmber
+                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                 )
                             }
 
@@ -3872,7 +3883,7 @@ fun SettingsScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 border = BorderStroke(
                                     1.dp,
-                                    if (testCaregiverSosCountdownSec == 0) ColorVeryLow.copy(alpha = 0.6f)
+                                    if (testCaregiverSosCountdownSec == 0) TestButtonAmber.copy(alpha = 0.7f)
                                     else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
                                 )
                             ) {
@@ -3880,7 +3891,7 @@ fun SettingsScreen(
                                     imageVector = Icons.Default.NotificationsActive,
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp),
-                                    tint = if (testCaregiverSosCountdownSec == 0) ColorVeryLow
+                                    tint = if (testCaregiverSosCountdownSec == 0) TestButtonAmber
                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -3889,10 +3900,10 @@ fun SettingsScreen(
                                         if (isRu) "🔴 SOS через ${testCaregiverSosCountdownSec}с..."
                                         else "🔴 SOS in ${testCaregiverSosCountdownSec}s..."
                                     } else {
-                                        if (isRu) "SOS-экран фоловера (5 сек)" else "Follower SOS Screen (5s)"
+                                        if (isRu) "Экран SOS фоловера (5 сек)" else "Follower SOS screen (5s)"
                                     },
                                     style = MaterialTheme.typography.labelLarge,
-                                    color = if (testCaregiverSosCountdownSec == 0) ColorVeryLow
+                                    color = if (testCaregiverSosCountdownSec == 0) TestButtonAmber
                                             else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                 )
                             }
@@ -3914,36 +3925,7 @@ fun SettingsScreen(
                             }
                         }
 
-                        // Test 3: Caregiver SOS SMS (60 sec cooldown)
-                        OutlinedButton(
-                            onClick = {
-                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-                                    smsPermissionsLauncher.launch(arrayOf(Manifest.permission.SEND_SMS))
-                                } else {
-                                    testSosSmsCooldownSec = 60
-                                    viewModel.sendCaregiverSosTestSms()
-                                }
-                            },
-                            enabled = testSosSmsCooldownSec == 0,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, ColorVeryLow.copy(alpha = 0.7f))
-                        ) {
-                            Text(text = "✉️", fontSize = 16.sp)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (testSosSmsCooldownSec > 0) {
-                                    if (isRu) "Отправить SOS-SMS (${testSosSmsCooldownSec}с)" else "Send Follower SOS SMS (${testSosSmsCooldownSec}s)"
-                                } else {
-                                    if (isRu) "Отправить SOS-SMS" else "Send Follower SOS SMS"
-                                },
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = if (testSosSmsCooldownSec == 0) ColorVeryLow else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                            )
-                        }
-
-                        // Test: Heads-Up Message Screen preview (5s countdown)
+                        // Test 3: Heads-Up Message Screen preview (5s countdown) — moved above SOS-SMS
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -3975,12 +3957,12 @@ fun SettingsScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 border = BorderStroke(
                                     1.dp,
-                                    if (testHeadsUpCountdownSec == 0) ActionBlue.copy(alpha = 0.7f)
+                                    if (testHeadsUpCountdownSec == 0) TestButtonAmber.copy(alpha = 0.7f)
                                     else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
                                 )
                             ) {
                                 Text(
-                                    text = if (testHeadsUpCountdownSec > 0) "💬" else "💬",
+                                    text = "💬",
                                     fontSize = 16.sp
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -3989,10 +3971,10 @@ fun SettingsScreen(
                                         if (isRu) "Сообщение через ${testHeadsUpCountdownSec}с..."
                                         else "Message in ${testHeadsUpCountdownSec}s..."
                                     } else {
-                                        if (isRu) "Важное SMS-сообщение (5 сек)" else "Heads-Up SMS-message (5s)"
+                                        if (isRu) "Экран важное SMS (5 сек)" else "Important SMS screen (5s)"
                                     },
                                     style = MaterialTheme.typography.labelLarge,
-                                    color = if (testHeadsUpCountdownSec == 0) ActionBlue
+                                    color = if (testHeadsUpCountdownSec == 0) TestButtonAmber
                                             else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                 )
                             }
@@ -4012,6 +3994,71 @@ fun SettingsScreen(
                                     )
                                 }
                             }
+                        }
+
+                        // Test 4: Caregiver SOS SMS (60 sec cooldown) — with confirmation dialog
+                        OutlinedButton(
+                            onClick = {
+                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                                    smsPermissionsLauncher.launch(arrayOf(Manifest.permission.SEND_SMS))
+                                } else {
+                                    showSosSmsSendConfirmDialog = true
+                                }
+                            },
+                            enabled = testSosSmsCooldownSec == 0,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, TestButtonAmber.copy(alpha = 0.7f))
+                        ) {
+                            Text(text = "✉️", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (testSosSmsCooldownSec > 0) {
+                                    if (isRu) "Отправить SOS-SMS (${testSosSmsCooldownSec}с)" else "Send Follower SOS SMS (${testSosSmsCooldownSec}s)"
+                                } else {
+                                    if (isRu) "Отправить SOS-SMS" else "Send Follower SOS SMS"
+                                },
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (testSosSmsCooldownSec == 0) TestButtonAmber else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            )
+                        }
+
+                        // Confirmation dialog for SOS SMS sending
+                        if (showSosSmsSendConfirmDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showSosSmsSendConfirmDialog = false },
+                                icon = { Text(text = "⚠️", fontSize = 28.sp) },
+                                title = {
+                                    Text(
+                                        text = if (isRu) "Отправить тестовое SOS-SMS?" else "Send test SOS SMS?",
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                },
+                                text = {
+                                    Text(
+                                        text = if (isRu) "На номера доверенных контактов будут отправлены реальные SMS-сообщения. Убедитесь, что контакты предупреждены о тесте."
+                                               else "Real SMS messages will be sent to trusted contact numbers. Make sure contacts are aware this is a test."
+                                    )
+                                },
+                                confirmButton = {
+                                    Button(
+                                        onClick = {
+                                            showSosSmsSendConfirmDialog = false
+                                            testSosSmsCooldownSec = 60
+                                            viewModel.sendCaregiverSosTestSms()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                                    ) {
+                                        Text(if (isRu) "Отправить" else "Send", color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                },
+                                dismissButton = {
+                                    OutlinedButton(onClick = { showSosSmsSendConfirmDialog = false }) {
+                                        Text(if (isRu) "Отмена" else "Cancel")
+                                    }
+                                }
+                            )
                         }
 
                         Text(

@@ -33,6 +33,7 @@ object TargetCompensatorCalculator {
         latestReading: GlucoseReading?,
         recentReadings: List<GlucoseReading>,
         targetRanges: TargetRanges,
+        @Suppress("UNUSED_PARAMETER")
         language: String = "RU",
         referenceTimestamp: Long = System.currentTimeMillis()
     ): CompensatorGoal {
