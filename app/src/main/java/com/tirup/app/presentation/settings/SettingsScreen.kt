@@ -2699,6 +2699,39 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                            // Heads-Up SMS in TIRUp toggle (shared for both roles)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isRu) "📲 Важные SMS в TIRUp" else "📲 Important SMS in TIRUp",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = if (isRu) "Показывать входящие SMS от фоловера/мастера в оверлее TIRUp"
+                                               else "Show incoming SMS from follower/master in TIRUp overlay",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        lineHeight = 16.sp
+                                    )
+                                }
+                                Checkbox(
+                                    checked = alerts.isHeadsUpMessagingEnabled,
+                                    onCheckedChange = { isChecked ->
+                                        viewModel.updateAlertSettings(alerts.copy(isHeadsUpMessagingEnabled = isChecked))
+                                    },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = ActionBlue,
+                                        uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -3776,13 +3809,13 @@ fun SettingsScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 border = BorderStroke(1.dp, ColorVeryLow.copy(alpha = 0.7f))
                             ) {
-                                Text(text = "🛡️", fontSize = 16.sp)
+                                Text(text = "🚨", fontSize = 16.sp)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = if (testRescueCountdownSec > 0) {
                                         if (isRu) "Запуск через ${testRescueCountdownSec}с..." else "Starting in ${testRescueCountdownSec}s..."
                                     } else {
-                                        if (isRu) "Тест экрана спасения (5 сек)" else "Test Rescue Screen (5s)"
+                                        if (isRu) "Экран спасения (5 сек)" else "Rescue Screen (5s)"
                                     },
                                     style = MaterialTheme.typography.labelLarge,
                                     color = ColorVeryLow
@@ -3807,36 +3840,7 @@ fun SettingsScreen(
                             }
                         }
 
-                        // Test 2: Caregiver SOS SMS (60 sec cooldown)
-                        OutlinedButton(
-                            onClick = {
-                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-                                    smsPermissionsLauncher.launch(arrayOf(Manifest.permission.SEND_SMS))
-                                } else {
-                                    testSosSmsCooldownSec = 60
-                                    viewModel.sendCaregiverSosTestSms()
-                                }
-                            },
-                            enabled = testSosSmsCooldownSec == 0,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, ColorVeryLow.copy(alpha = 0.7f))
-                        ) {
-                            Text(text = "🚨", fontSize = 16.sp)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (testSosSmsCooldownSec > 0) {
-                                    if (isRu) "Тест SOS для фоловера (${testSosSmsCooldownSec}с)" else "Test Follower SOS (${testSosSmsCooldownSec}s)"
-                                } else {
-                                    if (isRu) "Тест SOS для фоловера (SMS)" else "Test Follower SOS (SMS)"
-                                },
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = if (testSosSmsCooldownSec == 0) ColorVeryLow else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                            )
-                        }
-
-                        // Test 3: Follower SOS Screen & Siren preview (5s countdown)
+                        // Test 2: Follower SOS Screen & Siren preview (5s countdown)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -3885,7 +3889,7 @@ fun SettingsScreen(
                                         if (isRu) "🔴 SOS через ${testCaregiverSosCountdownSec}с..."
                                         else "🔴 SOS in ${testCaregiverSosCountdownSec}s..."
                                     } else {
-                                        if (isRu) "🔴 SOS-экран фоловера (5 сек)" else "🔴 Follower SOS Screen (5s)"
+                                        if (isRu) "SOS-экран фоловера (5 сек)" else "Follower SOS Screen (5s)"
                                     },
                                     style = MaterialTheme.typography.labelLarge,
                                     color = if (testCaregiverSosCountdownSec == 0) ColorVeryLow
@@ -3910,6 +3914,35 @@ fun SettingsScreen(
                             }
                         }
 
+                        // Test 3: Caregiver SOS SMS (60 sec cooldown)
+                        OutlinedButton(
+                            onClick = {
+                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                                    smsPermissionsLauncher.launch(arrayOf(Manifest.permission.SEND_SMS))
+                                } else {
+                                    testSosSmsCooldownSec = 60
+                                    viewModel.sendCaregiverSosTestSms()
+                                }
+                            },
+                            enabled = testSosSmsCooldownSec == 0,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, ColorVeryLow.copy(alpha = 0.7f))
+                        ) {
+                            Text(text = "✉️", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (testSosSmsCooldownSec > 0) {
+                                    if (isRu) "Отправить SOS-SMS (${testSosSmsCooldownSec}с)" else "Send Follower SOS SMS (${testSosSmsCooldownSec}s)"
+                                } else {
+                                    if (isRu) "Отправить SOS-SMS" else "Send Follower SOS SMS"
+                                },
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (testSosSmsCooldownSec == 0) ColorVeryLow else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            )
+                        }
+
                         // Test: Heads-Up Message Screen preview (5s countdown)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -3929,8 +3962,8 @@ fun SettingsScreen(
                                         }
                                         Toast.makeText(
                                             context,
-                                            if (isRu) "Заблокируйте экран! Важное сообщение появится через 5 секунд..."
-                                            else "Lock your screen! Heads-Up message in 5 seconds...",
+                                            if (isRu) "Заблокируйте экран! Важное SMS-сообщение появится через 5 секунд..."
+                                            else "Lock your screen! Heads-Up SMS-message in 5 seconds...",
                                             Toast.LENGTH_SHORT
                                         ).show()
                                         testHeadsUpCountdownSec = 5
@@ -3956,7 +3989,7 @@ fun SettingsScreen(
                                         if (isRu) "Сообщение через ${testHeadsUpCountdownSec}с..."
                                         else "Message in ${testHeadsUpCountdownSec}s..."
                                     } else {
-                                        if (isRu) "💬 Важное сообщение (5 сек)" else "💬 Heads-Up Message (5s)"
+                                        if (isRu) "Важное SMS-сообщение (5 сек)" else "Heads-Up SMS-message (5s)"
                                     },
                                     style = MaterialTheme.typography.labelLarge,
                                     color = if (testHeadsUpCountdownSec == 0) ActionBlue
@@ -4153,7 +4186,7 @@ fun SettingsScreen(
                     .clip(RoundedCornerShape(8.dp))
                     .clickable {
                         val now = System.currentTimeMillis()
-                        if (now - lastDevTapTime > 1500L) {
+                        if (now - lastDevTapTime > 500L) {
                             devTapCount = 0
                         }
                         lastDevTapTime = now
@@ -4168,29 +4201,15 @@ fun SettingsScreen(
                                     if (isRu) "🛠️ Режим тестирования систем активирован" else "🛠️ System testing mode activated",
                                     Toast.LENGTH_SHORT
                                 ).show()
-                            } else {
-                                val remaining = 5 - devTapCount
-                                val tapsWord = if (isRu) {
-                                    when (remaining) {
-                                        1 -> "тап"
-                                        in 2..4 -> "тапа"
-                                        else -> "тапов"
-                                    }
-                                } else {
-                                    if (remaining == 1) "tap" else "taps"
-                                }
+                            } else if (devTapCount == 4) {
+                                // Show hint only on the last tap before unlock
                                 Toast.makeText(
                                     context,
-                                    if (isRu) "Осталось $remaining $tapsWord..." else "$remaining $tapsWord remaining...",
+                                    if (isRu) "Ещё 1 тап..." else "1 more tap...",
                                     Toast.LENGTH_SHORT
                                 ).show()
                             }
-                        } else {
-                            Toast.makeText(
-                                context,
-                                if (isRu) "🛠️ Режим тестирования систем уже активен" else "🛠️ System testing mode is active",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            // No toast for taps 1-3 to avoid blocking the tap area
                         }
                     }
                     .padding(top = 10.dp, bottom = 4.dp),

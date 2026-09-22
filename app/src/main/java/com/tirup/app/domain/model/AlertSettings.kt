@@ -62,5 +62,8 @@ data class AlertSettings(
     val isCaregiverSosWakeupEnabled: Boolean = true,
 
     // Emergency SMS mode: false = Patient (SOS sender), true = Caregiver (SOS receiver & alarm)
-    val isCaregiverRole: Boolean = false
+    val isCaregiverRole: Boolean = false,
+
+    // Heads-Up SMS display in TIRUp: show incoming SMS from follower/master directly in the app overlay
+    val isHeadsUpMessagingEnabled: Boolean = true
 )

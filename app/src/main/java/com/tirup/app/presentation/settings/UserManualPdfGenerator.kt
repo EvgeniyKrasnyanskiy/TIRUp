@@ -625,12 +625,20 @@ class UserManualPdfGenerator(private val context: Context) {
                     if (isRu) "Чтобы экраны спасения и важных сообщений открывались поверх заблокированного экрана, необходимо выдать два специальных разрешения: 1) Настройки Андроид → Приложения → Специальный доступ → Отображать поверх других приложений → TIRUp → включить. 2) Настройки Андроид → Приложения → Специальный доступ → Отправлять полноэкранные уведомления → TIRUp → включить. Точные названия пунктов меню могут незначительно отличаться в зависимости от производителя."
                     else "To allow Rescue and Heads-Up screens to appear over the locked display, grant two special permissions: 1) Android Settings → Apps → Special app access → Display over other apps → TIRUp → Enable. 2) Android Settings → Apps → Special app access → Send full-screen notifications → TIRUp → Enable. Exact menu names may vary by manufacturer."
                 )
+                )
                 flow.callout(
                     CalloutType.TIP,
                     if (isRu) "📱 ПРОВЕРКА ЭКРАНОВ НА ЗАБЛОКИРОВАННОМ УСТРОЙСТВЕ:" else "📱 VERIFY SCREENS ON A LOCKED DEVICE:",
-                    if (isRu) "В блоке «Тестирование систем» кнопки «SOS-экран фоловера (5 сек)» и «Важное сообщение (5 сек)» дают 5 секунд для блокировки телефона перед показом. Если экран не открылся — разрешения «Поверх других приложений» и «Полноэкранные уведомления» не предоставлены. Приложение покажет toast-подсказку при нажатии кнопки теста в этом случае."
-                    else "In System Testing, 'Follower SOS Screen (5s)' and 'Heads-Up Message (5s)' buttons provide 5 seconds to lock the phone before display. If screen doesn't wake — 'Display over other apps' and 'Full-screen notifications' permissions are missing. The app shows a toast hint when tapping the test button."
+                    if (isRu) "В блоке «Тестирование систем» кнопки «SOS-экран фоловера (5 сек)» и «Важное SMS-сообщение (5 сек)» дают 5 секунд для блокировки телефона перед показом. ВАЖНО: если информация после теста не появилась на заблокированном экране — обязательно проверьте разрешения «Поверх других приложений» и «Полноэкранные уведомления» в настройках Android, затем протестируйте снова."
+                    else "In System Testing, 'Follower SOS Screen (5s)' and 'Heads-Up SMS-message (5s)' buttons provide 5 seconds to lock the phone before display. IMPORTANT: if no overlay appeared on the locked screen, check 'Display over other apps' and 'Full-screen notifications' permissions in Android Settings, then test again."
                 )
+                flow.section(if (isRu) "4.3. Управление отображением SMS в TIRUp" else "4.3. In-App SMS Display Control")
+                flow.bullet(
+                    if (isRu) "📲 Важные SMS в TIRUp" else "📲 Important SMS in TIRUp",
+                    if (isRu) "Чекбокс «Важные SMS в TIRUp» в нижней части блока «Экстренные SMS» управляет отображением входящих текстовых сообщений от фоловера или мастера непосредственно в оверлее TIRUp. Когда включено (по умолчанию): любое нераспознанное служебным ботом SMS от доверенного номера будет показано через Heads-Up экран с пульсирующей каймой и вибрацией. Когда выключено: входящие сообщения от доверенных контактов обрабатываются только как запросы телеметрии (если содержат команду) и не показываются в оверлее."
+                    else "The 'Important SMS in TIRUp' checkbox at the bottom of the Emergency SMS block controls whether incoming text messages from the follower or master are displayed directly in the TIRUp overlay. When enabled (default): any human-readable SMS from a trusted contact triggers the Heads-Up screen with a pulsing border and vibration. When disabled: trusted-contact messages are silently handled only as telemetry queries if they match a command keyword, and no overlay is shown."
+                )
+
 
 
                 // =========================================================================
