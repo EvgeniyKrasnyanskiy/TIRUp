@@ -144,6 +144,10 @@ class SmsQueryReceiver : BroadcastReceiver() {
         }
 
         // 4. Human text message from trusted contact: Show Heads-Up HUD screen with gentle vibration over lockscreen
+        if (!alerts.isHeadsUpMessagingEnabled) {
+            Log.d(TAG, "Heads-Up SMS messaging is disabled in settings, skipping HeadsUpMessageActivity.")
+            return
+        }
         val contactName = if (isMatchingPhone(senderPhone, trustedPhone1)) {
             alerts.emergencyContactName.ifBlank { if (alerts.isCaregiverRole) "Мастер" else "Фоловер" }
         } else {
