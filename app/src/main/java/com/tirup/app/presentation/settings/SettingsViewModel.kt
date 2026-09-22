@@ -669,6 +669,21 @@ class SettingsViewModel(
         )
     }
 
+    private var headsUpTestCountdownJob: kotlinx.coroutines.Job? = null
+
+    fun startHeadsUpTestCountdown(delaySec: Int = 5) {
+        headsUpTestCountdownJob?.cancel()
+        headsUpTestCountdownJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(delaySec * 1000L)
+            testHeadsUpMessageScreen()
+        }
+    }
+
+    fun cancelHeadsUpTest() {
+        headsUpTestCountdownJob?.cancel()
+        headsUpTestCountdownJob = null
+    }
+
     fun playTestSound(volumePercent: Int) {
         com.tirup.app.data.alert.MedicalSoundPlayer.playTestSound(volumePercent)
     }
