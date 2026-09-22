@@ -25,6 +25,7 @@ object PatternRecognitionEngine {
     fun analyze(
         bins: List<AGPPercentileBin>,
         stats: GlucoseStatistics,
+        @Suppress("UNUSED_PARAMETER")
         isMmol: Boolean = true,
         nightStartHour: Int = 0,
         nightEndHour: Int = 6

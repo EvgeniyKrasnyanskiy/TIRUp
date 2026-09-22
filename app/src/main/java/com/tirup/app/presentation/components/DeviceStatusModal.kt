@@ -328,6 +328,7 @@ private fun DeviceSection(
     installedAt: Long,
     expiresAt: Long,
     millisRemaining: Long,
+    @Suppress("UNUSED_PARAMETER")
     daysRemaining: Int,
     pickerDays: Int,
     pickerMin: Int,

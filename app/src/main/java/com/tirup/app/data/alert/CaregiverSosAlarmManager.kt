@@ -61,6 +61,7 @@ object CaregiverSosAlarmManager {
         try {
             val pm = appContext.getSystemService(Context.POWER_SERVICE) as? PowerManager
             wakeLock?.release()
+            @Suppress("DEPRECATION")
             wakeLock = pm?.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
                 "TIRUp:CaregiverSosWakeLock"
