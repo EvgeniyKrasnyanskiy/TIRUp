@@ -25,8 +25,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -263,7 +266,9 @@ fun DailyGlucoseChart(
     selectedMode: Int = 0,
     onModeChange: (Int) -> Unit = {},
     onConfigureMetricsClick: (() -> Unit)? = null,
-    metricsContent: (@Composable () -> Unit)? = null
+    metricsContent: (@Composable () -> Unit)? = null,
+    initialZoomHours: Int = 24,
+    onZoomHoursChange: ((Int) -> Unit)? = null
 ) {
     val now = System.currentTimeMillis()
     val latestTimestamp = readings.lastOrNull()?.timestamp ?: now
@@ -304,10 +309,15 @@ fun DailyGlucoseChart(
         clusterNoteTreatments(todayTreatments)
     }
 
-    var visibleMinutes by remember { mutableFloatStateOf(360f) }
-    var windowStartMinute by remember {
-        mutableFloatStateOf((currentMinuteOfDay - 300f).coerceIn(0f, (1440f - 360f).coerceAtLeast(0f)))
+    val defaultVisibleMinutes = remember(initialZoomHours) {
+        (initialZoomHours.coerceIn(1, 24) * 60f)
     }
+    var visibleMinutes by remember(defaultVisibleMinutes) { mutableFloatStateOf(defaultVisibleMinutes) }
+    var windowStartMinute by remember(defaultVisibleMinutes) {
+        val start = if (defaultVisibleMinutes >= 1440f) 0f else (currentMinuteOfDay - defaultVisibleMinutes * 0.8f).coerceIn(0f, 1440f - defaultVisibleMinutes)
+        mutableFloatStateOf(start)
+    }
+    var showZoomMenu by remember { mutableStateOf(false) }
 
     var selectedReading by remember { mutableStateOf<GlucoseReading?>(null) }
     var selectedGap by remember { mutableStateOf<DataGap?>(null) }
@@ -457,18 +467,68 @@ fun DailyGlucoseChart(
                             if (isRu) "${visibleMinutes.toInt()} мин" else "${visibleMinutes.toInt()}m"
                         }
 
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
-                            border = androidx.compose.foundation.BorderStroke(0.6.dp, outlineColor.copy(alpha = 0.3f))
-                        ) {
-                            Text(
-                                text = zoomLabel,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = onSurfaceVariant,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
+                        Box {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
+                                border = androidx.compose.foundation.BorderStroke(0.6.dp, outlineColor.copy(alpha = 0.3f)),
+                                modifier = Modifier.clickable { showZoomMenu = true }
+                            ) {
+                                Text(
+                                    text = zoomLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = onSurfaceVariant,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = showZoomMenu,
+                                onDismissRequest = { showZoomMenu = false }
+                            ) {
+                                val presets = listOf(1, 2, 3, 6, 12, 24)
+                                val currentHoursRounded = (visibleMinutes / 60f).roundToInt()
+                                presets.forEach { hours ->
+                                    val isSelected = currentHoursRounded == hours
+                                    val label = if (isRu) "$hours ч" else "${hours}h"
+                                    DropdownMenuItem(
+                                        text = {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (isSelected) PrimaryEmerald else MaterialTheme.colorScheme.onSurface
+                                                )
+                                                if (isSelected) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Check,
+                                                        contentDescription = null,
+                                                        tint = PrimaryEmerald,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        onClick = {
+                                            showZoomMenu = false
+                                            val targetVisible = hours * 60f
+                                            visibleMinutes = targetVisible
+                                            val start = if (targetVisible >= 1440f) {
+                                                0f
+                                            } else {
+                                                (currentMinuteOfDay - targetVisible * 0.8f).coerceIn(0f, 1440f - targetVisible)
+                                            }
+                                            windowStartMinute = start
+                                            onZoomHoursChange?.invoke(hours)
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -1000,19 +1060,29 @@ fun DailyGlucoseChart(
                                         windowStartMinute = (windowStartMinute - panChange.x * minutesPerPx).coerceIn(0f, 1440f - visibleMinutes)
 
                                         event.changes.forEach { it.consume() }
+                                        onZoomHoursChange?.invoke((newVisible / 60f).roundToInt().coerceIn(1, 24))
                                     }
                                 } else if (pressedCount == 1) {
-                                    // 2. Single-finger drag:
-                                    // If scale is <= 5h (<= 300 minutes), scroll the chart horizontally.
-                                    // If scale is > 5h (default 6h, 8h, 24h, etc.), do NOT consume drag,
-                                    // allowing parent HorizontalPager to swipe between screens.
-                                    if (visibleMinutes <= 300f) {
+                                    // 2. Single-finger drag with Edge-Aware routing:
+                                    // If visibleMinutes covers the full 24 hours (>= 1435f), do NOT consume drag,
+                                    // so parent HorizontalPager swipes between screens seamlessly.
+                                    // If zoomed in (< 24h), scroll the chart horizontally.
+                                    // If already scrolled to the edge (0 or 1440 - visibleMinutes) and dragging further outward,
+                                    // do NOT consume drag so parent pager can take over.
+                                    if (visibleMinutes < 1435f) {
                                         val panChange = event.calculatePan()
                                         if (panChange.x != 0f) {
                                             val chartWidth = (size.width - 70f).coerceAtLeast(10f)
                                             val minutesPerPx = visibleMinutes / chartWidth
-                                            windowStartMinute = (windowStartMinute - panChange.x * minutesPerPx).coerceIn(0f, 1440f - visibleMinutes)
-                                            event.changes.forEach { it.consume() }
+                                            val maxStart = 1440f - visibleMinutes
+                                            val proposedStart = windowStartMinute - panChange.x * minutesPerPx
+                                            val clampedStart = proposedStart.coerceIn(0f, maxStart)
+
+                                            // If chart actually moved (not blocked at edge), consume gesture
+                                            if (Math.abs(clampedStart - windowStartMinute) > 0.05f) {
+                                                windowStartMinute = clampedStart
+                                                event.changes.forEach { it.consume() }
+                                            }
                                         }
                                     }
                                 }

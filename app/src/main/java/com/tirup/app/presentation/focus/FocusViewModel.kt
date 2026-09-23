@@ -453,4 +453,14 @@ class FocusViewModel(
             settingsRepository.resumeAlerts()
         }
     }
+
+    fun setChartZoomHours(hours: Int) {
+        viewModelScope.launch {
+            val clamped = hours.coerceIn(1, 24)
+            val current = _uiState.value.userSettings
+            if (current.chartZoomHours != clamped) {
+                settingsRepository.updateSettings(current.copy(chartZoomHours = clamped))
+            }
+        }
+    }
 }

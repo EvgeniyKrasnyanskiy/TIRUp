@@ -568,6 +568,8 @@ fun FocusScreen(
                 selectedMode = focusCardMode,
                 onModeChange = { focusCardMode = it },
                 onConfigureMetricsClick = { showMetricsOrderDialog = true },
+                initialZoomHours = userSettings.chartZoomHours,
+                onZoomHoursChange = { viewModel.setChartZoomHours(it) },
                 metricsContent = {
                     @Composable
                     fun RenderMetricWidget(id: String, modifier: Modifier) {
