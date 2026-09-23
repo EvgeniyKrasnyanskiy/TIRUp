@@ -197,7 +197,7 @@ object CaregiverSosAlarmManager {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID_CAREGIVER_SOS,
-                "Экстренный SOS опекуна (Caregiver Wakeup)",
+                "0. Экстренный SOS фоловера (Caregiver Wakeup)",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Громкая сирена при получении SMS о критической гипогликемии у близкого"

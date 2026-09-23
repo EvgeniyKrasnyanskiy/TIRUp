@@ -488,6 +488,7 @@ fun SettingsScreen(
     }
 
     var showSosSmsSendConfirmDialog by remember { mutableStateOf(false) }
+    var isRoleSectionExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.infoMessage) {
         val msg = state.infoMessage
@@ -618,14 +619,62 @@ fun SettingsScreen(
             val isFollower = alerts.isCaregiverRole
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Column {
-                        Text(
-                            text = if (isRu) "Роль устройства в системе" else "Device Role in TIRUp",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isRoleSectionExpanded = !isRoleSectionExpanded },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isRu) "Роль устройства в системе" else "Device Role in TIRUp",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isFollower) {
+                                    if (isRu) "Текущая: 👁️ Фоловер (Наблюдатель)"
+                                    else "Active: 👁️ Follower (Observer)"
+                                } else {
+                                    if (isRu) "Текущая: 👑 Мастер (Сенсор)"
+                                    else "Active: 👑 Master (Sensor)"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isFollower) PrimaryEmerald else ActionBlue
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = (if (isFollower) PrimaryEmerald else ActionBlue).copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, (if (isFollower) PrimaryEmerald else ActionBlue).copy(alpha = 0.35f)),
+                            modifier = Modifier.padding(start = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = if (isFollower) (if (isRu) "Фоловер" else "Follower") else (if (isRu) "Мастер" else "Master"),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isFollower) PrimaryEmerald else ActionBlue
+                                )
+                                Text(
+                                    text = if (isRoleSectionExpanded) "▲" else "▼",
+                                    fontSize = 11.sp,
+                                    color = if (isFollower) PrimaryEmerald else ActionBlue
+                                )
+                            }
+                        }
+                    }
+
+                    if (isRoleSectionExpanded) {
                         Text(
                             text = if (isFollower) {
                                 if (isRu) "Наблюдатель: приём данных, сирена при ночном SOS"
@@ -637,13 +686,12 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
 
-                    // Role Selectors: Master (👑) vs Follower (👁️)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
+                        // Role Selectors: Master (👑) vs Follower (👁️)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
                         // Master button
                         Surface(
                             modifier = Modifier
@@ -727,6 +775,7 @@ fun SettingsScreen(
                                 )
                             }
                         }
+                    }
                     }
                 }
             }
@@ -4109,7 +4158,7 @@ fun SettingsScreen(
                                 enabled = bleRangeCooldownSec == 0,
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.7f))
+                                border = BorderStroke(1.dp, TestButtonAmber.copy(alpha = 0.7f))
                             ) {
                                 Text(text = "📡", fontSize = 16.sp)
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -4117,7 +4166,7 @@ fun SettingsScreen(
                                     text = bleRangeButtonText,
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (bleRangeCooldownSec == 0) ActionBlue else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                    color = if (bleRangeCooldownSec == 0) TestButtonAmber else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                                 )
                             }
 

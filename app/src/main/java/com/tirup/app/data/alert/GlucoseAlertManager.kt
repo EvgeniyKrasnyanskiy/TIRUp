@@ -375,7 +375,7 @@ object GlucoseAlertManager {
         // Lockscreen / Ongoing Glucose Status
         val lockscreenChannel = NotificationChannel(
             CHANNEL_LOCKSCREEN,
-            "Текущий сахар (экран блокировки / шторка)",
+            "6. Текущий сахар (экран блокировки / шторка)",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
             description = "Постоянный статус сахара, тренда и TIR на экране блокировки и в панели уведомлений"
@@ -387,7 +387,7 @@ object GlucoseAlertManager {
         // Weekly Sunday Digest
         val weeklyDigestChannel = NotificationChannel(
             CHANNEL_WEEKLY_DIGEST,
-            "Воскресный дайджест",
+            "7. Воскресный дайджест",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             description = "Еженедельная аналитическая сводка прогресса TIR, вариабельности и стабильности"
@@ -405,7 +405,7 @@ object GlucoseAlertManager {
 
         NotificationChannel(
             CHANNEL_DEVICE_REMINDER,
-            "Напоминания об устройствах",
+            "8. Напоминания об устройствах",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             description = "Напоминания о замене сенсора CGM и инфузионного набора"
@@ -415,7 +415,7 @@ object GlucoseAlertManager {
 
         NotificationChannel(
             CHANNEL_HBA1C_REMINDER,
-            "Напоминания об анализах (HbA1c)",
+            "9. Напоминания об анализах (HbA1c)",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             description = "Ежеквартальные напоминания о сдаче HbA1c и корреляция с GMI сенсора"
@@ -425,7 +425,7 @@ object GlucoseAlertManager {
 
         NotificationChannel(
             CHANNEL_YEAR_END_DIGEST,
-            "Итоги года",
+            "10. Итоги года",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             description = "Праздничный годовой отчёт и статистика компенсации диабета 31 декабря"
