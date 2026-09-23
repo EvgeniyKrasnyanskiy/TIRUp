@@ -1261,12 +1261,13 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                             lastPeriodicHistorySync = now
                         }
                         val countToFetch = if (latestInDbBefore == null || force) {
-                            288 // Full 24 hours (288 * 5 min)
+                            1440 // Full 24 hours of 1-minute cadence readings (or 288 for 5-min)
                         } else {
                             val gapMs = (now - latestInDbBefore.timestamp).coerceAtLeast(0L)
-                            val missingPoints = (gapMs / 300_000L).toInt() + 2
-                            val minPoints = if (isPeriodicDue) 72 else 12 // Periodic pull fetches up to 6h of history to ensure 100% sync
-                            missingPoints.coerceIn(minPoints, 288)
+                            // Support sensors with 1-minute cadence (Libre 2/3, Dexcom G7) as well as 5-minute
+                            val missingPoints = (gapMs / 60_000L).toInt() + 5
+                            val minPoints = if (isPeriodicDue) 360 else 30 // Periodic pull fetches up to 6h of 1-min history
+                            missingPoints.coerceIn(minPoints, 1440)
                         }
                         val sgvJsonStr = queryLocalEndpoint("sgv.json?count=$countToFetch")
                         if (!sgvJsonStr.isNullOrBlank()) {
@@ -1288,6 +1289,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                                         )
                                     }
                                 }
+                                Log.i(TAG, "Fetched ${array.length()} points from xDrip /sgv.json (requested $countToFetch, backfill candidates: ${backfilledReadings.size})")
                             } catch (e: Exception) {
                                 Log.w(TAG, "Error parsing /sgv.json: ${e.message}")
                             }
