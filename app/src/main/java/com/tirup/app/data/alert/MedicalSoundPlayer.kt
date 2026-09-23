@@ -36,7 +36,12 @@ object MedicalSoundPlayer {
                     AlertTier.MAIN -> playTripleMainBeep(volumePercent)
                     AlertTier.CRITICAL -> {
                         boostAlarmVolumeIfNeeded()
-                        playCriticalAlarmSeries()
+                        try {
+                            playCriticalAlarmSeries()
+                        } finally {
+                            isCriticalActive = false
+                            restoreAlarmVolumeIfNeeded()
+                        }
                     }
                     AlertTier.SIGNAL_LOSS -> {
                         boostAlarmVolumeIfNeeded()
@@ -294,6 +299,49 @@ object MedicalSoundPlayer {
         playRawPcm(audioData, usage = AudioAttributes.USAGE_ALARM)
     }
 
+    enum class CriticalToneType {
+        STANDARD,      // ~12s 5-tone medical alarm
+        SUPER_HYPO,    // ~50s GDH FM sweep siren (450-850 Hz)
+        SUPER_HYPER    // ~16s high-pitched pulsed alarm
+    }
+
+    /**
+     * Plays a critical alarm with the specified tone type.
+     */
+    fun playCriticalAlarm(type: CriticalToneType = CriticalToneType.STANDARD) {
+        isPlayingActive = true
+        isCriticalActive = true
+        audioScope.launch {
+            try {
+                boostAlarmVolumeIfNeeded()
+                when (type) {
+                    CriticalToneType.STANDARD -> playCriticalAlarmSeries()
+                    CriticalToneType.SUPER_HYPO -> runSuperHypoSirenLoop()
+                    CriticalToneType.SUPER_HYPER -> runSuperHyperAlarmLoop()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Critical alarm playback failed for type=$type: ${e.message}")
+            } finally {
+                isCriticalActive = false
+                restoreAlarmVolumeIfNeeded()
+            }
+        }
+    }
+
+    /**
+     * Super-HYPO civil defense / GDH siren (~50 seconds) for glucose below critical threshold.
+     */
+    fun playSuperHypoSiren() {
+        playCriticalAlarm(CriticalToneType.SUPER_HYPO)
+    }
+
+    /**
+     * Super-HYPER piercing rapid pulsed alarm (~16 seconds) for glucose above critical threshold.
+     */
+    fun playSuperHyperAlarm() {
+        playCriticalAlarm(CriticalToneType.SUPER_HYPER)
+    }
+
     /**
      * Tier 3: High-urgency alternating alarm siren (USAGE_ALARM).
      * Plays a series lasting ~12 seconds (8 bursts with 300ms pause), cancellable anytime.
@@ -320,44 +368,80 @@ object MedicalSoundPlayer {
 
         // Repeat 8 times (~12 seconds total), but stop immediately if cancelled
         for (cycle in 0 until 8) {
-            if (!isCriticalActive) break
+            if (!isCriticalActive || !isPlayingActive) break
             playRawPcm(burstData, usage = AudioAttributes.USAGE_ALARM)
         }
-        isCriticalActive = false
-        restoreAlarmVolumeIfNeeded()
     }
 
     /**
-     * Caregiver SOS Wakeup: Plays double critical alarm series (~24 seconds total, 16 bursts)
+     * Generates and plays the 50-second continuous civil defense / GDH air-raid siren.
+     * Uses FM modulation oscillating smoothly between 450 Hz and 850 Hz with 2nd harmonic.
+     */
+    private fun runSuperHypoSirenLoop() {
+        val cycleSec = 3.0
+        val numSamples = (SAMPLE_RATE * cycleSec).toInt()
+        val sirenCycle = ShortArray(numSamples)
+        var phase = 0.0
+
+        for (i in 0 until numSamples) {
+            val t = i.toDouble() / SAMPLE_RATE
+            // Cosine modulation: starts at 450 Hz, peaks at 850 Hz at 1.5s, returns to 450 Hz at 3.0s
+            val modProgress = 0.5 * (1.0 - kotlin.math.cos(2.0 * PI * t / cycleSec))
+            val currentFreq = 450.0 + (850.0 - 450.0) * modProgress
+            phase += 2.0 * PI * currentFreq / SAMPLE_RATE
+            if (phase > 2.0 * PI) phase -= 2.0 * PI
+
+            // Authentic air-raid siren timbre: fundamental + 2nd harmonic
+            val raw = 0.72 * sin(phase) + 0.28 * sin(2.0 * phase)
+            val sampleVal = (raw * Short.MAX_VALUE).toInt()
+            sirenCycle[i] = sampleVal.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+        }
+
+        // Loop 17 cycles (~51 seconds total)
+        for (cycle in 0 until 17) {
+            if (!isCriticalActive || !isPlayingActive) break
+            playRawPcm(sirenCycle, usage = AudioAttributes.USAGE_ALARM)
+        }
+    }
+
+    /**
+     * Generates and plays the 16-second piercing pulsed high-urgency alarm for extreme hyper.
+     * High-pitched alternating chime bursts (1760 Hz & 2349 Hz).
+     */
+    private fun runSuperHyperAlarmLoop() {
+        val b1 = generateSineWave(freq = 1760.00, durationMs = 80, volume = 0.95f)
+        val b2 = generateSineWave(freq = 2349.32, durationMs = 80, volume = 1.0f)
+        val b3 = generateSineWave(freq = 1760.00, durationMs = 80, volume = 0.95f)
+        val b4 = generateSineWave(freq = 2349.32, durationMs = 140, volume = 1.0f)
+        val pause = ShortArray((SAMPLE_RATE * 0.62).toInt()) // 620ms pause -> 1.0s total cycle
+
+        val burstLen = b1.size + b2.size + b3.size + b4.size + pause.size
+        val burstData = ShortArray(burstLen)
+        var offset = 0
+        System.arraycopy(b1, 0, burstData, offset, b1.size); offset += b1.size
+        System.arraycopy(b2, 0, burstData, offset, b2.size); offset += b2.size
+        System.arraycopy(b3, 0, burstData, offset, b3.size); offset += b3.size
+        System.arraycopy(b4, 0, burstData, offset, b4.size); offset += b4.size
+        System.arraycopy(pause, 0, burstData, offset, pause.size)
+
+        // Loop 16 cycles (~16 seconds total)
+        for (cycle in 0 until 16) {
+            if (!isCriticalActive || !isPlayingActive) break
+            playRawPcm(burstData, usage = AudioAttributes.USAGE_ALARM)
+        }
+    }
+
+    /**
+     * Caregiver SOS Wakeup: Plays 50-second continuous civil defense Super-Hypo siren
      * with volume forced to 100% on USAGE_ALARM stream.
      */
-    fun playCaregiverSosAlarm(cycles: Int = 16) {
+    fun playCaregiverSosAlarm() {
         isPlayingActive = true
         isCriticalActive = true
         audioScope.launch {
             try {
                 boostAlarmVolumeToMax()
-                val pulse1 = generateSineWave(freq = 1046.5, durationMs = 150, volume = 1.0f)
-                val pulse2 = generateSineWave(freq = 784.0, durationMs = 150, volume = 1.0f)
-                val pulse3 = generateSineWave(freq = 1046.5, durationMs = 150, volume = 1.0f)
-                val pulse4 = generateSineWave(freq = 784.0, durationMs = 150, volume = 1.0f)
-                val pulse5 = generateSineWave(freq = 1174.66, durationMs = 320, volume = 1.0f)
-                val pause = ShortArray((SAMPLE_RATE * 0.35).toInt()) // 350ms pause
-
-                val burstLen = pulse1.size + pulse2.size + pulse3.size + pulse4.size + pulse5.size + pause.size
-                val burstData = ShortArray(burstLen)
-                var offset = 0
-                System.arraycopy(pulse1, 0, burstData, offset, pulse1.size); offset += pulse1.size
-                System.arraycopy(pulse2, 0, burstData, offset, pulse2.size); offset += pulse2.size
-                System.arraycopy(pulse3, 0, burstData, offset, pulse3.size); offset += pulse3.size
-                System.arraycopy(pulse4, 0, burstData, offset, pulse4.size); offset += pulse4.size
-                System.arraycopy(pulse5, 0, burstData, offset, pulse5.size); offset += pulse5.size
-                System.arraycopy(pause, 0, burstData, offset, pause.size)
-
-                for (cycle in 0 until cycles) {
-                    if (!isCriticalActive || !isPlayingActive) break
-                    playRawPcm(burstData, usage = AudioAttributes.USAGE_ALARM)
-                }
+                runSuperHypoSirenLoop()
             } catch (e: Exception) {
                 Log.e(TAG, "Caregiver SOS alarm playback error: ${e.message}")
             } finally {

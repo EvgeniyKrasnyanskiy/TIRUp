@@ -990,13 +990,11 @@ object GlucoseAlertManager {
                 "TIRUp:PatientRescueWakeLock"
             )?.apply {
                 setReferenceCounted(false)
-                acquire(30_000L)
+                acquire(55_000L) // 55s max hold (covers 50s Super-Hypo siren)
             }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to acquire rescueWakeLock: ${e.message}")
         }
-
-        MedicalSoundPlayer.playSound(AlertTier.CRITICAL, 100)
 
         val title = if (isTest) "🚨 ТЕСТ: Экран спасения" else "🚨 ЭКСТРЕМАЛЬНО НИЗКИЙ САХАР!"
         val text = "Сахар: $glucoseDisplay ($trendArrow). Срочно примите быстрые углеводы!"
@@ -1014,7 +1012,8 @@ object GlucoseAlertManager {
             glucoseDisplay = glucoseDisplay,
             trendArrow = trendArrow,
             primaryContactPhone = primaryPhone,
-            primaryContactName = primaryName
+            primaryContactName = primaryName,
+            criticalToneType = MedicalSoundPlayer.CriticalToneType.SUPER_HYPO
         )
     }
 
@@ -1296,6 +1295,7 @@ object GlucoseAlertManager {
                         latest.valueMmol,
                         iobText
                     )
+                    val toneType = if (isExtremeLow) MedicalSoundPlayer.CriticalToneType.SUPER_HYPO else MedicalSoundPlayer.CriticalToneType.STANDARD
                     sendNotification(
                         context = context,
                         channelId = CHANNEL_CRITICAL,
@@ -1309,7 +1309,8 @@ object GlucoseAlertManager {
                         glucoseDisplay = String.format(Locale.US, "%.1f", latest.valueMmol),
                         trendArrow = latest.trendArrow ?: "→",
                         primaryContactPhone = alerts.emergencyContactPhone,
-                        primaryContactName = alerts.emergencyContactName
+                        primaryContactName = alerts.emergencyContactName,
+                        criticalToneType = toneType
                     )
                     scheduleEmergencySmsIfEnabled(context, latest.valueMmol, latest.trendArrow ?: "→", alerts, settings.patientProfile, isRu, settings.unit)
                     return
@@ -1363,6 +1364,7 @@ object GlucoseAlertManager {
                         latest.valueMmol,
                         iobText
                     )
+                    val toneType = if (isExtremeHigh) MedicalSoundPlayer.CriticalToneType.SUPER_HYPER else MedicalSoundPlayer.CriticalToneType.STANDARD
                     sendNotification(
                         context = context,
                         channelId = CHANNEL_CRITICAL,
@@ -1376,7 +1378,8 @@ object GlucoseAlertManager {
                         glucoseDisplay = String.format(Locale.US, "%.1f", latest.valueMmol),
                         trendArrow = "↑",
                         primaryContactPhone = alerts.emergencyContactPhone,
-                        primaryContactName = alerts.emergencyContactName
+                        primaryContactName = alerts.emergencyContactName,
+                        criticalToneType = toneType
                     )
                     return
                 }
@@ -1590,7 +1593,8 @@ object GlucoseAlertManager {
         glucoseDisplay: String = "2.8",
         trendArrow: String = "⇊",
         primaryContactPhone: String = "",
-        primaryContactName: String = ""
+        primaryContactName: String = "",
+        criticalToneType: MedicalSoundPlayer.CriticalToneType = MedicalSoundPlayer.CriticalToneType.STANDARD
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
@@ -1699,6 +1703,12 @@ object GlucoseAlertManager {
 
         if (notificationId == NOTIFICATION_ID_LAST_CHANCE) {
             MedicalSoundPlayer.playLastChanceAlertTone()
+        } else if (tier == AlertTier.CRITICAL) {
+            when (criticalToneType) {
+                MedicalSoundPlayer.CriticalToneType.SUPER_HYPO -> MedicalSoundPlayer.playSuperHypoSiren()
+                MedicalSoundPlayer.CriticalToneType.SUPER_HYPER -> MedicalSoundPlayer.playSuperHyperAlarm()
+                MedicalSoundPlayer.CriticalToneType.STANDARD -> MedicalSoundPlayer.playSound(tier, volumePercent)
+            }
         } else {
             MedicalSoundPlayer.playSound(tier, volumePercent)
         }

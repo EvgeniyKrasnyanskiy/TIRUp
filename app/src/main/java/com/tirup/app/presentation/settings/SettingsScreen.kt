@@ -1266,8 +1266,8 @@ fun SettingsScreen(
                             !alerts.isCriticalEnabled -> {
                                 if (isRu) "Выключено пользователем" else "Disabled by user"
                             }
-                            else -> if (isRu) "Сирена ~12 сек при гипо >20 мин, гипер >90 мин или <${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)} / >${String.format(Locale.US, "%.1f", alerts.criticalHighThresholdMmol)}"
-                                    else "Siren ~12s on hypo >20m, hyper >90m or <${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)} / >${String.format(Locale.US, "%.1f", alerts.criticalHighThresholdMmol)}"
+                            else -> if (isRu) "Супер-ГИПО (50с ГО) <${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)}, Супер-ГИПЕР (16с) >${String.format(Locale.US, "%.1f", alerts.criticalHighThresholdMmol)}, затяжные (12с)"
+                                    else "Super-HYPO (50s GDH) <${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)}, Super-HYPER (16s) >${String.format(Locale.US, "%.1f", alerts.criticalHighThresholdMmol)}, prolonged (12s)"
                         }
 
                         // Tier 3: Critical (Prolonged / Extreme)
@@ -4071,6 +4071,53 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = if (testSosSmsCooldownSec == 0) TestButtonAmber else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                             )
+                        }
+
+                        // Test 5: Direct Sound Previews (Super-HYPO 50s & Super-HYPER 16s)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                onClick = { viewModel.playSuperHypoTestSound() },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, ColorVeryLow.copy(alpha = 0.7f))
+                            ) {
+                                Text(text = "🚨", fontSize = 14.sp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isRu) "Супер-ГИПО (50с)" else "Super-HYPO (50s)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ColorVeryLow
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = { viewModel.playSuperHyperTestSound() },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, ColorHigh.copy(alpha = 0.7f))
+                            ) {
+                                Text(text = "⚠️", fontSize = 14.sp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isRu) "Супер-ГИПЕР (16с)" else "Super-HYPER (16s)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ColorHigh
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = { viewModel.stopAlertSounds() },
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                            ) {
+                                Text(text = "⏹️", fontSize = 14.sp)
+                            }
                         }
 
                         // Confirmation dialog for SOS SMS sending
