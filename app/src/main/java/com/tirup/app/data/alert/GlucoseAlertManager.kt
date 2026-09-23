@@ -333,19 +333,19 @@ object GlucoseAlertManager {
         nm.createNotificationChannelGroup(
             NotificationChannelGroup(
                 GROUP_ALERTS,
-                if (isRu) "🚨 Тревоги и экстренный SOS" else "🚨 Alarms & Emergency SOS"
+                if (isRu) "1. 🚨 Тревоги и экстренный SOS" else "1. 🚨 Alarms & Emergency SOS"
             )
         )
         nm.createNotificationChannelGroup(
             NotificationChannelGroup(
                 GROUP_STATUS,
-                if (isRu) "📊 Мониторинг и статус" else "📊 Monitoring & Status"
+                if (isRu) "2. 📊 Мониторинг и статус" else "2. 📊 Monitoring & Status"
             )
         )
         nm.createNotificationChannelGroup(
             NotificationChannelGroup(
                 GROUP_REMINDERS,
-                if (isRu) "🔔 Напоминания и отчеты" else "🔔 Reminders & Reports"
+                if (isRu) "3. 🔔 Напоминания и отчеты" else "3. 🔔 Reminders & Reports"
             )
         )
 
@@ -355,7 +355,7 @@ object GlucoseAlertManager {
         // Tier 1: Predictive (Soft) - sound handled purely by MedicalSoundPlayer, high importance for heads-up visibility
         val predictiveChannel = NotificationChannel(
             CHANNEL_PREDICTIVE,
-            "1. Предиктивные тревоги (за 15 мин)",
+            "Предиктивные тревоги (за 15 мин)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             group = GROUP_ALERTS
@@ -367,7 +367,7 @@ object GlucoseAlertManager {
         // Tier 2: Main (Confirmed 5 points) - sound handled purely by MedicalSoundPlayer
         val mainChannel = NotificationChannel(
             CHANNEL_MAIN,
-            "2. Основные тревоги (5 точек)",
+            "Основные тревоги (5 точек)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             group = GROUP_ALERTS
@@ -379,7 +379,7 @@ object GlucoseAlertManager {
         // Tier 3: Critical (Prolonged or extreme) - sound handled purely by MedicalSoundPlayer on USAGE_ALARM
         val criticalChannel = NotificationChannel(
             CHANNEL_CRITICAL,
-            "3. Критические тревоги («кричащие»)",
+            "Критические тревоги («кричащие»)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             group = GROUP_ALERTS
@@ -392,7 +392,7 @@ object GlucoseAlertManager {
         // Tier 4: Signal Loss (No readings >20 min) - Critical Alarm, bypass DND
         val signalLossChannel = NotificationChannel(
             CHANNEL_SIGNAL_LOSS,
-            "4. Потеря сигнала сенсора (>20 мин)",
+            "Потеря сигнала сенсора (>20 мин)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             group = GROUP_ALERTS
@@ -405,7 +405,7 @@ object GlucoseAlertManager {
         // Tier 5: Daily Compensator (Last Chance TIR)
         val compensatorChannel = NotificationChannel(
             CHANNEL_COMPENSATOR,
-            "5. Компенсатор цели (Суточный TIR)",
+            "Компенсатор цели (Суточный TIR)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             group = GROUP_ALERTS
@@ -417,7 +417,7 @@ object GlucoseAlertManager {
         // Lockscreen / Ongoing Glucose Status
         val lockscreenChannel = NotificationChannel(
             CHANNEL_LOCKSCREEN,
-            "6. Текущий сахар (экран блокировки / шторка)",
+            "Текущий сахар (экран блокировки / шторка)",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
             group = GROUP_STATUS
@@ -430,7 +430,7 @@ object GlucoseAlertManager {
         // Weekly Sunday Digest
         val weeklyDigestChannel = NotificationChannel(
             CHANNEL_WEEKLY_DIGEST,
-            "7. Воскресный дайджест",
+            "Воскресный дайджест",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             group = GROUP_STATUS
@@ -449,7 +449,7 @@ object GlucoseAlertManager {
 
         NotificationChannel(
             CHANNEL_DEVICE_REMINDER,
-            "8. Напоминания об устройствах",
+            "Напоминания об устройствах",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             group = GROUP_REMINDERS
@@ -460,7 +460,7 @@ object GlucoseAlertManager {
 
         NotificationChannel(
             CHANNEL_HBA1C_REMINDER,
-            "9. Напоминания об анализах (HbA1c)",
+            "Напоминания об анализах (HbA1c)",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             group = GROUP_REMINDERS
@@ -471,7 +471,7 @@ object GlucoseAlertManager {
 
         NotificationChannel(
             CHANNEL_YEAR_END_DIGEST,
-            "10. Итоги года",
+            "Итоги года",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             group = GROUP_REMINDERS

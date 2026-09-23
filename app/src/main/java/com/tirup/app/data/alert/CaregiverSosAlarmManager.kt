@@ -197,7 +197,7 @@ object CaregiverSosAlarmManager {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID_CAREGIVER_SOS,
-                "0. Экстренный SOS фоловера (Caregiver Wakeup)",
+                "Экстренный SOS фоловера (Caregiver Wakeup)",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 group = GlucoseAlertManager.GROUP_ALERTS
