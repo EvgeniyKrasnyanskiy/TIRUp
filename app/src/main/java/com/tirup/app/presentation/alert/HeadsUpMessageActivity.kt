@@ -57,15 +57,25 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -75,6 +85,7 @@ import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.PrimaryEmerald
 import com.tirup.app.presentation.theme.TIRUpTheme
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -210,17 +221,28 @@ fun HeadsUpMessageScreen(
     var replyText by remember { mutableStateOf("") }
     var userInteracted by remember { mutableStateOf(false) }
 
-    // Auto-dismiss after 20 seconds of no interaction to prevent battery drain
-    LaunchedEffect(userInteracted) {
-        if (!userInteracted) {
-            kotlinx.coroutines.delay(20_000L)
-            if (!userInteracted && !showReplyDialog) {
-                onDismiss()
-            }
+    // 1. Two-phase dismiss timer:
+    // Phase 1 (no touch): 20 seconds countdown
+    // Phase 2 (after touch): 30 seconds hidden countdown, reveals warning only at <= 10s
+    var remainingSeconds by remember { mutableIntStateOf(20) }
+
+    LaunchedEffect(userInteracted, showReplyDialog) {
+        if (showReplyDialog) return@LaunchedEffect
+        remainingSeconds = if (!userInteracted) 20 else 30
+        while (remainingSeconds > 0) {
+            kotlinx.coroutines.delay(1000L)
+            remainingSeconds--
+        }
+        if (!showReplyDialog) {
+            onDismiss()
         }
     }
 
-    // Gentle pulsing neon border animation: shifts smoothly between lighter and deeper sky blue
+    // Determine Day vs Night mode for lighting effects
+    val currentHour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+    val isNightTime = currentHour in 22..23 || currentHour in 0..6
+
+    // Pulsing neon border animation: shifts smoothly between lighter and deeper sky blue
     val transition = rememberInfiniteTransition(label = "pulseBorder")
     val animatedBorderColor by transition.animateColor(
         initialValue = Color(0xFF38BDF8), // Light Cyan / Sky Blue
@@ -232,21 +254,139 @@ fun HeadsUpMessageScreen(
         label = "borderColor"
     )
 
+    // Daytime breathing ambient glow on screen edges (alpha 0.05..0.22)
+    val daySideGlowAlpha by transition.animateFloat(
+        initialValue = 0.05f,
+        targetValue = 0.22f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "sideGlow"
+    )
+
+    // Nighttime soft strobe beacon: alternating top and bottom gentle pulses (450ms cycle)
+    val strobeTransition = rememberInfiniteTransition(label = "nightStrobe")
+    val strobePhase by strobeTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "strobePhase"
+    )
+    val topStrobeAlpha = if (isNightTime && strobePhase < 0.5f) {
+        (Math.sin(strobePhase * 2 * Math.PI) * 0.38f).toFloat().coerceAtLeast(0f)
+    } else 0f
+    val bottomStrobeAlpha = if (isNightTime && strobePhase >= 0.5f) {
+        (Math.sin((strobePhase - 0.5f) * 2 * Math.PI) * 0.38f).toFloat().coerceAtLeast(0f)
+    } else 0f
+
     val timeFormatted = remember(timestamp) {
         SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp))
+    }
+
+    // Text Obfuscation: show first 3-4 words initially, toggle on tap
+    var isTextObfuscated by remember { mutableStateOf(true) }
+    val (previewText, hasHiddenWords) = remember(messageText) {
+        val clean = messageText.trim()
+        val words = clean.split(Regex("\\s+"))
+        if (words.size > 4) {
+            val preview = words.take(4).joinToString(" ")
+            Pair(preview, true)
+        } else {
+            Pair(clean, false)
+        }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF090E17)) // Deep dark slate background
-            .padding(14.dp),
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = {
+                        userInteracted = true
+                        // Reset to fresh 30-sec safety timeout on tap
+                        remainingSeconds = 30
+                    }
+                )
+            },
         contentAlignment = Alignment.Center
     ) {
-        // Main Heads-Up Container with glowing pulsing outline
+        // --- 1. Ambient Lighting Layers ---
+        if (!isNightTime) {
+            // Daytime Soft Lateral Breathing Glow
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(48.dp)
+                    .align(Alignment.CenterStart)
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                animatedBorderColor.copy(alpha = daySideGlowAlpha),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(48.dp)
+                    .align(Alignment.CenterEnd)
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                animatedBorderColor.copy(alpha = daySideGlowAlpha)
+                            )
+                        )
+                    )
+            )
+        } else {
+            // Nighttime Gentle Strobe Beacon (Top & Bottom moon-white glow)
+            if (topStrobeAlpha > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(36.dp)
+                        .align(Alignment.TopCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0xFFE2E8F0).copy(alpha = topStrobeAlpha),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+            }
+            if (bottomStrobeAlpha > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(36.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color(0xFFE2E8F0).copy(alpha = bottomStrobeAlpha)
+                                )
+                            )
+                        )
+                )
+            }
+        }
+
+        // --- 2. Main Heads-Up Container with glowing pulsing outline ---
         Card(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(14.dp)
                 .border(
                     width = 2.5.dp,
                     color = animatedBorderColor,
@@ -261,7 +401,7 @@ fun HeadsUpMessageScreen(
                     .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header: Sender role & time badge
+                // Header: Sender role & time badge + Timer indicator
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -287,35 +427,100 @@ fun HeadsUpMessageScreen(
                         }
                     }
 
-                    Text(
-                        text = timeFormatted,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color(0xFF94A3B8)
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Timer status badge:
+                        // Phase 1 (no interaction): always show countdown
+                        // Phase 2 (interacted): hidden until remainingSeconds <= 10
+                        if (!userInteracted || remainingSeconds <= 10) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (remainingSeconds <= 5) Color(0xFFEF4444).copy(alpha = 0.2f)
+                                else Color.White.copy(alpha = 0.08f),
+                                border = BorderStroke(
+                                    0.8.dp,
+                                    if (remainingSeconds <= 5) Color(0xFFEF4444).copy(alpha = 0.5f)
+                                    else Color.White.copy(alpha = 0.2f)
+                                )
+                            ) {
+                                Text(
+                                    text = "⏱ ${remainingSeconds}с",
+                                    color = if (remainingSeconds <= 5) Color(0xFFFCA5A5) else Color(0xFFCBD5E1),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = timeFormatted,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
-                // Scrollable Central Message Body (Large, Crisp, White text)
+                // Adaptive Central Message Body with Obfuscation / Full Reveal toggle
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(180.dp)
+                        .heightIn(min = 110.dp, max = 340.dp)
                         .background(Color(0xFF132238), RoundedCornerShape(16.dp))
+                        .clickable {
+                            userInteracted = true
+                            remainingSeconds = 30
+                            if (hasHiddenWords) {
+                                isTextObfuscated = !isTextObfuscated
+                            }
+                        }
                         .padding(16.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    Text(
-                        text = messageText.ifBlank { "Сообщение без текста" },
-                        color = Color.White,
-                        fontSize = 22.sp,
-                        lineHeight = 30.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Start
-                    )
+                    Column {
+                        val displayedText = if (hasHiddenWords && isTextObfuscated) {
+                            "$previewText..."
+                        } else {
+                            messageText.ifBlank { "Сообщение без текста" }
+                        }
+
+                        Text(
+                            text = displayedText,
+                            color = Color.White,
+                            fontSize = 22.sp,
+                            lineHeight = 30.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Start
+                        )
+
+                        if (hasHiddenWords) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isTextObfuscated) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = null,
+                                    tint = ActionBlue,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = if (isTextObfuscated) "Показать полностью" else "Скрыть детали",
+                                    color = ActionBlue,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // Action 1: Big Green "OK!" Dismiss Button (Height 60dp)
                 Button(

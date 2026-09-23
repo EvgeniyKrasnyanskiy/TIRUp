@@ -309,11 +309,9 @@ fun DailyGlucoseChart(
         clusterNoteTreatments(todayTreatments)
     }
 
-    val defaultVisibleMinutes = remember(initialZoomHours) {
-        (initialZoomHours.coerceIn(1, 24) * 60f)
-    }
-    var visibleMinutes by remember(defaultVisibleMinutes) { mutableFloatStateOf(defaultVisibleMinutes) }
-    var windowStartMinute by remember(defaultVisibleMinutes) {
+    val defaultVisibleMinutes = (initialZoomHours.coerceIn(1, 24) * 60f)
+    var visibleMinutes by remember { mutableFloatStateOf(defaultVisibleMinutes) }
+    var windowStartMinute by remember {
         val start = if (defaultVisibleMinutes >= 1440f) 0f else (currentMinuteOfDay - defaultVisibleMinutes * 0.8f).coerceIn(0f, 1440f - defaultVisibleMinutes)
         mutableFloatStateOf(start)
     }
@@ -1064,22 +1062,24 @@ fun DailyGlucoseChart(
                                     }
                                 } else if (pressedCount == 1) {
                                     // 2. Single-finger drag with Edge-Aware routing:
-                                    // If visibleMinutes covers the full 24 hours (>= 1435f), do NOT consume drag,
-                                    // so parent HorizontalPager swipes between screens seamlessly.
-                                    // If zoomed in (< 24h), scroll the chart horizontally.
-                                    // If already scrolled to the edge (0 or 1440 - visibleMinutes) and dragging further outward,
-                                    // do NOT consume drag so parent pager can take over.
-                                    if (visibleMinutes < 1435f) {
+                                    // If scale is at full 24 hours (>= 1430f), do NOT consume drag,
+                                    // allowing parent HorizontalPager to swipe between screens directly.
+                                    // When zoomed in (< 1430f), scroll the chart smoothly.
+                                    // Only pass drag to parent pager when already at the edge and pulling outward.
+                                    if (visibleMinutes < 1430f) {
                                         val panChange = event.calculatePan()
                                         if (panChange.x != 0f) {
                                             val chartWidth = (size.width - 70f).coerceAtLeast(10f)
                                             val minutesPerPx = visibleMinutes / chartWidth
-                                            val maxStart = 1440f - visibleMinutes
-                                            val proposedStart = windowStartMinute - panChange.x * minutesPerPx
+                                            val maxStart = (1440f - visibleMinutes).coerceAtLeast(0f)
+                                            val currentStart = windowStartMinute
+                                            val proposedStart = currentStart - panChange.x * minutesPerPx
                                             val clampedStart = proposedStart.coerceIn(0f, maxStart)
 
-                                            // If chart actually moved (not blocked at edge), consume gesture
-                                            if (Math.abs(clampedStart - windowStartMinute) > 0.05f) {
+                                            val isAtLeftEdge = currentStart <= 0.5f && panChange.x > 0f
+                                            val isAtRightEdge = currentStart >= (maxStart - 0.5f) && panChange.x < 0f
+
+                                            if (!isAtLeftEdge && !isAtRightEdge) {
                                                 windowStartMinute = clampedStart
                                                 event.changes.forEach { it.consume() }
                                             }
