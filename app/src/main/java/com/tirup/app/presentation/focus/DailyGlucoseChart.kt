@@ -241,7 +241,7 @@ private fun areTreatmentsDuplicate(t1: Treatment, t2: Treatment): Boolean {
 /**
  * Interactive 24-hour daily glucose chart for the Focus screen.
  * Supports:
- * - Horizontal pinch-to-zoom (from 2h up to 24h window)
+ * - Horizontal pinch-to-zoom (from 1h up to 24h window)
  * - Horizontal drag/pan scrolling
  * - Tap on readings to inspect exact value, timestamp, delta, and IoB
  * - Clinical target corridor (3.9 - 10.0 mmol/L / 70 - 180 mg/dL)
@@ -988,7 +988,7 @@ fun DailyGlucoseChart(
                                     val panChange = event.calculatePan()
 
                                     if (zoomChange != 1f || panChange != Offset.Zero) {
-                                        val newVisible = (visibleMinutes / zoomChange).coerceIn(120f, 1440f)
+                                        val newVisible = (visibleMinutes / zoomChange).coerceIn(60f, 1440f)
                                         val chartWidth = (size.width - 70f).coerceAtLeast(10f)
                                         val centroid = event.calculateCentroid(useCurrent = true)
                                         val centroidRatio = (centroid.x / chartWidth).coerceIn(0f, 1f)
@@ -1081,6 +1081,7 @@ fun DailyGlucoseChart(
                     val textPaint = axisTextPaint
 
                     val stepMinutes = when {
+                        visibleMinutes <= 90f -> 30   // Every 30 minutes for 1h - 1.5h zoom
                         visibleMinutes <= 240f -> 60  // Every hour
                         visibleMinutes <= 600f -> 120 // Every 2 hours
                         visibleMinutes <= 1000f -> 180 // Every 3 hours
