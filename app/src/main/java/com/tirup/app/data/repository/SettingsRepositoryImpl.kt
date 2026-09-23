@@ -101,6 +101,7 @@ class SettingsRepositoryImpl(
             .putLong(KEY_DISMISSED_WEEKLY_DIGEST_TIMESTAMP, settings.dismissedWeeklyDigestTimestamp)
             .putBoolean(KEY_SHOW_TREATMENTS_ON_CHART, settings.showTreatmentsOnChart)
             .putBoolean(KEY_SHOW_PREDICTION_ON_CHART, settings.showPredictionOnChart)
+            .putInt(KEY_CHART_ZOOM_HOURS, settings.chartZoomHours)
             // Alert Settings
             .putBoolean(KEY_ALERT_MASTER_ENABLED, settings.alertSettings.isAlertsMasterEnabled)
             .putLong(KEY_ALERT_MUTE_UNTIL, settings.alertSettings.alertsMuteUntilTimestamp)
@@ -302,6 +303,7 @@ class SettingsRepositoryImpl(
             dismissedWeeklyDigestTimestamp = prefs.getLong(KEY_DISMISSED_WEEKLY_DIGEST_TIMESTAMP, 0L),
             showTreatmentsOnChart = prefs.getBoolean(KEY_SHOW_TREATMENTS_ON_CHART, true),
             showPredictionOnChart = prefs.getBoolean(KEY_SHOW_PREDICTION_ON_CHART, true),
+            chartZoomHours = prefs.getInt(KEY_CHART_ZOOM_HOURS, 24),
             alertSettings = AlertSettings(
                 isAlertsMasterEnabled = prefs.getBoolean(KEY_ALERT_MASTER_ENABLED, true),
                 alertsMuteUntilTimestamp = prefs.getLong(KEY_ALERT_MUTE_UNTIL, 0L),
@@ -502,6 +504,7 @@ class SettingsRepositoryImpl(
         private const val KEY_DISMISSED_WEEKLY_DIGEST_TIMESTAMP = "key_dismissed_weekly_digest_timestamp"
         private const val KEY_SHOW_TREATMENTS_ON_CHART = "key_show_treatments_on_chart"
         private const val KEY_SHOW_PREDICTION_ON_CHART = "key_show_prediction_on_chart"
+        private const val KEY_CHART_ZOOM_HOURS = "key_chart_zoom_hours"
 
         private const val KEY_ALERT_MASTER_ENABLED = "key_alert_master_enabled"
         private const val KEY_ALERT_MUTE_UNTIL = "key_alert_mute_until"

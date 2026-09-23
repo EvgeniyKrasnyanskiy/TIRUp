@@ -169,6 +169,7 @@ data class UserSettings(
     val dismissedWeeklyDigestTimestamp: Long = 0L,
     val showTreatmentsOnChart: Boolean = true,
     val showPredictionOnChart: Boolean = true,
+    val chartZoomHours: Int = 24,
     val alertSettings: AlertSettings = AlertSettings(),
     val bleBridgeSettings: BleBridgeSettings = BleBridgeSettings(),
     val isDeviceRemindersEnabled: Boolean = true,
