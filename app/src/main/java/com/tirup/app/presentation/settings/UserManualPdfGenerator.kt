@@ -570,7 +570,27 @@ class UserManualPdfGenerator(private val context: Context) {
                     if (isRu) "При отсутствии точек >20 мин подаётся сигнал будильника. В Настройках задаются «Часы ночного сна» (по умолчанию 23:00–07:00), в этот период действуют отдельные ночные пороги тревог и строгий контроль связи."
                     else "Alarm sounds if readings stop for >20 mins. Configurable Night Sleep Window (default 23:00-07:00) applies dedicated nocturnal thresholds and strict signal checks."
                 )
-                flow.section(if (isRu) "3.2. Экран спасения и защита от комы (Coma Guard <2.8 ммоль/л)" else "3.2. Patient Rescue Screen & Coma Guard (<2.8 mmol/L)")
+                flow.section(if (isRu) "3.2. Градация сирен: Супер-ГИПО (GDH) и Супер-ГИПЕР" else "3.2. Siren Escalation: Super-HYPO (GDH) & Super-HYPER")
+                flow.paragraph(
+                    if (isRu) "В TIRUp критические тревоги разделены на мгновенные экстремальные и подтверждённые затяжные с уникальным математически синтезированным звуковым оформлением (PCM без утяжеления приложения аудиофайлами):"
+                    else "In TIRUp critical alerts are segregated into instant extreme and verified prolonged states with mathematically synthesized PCM tones (zero APK audio bloat):"
+                )
+                flow.bullet(
+                    if (isRu) "🚨 Супер-ГИПО (<3.0 ммоль/л или настроенный порог) — 50-секундная сирена ГО" else "🚨 Super-HYPO (<3.0 mmol/L) — 50-Second GDH Siren",
+                    if (isRu) "Непрерывная мощная сирена гражданской обороны с частотной модуляцией 450–850 Гц и добавлением 2-й гармоники. Срабатывает мгновенно без ожидания повторных точек. Предназначена для гарантированного пробуждения из самого глубокого сна как самого пациента, так и фоловера при поступлении SOS."
+                    else "Continuous 50s civil defense air-raid siren sweeping smoothly between 450 Hz and 850 Hz with 2nd harmonic. Triggers instantly without multi-point delay to awaken patient or follower."
+                )
+                flow.bullet(
+                    if (isRu) "⚠️ Супер-ГИПЕР (>13.9 ммоль/л или настроенный порог) — 16-секундный резкий пульс" else "⚠️ Super-HYPER (>13.9 mmol/L) — 16-Second Piercing Pulse",
+                    if (isRu) "Серия высокочастотных резких пульсирующих сигналов (1760/2349 Гц), резко контрастирующая с сиреной гипогликемии. Предупреждает о критической гипергликемии и необходимости контроля подколки/кетонов."
+                    else "High-urgency alternating chime bursts (1760 Hz & 2349 Hz) lasting 16 seconds. Clearly distinguishes extreme hyperglycemia from hypo alarms."
+                )
+                flow.bullet(
+                    if (isRu) "🔔 Затяжные тревоги (ГИПО >20 мин или ГИПЕР >90 мин)" else "🔔 Prolonged Alerts (Hypo >20m or Hyper >90m)",
+                    if (isRu) "Воспроизводят стандартную 12-секундную медицинскую сирену. При затяжной гипергликемии сигнал глушится, если есть активный болюс (IoB) и зафиксирована динамика падения сахара."
+                    else "Standard 12s medical alarm series. Automatically mutes during prolonged hyper if corrective bolus (IoB) is active and glucose is declining."
+                )
+                flow.section(if (isRu) "3.3. Экран спасения и защита от комы (Coma Guard <2.8 ммоль/л)" else "3.3. Patient Rescue Screen & Coma Guard (<2.8 mmol/L)")
                 flow.paragraph(
                     if (isRu) "При сахаре <3.0 ммоль/л (или затяжной гипо >20 мин) TIRUp пробуждает спящий телефон и разворачивает поверх пароля боевой интерфейс спасения с крупными цифрами сахара, стрелкой падения, таймером SOS SMS и кнопкой купирования. При сахаре ниже 2.8 ммоль/л включается Coma Guard: снуз ограничен 5 мин, сирена повторяется каждые 5 мин до подтверждения."
                     else "On glucose <3.0 mmol/L (or prolonged hypo >20m) TIRUp wakes screen over lockscreen with giant glucose, trend arrow, and SOS timer. Below 2.8 mmol/L Coma Guard caps snooze to 5 mins, repeating siren every 5 mins until confirmed."

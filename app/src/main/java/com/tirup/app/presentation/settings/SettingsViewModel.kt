@@ -688,6 +688,18 @@ class SettingsViewModel(
         com.tirup.app.data.alert.MedicalSoundPlayer.playTestSound(volumePercent)
     }
 
+    fun playSuperHypoTestSound() {
+        com.tirup.app.data.alert.MedicalSoundPlayer.playSuperHypoSiren()
+    }
+
+    fun playSuperHyperTestSound() {
+        com.tirup.app.data.alert.MedicalSoundPlayer.playSuperHyperAlarm()
+    }
+
+    fun stopAlertSounds() {
+        com.tirup.app.data.alert.MedicalSoundPlayer.stopAll()
+    }
+
     fun showClearConfirm(show: Boolean) {
         _uiState.update { it.copy(showClearDialog = show) }
     }

@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -176,7 +177,10 @@ fun CriticalThresholdDialog(
     var highVal by remember { mutableStateOf(initialHigh) }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            com.tirup.app.data.alert.MedicalSoundPlayer.stopAll()
+            onDismiss()
+        },
         title = {
             Text(
                 text = if (isRu) "Пороги критических тревог" else "Critical Alert Thresholds",
@@ -228,6 +232,34 @@ fun CriticalThresholdDialog(
                         Text(if (isRu) "По умолчанию: 3.0" else "Default: 3.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("4.5", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = ColorVeryLow.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, ColorVeryLow.copy(alpha = 0.35f)),
+                            modifier = Modifier.clickable {
+                                com.tirup.app.data.alert.MedicalSoundPlayer.playSuperHypoSiren()
+                            }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = ColorVeryLow, modifier = Modifier.size(14.dp))
+                                Text(
+                                    text = if (isRu) "Тест сирены GDH (50с)" else "Test GDH Siren (50s)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = ColorVeryLow
+                                )
+                            }
+                        }
+                    }
                 }
 
                 // Critical High threshold
@@ -265,12 +297,41 @@ fun CriticalThresholdDialog(
                         Text(if (isRu) "По умолчанию: 13.9" else "Default: 13.9", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("16.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = ColorHigh.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, ColorHigh.copy(alpha = 0.35f)),
+                            modifier = Modifier.clickable {
+                                com.tirup.app.data.alert.MedicalSoundPlayer.playSuperHyperAlarm()
+                            }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = ColorHigh, modifier = Modifier.size(14.dp))
+                                Text(
+                                    text = if (isRu) "Тест сигнала ГИПЕР (16с)" else "Test HYPER Alarm (16s)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = ColorHigh
+                                )
+                            }
+                        }
+                    }
                 }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
+                    com.tirup.app.data.alert.MedicalSoundPlayer.stopAll()
                     onSave(lowVal, highVal)
                     onDismiss()
                 },
@@ -282,6 +343,7 @@ fun CriticalThresholdDialog(
         dismissButton = {
             TextButton(
                 onClick = {
+                    com.tirup.app.data.alert.MedicalSoundPlayer.stopAll()
                     onResetDefault()
                     onDismiss()
                 }

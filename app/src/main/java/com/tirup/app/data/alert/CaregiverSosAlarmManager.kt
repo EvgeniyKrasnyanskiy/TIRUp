@@ -67,14 +67,14 @@ object CaregiverSosAlarmManager {
                 "TIRUp:CaregiverSosWakeLock"
             )?.apply {
                 setReferenceCounted(false)
-                acquire(30_000L) // 30 sec max hold
+                acquire(55_000L) // 55 sec max hold (covers 50s Super-Hypo siren)
             }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to acquire wakeLock: ${e.message}")
         }
 
-        // 2. Play 24-second siren on USAGE_ALARM at 100% volume
-        MedicalSoundPlayer.playCaregiverSosAlarm(cycles = 16)
+        // 2. Play 50-second continuous Super-Hypo GDH siren on USAGE_ALARM at 100% volume
+        MedicalSoundPlayer.playCaregiverSosAlarm()
 
         // 3. Strobe camera flashlight for ~24 seconds
         startFlashlightStrobe(appContext)
@@ -228,8 +228,8 @@ object CaregiverSosAlarmManager {
                 } ?: return@launch
                 activeCameraId = cameraId
 
-                // 24 seconds = 48 pulses (160ms on, 340ms off = 500ms cycle)
-                for (i in 0 until 48) {
+                // ~50 seconds = 100 pulses (160ms on, 340ms off = 500ms cycle)
+                for (i in 0 until 100) {
                     if (!_isSosAlarmActive.value) break
                     cameraManager.setTorchMode(cameraId, true)
                     delay(160)
