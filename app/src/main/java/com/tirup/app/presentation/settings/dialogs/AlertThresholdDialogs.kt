@@ -12,7 +12,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
@@ -178,15 +181,16 @@ fun CriticalThresholdDialog(
 ) {
     var lowVal by remember { mutableStateOf(initialLow) }
     var highVal by remember { mutableStateOf(initialHigh) }
-    val isSoundPlaying by com.tirup.app.data.alert.MedicalSoundPlayer.isPlaying.collectAsState()
+    val currentlyPlayingTag by com.tirup.app.data.alert.MedicalSoundPlayer.currentlyPlayingTag.collectAsState()
     var lastClickTime by remember { mutableLongStateOf(0L) }
-    val handleSoundClick: (() -> Unit) -> Unit = { action ->
+    val handleSoundClick: (String, () -> Unit) -> Unit = { tag, action ->
         val now = System.currentTimeMillis()
         if (now - lastClickTime >= 400L) {
             lastClickTime = now
-            if (isSoundPlaying) {
+            if (currentlyPlayingTag == tag) {
                 com.tirup.app.data.alert.MedicalSoundPlayer.stopAll()
             } else {
+                com.tirup.app.data.alert.MedicalSoundPlayer.stopAll()
                 action()
             }
         }
@@ -249,16 +253,17 @@ fun CriticalThresholdDialog(
                         Text("4.5", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Spacer(modifier = Modifier.height(4.dp))
+                    val isHypoPlaying = (currentlyPlayingTag == "EXTRA_HYPO")
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = (if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorVeryLow).copy(alpha = 0.12f),
-                            border = BorderStroke(1.dp, (if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorVeryLow).copy(alpha = 0.35f)),
+                            color = (if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow).copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, (if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow).copy(alpha = 0.35f)),
                             modifier = Modifier.clickable {
-                                handleSoundClick { com.tirup.app.data.alert.MedicalSoundPlayer.playExtraHypoSiren() }
+                                handleSoundClick("EXTRA_HYPO") { com.tirup.app.data.alert.MedicalSoundPlayer.playExtraHypoSiren() }
                             }
                         ) {
                             Row(
@@ -267,17 +272,17 @@ fun CriticalThresholdDialog(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 Icon(
-                                    imageVector = if (isSoundPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
+                                    imageVector = if (isHypoPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
                                     contentDescription = null,
-                                    tint = if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorVeryLow,
+                                    tint = if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow,
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Text(
-                                    text = if (isSoundPlaying) (if (isRu) "⏹️ Стоп" else "⏹️ Stop")
+                                    text = if (isHypoPlaying) (if (isRu) "⏹️ Стоп" else "⏹️ Stop")
                                            else (if (isRu) "Тест Экстра-ГИПО (50с)" else "Test Extra-HYPO (50s)"),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorVeryLow
+                                    color = if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow
                                 )
                             }
                         }
@@ -320,16 +325,17 @@ fun CriticalThresholdDialog(
                         Text("16.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Spacer(modifier = Modifier.height(4.dp))
+                    val isHyperPlaying = (currentlyPlayingTag == "EXTRA_HYPER")
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = (if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorHigh).copy(alpha = 0.12f),
-                            border = BorderStroke(1.dp, (if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorHigh).copy(alpha = 0.35f)),
+                            color = (if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh).copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, (if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh).copy(alpha = 0.35f)),
                             modifier = Modifier.clickable {
-                                handleSoundClick { com.tirup.app.data.alert.MedicalSoundPlayer.playExtraHyperAlarm() }
+                                handleSoundClick("EXTRA_HYPER") { com.tirup.app.data.alert.MedicalSoundPlayer.playExtraHyperAlarm() }
                             }
                         ) {
                             Row(
@@ -338,17 +344,17 @@ fun CriticalThresholdDialog(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 Icon(
-                                    imageVector = if (isSoundPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
+                                    imageVector = if (isHyperPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
                                     contentDescription = null,
-                                    tint = if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorHigh,
+                                    tint = if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh,
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Text(
-                                    text = if (isSoundPlaying) (if (isRu) "⏹️ Стоп" else "⏹️ Stop")
+                                    text = if (isHyperPlaying) (if (isRu) "⏹️ Стоп" else "⏹️ Stop")
                                            else (if (isRu) "Тест Экстра-ГИПЕР (16с)" else "Test Extra-HYPER (16s)"),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorHigh
+                                    color = if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh
                                 )
                             }
                         }
@@ -675,6 +681,227 @@ fun CriticalHypoSafetyDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+        }
+    )
+}
+
+@Composable
+fun ExtraAlertSoundsInfoDialog(
+    lowThresholdMmol: Double,
+    highThresholdMmol: Double,
+    isRu: Boolean,
+    onDismiss: () -> Unit
+) {
+    val currentlyPlayingTag by com.tirup.app.data.alert.MedicalSoundPlayer.currentlyPlayingTag.collectAsState()
+    var lastClickTime by remember { mutableLongStateOf(0L) }
+    val handleSoundClick: (String, () -> Unit) -> Unit = { tag, action ->
+        val now = System.currentTimeMillis()
+        if (now - lastClickTime >= 400L) {
+            lastClickTime = now
+            if (currentlyPlayingTag == tag) {
+                com.tirup.app.data.alert.MedicalSoundPlayer.stopAll()
+            } else {
+                com.tirup.app.data.alert.MedicalSoundPlayer.stopAll()
+                action()
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = {
+            com.tirup.app.data.alert.MedicalSoundPlayer.stopAll()
+            onDismiss()
+        },
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(text = "ℹ️", fontSize = 22.sp)
+                Text(
+                    text = if (isRu) "Экстра звуки тревог" else "Extra Alert Sounds",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF60A5FA)
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = if (isRu)
+                        "Для экстремальных значений гликемии в TIRUp предусмотрены уникальные математически синтезированные звуки тревог, резко отличающиеся от стандартных сигналов:"
+                    else
+                        "For extreme glucose excursions, TIRUp features dedicated mathematically synthesized alert sounds distinct from standard chimes:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // Extra-HYPO card
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = ColorVeryLow.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, ColorVeryLow.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = if (isRu) "🚨 Экстра-ГИПО (< ${String.format(Locale.US, "%.1f", lowThresholdMmol)} ммоль/л)"
+                                   else "🚨 Extra-HYPO (< ${String.format(Locale.US, "%.1f", lowThresholdMmol)} mmol/L)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = ColorVeryLow
+                        )
+                        Text(
+                            text = if (isRu)
+                                "50-секундная мощная сирена ГО / GDH с плавной частотной модуляцией (450–850 Гц) со второй гармоникой на 100% громкости. Срабатывает мгновенно по первой точке для гарантированного пробуждения из глубокого сна как пациента, так и фоловера."
+                            else
+                                "50-second continuous civil defense air-raid siren sweeping smoothly between 450 Hz and 850 Hz with 2nd harmonic. Triggers immediately to wake patient or follower.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            val isHypoPlaying = (currentlyPlayingTag == "EXTRA_HYPO")
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = (if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow).copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, (if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow).copy(alpha = 0.45f)),
+                                modifier = Modifier.clickable {
+                                    handleSoundClick("EXTRA_HYPO") {
+                                        com.tirup.app.data.alert.MedicalSoundPlayer.playExtraHypoSiren()
+                                    }
+                                }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isHypoPlaying) Icons.Default.Close else Icons.AutoMirrored.Filled.VolumeUp,
+                                        contentDescription = null,
+                                        tint = if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = if (isHypoPlaying) (if (isRu) "⏹️ Стоп" else "⏹️ Stop")
+                                               else (if (isRu) "Тест сирены (50с)" else "Test siren (50s)"),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Extra-HYPER card
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = ColorHigh.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, ColorHigh.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = if (isRu) "⚠️ Экстра-ГИПЕР (> ${String.format(Locale.US, "%.1f", highThresholdMmol)} ммоль/л)"
+                                   else "⚠️ Extra-HYPER (> ${String.format(Locale.US, "%.1f", highThresholdMmol)} mmol/L)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = ColorHigh
+                        )
+                        Text(
+                            text = if (isRu)
+                                "16-секундный резкий пульсирующий сигнал высокой тональности (1760/2349 Гц), резко контрастирующий с сиреной гипогликемии. Предупреждает о критической гипергликемии и необходимости контроля подколки/кетонов."
+                            else
+                                "16-second piercing high-frequency pulsed alert (1760/2349 Hz), sharply distinguishing hyperglycemia from hypo alarms.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            val isHyperPlaying = (currentlyPlayingTag == "EXTRA_HYPER")
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = (if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh).copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, (if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh).copy(alpha = 0.45f)),
+                                modifier = Modifier.clickable {
+                                    handleSoundClick("EXTRA_HYPER") {
+                                        com.tirup.app.data.alert.MedicalSoundPlayer.playExtraHyperAlarm()
+                                    }
+                                }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isHyperPlaying) Icons.Default.Close else Icons.AutoMirrored.Filled.VolumeUp,
+                                        contentDescription = null,
+                                        tint = if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = if (isHyperPlaying) (if (isRu) "⏹️ Стоп" else "⏹️ Stop")
+                                               else (if (isRu) "Тест сигнала (16с)" else "Test alarm (16s)"),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Threshold configuration note
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFF3B82F6).copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text("⚙️", fontSize = 14.sp)
+                        Text(
+                            text = if (isRu) "Пороги включения этих сигналов настраиваются в соседней плашке диапазонов."
+                                   else "Activation thresholds are adjusted in the adjacent range badge.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    com.tirup.app.data.alert.MedicalSoundPlayer.stopAll()
+                    onDismiss()
+                }
+            ) {
+                Text(text = if (isRu) "Понятно" else "Got it", fontWeight = FontWeight.Bold, color = ActionBlue)
             }
         }
     )

@@ -31,11 +31,15 @@ object MedicalSoundPlayer {
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
+    private val _currentlyPlayingTag = MutableStateFlow<String?>(null)
+    val currentlyPlayingTag: StateFlow<String?> = _currentlyPlayingTag.asStateFlow()
+
     private var currentAudioTrack: AudioTrack? = null
 
     fun playSound(tier: AlertTier, volumePercent: Int = 80) {
         isPlayingActive = true
         _isPlaying.value = true
+        _currentlyPlayingTag.value = tier.name
         audioScope.launch {
             try {
                 when (tier) {
@@ -59,6 +63,7 @@ object MedicalSoundPlayer {
                 Log.e(TAG, "Failed to play synthesized medical sound for tier=$tier: ${e.message}")
             } finally {
                 _isPlaying.value = false
+                _currentlyPlayingTag.value = null
             }
         }
     }
@@ -69,6 +74,7 @@ object MedicalSoundPlayer {
     fun playTestSound(volumePercent: Int = 80) {
         isPlayingActive = true
         _isPlaying.value = true
+        _currentlyPlayingTag.value = "TEST_SOUND"
         audioScope.launch {
             try {
                 ensureAlarmStreamAudible()
@@ -93,6 +99,7 @@ object MedicalSoundPlayer {
                 Log.w(TAG, "Test sound failed: ${e.message}")
             } finally {
                 _isPlaying.value = false
+                _currentlyPlayingTag.value = null
             }
         }
     }
@@ -257,6 +264,7 @@ object MedicalSoundPlayer {
         isSignalLossActive = false
         isPlayingActive = false
         _isPlaying.value = false
+        _currentlyPlayingTag.value = null
         try {
             currentAudioTrack?.stop()
             currentAudioTrack?.release()
@@ -325,6 +333,11 @@ object MedicalSoundPlayer {
         isPlayingActive = true
         isCriticalActive = true
         _isPlaying.value = true
+        _currentlyPlayingTag.value = when (type) {
+            CriticalToneType.STANDARD -> AlertTier.CRITICAL.name
+            CriticalToneType.EXTRA_HYPO -> "EXTRA_HYPO"
+            CriticalToneType.EXTRA_HYPER -> "EXTRA_HYPER"
+        }
         audioScope.launch {
             try {
                 boostAlarmVolumeIfNeeded()
@@ -338,6 +351,7 @@ object MedicalSoundPlayer {
             } finally {
                 isCriticalActive = false
                 _isPlaying.value = false
+                _currentlyPlayingTag.value = null
                 restoreAlarmVolumeIfNeeded()
             }
         }
@@ -457,6 +471,7 @@ object MedicalSoundPlayer {
         isPlayingActive = true
         isCriticalActive = true
         _isPlaying.value = true
+        _currentlyPlayingTag.value = "CAREGIVER_SOS"
         audioScope.launch {
             try {
                 boostAlarmVolumeToMax()
@@ -466,6 +481,7 @@ object MedicalSoundPlayer {
             } finally {
                 isCriticalActive = false
                 _isPlaying.value = false
+                _currentlyPlayingTag.value = null
                 restoreAlarmVolumeIfNeeded()
             }
         }
