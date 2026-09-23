@@ -242,7 +242,7 @@ fun PatientProfileEditDialog(
                         onValueChange = { newName ->
                             localProfile = localProfile.copy(fullName = newName)
                         },
-                        label = { Text(if (isRu) "ФИО пациента" else "Full Name") },
+                        label = { Text(if (isRu) "Моё имя" else "My Name") },
                         placeholder = { Text(if (isRu) "Фамилия Имя Отчество" else "Last First Middle") },
                         supportingText = {
                             Text(
