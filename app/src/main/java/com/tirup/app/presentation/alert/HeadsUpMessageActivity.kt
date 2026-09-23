@@ -242,6 +242,13 @@ fun HeadsUpMessageScreen(
     val currentHour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
     val isNightTime = currentHour in 22..23 || currentHour in 0..6
 
+    // Limit ambient / strobe lighting animation to the first 6 seconds
+    var isLightingActive by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(6_000L)
+        isLightingActive = false
+    }
+
     // Pulsing neon border animation: shifts smoothly between lighter and deeper sky blue
     val transition = rememberInfiniteTransition(label = "pulseBorder")
     val animatedBorderColor by transition.animateColor(
@@ -254,33 +261,33 @@ fun HeadsUpMessageScreen(
         label = "borderColor"
     )
 
-    // Daytime breathing ambient glow on screen edges (alpha 0.05..0.22)
+    // Daytime breathing ambient glow on screen edges: enhanced brightness (alpha 0.15..0.65)
     val daySideGlowAlpha by transition.animateFloat(
-        initialValue = 0.05f,
-        targetValue = 0.22f,
+        initialValue = 0.15f,
+        targetValue = 0.65f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2600, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "sideGlow"
     )
 
-    // Nighttime soft strobe beacon: alternating top and bottom gentle pulses (450ms cycle)
+    // Nighttime soft strobe beacon: alternating top and bottom vivid pulses (600ms cycle)
     val strobeTransition = rememberInfiniteTransition(label = "nightStrobe")
     val strobePhase by strobeTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900, easing = LinearEasing),
+            animation = tween(durationMillis = 700, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "strobePhase"
     )
-    val topStrobeAlpha = if (isNightTime && strobePhase < 0.5f) {
-        (Math.sin(strobePhase * 2 * Math.PI) * 0.38f).toFloat().coerceAtLeast(0f)
+    val topStrobeAlpha = if (isLightingActive && isNightTime && strobePhase < 0.5f) {
+        (Math.sin(strobePhase * 2 * Math.PI) * 0.75f).toFloat().coerceAtLeast(0f)
     } else 0f
-    val bottomStrobeAlpha = if (isNightTime && strobePhase >= 0.5f) {
-        (Math.sin((strobePhase - 0.5f) * 2 * Math.PI) * 0.38f).toFloat().coerceAtLeast(0f)
+    val bottomStrobeAlpha = if (isLightingActive && isNightTime && strobePhase >= 0.5f) {
+        (Math.sin((strobePhase - 0.5f) * 2 * Math.PI) * 0.75f).toFloat().coerceAtLeast(0f)
     } else 0f
 
     val timeFormatted = remember(timestamp) {
@@ -315,70 +322,72 @@ fun HeadsUpMessageScreen(
             },
         contentAlignment = Alignment.Center
     ) {
-        // --- 1. Ambient Lighting Layers ---
-        if (!isNightTime) {
-            // Daytime Soft Lateral Breathing Glow
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(48.dp)
-                    .align(Alignment.CenterStart)
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                animatedBorderColor.copy(alpha = daySideGlowAlpha),
-                                Color.Transparent
-                            )
-                        )
-                    )
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(48.dp)
-                    .align(Alignment.CenterEnd)
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                animatedBorderColor.copy(alpha = daySideGlowAlpha)
-                            )
-                        )
-                    )
-            )
-        } else {
-            // Nighttime Gentle Strobe Beacon (Top & Bottom moon-white glow)
-            if (topStrobeAlpha > 0f) {
+        // --- 1. Ambient Lighting Layers (Active for first 6 seconds) ---
+        if (isLightingActive) {
+            if (!isNightTime) {
+                // Daytime Lateral Breathing Glow (vivid sky-blue ambient bleed)
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(36.dp)
-                        .align(Alignment.TopCenter)
+                        .fillMaxHeight()
+                        .width(72.dp)
+                        .align(Alignment.CenterStart)
                         .background(
-                            Brush.verticalGradient(
+                            Brush.horizontalGradient(
                                 colors = listOf(
-                                    Color(0xFFE2E8F0).copy(alpha = topStrobeAlpha),
+                                    animatedBorderColor.copy(alpha = daySideGlowAlpha),
                                     Color.Transparent
                                 )
                             )
                         )
                 )
-            }
-            if (bottomStrobeAlpha > 0f) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(36.dp)
-                        .align(Alignment.BottomCenter)
+                        .fillMaxHeight()
+                        .width(72.dp)
+                        .align(Alignment.CenterEnd)
                         .background(
-                            Brush.verticalGradient(
+                            Brush.horizontalGradient(
                                 colors = listOf(
                                     Color.Transparent,
-                                    Color(0xFFE2E8F0).copy(alpha = bottomStrobeAlpha)
+                                    animatedBorderColor.copy(alpha = daySideGlowAlpha)
                                 )
                             )
                         )
                 )
+            } else {
+                // Nighttime Strobe Beacon (Top & Bottom moon-white glow)
+                if (topStrobeAlpha > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .align(Alignment.TopCenter)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFFE2E8F0).copy(alpha = topStrobeAlpha),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+                }
+                if (bottomStrobeAlpha > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .align(Alignment.BottomCenter)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color(0xFFE2E8F0).copy(alpha = bottomStrobeAlpha)
+                                    )
+                                )
+                            )
+                    )
+                }
             }
         }
 

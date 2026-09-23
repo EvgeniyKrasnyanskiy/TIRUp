@@ -962,14 +962,25 @@ fun DailyGlucoseChart(
                     .pointerInput(todayReadings, dataGaps, todayTreatments, insulinClusters, carbsClusters, notesClusters) {
                         detectTapGestures { tapOffset ->
                             // Find reading, treatment cluster, or gap closest to tap
-                            val chartWidth = size.width - 70f // right margin for labels
+                                val chartWidth = size.width - 70f // right margin for labels
                             if (chartWidth > 0 && (todayReadings.isNotEmpty() || insulinClusters.isNotEmpty() || carbsClusters.isNotEmpty() || notesClusters.isNotEmpty())) {
                                 val tapMinute = windowStartMinute + (tapOffset.x / chartWidth) * visibleMinutes
-                                val toleranceMin = (visibleMinutes / 30f).coerceIn(6f, 30f)
+                                // Precision hit-testing: proportional to visible scale (~14px converted to minutes)
+                                val minutesPerPx = visibleMinutes / chartWidth
+                                val toleranceMin = (14f * minutesPerPx).coerceIn(1.5f, 15f)
+
+                                // Clusters hit test: only when tapping near the top/bottom badge area or close in time
+                                val isNearTopBadges = tapOffset.y <= (size.height * 0.35f)
+                                val isNearBottomBadges = tapOffset.y >= (size.height * 0.65f)
+                                val clusterToleranceMin = if (isNearTopBadges || isNearBottomBadges) {
+                                    (24f * minutesPerPx).coerceIn(3f, 20f)
+                                } else {
+                                    toleranceMin
+                                }
 
                                 val candidateClusters = (insulinClusters + carbsClusters + notesClusters).filter { cl ->
                                     val clMinute = (cl.timestamp - startOfDay) / 60000f
-                                    abs(clMinute - tapMinute) <= toleranceMin
+                                    abs(clMinute - tapMinute) <= clusterToleranceMin
                                 }
 
                                 val tappedCluster = if (candidateClusters.isNotEmpty()) {
@@ -995,7 +1006,7 @@ fun DailyGlucoseChart(
                                 } else {
                                     selectedTreatmentCluster = null
                                     val tappedGap = dataGaps.firstOrNull { gap ->
-                                        tapMinute in (gap.startMinute - 4f)..(gap.endMinute + 4f)
+                                        tapMinute in (gap.startMinute - 2f)..(gap.endMinute + 2f)
                                     }
 
                                     if (tappedGap != null) {
@@ -1017,14 +1028,20 @@ fun DailyGlucoseChart(
 
                                         val distFp = closestFp?.let { abs((it.timestamp - startOfDay) / 60000f - tapMinute) } ?: Float.MAX_VALUE
                                         val distR = closestReading?.let { abs((it.timestamp - startOfDay) / 60000f - tapMinute) } ?: Float.MAX_VALUE
+                                        val maxReadingDistMin = (18f * minutesPerPx).coerceIn(2.5f, 25f)
 
-                                        if (distFp < distR && distFp <= 12f) {
+                                        if (distFp < distR && distFp <= (12f * minutesPerPx).coerceIn(2f, 15f)) {
                                             selectedForecastPoint = if (selectedForecastPoint == closestFp) null else closestFp
                                             selectedReading = null
                                             selectedGap = null
                                             selectedTreatmentCluster = null
-                                        } else {
+                                        } else if (distR <= maxReadingDistMin) {
                                             selectedReading = if (closestReading != null && selectedReading == closestReading) null else closestReading
+                                            selectedForecastPoint = null
+                                            selectedGap = null
+                                        } else {
+                                            // Tapped on empty space far from any point -> deselect
+                                            selectedReading = null
                                             selectedForecastPoint = null
                                             selectedGap = null
                                         }
