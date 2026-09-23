@@ -6,6 +6,7 @@ import com.tirup.app.presentation.settings.dialogs.BleLongRangeConfirmDialog
 import com.tirup.app.presentation.settings.dialogs.BleRangeHelpDialog
 import com.tirup.app.presentation.settings.dialogs.CriticalHypoSafetyDialog
 import com.tirup.app.presentation.settings.dialogs.CriticalThresholdDialog
+import com.tirup.app.presentation.settings.dialogs.ExtraAlertSoundsInfoDialog
 import com.tirup.app.presentation.settings.dialogs.Hba1cHistoryDialog
 import com.tirup.app.presentation.settings.dialogs.MainThresholdDialog
 import com.tirup.app.presentation.settings.dialogs.PatientProfileEditDialog
@@ -208,6 +209,7 @@ fun SettingsScreen(
     var showProfileDialog by rememberSaveable { mutableStateOf(false) }
     var showCriticalHypoSafetyDialog by rememberSaveable { mutableStateOf(false) }
     var showCriticalThresholdDialog by rememberSaveable { mutableStateOf(false) }
+    var showExtraAlertSoundsInfoDialog by rememberSaveable { mutableStateOf(false) }
     var showMainThresholdDialog by rememberSaveable { mutableStateOf(false) }
     var showPredictiveHorizonDialog by rememberSaveable { mutableStateOf(false) }
     var showPredictiveInfoDialog by rememberSaveable { mutableStateOf(false) }
@@ -220,15 +222,16 @@ fun SettingsScreen(
     var devTapCount by remember { mutableStateOf(0) }
     var lastDevTapTime by remember { mutableStateOf(0L) }
     var bleRangeCooldownSec by remember { mutableStateOf(0) }
-    val isSoundPlaying by com.tirup.app.data.alert.MedicalSoundPlayer.isPlaying.collectAsState()
+    val currentlyPlayingTag by com.tirup.app.data.alert.MedicalSoundPlayer.currentlyPlayingTag.collectAsState()
     var lastSoundClickTime by remember { mutableStateOf(0L) }
-    val handleSoundClick: (() -> Unit) -> Unit = { action ->
+    val handleSoundClick: (String, () -> Unit) -> Unit = { tag, action ->
         val now = System.currentTimeMillis()
         if (now - lastSoundClickTime >= 400L) {
             lastSoundClickTime = now
-            if (isSoundPlaying) {
+            if (currentlyPlayingTag == tag) {
                 viewModel.stopAlertSounds()
             } else {
+                viewModel.stopAlertSounds()
                 action()
             }
         }
@@ -1226,8 +1229,8 @@ fun SettingsScreen(
                             flash = alerts.isPredictiveFlash,
                             onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isPredictiveFlash = it)) },
                             accentColor = ActionBlue,
-                            onTestClick = { handleSoundClick { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.PREDICTIVE) } },
-                            isTesting = isSoundPlaying,
+                            onTestClick = { handleSoundClick(com.tirup.app.data.alert.AlertTier.PREDICTIVE.name) { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.PREDICTIVE) } },
+                            isTesting = (currentlyPlayingTag == com.tirup.app.data.alert.AlertTier.PREDICTIVE.name),
                             isRu = isRu,
                             thresholdBadge = if (isRu) "⏱️ Горизонт: ${alerts.predictiveMinutesAhead} мин" else "⏱️ Horizon: ${alerts.predictiveMinutesAhead} min",
                             onThresholdClick = { showPredictiveHorizonDialog = true }
@@ -1253,8 +1256,8 @@ fun SettingsScreen(
                             flash = alerts.isMainFlash,
                             onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isMainFlash = it)) },
                             accentColor = ColorHigh,
-                            onTestClick = { handleSoundClick { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.MAIN) } },
-                            isTesting = isSoundPlaying,
+                            onTestClick = { handleSoundClick(com.tirup.app.data.alert.AlertTier.MAIN.name) { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.MAIN) } },
+                            isTesting = (currentlyPlayingTag == com.tirup.app.data.alert.AlertTier.MAIN.name),
                             isRu = isRu,
                             thresholdBadge = "< ${String.format(Locale.US, "%.1f", alerts.mainLowThresholdMmol)}  |  > ${String.format(Locale.US, "%.1f", alerts.mainHighThresholdMmol)}",
                             onThresholdClick = { showMainThresholdDialog = true }
@@ -1288,6 +1291,7 @@ fun SettingsScreen(
                         // Tier 3: Critical (Prolonged / Extreme)
                         val isCriticalInPauseState = isCriticalPaused && !alerts.isCriticalHypoPermanentDisabled
                         val isCriticalEffectiveEnabled = if (isCriticalInPauseState) true else (isMaster && alerts.isCriticalEnabled && !alerts.isCriticalHypoPermanentDisabled)
+                        val tier3Tag = if (alerts.isCaregiverRole) "CAREGIVER_SOS" else com.tirup.app.data.alert.AlertTier.CRITICAL.name
 
                         AlertTierConfigRow(
                             title = if (isRu) "3. Экстренные сирены (критические и затяжные)" else "3. Critical & Prolonged (Alarms)",
@@ -1313,7 +1317,7 @@ fun SettingsScreen(
                             onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalFlash = it)) },
                             accentColor = if (isCriticalInPauseState) ColorHigh else ColorVeryLow,
                             onTestClick = {
-                                handleSoundClick {
+                                handleSoundClick(tier3Tag) {
                                     if (alerts.isCaregiverRole) {
                                         viewModel.testCaregiverSosScreen()
                                     } else {
@@ -1321,13 +1325,14 @@ fun SettingsScreen(
                                     }
                                 }
                             },
-                            isTesting = isSoundPlaying,
+                            isTesting = (currentlyPlayingTag == tier3Tag),
                             isRu = isRu,
                             timerBadge = criticalBadge,
                             isPaused = isCriticalInPauseState,
                             thresholdBadge = "< ${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)}  |  > ${String.format(Locale.US, "%.1f", alerts.criticalHighThresholdMmol)}",
-                            extraBadge = if (isRu) "🔊 Экстра-звуки" else "🔊 Extra Sounds",
-                            onThresholdClick = { showCriticalThresholdDialog = true }
+                            extraBadge = if (isRu) "Экстра звуки тревог" else "Extra alert sounds",
+                            onThresholdClick = { showCriticalThresholdDialog = true },
+                            onExtraBadgeClick = { showExtraAlertSoundsInfoDialog = true }
                         )
                         
                         Spacer(modifier = Modifier.height(6.dp))
@@ -1350,8 +1355,8 @@ fun SettingsScreen(
                             flash = alerts.isSignalLossFlash,
                             onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isSignalLossFlash = it)) },
                             accentColor = Color(0xFF8B5CF6),
-                            onTestClick = { handleSoundClick { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.SIGNAL_LOSS) } },
-                            isTesting = isSoundPlaying,
+                            onTestClick = { handleSoundClick(com.tirup.app.data.alert.AlertTier.SIGNAL_LOSS.name) { viewModel.testAlert(com.tirup.app.data.alert.AlertTier.SIGNAL_LOSS) } },
+                            isTesting = (currentlyPlayingTag == com.tirup.app.data.alert.AlertTier.SIGNAL_LOSS.name),
                             isRu = isRu
                         )
                     }
@@ -4094,50 +4099,52 @@ fun SettingsScreen(
                         }
 
                         // Test 5: Direct Sound Previews (Extra-HYPO 50s & Extra-HYPER 16s)
+                        val isHypoTesting = (currentlyPlayingTag == "EXTRA_HYPO")
+                        val isHyperTesting = (currentlyPlayingTag == "EXTRA_HYPER")
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             OutlinedButton(
-                                onClick = { handleSoundClick { viewModel.playExtraHypoTestSound() } },
+                                onClick = { handleSoundClick("EXTRA_HYPO") { viewModel.playExtraHypoTestSound() } },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(10.dp),
                                 border = BorderStroke(
                                     1.dp,
-                                    if (isSoundPlaying) MaterialTheme.colorScheme.error
+                                    if (isHypoTesting) MaterialTheme.colorScheme.error
                                     else ColorVeryLow.copy(alpha = 0.7f)
                                 )
                             ) {
-                                Text(text = if (isSoundPlaying) "⏹️" else "🚨", fontSize = 14.sp)
+                                Text(text = if (isHypoTesting) "⏹️" else "🚨", fontSize = 14.sp)
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = if (isSoundPlaying) (if (isRu) "Стоп" else "Stop")
+                                    text = if (isHypoTesting) (if (isRu) "Стоп" else "Stop")
                                            else (if (isRu) "Экстра-ГИПО (50с)" else "Extra-HYPO (50s)"),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorVeryLow
+                                    color = if (isHypoTesting) MaterialTheme.colorScheme.error else ColorVeryLow
                                 )
                             }
 
                             OutlinedButton(
-                                onClick = { handleSoundClick { viewModel.playExtraHyperTestSound() } },
+                                onClick = { handleSoundClick("EXTRA_HYPER") { viewModel.playExtraHyperTestSound() } },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(10.dp),
                                 border = BorderStroke(
                                     1.dp,
-                                    if (isSoundPlaying) MaterialTheme.colorScheme.error
+                                    if (isHyperTesting) MaterialTheme.colorScheme.error
                                     else ColorHigh.copy(alpha = 0.7f)
                                 )
                             ) {
-                                Text(text = if (isSoundPlaying) "⏹️" else "⚠️", fontSize = 14.sp)
+                                Text(text = if (isHyperTesting) "⏹️" else "⚠️", fontSize = 14.sp)
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = if (isSoundPlaying) (if (isRu) "Стоп" else "Stop")
+                                    text = if (isHyperTesting) (if (isRu) "Стоп" else "Stop")
                                            else (if (isRu) "Экстра-ГИПЕР (16с)" else "Extra-HYPER (16s)"),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorHigh
+                                    color = if (isHyperTesting) MaterialTheme.colorScheme.error else ColorHigh
                                 )
                             }
 
@@ -4748,6 +4755,15 @@ fun SettingsScreen(
         )
     }
 
+    if (showExtraAlertSoundsInfoDialog) {
+        ExtraAlertSoundsInfoDialog(
+            lowThresholdMmol = settings.alertSettings.criticalLowThresholdMmol,
+            highThresholdMmol = settings.alertSettings.criticalHighThresholdMmol,
+            isRu = isRu,
+            onDismiss = { showExtraAlertSoundsInfoDialog = false }
+        )
+    }
+
     if (showBleRangeHelpDialog) {
         BleRangeHelpDialog(
             isRu = isRu,
@@ -5027,6 +5043,7 @@ private fun AlertTierConfigRow(
     thresholdBadge: String? = null,
     extraBadge: String? = null,
     onThresholdClick: (() -> Unit)? = null,
+    onExtraBadgeClick: (() -> Unit)? = null,
     isTesting: Boolean = false
 ) {
     Surface(
@@ -5090,19 +5107,31 @@ private fun AlertTierConfigRow(
                             }
 
                             if (extraBadge != null) {
+                                val infoBlue = Color(0xFF3B82F6)
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = accentColor.copy(alpha = 0.14f),
-                                    border = BorderStroke(1.dp, accentColor.copy(alpha = 0.4f)),
-                                    modifier = Modifier.clickable { onThresholdClick() }
+                                    color = infoBlue.copy(alpha = 0.12f),
+                                    border = BorderStroke(1.dp, infoBlue.copy(alpha = 0.55f)),
+                                    modifier = Modifier.clickable(enabled = onExtraBadgeClick != null) {
+                                        onExtraBadgeClick?.invoke()
+                                    }
                                 ) {
-                                    Text(
-                                        text = extraBadge,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = accentColor,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "ℹ️",
+                                            fontSize = 11.sp
+                                        )
+                                        Text(
+                                            text = extraBadge,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF60A5FA)
+                                        )
+                                    }
                                 }
                             }
                         }
