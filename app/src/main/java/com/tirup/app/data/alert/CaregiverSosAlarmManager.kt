@@ -200,6 +200,7 @@ object CaregiverSosAlarmManager {
                 "0. Экстренный SOS фоловера (Caregiver Wakeup)",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
+                group = GlucoseAlertManager.GROUP_ALERTS
                 description = "Громкая сирена при получении SMS о критической гипогликемии у близкого"
                 enableLights(true)
                 lightColor = Color.RED
