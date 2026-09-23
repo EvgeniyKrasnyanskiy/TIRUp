@@ -3,6 +3,7 @@ package com.tirup.app.data.alert
 import android.app.AlarmManager
 import android.app.KeyguardManager
 import android.app.NotificationChannel
+import android.app.NotificationChannelGroup
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -244,6 +245,11 @@ object GlucoseAlertManager {
         _activeAlertBanner.value = null
     }
 
+    // Notification Channel Groups
+    const val GROUP_ALERTS = "group_tirup_alerts"
+    const val GROUP_STATUS = "group_tirup_status"
+    const val GROUP_REMINDERS = "group_tirup_reminders"
+
     const val CHANNEL_PREDICTIVE = "tirup_alert_predictive_v3"
     const val CHANNEL_MAIN = "tirup_alert_main_v2"
     const val CHANNEL_CRITICAL = "tirup_alert_critical_v2"
@@ -322,6 +328,27 @@ object GlucoseAlertManager {
             try { nm.deleteNotificationChannel(id) } catch (_: Exception) {}
         }
 
+        // Register Notification Channel Groups for clean categorized layout in Android settings
+        val isRu = context.resources.configuration.locales[0].language.startsWith("ru")
+        nm.createNotificationChannelGroup(
+            NotificationChannelGroup(
+                GROUP_ALERTS,
+                if (isRu) "🚨 Тревоги и экстренный SOS" else "🚨 Alarms & Emergency SOS"
+            )
+        )
+        nm.createNotificationChannelGroup(
+            NotificationChannelGroup(
+                GROUP_STATUS,
+                if (isRu) "📊 Мониторинг и статус" else "📊 Monitoring & Status"
+            )
+        )
+        nm.createNotificationChannelGroup(
+            NotificationChannelGroup(
+                GROUP_REMINDERS,
+                if (isRu) "🔔 Напоминания и отчеты" else "🔔 Reminders & Reports"
+            )
+        )
+
         // Initialize Caregiver / Follower SOS channel
         CaregiverSosAlarmManager.initChannel(nm)
 
@@ -331,6 +358,7 @@ object GlucoseAlertManager {
             "1. Предиктивные тревоги (за 15 мин)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
+            group = GROUP_ALERTS
             description = "Мягкие упреждающие сигналы о скором выходе за целевой диапазон"
             setSound(null, null)
             enableVibration(false)
@@ -342,6 +370,7 @@ object GlucoseAlertManager {
             "2. Основные тревоги (5 точек)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
+            group = GROUP_ALERTS
             description = "Уверенные сигналы при подтверждённом выходе сахара за целевой диапазон"
             setSound(null, null)
             enableVibration(false)
@@ -353,6 +382,7 @@ object GlucoseAlertManager {
             "3. Критические тревоги («кричащие»)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
+            group = GROUP_ALERTS
             description = "Громкие настойчивые тревоги при затяжной гипо/гипергликемии или экстремальных значениях"
             setSound(null, null)
             enableVibration(false)
@@ -365,6 +395,7 @@ object GlucoseAlertManager {
             "4. Потеря сигнала сенсора (>20 мин)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
+            group = GROUP_ALERTS
             description = "Оповещения при отсутствии свежих данных от трансмиттера/сенсора (пробуждение и настойчивые повторы)"
             setSound(null, null)
             enableVibration(false)
@@ -377,6 +408,7 @@ object GlucoseAlertManager {
             "5. Компенсатор цели (Суточный TIR)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
+            group = GROUP_ALERTS
             description = "Мотивирующие уведомления о критическом запасе времени для достижения суточного TIR"
             setSound(null, null)
             enableVibration(false)
@@ -388,6 +420,7 @@ object GlucoseAlertManager {
             "6. Текущий сахар (экран блокировки / шторка)",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
+            group = GROUP_STATUS
             description = "Постоянный статус сахара, тренда и TIR на экране блокировки и в панели уведомлений"
             setSound(null, null)
             enableVibration(false)
@@ -400,6 +433,7 @@ object GlucoseAlertManager {
             "7. Воскресный дайджест",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
+            group = GROUP_STATUS
             description = "Еженедельная аналитическая сводка прогресса TIR, вариабельности и стабильности"
             setSound(null, null)
             enableVibration(false)
@@ -418,6 +452,7 @@ object GlucoseAlertManager {
             "8. Напоминания об устройствах",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
+            group = GROUP_REMINDERS
             description = "Напоминания о замене сенсора CGM и инфузионного набора"
             enableLights(true)
             lightColor = Color.CYAN
@@ -428,6 +463,7 @@ object GlucoseAlertManager {
             "9. Напоминания об анализах (HbA1c)",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
+            group = GROUP_REMINDERS
             description = "Ежеквартальные напоминания о сдаче HbA1c и корреляция с GMI сенсора"
             enableLights(true)
             lightColor = Color.RED
@@ -438,6 +474,7 @@ object GlucoseAlertManager {
             "10. Итоги года",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
+            group = GROUP_REMINDERS
             description = "Праздничный годовой отчёт и статистика компенсации диабета 31 декабря"
             enableLights(true)
             lightColor = Color.parseColor("#10B981")
