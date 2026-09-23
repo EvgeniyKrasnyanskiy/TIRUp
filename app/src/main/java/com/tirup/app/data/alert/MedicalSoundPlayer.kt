@@ -6,6 +6,9 @@ import android.media.AudioTrack
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.sin
@@ -25,10 +28,14 @@ object MedicalSoundPlayer {
     private var isPlayingActive = true
     private var previousAlarmVolume: Int? = null
 
+    private val _isPlaying = MutableStateFlow(false)
+    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+
     private var currentAudioTrack: AudioTrack? = null
 
     fun playSound(tier: AlertTier, volumePercent: Int = 80) {
         isPlayingActive = true
+        _isPlaying.value = true
         audioScope.launch {
             try {
                 when (tier) {
@@ -50,6 +57,8 @@ object MedicalSoundPlayer {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to play synthesized medical sound for tier=$tier: ${e.message}")
+            } finally {
+                _isPlaying.value = false
             }
         }
     }
@@ -59,6 +68,7 @@ object MedicalSoundPlayer {
      */
     fun playTestSound(volumePercent: Int = 80) {
         isPlayingActive = true
+        _isPlaying.value = true
         audioScope.launch {
             try {
                 ensureAlarmStreamAudible()
@@ -81,6 +91,8 @@ object MedicalSoundPlayer {
                 playRawPcm(audioData, usage = AudioAttributes.USAGE_ALARM)
             } catch (e: Exception) {
                 Log.w(TAG, "Test sound failed: ${e.message}")
+            } finally {
+                _isPlaying.value = false
             }
         }
     }
@@ -244,6 +256,7 @@ object MedicalSoundPlayer {
         isCriticalActive = false
         isSignalLossActive = false
         isPlayingActive = false
+        _isPlaying.value = false
         try {
             currentAudioTrack?.stop()
             currentAudioTrack?.release()
@@ -301,8 +314,8 @@ object MedicalSoundPlayer {
 
     enum class CriticalToneType {
         STANDARD,      // ~12s 5-tone medical alarm
-        SUPER_HYPO,    // ~50s GDH FM sweep siren (450-850 Hz)
-        SUPER_HYPER    // ~16s high-pitched pulsed alarm
+        EXTRA_HYPO,    // ~50s GDH FM sweep siren (450-850 Hz)
+        EXTRA_HYPER    // ~16s high-pitched pulsed alarm
     }
 
     /**
@@ -311,36 +324,41 @@ object MedicalSoundPlayer {
     fun playCriticalAlarm(type: CriticalToneType = CriticalToneType.STANDARD) {
         isPlayingActive = true
         isCriticalActive = true
+        _isPlaying.value = true
         audioScope.launch {
             try {
                 boostAlarmVolumeIfNeeded()
                 when (type) {
                     CriticalToneType.STANDARD -> playCriticalAlarmSeries()
-                    CriticalToneType.SUPER_HYPO -> runSuperHypoSirenLoop()
-                    CriticalToneType.SUPER_HYPER -> runSuperHyperAlarmLoop()
+                    CriticalToneType.EXTRA_HYPO -> runExtraHypoSirenLoop()
+                    CriticalToneType.EXTRA_HYPER -> runExtraHyperAlarmLoop()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Critical alarm playback failed for type=$type: ${e.message}")
             } finally {
                 isCriticalActive = false
+                _isPlaying.value = false
                 restoreAlarmVolumeIfNeeded()
             }
         }
     }
 
     /**
-     * Super-HYPO civil defense / GDH siren (~50 seconds) for glucose below critical threshold.
+     * Extra-HYPO civil defense / GDH siren (~50 seconds) for glucose below critical threshold.
      */
-    fun playSuperHypoSiren() {
-        playCriticalAlarm(CriticalToneType.SUPER_HYPO)
+    fun playExtraHypoSiren() {
+        playCriticalAlarm(CriticalToneType.EXTRA_HYPO)
     }
 
     /**
-     * Super-HYPER piercing rapid pulsed alarm (~16 seconds) for glucose above critical threshold.
+     * Extra-HYPER piercing rapid pulsed alarm (~16 seconds) for glucose above critical threshold.
      */
-    fun playSuperHyperAlarm() {
-        playCriticalAlarm(CriticalToneType.SUPER_HYPER)
+    fun playExtraHyperAlarm() {
+        playCriticalAlarm(CriticalToneType.EXTRA_HYPER)
     }
+
+    fun playSuperHypoSiren() = playExtraHypoSiren()
+    fun playSuperHyperAlarm() = playExtraHyperAlarm()
 
     /**
      * Tier 3: High-urgency alternating alarm siren (USAGE_ALARM).
@@ -377,7 +395,7 @@ object MedicalSoundPlayer {
      * Generates and plays the 50-second continuous civil defense / GDH air-raid siren.
      * Uses FM modulation oscillating smoothly between 450 Hz and 850 Hz with 2nd harmonic.
      */
-    private fun runSuperHypoSirenLoop() {
+    private fun runExtraHypoSirenLoop() {
         val cycleSec = 3.0
         val numSamples = (SAMPLE_RATE * cycleSec).toInt()
         val sirenCycle = ShortArray(numSamples)
@@ -408,7 +426,7 @@ object MedicalSoundPlayer {
      * Generates and plays the 16-second piercing pulsed high-urgency alarm for extreme hyper.
      * High-pitched alternating chime bursts (1760 Hz & 2349 Hz).
      */
-    private fun runSuperHyperAlarmLoop() {
+    private fun runExtraHyperAlarmLoop() {
         val b1 = generateSineWave(freq = 1760.00, durationMs = 80, volume = 0.95f)
         val b2 = generateSineWave(freq = 2349.32, durationMs = 80, volume = 1.0f)
         val b3 = generateSineWave(freq = 1760.00, durationMs = 80, volume = 0.95f)
@@ -432,20 +450,22 @@ object MedicalSoundPlayer {
     }
 
     /**
-     * Caregiver SOS Wakeup: Plays 50-second continuous civil defense Super-Hypo siren
+     * Caregiver SOS Wakeup: Plays 50-second continuous civil defense Extra-Hypo siren
      * with volume forced to 100% on USAGE_ALARM stream.
      */
     fun playCaregiverSosAlarm() {
         isPlayingActive = true
         isCriticalActive = true
+        _isPlaying.value = true
         audioScope.launch {
             try {
                 boostAlarmVolumeToMax()
-                runSuperHypoSirenLoop()
+                runExtraHypoSirenLoop()
             } catch (e: Exception) {
                 Log.e(TAG, "Caregiver SOS alarm playback error: ${e.message}")
             } finally {
                 isCriticalActive = false
+                _isPlaying.value = false
                 restoreAlarmVolumeIfNeeded()
             }
         }
