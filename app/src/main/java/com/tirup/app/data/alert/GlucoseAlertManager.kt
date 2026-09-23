@@ -1013,7 +1013,7 @@ object GlucoseAlertManager {
             trendArrow = trendArrow,
             primaryContactPhone = primaryPhone,
             primaryContactName = primaryName,
-            criticalToneType = MedicalSoundPlayer.CriticalToneType.SUPER_HYPO
+            criticalToneType = MedicalSoundPlayer.CriticalToneType.EXTRA_HYPO
         )
     }
 
@@ -1295,7 +1295,7 @@ object GlucoseAlertManager {
                         latest.valueMmol,
                         iobText
                     )
-                    val toneType = if (isExtremeLow) MedicalSoundPlayer.CriticalToneType.SUPER_HYPO else MedicalSoundPlayer.CriticalToneType.STANDARD
+                    val toneType = if (isExtremeLow) MedicalSoundPlayer.CriticalToneType.EXTRA_HYPO else MedicalSoundPlayer.CriticalToneType.STANDARD
                     sendNotification(
                         context = context,
                         channelId = CHANNEL_CRITICAL,
@@ -1364,7 +1364,7 @@ object GlucoseAlertManager {
                         latest.valueMmol,
                         iobText
                     )
-                    val toneType = if (isExtremeHigh) MedicalSoundPlayer.CriticalToneType.SUPER_HYPER else MedicalSoundPlayer.CriticalToneType.STANDARD
+                    val toneType = if (isExtremeHigh) MedicalSoundPlayer.CriticalToneType.EXTRA_HYPER else MedicalSoundPlayer.CriticalToneType.STANDARD
                     sendNotification(
                         context = context,
                         channelId = CHANNEL_CRITICAL,
@@ -1705,8 +1705,8 @@ object GlucoseAlertManager {
             MedicalSoundPlayer.playLastChanceAlertTone()
         } else if (tier == AlertTier.CRITICAL) {
             when (criticalToneType) {
-                MedicalSoundPlayer.CriticalToneType.SUPER_HYPO -> MedicalSoundPlayer.playSuperHypoSiren()
-                MedicalSoundPlayer.CriticalToneType.SUPER_HYPER -> MedicalSoundPlayer.playSuperHyperAlarm()
+                MedicalSoundPlayer.CriticalToneType.EXTRA_HYPO -> MedicalSoundPlayer.playExtraHypoSiren()
+                MedicalSoundPlayer.CriticalToneType.EXTRA_HYPER -> MedicalSoundPlayer.playExtraHyperAlarm()
                 MedicalSoundPlayer.CriticalToneType.STANDARD -> MedicalSoundPlayer.playSound(tier, volumePercent)
             }
         } else {

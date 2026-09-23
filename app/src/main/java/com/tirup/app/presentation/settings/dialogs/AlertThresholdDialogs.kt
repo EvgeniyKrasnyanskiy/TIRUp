@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Tune
@@ -33,7 +34,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -175,6 +178,19 @@ fun CriticalThresholdDialog(
 ) {
     var lowVal by remember { mutableStateOf(initialLow) }
     var highVal by remember { mutableStateOf(initialHigh) }
+    val isSoundPlaying by com.tirup.app.data.alert.MedicalSoundPlayer.isPlaying.collectAsState()
+    var lastClickTime by remember { mutableLongStateOf(0L) }
+    val handleSoundClick: (() -> Unit) -> Unit = { action ->
+        val now = System.currentTimeMillis()
+        if (now - lastClickTime >= 400L) {
+            lastClickTime = now
+            if (isSoundPlaying) {
+                com.tirup.app.data.alert.MedicalSoundPlayer.stopAll()
+            } else {
+                action()
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = {
@@ -239,10 +255,10 @@ fun CriticalThresholdDialog(
                     ) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = ColorVeryLow.copy(alpha = 0.12f),
-                            border = BorderStroke(1.dp, ColorVeryLow.copy(alpha = 0.35f)),
+                            color = (if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorVeryLow).copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, (if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorVeryLow).copy(alpha = 0.35f)),
                             modifier = Modifier.clickable {
-                                com.tirup.app.data.alert.MedicalSoundPlayer.playSuperHypoSiren()
+                                handleSoundClick { com.tirup.app.data.alert.MedicalSoundPlayer.playExtraHypoSiren() }
                             }
                         ) {
                             Row(
@@ -250,12 +266,18 @@ fun CriticalThresholdDialog(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = ColorVeryLow, modifier = Modifier.size(14.dp))
+                                Icon(
+                                    imageVector = if (isSoundPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorVeryLow,
+                                    modifier = Modifier.size(14.dp)
+                                )
                                 Text(
-                                    text = if (isRu) "Тест сирены GDH (50с)" else "Test GDH Siren (50s)",
+                                    text = if (isSoundPlaying) (if (isRu) "⏹️ Стоп" else "⏹️ Stop")
+                                           else (if (isRu) "Тест Экстра-ГИПО (50с)" else "Test Extra-HYPO (50s)"),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = ColorVeryLow
+                                    color = if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorVeryLow
                                 )
                             }
                         }
@@ -304,10 +326,10 @@ fun CriticalThresholdDialog(
                     ) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = ColorHigh.copy(alpha = 0.12f),
-                            border = BorderStroke(1.dp, ColorHigh.copy(alpha = 0.35f)),
+                            color = (if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorHigh).copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, (if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorHigh).copy(alpha = 0.35f)),
                             modifier = Modifier.clickable {
-                                com.tirup.app.data.alert.MedicalSoundPlayer.playSuperHyperAlarm()
+                                handleSoundClick { com.tirup.app.data.alert.MedicalSoundPlayer.playExtraHyperAlarm() }
                             }
                         ) {
                             Row(
@@ -315,12 +337,18 @@ fun CriticalThresholdDialog(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = ColorHigh, modifier = Modifier.size(14.dp))
+                                Icon(
+                                    imageVector = if (isSoundPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorHigh,
+                                    modifier = Modifier.size(14.dp)
+                                )
                                 Text(
-                                    text = if (isRu) "Тест сигнала ГИПЕР (16с)" else "Test HYPER Alarm (16s)",
+                                    text = if (isSoundPlaying) (if (isRu) "⏹️ Стоп" else "⏹️ Stop")
+                                           else (if (isRu) "Тест Экстра-ГИПЕР (16с)" else "Test Extra-HYPER (16s)"),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = ColorHigh
+                                    color = if (isSoundPlaying) MaterialTheme.colorScheme.error else ColorHigh
                                 )
                             }
                         }
@@ -593,7 +621,7 @@ fun CriticalHypoSafetyDialog(
                         colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
                     ) {
                         Text(
-                            text = if (isRu) "▶️ Снять паузу и включить сейчас" else "▶️ Resume and Enable Now",
+                            text = if (isRu) "▶️ Снять паузу" else "▶️ Resume",
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
@@ -643,7 +671,7 @@ fun CriticalHypoSafetyDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = if (isRu) "Отмена (Оставить включённым)" else "Cancel (Keep Enabled)",
+                        text = if (isRu) "Отмена (Оставить паузу)" else "Cancel (Keep Pause)",
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }

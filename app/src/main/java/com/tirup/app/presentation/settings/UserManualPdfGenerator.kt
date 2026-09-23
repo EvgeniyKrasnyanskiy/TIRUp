@@ -570,18 +570,18 @@ class UserManualPdfGenerator(private val context: Context) {
                     if (isRu) "При отсутствии точек >20 мин подаётся сигнал будильника. В Настройках задаются «Часы ночного сна» (по умолчанию 23:00–07:00), в этот период действуют отдельные ночные пороги тревог и строгий контроль связи."
                     else "Alarm sounds if readings stop for >20 mins. Configurable Night Sleep Window (default 23:00-07:00) applies dedicated nocturnal thresholds and strict signal checks."
                 )
-                flow.section(if (isRu) "3.2. Градация сирен: Супер-ГИПО (GDH) и Супер-ГИПЕР" else "3.2. Siren Escalation: Super-HYPO (GDH) & Super-HYPER")
+                flow.section(if (isRu) "3.2. Градация сирен: Экстра-ГИПО (GDH) и Экстра-ГИПЕР" else "3.2. Siren Escalation: Extra-HYPO (GDH) & Extra-HYPER")
                 flow.paragraph(
                     if (isRu) "В TIRUp критические тревоги разделены на мгновенные экстремальные и подтверждённые затяжные с уникальным математически синтезированным звуковым оформлением (PCM без утяжеления приложения аудиофайлами):"
                     else "In TIRUp critical alerts are segregated into instant extreme and verified prolonged states with mathematically synthesized PCM tones (zero APK audio bloat):"
                 )
                 flow.bullet(
-                    if (isRu) "🚨 Супер-ГИПО (<3.0 ммоль/л или настроенный порог) — 50-секундная сирена ГО" else "🚨 Super-HYPO (<3.0 mmol/L) — 50-Second GDH Siren",
+                    if (isRu) "🚨 Экстра-ГИПО (<3.0 ммоль/л или настроенный порог) — 50-секундная сирена ГО" else "🚨 Extra-HYPO (<3.0 mmol/L) — 50-Second GDH Siren",
                     if (isRu) "Непрерывная мощная сирена гражданской обороны с частотной модуляцией 450–850 Гц и добавлением 2-й гармоники. Срабатывает мгновенно без ожидания повторных точек. Предназначена для гарантированного пробуждения из самого глубокого сна как самого пациента, так и фоловера при поступлении SOS."
                     else "Continuous 50s civil defense air-raid siren sweeping smoothly between 450 Hz and 850 Hz with 2nd harmonic. Triggers instantly without multi-point delay to awaken patient or follower."
                 )
                 flow.bullet(
-                    if (isRu) "⚠️ Супер-ГИПЕР (>13.9 ммоль/л или настроенный порог) — 16-секундный резкий пульс" else "⚠️ Super-HYPER (>13.9 mmol/L) — 16-Second Piercing Pulse",
+                    if (isRu) "⚠️ Экстра-ГИПЕР (>13.9 ммоль/л или настроенный порог) — 16-секундный резкий пульс" else "⚠️ Extra-HYPER (>13.9 mmol/L) — 16-Second Piercing Pulse",
                     if (isRu) "Серия высокочастотных резких пульсирующих сигналов (1760/2349 Гц), резко контрастирующая с сиреной гипогликемии. Предупреждает о критической гипергликемии и необходимости контроля подколки/кетонов."
                     else "High-urgency alternating chime bursts (1760 Hz & 2349 Hz) lasting 16 seconds. Clearly distinguishes extreme hyperglycemia from hypo alarms."
                 )
