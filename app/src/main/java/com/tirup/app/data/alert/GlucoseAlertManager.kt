@@ -310,10 +310,20 @@ object GlucoseAlertManager {
 
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
-        // Delete old v1/v2 channels that had system sound attached or didn't bypass DND
-        listOf("tirup_alert_predictive", "tirup_alert_predictive_v2", "tirup_alert_main", "tirup_alert_critical", "tirup_alert_signal_loss_v2").forEach { id ->
+        // Delete old v1/v2 channels that had system sound attached, didn't bypass DND, or need title refresh
+        listOf(
+            "channel_caregiver_sos_v1",
+            "tirup_alert_predictive",
+            "tirup_alert_predictive_v2",
+            "tirup_alert_main",
+            "tirup_alert_critical",
+            "tirup_alert_signal_loss_v2"
+        ).forEach { id ->
             try { nm.deleteNotificationChannel(id) } catch (_: Exception) {}
         }
+
+        // Initialize Caregiver / Follower SOS channel
+        CaregiverSosAlarmManager.initChannel(nm)
 
         // Tier 1: Predictive (Soft) - sound handled purely by MedicalSoundPlayer, high importance for heads-up visibility
         val predictiveChannel = NotificationChannel(

@@ -34,7 +34,7 @@ object CaregiverSosAlarmManager {
 
     private const val TAG = "CaregiverSosAlarmManager"
     const val NOTIFICATION_ID_CAREGIVER_SOS = 9999
-    const val CHANNEL_ID_CAREGIVER_SOS = "channel_caregiver_sos_v1"
+    const val CHANNEL_ID_CAREGIVER_SOS = "channel_caregiver_sos_v2"
 
     private val scope = CoroutineScope(Dispatchers.IO)
     private var wakeLock: PowerManager.WakeLock? = null
@@ -193,7 +193,7 @@ object CaregiverSosAlarmManager {
         nm.notify(NOTIFICATION_ID_CAREGIVER_SOS, builder.build())
     }
 
-    private fun initChannel(nm: NotificationManager) {
+    fun initChannel(nm: NotificationManager) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID_CAREGIVER_SOS,
