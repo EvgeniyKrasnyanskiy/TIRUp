@@ -339,13 +339,13 @@ object GlucoseAlertManager {
         nm.createNotificationChannelGroup(
             NotificationChannelGroup(
                 GROUP_STATUS,
-                if (isRu) "2. 📊 Мониторинг и статус" else "2. 📊 Monitoring & Status"
+                if (isRu) "3. 📊 Мониторинг и статус" else "3. 📊 Monitoring & Status"
             )
         )
         nm.createNotificationChannelGroup(
             NotificationChannelGroup(
                 GROUP_REMINDERS,
-                if (isRu) "3. 🔔 Напоминания и отчеты" else "3. 🔔 Reminders & Reports"
+                if (isRu) "2. 🔔 Напоминания и отчеты" else "2. 🔔 Reminders & Reports"
             )
         )
 
