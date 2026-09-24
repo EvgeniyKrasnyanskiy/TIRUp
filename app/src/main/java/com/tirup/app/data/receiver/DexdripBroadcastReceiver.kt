@@ -738,7 +738,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
         suspend fun saveTreatmentIfNew(database: AppDatabase, treatment: Treatment) {
             val dao = database.treatmentDao()
-            val windowMs = 5 * 60_000L // 5-minute window bridges broadcast vs web-server sync latencies
+            val windowMs = 45_000L // 45-second window prevents duplicate self-echoes from xDrip broadcasts without blocking sequential boluses
             val existing = dao.getTreatmentsBetweenSync(treatment.timestamp - windowMs, treatment.timestamp + windowMs)
 
             val duplicate = existing.firstOrNull { entity ->
@@ -1091,6 +1091,55 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to send xDrip handshake: ${e.message}")
+            }
+        }
+
+        /**
+         * Sends a treatment event broadcast to xDrip+ using the standard Nightscout Emulator protocol.
+         * Broadcast action: com.eveningoutpost.dexdrip.NSEmulator.TREATMENT
+         */
+        fun postTreatmentToXdrip(
+            context: Context,
+            insulin: Double? = null,
+            carbs: Double? = null,
+            glucose: Double? = null,
+            notes: String? = null,
+            timestamp: Long = System.currentTimeMillis()
+        ) {
+            try {
+                val intent = Intent("com.eveningoutpost.dexdrip.NSEmulator.TREATMENT").apply {
+                    setPackage("com.eveningoutpost.dexdrip")
+                    putExtra("timestamp", timestamp)
+                    putExtra("created_at", timestamp)
+
+                    val eventType = when {
+                        insulin != null && carbs != null -> "Meal Bolus"
+                        insulin != null -> "Correction Bolus"
+                        carbs != null -> "Carb Correction"
+                        glucose != null -> "BG Check"
+                        else -> "Note"
+                    }
+                    putExtra("eventType", eventType)
+
+                    if (insulin != null && insulin > 0.0) {
+                        putExtra("insulin", insulin)
+                        putExtra("bolus", insulin)
+                    }
+                    if (carbs != null && carbs > 0.0) {
+                        putExtra("carbs", carbs)
+                    }
+                    if (glucose != null && glucose > 0.0) {
+                        putExtra("glucose", glucose)
+                        putExtra("glucoseType", "Finger")
+                    }
+                    if (!notes.isNullOrBlank()) {
+                        putExtra("notes", notes)
+                    }
+                }
+                context.sendBroadcast(intent)
+                Log.i(TAG, "Dispatched treatment to xDrip+: insulin=$insulin, carbs=$carbs, bg=$glucose, notes=$notes")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to post treatment to xDrip: ${e.message}", e)
             }
         }
 

@@ -13,6 +13,7 @@ import com.tirup.app.domain.calculator.PredictedEvent
 import com.tirup.app.domain.calculator.TargetCompensatorCalculator
 import com.tirup.app.domain.model.DailySummary
 import com.tirup.app.domain.model.GlucoseReading
+import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.domain.model.SensorStatus
 import com.tirup.app.domain.model.PumpSetStatus
@@ -298,6 +299,49 @@ class FocusViewModel(
     fun deleteTreatment(treatmentId: Long) {
         viewModelScope.launch {
             glucoseRepository.deleteTreatmentById(treatmentId)
+        }
+    }
+
+    fun addTreatment(
+        insulinUnits: Double? = null,
+        carbsGrams: Double? = null,
+        glucoseValue: Double? = null,
+        notes: String? = null,
+        timestamp: Long = System.currentTimeMillis()
+    ) {
+        viewModelScope.launch {
+            val hasInsulin = insulinUnits != null && insulinUnits > 0.0
+            val hasCarbs = carbsGrams != null && carbsGrams > 0.0
+            val hasNotes = !notes.isNullOrBlank()
+
+            if (hasInsulin || hasCarbs || hasNotes) {
+                val treatment = Treatment(
+                    timestamp = timestamp,
+                    insulinUnits = if (hasInsulin) insulinUnits else null,
+                    carbsGrams = if (hasCarbs) carbsGrams else null,
+                    notes = notes,
+                    source = "TIRUP"
+                )
+                glucoseRepository.insertTreatment(treatment)
+            }
+
+            // Post to xDrip via broadcast
+            val glucoseMgdl = if (glucoseValue != null && glucoseValue > 0.0) {
+                if (_uiState.value.userSettings.unit == GlucoseUnit.MMOL_L) {
+                    glucoseValue * 18.0182
+                } else {
+                    glucoseValue
+                }
+            } else null
+
+            com.tirup.app.data.receiver.DexdripBroadcastReceiver.postTreatmentToXdrip(
+                context = context,
+                insulin = if (hasInsulin) insulinUnits else null,
+                carbs = if (hasCarbs) carbsGrams else null,
+                glucose = glucoseMgdl,
+                notes = notes,
+                timestamp = timestamp
+            )
         }
     }
     fun updateSensorInstalled(durationDays: Int, installedAt: Long = System.currentTimeMillis()) {
