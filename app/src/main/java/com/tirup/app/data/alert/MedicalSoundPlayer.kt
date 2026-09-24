@@ -407,7 +407,9 @@ object MedicalSoundPlayer {
 
     /**
      * Generates and plays the 50-second continuous civil defense / GDH air-raid siren.
-     * Uses FM modulation oscillating smoothly between 450 Hz and 850 Hz with 2nd harmonic.
+     * Uses FM modulation oscillating smoothly between 520 Hz and 980 Hz with multi-harmonic
+     * piercing acoustic saturation (1st, 2nd, 3rd, 4th harmonics + tanh overdrive) for maximum
+     * phone speaker loudness and urgency.
      */
     private fun runExtraHypoSirenLoop() {
         val cycleSec = 3.0
@@ -417,15 +419,17 @@ object MedicalSoundPlayer {
 
         for (i in 0 until numSamples) {
             val t = i.toDouble() / SAMPLE_RATE
-            // Cosine modulation: starts at 450 Hz, peaks at 850 Hz at 1.5s, returns to 450 Hz at 3.0s
+            // Cosine modulation: starts at 520 Hz, peaks at 980 Hz at 1.5s, returns to 520 Hz at 3.0s
             val modProgress = 0.5 * (1.0 - kotlin.math.cos(2.0 * PI * t / cycleSec))
-            val currentFreq = 450.0 + (850.0 - 450.0) * modProgress
+            val currentFreq = 520.0 + (980.0 - 520.0) * modProgress
             phase += 2.0 * PI * currentFreq / SAMPLE_RATE
             if (phase > 2.0 * PI) phase -= 2.0 * PI
 
-            // Authentic air-raid siren timbre: fundamental + 2nd harmonic
-            val raw = 0.72 * sin(phase) + 0.28 * sin(2.0 * phase)
-            val sampleVal = (raw * Short.MAX_VALUE).toInt()
+            // Powerful air-raid siren timbre: fundamental + 2nd, 3rd (piercing 1.5-3 kHz), 4th harmonics
+            val raw = 0.45 * sin(phase) + 0.28 * sin(2.0 * phase) + 0.20 * sin(3.0 * phase) + 0.07 * sin(4.0 * phase)
+            // Saturated overdrive via tanh for maximum RMS acoustical loudness on mobile transducers
+            val saturated = kotlin.math.tanh(raw * 1.6)
+            val sampleVal = (saturated * Short.MAX_VALUE * 0.98).toInt()
             sirenCycle[i] = sampleVal.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
         }
 
