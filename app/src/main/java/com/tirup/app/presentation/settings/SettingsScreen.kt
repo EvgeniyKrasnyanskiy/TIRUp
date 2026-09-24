@@ -957,6 +957,212 @@ fun SettingsScreen(
             }
         }
 
+        // Section: Always-On Display (AOD / Ночной монитор)
+        item {
+            var isAodExpanded by rememberSaveable { mutableStateOf(false) }
+            val aod = settings.aodSettings
+
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isAodExpanded = !isAodExpanded },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("🌙", fontSize = 22.sp)
+                            Column {
+                                Text(
+                                    text = if (isRu) "Ночной AOD (Always-On Display)" else "Night AOD (Always-On Display)",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (aod.isEnabled) {
+                                        if (isRu) "Активен • ${if (aod.displayMode == com.tirup.app.domain.model.AodDisplayMode.PULSE_ON_UPDATE) "Пробуждение при замере (0% батареи)" else "Всегда включен (1% яркости)"}"
+                                        else "Enabled • ${if (aod.displayMode == com.tirup.app.domain.model.AodDisplayMode.PULSE_ON_UPDATE) "Pulse on update (0% battery)" else "Always on (1% brightness)"}"
+                                    } else {
+                                        if (isRu) "Выключен" else "Disabled"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (aod.isEnabled) PrimaryEmerald else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Switch(
+                            checked = aod.isEnabled,
+                            onCheckedChange = { isEnabled ->
+                                viewModel.updateAodSettings(aod.copy(isEnabled = isEnabled))
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = PrimaryEmerald
+                            )
+                        )
+                    }
+
+                    if (isAodExpanded) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                        )
+
+                        // OLED Notice Alert
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFF1E293B),
+                            border = BorderStroke(1.dp, Color(0xFF334155)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Text("💡", fontSize = 16.sp)
+                                Text(
+                                    text = if (isRu) "Режим оптимизирован под экраны AMOLED/OLED: абсолютно черный фон (#000000) полностью отключает пиксели матрицы, а микро-смещение Anti-Burn-In защищает экран от выгорания."
+                                    else "Optimized for AMOLED/OLED: true black background (#000000) turns off matrix pixels, and Anti-Burn-In micro-jitter protects display.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF94A3B8)
+                                )
+                            }
+                        }
+
+                        // Display Mode Selector
+                        Text(
+                            text = if (isRu) "Режим работы дисплея:" else "Display Mode:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        viewModel.updateAodSettings(aod.copy(displayMode = com.tirup.app.domain.model.AodDisplayMode.PULSE_ON_UPDATE))
+                                    },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (aod.displayMode == com.tirup.app.domain.model.AodDisplayMode.PULSE_ON_UPDATE) PrimaryEmerald.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                border = BorderStroke(
+                                    width = if (aod.displayMode == com.tirup.app.domain.model.AodDisplayMode.PULSE_ON_UPDATE) 1.5.dp else 0.8.dp,
+                                    color = if (aod.displayMode == com.tirup.app.domain.model.AodDisplayMode.PULSE_ON_UPDATE) PrimaryEmerald else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                                )
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Text(
+                                        text = if (isRu) "⚡ Просыпаться" else "⚡ Pulse Wake",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (aod.displayMode == com.tirup.app.domain.model.AodDisplayMode.PULSE_ON_UPDATE) PrimaryEmerald else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (isRu) "Экран 0% света. Зажигается на 5 сек при новом сахаре или тапе" else "0% light. Turns on for 5s on new reading or tap",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        viewModel.updateAodSettings(aod.copy(displayMode = com.tirup.app.domain.model.AodDisplayMode.ALWAYS_ON))
+                                    },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (aod.displayMode == com.tirup.app.domain.model.AodDisplayMode.ALWAYS_ON) ActionBlue.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                border = BorderStroke(
+                                    width = if (aod.displayMode == com.tirup.app.domain.model.AodDisplayMode.ALWAYS_ON) 1.5.dp else 0.8.dp,
+                                    color = if (aod.displayMode == com.tirup.app.domain.model.AodDisplayMode.ALWAYS_ON) ActionBlue else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                                )
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Text(
+                                        text = if (isRu) "👁️ Всегда включен" else "👁️ Always On",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (aod.displayMode == com.tirup.app.domain.model.AodDisplayMode.ALWAYS_ON) ActionBlue else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (isRu) "Непрерывно горит на минимальной физической яркости (1%)" else "Continuously visible at minimum physical brightness (1%)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        // Auto-start on charger
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isRu) "🔌 Автозапуск при ночной зарядке" else "🔌 Auto-start on night charge",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isRu) "Активировать AOD при подключении зарядного устройства с ${aod.autoChargeStartHour}:00 до ${aod.autoChargeEndHour}:00"
+                                    else "Launch AOD automatically when plugged in between ${aod.autoChargeStartHour}:00 and ${aod.autoChargeEndHour}:00",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = aod.autoChargeEnabled,
+                                onCheckedChange = { autoCharge ->
+                                    viewModel.updateAodSettings(aod.copy(autoChargeEnabled = autoCharge))
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = ActionBlue
+                                )
+                            )
+                        }
+
+                        // Launch Test Button
+                        Button(
+                            onClick = {
+                                val aodIntent = Intent(context, com.tirup.app.presentation.aod.AodActivity::class.java).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                }
+                                context.startActivity(aodIntent)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = if (isRu) "🌙 Запустить AOD сейчас для проверки" else "🌙 Launch AOD now for test",
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // Section 2: Smart Alerts (3 Tiers) - Master Card
         item {
             var isAlertsExpanded by rememberSaveable { mutableStateOf(false) }

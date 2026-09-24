@@ -1211,4 +1211,12 @@ class SettingsViewModel(
             }
         }
     }
+
+    fun updateAodSettings(newAod: com.tirup.app.domain.model.AodSettings) {
+        viewModelScope.launch {
+            val updated = _uiState.value.userSettings.copy(aodSettings = newAod)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+        }
+    }
 }

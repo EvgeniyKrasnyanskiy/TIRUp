@@ -1667,8 +1667,28 @@ object GlucoseAlertManager {
         if (tier == AlertTier.CRITICAL) {
             isCriticalAlarmActive = true
 
-            val isHypo = title.contains("гипо", true) || title.contains("low", true) || title.contains("Тест", true) || title.contains("Test", true)
+            val isHypo = title.contains("гипо", true) ||
+                    title.contains("низкий", true) ||
+                    title.contains("low", true) ||
+                    title.contains("Тест", true) ||
+                    title.contains("Test", true)
             if (isHypo) {
+                // Wake up screen and hold CPU
+                try {
+                    val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+                    rescueWakeLock?.release()
+                    @Suppress("DEPRECATION")
+                    rescueWakeLock = pm?.newWakeLock(
+                        PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+                        "TIRUp:PatientRescueWakeLock"
+                    )?.apply {
+                        setReferenceCounted(false)
+                        acquire(30_000L)
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to acquire rescueWakeLock: ${e.message}")
+                }
+
                 val fullScreenIntent = Intent(context, PatientCriticalHypoActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                     putExtra(PatientCriticalHypoActivity.EXTRA_GLUCOSE, glucoseDisplay)
@@ -1684,6 +1704,7 @@ object GlucoseAlertManager {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
                 builder.setFullScreenIntent(fullScreenPending, true)
+                builder.setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
 
                 try {
                     context.startActivity(fullScreenIntent)
