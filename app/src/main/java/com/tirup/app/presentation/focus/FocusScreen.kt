@@ -209,7 +209,7 @@ fun FocusScreen(
 
     val blePacketReceivedAt by viewModel.blePacketReceivedAt.collectAsState()
     var showBleStatusDialog by rememberSaveable { mutableStateOf(false) }
-    var activeTreatmentInput by remember { mutableStateOf<TreatmentInputType?>(null) }
+    // var activeTreatmentInput by remember { mutableStateOf<TreatmentInputType?>(null) }
 
     Box(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -875,6 +875,7 @@ fun FocusScreen(
             )
         }
 
+        /*
         // Quick Treatment Action Strip: [💬 Заметка] [🩸 Глюк] [🍞 Углеводы] [💉 Инсулин]
         item {
             QuickActionStrip(
@@ -882,6 +883,7 @@ fun FocusScreen(
                 onOpenTreatment = { type -> activeTreatmentInput = type }
             )
         }
+        */
 
         // 3. Goal Compensator: Mode switcher (TIR/TING) moved here, target goals on second line
         item {
@@ -1041,6 +1043,7 @@ fun FocusScreen(
         )
     }
 
+    /*
     // Treatment Quick Input Bottom Sheet
     if (activeTreatmentInput != null) {
         TreatmentInputBottomSheet(
@@ -1059,6 +1062,7 @@ fun FocusScreen(
             }
         )
     }
+    */
 
     // Streak Motivator Dialog
 
