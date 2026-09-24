@@ -5044,11 +5044,13 @@ private fun AlertTierConfigRow(
     onThresholdClick: (() -> Unit)? = null,
     isTesting: Boolean = false
 ) {
+    val effectiveAccent = if (isPaused) MaterialTheme.colorScheme.onSurfaceVariant else accentColor
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = if (isPaused) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.05f) else accentColor.copy(alpha = 0.08f),
-        border = BorderStroke(1.dp, if (isPaused) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f) else accentColor.copy(alpha = 0.35f))
+        color = effectiveAccent.copy(alpha = if (isPaused) 0.05f else 0.08f),
+        border = BorderStroke(1.dp, effectiveAccent.copy(alpha = if (isPaused) 0.20f else 0.35f))
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -5064,7 +5066,7 @@ private fun AlertTierConfigRow(
                         text = title,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = if (isPaused) MaterialTheme.colorScheme.onSurfaceVariant else accentColor
+                        color = effectiveAccent
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
@@ -5076,8 +5078,8 @@ private fun AlertTierConfigRow(
                         Spacer(modifier = Modifier.height(5.dp))
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = accentColor.copy(alpha = 0.14f),
-                            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.4f)),
+                            color = effectiveAccent.copy(alpha = if (isPaused) 0.08f else 0.14f),
+                            border = BorderStroke(1.dp, effectiveAccent.copy(alpha = if (isPaused) 0.25f else 0.4f)),
                             modifier = Modifier.clickable { onThresholdClick() }
                         ) {
                             Row(
@@ -5089,12 +5091,12 @@ private fun AlertTierConfigRow(
                                     text = thresholdBadge,
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = accentColor
+                                    color = effectiveAccent
                                 )
                                 Icon(
                                     imageVector = Icons.Default.Tune,
                                     contentDescription = null,
-                                    tint = accentColor,
+                                    tint = effectiveAccent,
                                     modifier = Modifier.size(12.dp)
                                 )
                             }
@@ -5105,14 +5107,14 @@ private fun AlertTierConfigRow(
                     if (timerBadge != null) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = (if (isPaused) ColorHigh else accentColor).copy(alpha = 0.16f),
-                            border = BorderStroke(1.dp, (if (isPaused) ColorHigh else accentColor).copy(alpha = 0.45f))
+                            color = effectiveAccent.copy(alpha = if (isPaused) 0.10f else 0.16f),
+                            border = BorderStroke(1.dp, effectiveAccent.copy(alpha = if (isPaused) 0.25f else 0.45f))
                         ) {
                             Text(
                                 text = timerBadge,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isPaused) ColorHigh else accentColor,
+                                color = effectiveAccent,
                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
                             )
                         }
@@ -5126,14 +5128,14 @@ private fun AlertTierConfigRow(
                                 Icon(
                                     imageVector = Icons.Default.Pause,
                                     contentDescription = "Paused",
-                                    tint = ColorHigh,
+                                    tint = effectiveAccent,
                                     modifier = Modifier.size(SwitchDefaults.IconSize)
                                 )
                             }
                         } else null,
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
-                            checkedTrackColor = if (isPaused) ColorHigh else accentColor
+                            checkedTrackColor = if (isPaused) effectiveAccent.copy(alpha = 0.40f) else effectiveAccent
                         )
                     )
                 }
@@ -5156,13 +5158,13 @@ private fun AlertTierConfigRow(
                             Checkbox(
                                 checked = vibrate,
                                 onCheckedChange = onVibrateChange,
-                                colors = CheckboxDefaults.colors(checkedColor = accentColor)
+                                colors = CheckboxDefaults.colors(checkedColor = effectiveAccent)
                             )
                             Spacer(modifier = Modifier.width(2.dp))
                             Text(
                                 text = if (isRu) "Вибро" else "Vibrate",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = if (isPaused) effectiveAccent else MaterialTheme.colorScheme.onSurface
                             )
                         }
 
@@ -5173,22 +5175,22 @@ private fun AlertTierConfigRow(
                             Checkbox(
                                 checked = flash,
                                 onCheckedChange = onFlashChange,
-                                colors = CheckboxDefaults.colors(checkedColor = accentColor)
+                                colors = CheckboxDefaults.colors(checkedColor = effectiveAccent)
                             )
                             Spacer(modifier = Modifier.width(2.dp))
                             Text(
                                 text = if (isRu) "Вспышка" else "Flash",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = if (isPaused) effectiveAccent else MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
 
-                    val btnColor = if (isTesting) MaterialTheme.colorScheme.error else accentColor
+                    val btnColor = if (isTesting) MaterialTheme.colorScheme.error else effectiveAccent
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = btnColor.copy(alpha = 0.16f),
-                        border = BorderStroke(1.dp, btnColor.copy(alpha = 0.5f)),
+                        color = btnColor.copy(alpha = if (isPaused) 0.10f else 0.16f),
+                        border = BorderStroke(1.dp, btnColor.copy(alpha = if (isPaused) 0.25f else 0.5f)),
                         modifier = Modifier.clickable { onTestClick() }
                     ) {
                         Row(
