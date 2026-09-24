@@ -209,6 +209,7 @@ fun FocusScreen(
 
     val blePacketReceivedAt by viewModel.blePacketReceivedAt.collectAsState()
     var showBleStatusDialog by rememberSaveable { mutableStateOf(false) }
+    var activeTreatmentInput by remember { mutableStateOf<TreatmentInputType?>(null) }
 
     Box(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -874,6 +875,14 @@ fun FocusScreen(
             )
         }
 
+        // Quick Treatment Action Strip: [💬 Заметка] [🩸 Глюк] [🍞 Углеводы] [💉 Инсулин]
+        item {
+            QuickActionStrip(
+                isRu = isRu,
+                onOpenTreatment = { type -> activeTreatmentInput = type }
+            )
+        }
+
         // 3. Goal Compensator: Mode switcher (TIR/TING) moved here, target goals on second line
         item {
             val currentScore = if (targetMode == TargetMode.TIR) state.statistics.tirPercent else state.statistics.tingPercent
@@ -1028,6 +1037,25 @@ fun FocusScreen(
                 TextButton(onClick = { detailDialogInfo = null }) {
                     Text(text = if (isRu) "Понятно" else "OK", color = ActionBlue, fontWeight = FontWeight.Bold)
                 }
+            }
+        )
+    }
+
+    // Treatment Quick Input Bottom Sheet
+    if (activeTreatmentInput != null) {
+        TreatmentInputBottomSheet(
+            initialType = activeTreatmentInput!!,
+            unit = unit,
+            isRu = isRu,
+            onDismiss = { activeTreatmentInput = null },
+            onSubmit = { insulin, carbs, bg, notes ->
+                viewModel.addTreatment(
+                    insulinUnits = insulin,
+                    carbsGrams = carbs,
+                    glucoseValue = bg,
+                    notes = notes
+                )
+                activeTreatmentInput = null
             }
         )
     }
