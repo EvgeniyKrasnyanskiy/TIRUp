@@ -1315,7 +1315,7 @@ fun SettingsScreen(
                             onVibrateChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalVibrate = it)) },
                             flash = alerts.isCriticalFlash,
                             onFlashChange = { viewModel.updateAlertSettings(alerts.copy(isCriticalFlash = it)) },
-                            accentColor = if (isCriticalInPauseState) ColorHigh else ColorVeryLow,
+                            accentColor = ColorVeryLow,
                             onTestClick = {
                                 handleSoundClick(tier3Tag) {
                                     if (alerts.isCaregiverRole) {
@@ -5047,8 +5047,8 @@ private fun AlertTierConfigRow(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = (if (isPaused) ColorHigh else accentColor).copy(alpha = 0.08f),
-        border = BorderStroke(1.dp, (if (isPaused) ColorHigh else accentColor).copy(alpha = 0.35f))
+        color = if (isPaused) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.05f) else accentColor.copy(alpha = 0.08f),
+        border = BorderStroke(1.dp, if (isPaused) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f) else accentColor.copy(alpha = 0.35f))
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -5064,7 +5064,7 @@ private fun AlertTierConfigRow(
                         text = title,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = if (isPaused) ColorHigh else accentColor
+                        color = if (isPaused) MaterialTheme.colorScheme.onSurfaceVariant else accentColor
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(

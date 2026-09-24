@@ -46,7 +46,9 @@
 ### 6. Четырёхуровневая система безопасности (Smart 4-Tier Alarms)
 - **Уровень 1 (Предиктивный прогноз за 15 мин)**: математическая регрессия скорости изменения сахара с расчётом точного астрономического времени события (*«в 16:42»*) и мягким перезвоном без стресса.
 - **Уровень 2 (Подтверждённый выход за границы)**: фиксация 5 замеров подряд вне персональных порогов; отчётливый тройной медицинский тон с паузой 1.5 сек.
-- **Уровень 3 (Критическая сирена «кричащая»)**: серия громкой сирены ~12 сек на аудиопотоке будильника (`USAGE_ALARM`), обход DND, авто-буст громкости $\ge 80\%$, стробоскоп вспышки камеры. Мгновенное глушение сирены любой физической кнопкой (громкость, питание) или тапом по пузырьку.
+- **Уровень 3 (Опасные и критические)**:
+  - *Опасные (затяжные)*: фиксация сахара < 3.9 ммоль/л (> 20 мин) или > 10.0 ммоль/л (> 90 мин) — 12-секундный медицинский сигнал.
+  - *Критические (экстра)*: настраиваемые границы (по умолчанию < 3.0 и > 13.9 ммоль/л). Мгновенное срабатывание по первой точке: мощная 50-секундная сирена ГО / GDH (520–980 Гц с гармониками и насыщением) при Крит. ГИПО с пробуждением экрана спасения поверх блокировки и отсчётом SOS фоловерам, либо 16-секундный резкий пульсирующий сигнал (1760/2349 Гц) при Крит. ГИПЕР. Управление порогами и сиренами объединено в единое модальное окно.
 - **Уровень 4 (Потеря сигнала сенсора >20 мин)**: мягкий сигнал потери связи с прогрессивным расписанием день/ночь (в окне сна: серия будильников для надёжного пробуждения; днём: щадящие интервалы).
 - **Независимый слайдер громкости тревог (20% – 100%)**: отдельный регулятор уровня звука тревог в настройках с кнопкой «Тест 🔔», воспроизводящей реалистичную мелодию оповещения.
 - **Быстрая пауза всех тревог (Snooze All)**: возможность отложить все тревоги на экране «Фокус» с удобным выбором пресетов (`10м`, `30м`, `1ч` по умолчанию, `2ч`, `4ч`, `8ч`) с автоматическим глушением сигналов потери связи.
@@ -259,7 +261,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ### Core Features:
 - **Direct Offline Broadcast**: Intercepts readings locally via `com.eveningoutpost.dexdrip.BgEstimate` from xDrip+, GlucoDataHandler, and Juggluco without internet or third-party servers.
 - **Treatments Overlay**: Visualizes bolus insulin doses (💉) and meal carbs (🍽️) on the 24-hour Canvas sparkline with interactive inspect tooltips.
-- **Smart 4-Tier Alarms & Controls**: Tier 1 predictive trend alert (*"at 16:42"*), Tier 2 confirmed tone, Tier 3 loud critical siren (~12s on `USAGE_ALARM` with instant physical button muting), Tier 4 signal loss alarm, independent alert volume slider (20%–100%) with test melody, configurable alert pause ('Snooze All' 10m..8h), and bilingual alert log.
+- **Smart 4-Tier Alarms & Controls**: Tier 1 predictive trend alert (*"at 16:42"*), Tier 2 confirmed tone, Tier 3 dangerous & critical alarms (12s prolonged warning; instant 50s GDH air-raid siren for Crit. HYPO < 3.0 with screen wakeup & SOS, and 16s pulsed alert for Crit. HYPER > 13.9 in a unified settings dialog), Tier 4 signal loss alarm, independent alert volume slider (20%–100%) with test melody, configurable alert pause ('Snooze All' 10m..8h), and bilingual alert log.
 - **Emergency Safety SMS & Offline Queries**:
   - Automatically dispatches an ultra-compact single-segment SMS ($\le 67$ chars) with optional GPS coordinates to a trusted contact when severe hypo (< 3.0 mmol/L) sirens remain unacknowledged for 5 minutes.
   - Whitelisted offline SMS query: trusted contacts can text `sugar`, `?`, `bg`, or `tir` to receive real-time glucose and TIR without internet access during network shutdowns.
