@@ -776,7 +776,7 @@ fun CriticalHypoSafetyDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = if (isRu) "Отмена (Оставить паузу)" else "Cancel (Keep Pause)",
+                        text = if (isRu) "Отмена" else "Cancel",
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
