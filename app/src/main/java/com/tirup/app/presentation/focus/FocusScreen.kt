@@ -257,6 +257,23 @@ fun FocusScreen(
                             onClick = { showDeviceModal = true }
                         )
                     }
+
+                    // Night AOD button
+                    IconButton(
+                        onClick = {
+                            val aodIntent = Intent(context, com.tirup.app.presentation.aod.AodActivity::class.java).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            }
+                            context.startActivity(aodIntent)
+                        },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Text(
+                            text = "🌙",
+                            fontSize = 18.sp
+                        )
+                    }
+
                     StreakBadge(
                         streakDays = state.streakDays,
                         onClick = {

@@ -89,6 +89,15 @@
             android:launchMode="singleTop"
             android:theme="@style/Theme.TIRUp" />
 
+        <activity
+            android:name=".presentation.aod.AodActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:screenOrientation="portrait"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.TIRUp" />
+
         <!-- BroadcastReceiver for xDrip+ / Juggluco / Nightscout / GlucoDataHandler local broadcasts -->
         <receiver
             android:name=".data.receiver.DexdripBroadcastReceiver"
@@ -148,6 +157,15 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.tirup.app.ACTION_REFRESH_STALENESS" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Receiver for automatic AOD trigger on charger connected -->
+        <receiver
+            android:name=".data.receiver.PowerConnectionReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
             </intent-filter>
         </receiver>
 
