@@ -7,6 +7,7 @@ import com.tirup.app.domain.model.HeatmapCell
 import com.tirup.app.domain.model.UserSettings
 
 enum class TrendPeriod(val days: Int, val stringResId: Int) {
+    PERIOD_1D(1, com.tirup.app.R.string.period_1d),
     PERIOD_7D(7, com.tirup.app.R.string.period_7d),
     PERIOD_14D(14, com.tirup.app.R.string.period_14d),
     PERIOD_30D(30, com.tirup.app.R.string.period_30d),

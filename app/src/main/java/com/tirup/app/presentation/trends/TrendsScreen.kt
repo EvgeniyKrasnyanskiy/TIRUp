@@ -834,6 +834,7 @@ fun CompactPeriodSelector(
     var expandedDropdown by remember { mutableStateOf(false) }
 
     val primaryPeriods = listOf(
+        TrendPeriod.PERIOD_1D,
         TrendPeriod.PERIOD_7D,
         TrendPeriod.PERIOD_14D,
         TrendPeriod.PERIOD_30D,
@@ -844,12 +845,12 @@ fun CompactPeriodSelector(
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         primaryPeriods.forEach { period ->
             val isSelected = selectedPeriod == period
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(10.dp),
                 color = if (isSelected) ActionBlue else MaterialTheme.colorScheme.surfaceVariant,
                 border = BorderStroke(
                     1.dp,
@@ -860,7 +861,7 @@ fun CompactPeriodSelector(
                     .clickable { onPeriodSelected(period) }
             ) {
                 Box(
-                    modifier = Modifier.padding(vertical = 9.dp),
+                    modifier = Modifier.padding(vertical = 7.dp, horizontal = 2.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -868,7 +869,8 @@ fun CompactPeriodSelector(
                         style = MaterialTheme.typography.labelSmall,
                         color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        fontSize = 11.5.sp
+                        fontSize = 10.5.sp,
+                        maxLines = 1
                     )
                 }
             }

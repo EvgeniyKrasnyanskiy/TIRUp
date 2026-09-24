@@ -694,6 +694,11 @@ class UserManualPdfGenerator(private val context: Context) {
                     else "Detects nocturnal dips, dawn phenomenon, and meal spikes. High-priority cards auto-expire after 48h, informational after 24h, with an expandable archive."
                 )
                 flow.bullet(
+                    if (isRu) "Сходимость данных с xDrip+ и 1-минутный CGM" else "Data Convergence with xDrip+ & 1-min CGM",
+                    if (isRu) "В отличие от старых систем с 5-минутным шагом, для минутных сенсоров (Libre 2/3, Dexcom G7) TIRUp фильтрует паразитный радиодребезг трансмиттера (повторные эхо-пакеты за 2–5 сек), сохраняя ровно 1 замер в минуту. Это даёт математически чистое взвешивание времени без искажения суточного TIR и среднего сахара."
+                    else "Unlike legacy 5-minute CGM pipelines, TIRUp applies a 25s deduplication window for 1-minute sensors (Libre 2/3, Dexcom G7) to filter transmitter echo bursts (2-5s deltas). This guarantees 100% genuine point retention and mathematically pure time-weighted metrics."
+                )
+                flow.bullet(
                     if (isRu) "Журнал HbA1c и квартальные напоминания (раз в 90 дн.)" else "HbA1c Journal & Quarterly Reminders (every 90d)",
                     if (isRu) "Журнал сопоставляет анализы крови с датчиком (GMI). Каждые 90 дней срабатывает квартальное напоминание о сдаче крови (макс. 2 раза за цикл с шагом 14 дней, кнопка «Пропустить +90д»). Цвета: <6.1% (норма), 6.1–7.0% (цель), 7.0–8.0% (суб), >8.0% (риск)."
                     else "Logs HbA1c vs sensor GMI. Quarterly reminder fires every 90 days (max 2 per cycle with 14d step, 'Skip +90d' button). Colors: <6.1% (norm), 6.1-7.0% (target), 7.0-8.0% (sub), >8.0% (risk)."

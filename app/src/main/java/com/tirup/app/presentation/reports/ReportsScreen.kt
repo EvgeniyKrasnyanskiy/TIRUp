@@ -310,6 +310,7 @@ fun ReportsScreen(
             "${fmt.format(Date(minTs))} — ${fmt.format(Date(maxTs))}"
         }
         val periodName = when (state.livePeriod) {
+            TrendPeriod.PERIOD_1D -> if (isRu) "1 день" else "1 Day"
             TrendPeriod.PERIOD_7D -> if (isRu) "7 дней" else "7 Days"
             TrendPeriod.PERIOD_14D -> if (isRu) "14 дней (AGP)" else "14 Days (AGP)"
             TrendPeriod.PERIOD_30D -> if (isRu) "30 дней" else "30 Days"
@@ -432,8 +433,8 @@ fun ReportsScreen(
                             "Почему показатели TIR, Mean и др. могут незначительно отличаться от цифр в xDrip+:\n\n" +
                             "1️⃣ Скользящее окно vs Календарные сутки:\n" +
                             "xDrip+ считает статистику за последние 24 скользящих часа от текущей секунды назад. TIRUp рассчитывает отчёт по фиксированным суткам (00:00–23:59) выбранного периода, что даёт строгие и воспроизводимые границы.\n\n" +
-                            "2️⃣ Количество точек и дубликаты:\n" +
-                            "При разрывах связи или пакетной выгрузке TIRUp устраняет дубликаты замеров с одинаковым временем. Также в xDrip+ могут учитываться калибровочные замеры глюкометра.\n\n" +
+                            "2️⃣ Количество точек и фильтрация дубликатов:\n" +
+                            "xDrip+ сохраняет все приходящие радиопакеты без проверки на повторы внутри минуты (включая повторные эхо-пакеты от сенсора и трансмиттера с разницей в несколько секунд — около 15–25 дубликатов в сутки). TIRUp применяет клиническое 25-секундное окно дедупликации: если сенсор присылает два пакета за пару секунд, TIRUp объединяет их, не создавая искусственных фантомных точек. Это делает расчёт взвешенного времени в диапазоне (TIR/TING) и среднего сахара (Mean) математически чище и точнее.\n\n" +
                             "3️⃣ Математическое усреднение:\n" +
                             "При переменном интервале точек (1 мин vs 5 мин) простое среднее арифметическое и средневзвешенное по времени могут расходиться на 0.1–0.3 ммоль/л.\n\n" +
                             "4️⃣ Сглаживание шума:\n" +
@@ -443,7 +444,7 @@ fun ReportsScreen(
                             "1️⃣ Rolling 24h Window vs Calendar Days:\n" +
                             "xDrip+ computes statistics over a sliding 24-hour window from the current moment backward. TIRUp aligns reports to strict astronomical calendar days (00:00–23:59), ensuring reproducible clinical boundaries.\n\n" +
                             "2️⃣ Reading Counts & Deduplication:\n" +
-                            "During reconnection bursts or signal gaps, TIRUp filters duplicate timestamps. xDrip+ may also incorporate fingerstick blood meter calibrations.\n\n" +
+                            "xDrip+ stores every incoming radio packet without sub-minute duplicate filtering (often accumulating 15–25 echo duplicate packets per day with 2–5s deltas). TIRUp applies a clinical 25-second deduplication window: if the sensor re-transmits a packet within seconds, TIRUp merges it without creating phantom points, ensuring clinically accurate time-weighted AUC and Mean.\n\n" +
                             "3️⃣ Mathematical Averaging:\n" +
                             "With variable sampling rates (1 min vs 5 min), simple arithmetic mean and time-weighted mean can deviate by 0.1–0.3 mmol/L.\n\n" +
                             "4️⃣ Noise Filtering:\n" +
