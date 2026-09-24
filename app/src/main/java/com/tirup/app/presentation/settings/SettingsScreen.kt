@@ -46,6 +46,8 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -5077,6 +5079,7 @@ private fun AlertTierConfigRow(
                     if (thresholdBadge != null && onThresholdClick != null) {
                         Spacer(modifier = Modifier.height(5.dp))
                         Row(
+                            modifier = Modifier.height(IntrinsicSize.Min),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -5084,7 +5087,9 @@ private fun AlertTierConfigRow(
                                 shape = RoundedCornerShape(6.dp),
                                 color = accentColor.copy(alpha = 0.14f),
                                 border = BorderStroke(1.dp, accentColor.copy(alpha = 0.4f)),
-                                modifier = Modifier.clickable { onThresholdClick() }
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .clickable { onThresholdClick() }
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -5107,29 +5112,34 @@ private fun AlertTierConfigRow(
                             }
 
                             if (extraBadge != null) {
-                                val infoBlue = Color(0xFF3B82F6)
+                                val darkRed = Color(0xFFDC2626) // Darker red (Tailwind Red 600) compared to ColorVeryLow (0xFFEF4444)
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = infoBlue.copy(alpha = 0.12f),
-                                    border = BorderStroke(1.dp, infoBlue.copy(alpha = 0.55f)),
-                                    modifier = Modifier.clickable(enabled = onExtraBadgeClick != null) {
-                                        onExtraBadgeClick?.invoke()
-                                    }
+                                    color = darkRed.copy(alpha = 0.18f),
+                                    border = BorderStroke(1.dp, darkRed.copy(alpha = 0.55f)),
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .clickable(enabled = onExtraBadgeClick != null) {
+                                            onExtraBadgeClick?.invoke()
+                                        }
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                                     ) {
-                                        Text(
-                                            text = "ℹ️",
-                                            fontSize = 11.sp
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = darkRed,
+                                            modifier = Modifier.size(12.dp)
                                         )
                                         Text(
                                             text = extraBadge,
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = Color(0xFF60A5FA)
+                                            color = darkRed,
+                                            maxLines = 1
                                         )
                                     }
                                 }

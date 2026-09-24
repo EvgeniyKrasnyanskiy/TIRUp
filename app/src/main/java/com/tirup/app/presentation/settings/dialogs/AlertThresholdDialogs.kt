@@ -718,12 +718,12 @@ fun ExtraAlertSoundsInfoDialog(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(text = "ℹ️", fontSize = 22.sp)
+                Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFFDC2626), modifier = Modifier.size(24.dp))
                 Text(
                     text = if (isRu) "Экстра звуки тревог" else "Extra Alert Sounds",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF60A5FA)
+                    color = Color(0xFFDC2626)
                 )
             }
         },
