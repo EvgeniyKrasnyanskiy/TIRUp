@@ -177,6 +177,7 @@ fun CriticalThresholdDialog(
     isRu: Boolean,
     onSave: (low: Double, high: Double) -> Unit,
     onResetDefault: () -> Unit,
+    onTestRescueScreen: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     var lowVal by remember { mutableStateOf(initialLow) }
@@ -202,162 +203,250 @@ fun CriticalThresholdDialog(
             onDismiss()
         },
         title = {
-            Text(
-                text = if (isRu) "Пороги критических тревог" else "Critical Alert Thresholds",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = ColorVeryLow,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = if (isRu) "Критические тревоги" else "Critical Alerts",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 Text(
-                    text = if (isRu) "При выходе за эти границы включается громкая сирена, полноэкранное окно спасения поверх блокировки и отсчёт таймера SOS фоловерам."
-                    else "Crossing these thresholds triggers maximum loud siren, full-screen rescue window over lockscreen, and follower SOS countdown.",
+                    text = if (isRu) "При выходе за эти границы срабатывают экстренные сирены, окно спасения поверх блокировки и отсчёт SOS фоловерам:"
+                    else "Crossing these thresholds triggers emergency sirens, rescue window over lockscreen, and follower SOS countdown:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                // Critical Low threshold
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                // Critical Low threshold Card (Крит. ГИПО)
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = ColorVeryLow.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, ColorVeryLow.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = if (isRu) "Критическая гипогликемия:" else "Critical hypoglycemia:",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = String.format(Locale.US, "%.1f ммоль/л", lowVal),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = ColorVeryLow
-                        )
-                    }
-                    Slider(
-                        value = lowVal.toFloat(),
-                        onValueChange = { lowVal = (Math.round(it * 10.0) / 10.0) },
-                        valueRange = 2.5f..4.5f,
-                        steps = 19,
-                        colors = SliderDefaults.colors(
-                            thumbColor = ColorVeryLow,
-                            activeTrackColor = ColorVeryLow
-                        )
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("2.5", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(if (isRu) "По умолчанию: 3.0" else "Default: 3.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("4.5", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    val isHypoPlaying = (currentlyPlayingTag == "EXTRA_HYPO")
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = (if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow).copy(alpha = 0.12f),
-                            border = BorderStroke(1.dp, (if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow).copy(alpha = 0.35f)),
-                            modifier = Modifier.clickable {
-                                handleSoundClick("EXTRA_HYPO") { com.tirup.app.data.alert.MedicalSoundPlayer.playExtraHypoSiren() }
-                            }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            Text(
+                                text = if (isRu) "🚨 Крит. ГИПО" else "🚨 Crit. HYPO",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = ColorVeryLow
+                            )
+                            Text(
+                                text = String.format(Locale.US, "< %.1f ммоль/л", lowVal),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = ColorVeryLow
+                            )
+                        }
+
+                        Slider(
+                            value = lowVal.toFloat(),
+                            onValueChange = { lowVal = (Math.round(it * 10.0) / 10.0) },
+                            valueRange = 2.5f..4.5f,
+                            steps = 19,
+                            colors = SliderDefaults.colors(
+                                thumbColor = ColorVeryLow,
+                                activeTrackColor = ColorVeryLow
+                            )
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("2.5", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(if (isRu) "По умолчанию: 3.0" else "Default: 3.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("4.5", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+
+                        Text(
+                            text = if (isRu)
+                                "50-секундная сирена ГО / GDH на 100% громкости, окно спасения поверх блокировки и вызов фоловеров при отсутствии ответа."
+                            else
+                                "50-second continuous civil defense air-raid siren at 100% volume, rescue window over lockscreen, and follower SOS.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        Spacer(modifier = Modifier.height(2.dp))
+                        val isHypoPlaying = (currentlyPlayingTag == "EXTRA_HYPO")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = (if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow).copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, (if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow).copy(alpha = 0.45f)),
+                                modifier = Modifier.clickable {
+                                    handleSoundClick("EXTRA_HYPO") { com.tirup.app.data.alert.MedicalSoundPlayer.playExtraHypoSiren() }
+                                }
                             ) {
-                                Icon(
-                                    imageVector = if (isHypoPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
-                                    contentDescription = null,
-                                    tint = if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Text(
-                                    text = if (isHypoPlaying) (if (isRu) "⏹️ Стоп" else "⏹️ Stop")
-                                           else (if (isRu) "Тест Экстра-ГИПО (50с)" else "Test Extra-HYPO (50s)"),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isHypoPlaying) Icons.Default.Close else Icons.AutoMirrored.Filled.VolumeUp,
+                                        contentDescription = null,
+                                        tint = if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = if (isHypoPlaying) (if (isRu) "⏹️ Стоп" else "⏹️ Stop")
+                                               else (if (isRu) "Тест сирены (50с)" else "Test siren (50s)"),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
-                // Critical High threshold
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                // Critical High threshold Card (Крит. ГИПЕР)
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = ColorHigh.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, ColorHigh.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = if (isRu) "Критическая гипергликемия:" else "Critical hyperglycemia:",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = String.format(Locale.US, "%.1f ммоль/л", highVal),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = ColorHigh
-                        )
-                    }
-                    Slider(
-                        value = highVal.toFloat(),
-                        onValueChange = { highVal = (Math.round(it * 10.0) / 10.0) },
-                        valueRange = 11.0f..16.0f,
-                        steps = 49,
-                        colors = SliderDefaults.colors(
-                            thumbColor = ColorHigh,
-                            activeTrackColor = ColorHigh
-                        )
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("11.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(if (isRu) "По умолчанию: 13.9" else "Default: 13.9", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("16.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    val isHyperPlaying = (currentlyPlayingTag == "EXTRA_HYPER")
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = (if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh).copy(alpha = 0.12f),
-                            border = BorderStroke(1.dp, (if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh).copy(alpha = 0.35f)),
-                            modifier = Modifier.clickable {
-                                handleSoundClick("EXTRA_HYPER") { com.tirup.app.data.alert.MedicalSoundPlayer.playExtraHyperAlarm() }
-                            }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            Text(
+                                text = if (isRu) "⚠️ Крит. ГИПЕР" else "⚠️ Crit. HYPER",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = ColorHigh
+                            )
+                            Text(
+                                text = String.format(Locale.US, "> %.1f ммоль/л", highVal),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = ColorHigh
+                            )
+                        }
+
+                        Slider(
+                            value = highVal.toFloat(),
+                            onValueChange = { highVal = (Math.round(it * 10.0) / 10.0) },
+                            valueRange = 11.0f..16.0f,
+                            steps = 49,
+                            colors = SliderDefaults.colors(
+                                thumbColor = ColorHigh,
+                                activeTrackColor = ColorHigh
+                            )
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("11.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(if (isRu) "По умолчанию: 13.9" else "Default: 13.9", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("16.0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+
+                        Text(
+                            text = if (isRu)
+                                "16-секундный резкий пульсирующий сигнал высокой тональности (1760/2349 Гц). Предупреждает о критической гипергликемии и необходимости контроля подколки/кетонов."
+                            else
+                                "16-second piercing high-frequency pulsed alert (1760/2349 Hz). Alerts to severe hyperglycemia and need for insulin/ketone check.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        Spacer(modifier = Modifier.height(2.dp))
+                        val isHyperPlaying = (currentlyPlayingTag == "EXTRA_HYPER")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = (if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh).copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, (if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh).copy(alpha = 0.45f)),
+                                modifier = Modifier.clickable {
+                                    handleSoundClick("EXTRA_HYPER") { com.tirup.app.data.alert.MedicalSoundPlayer.playExtraHyperAlarm() }
+                                }
                             ) {
-                                Icon(
-                                    imageVector = if (isHyperPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
-                                    contentDescription = null,
-                                    tint = if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Text(
-                                    text = if (isHyperPlaying) (if (isRu) "⏹️ Стоп" else "⏹️ Stop")
-                                           else (if (isRu) "Тест Экстра-ГИПЕР (16с)" else "Test Extra-HYPER (16s)"),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isHyperPlaying) Icons.Default.Close else Icons.AutoMirrored.Filled.VolumeUp,
+                                        contentDescription = null,
+                                        tint = if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = if (isHyperPlaying) (if (isRu) "⏹️ Стоп" else "⏹️ Stop")
+                                               else (if (isRu) "Тест сигнала (16с)" else "Test alarm (16s)"),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh
+                                    )
+                                }
                             }
                         }
+                    }
+                }
+
+                // Optional: Button to test the actual Rescue Screen
+                if (onTestRescueScreen != null) {
+                    OutlinedButton(
+                        onClick = {
+                            com.tirup.app.data.alert.MedicalSoundPlayer.stopAll()
+                            onTestRescueScreen()
+                            onDismiss()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = ColorVeryLow,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isRu) "Проверить экран спасения (Rescue Screen)" else "Test Rescue Screen",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 }
             }
@@ -375,14 +464,24 @@ fun CriticalThresholdDialog(
             }
         },
         dismissButton = {
-            TextButton(
-                onClick = {
-                    com.tirup.app.data.alert.MedicalSoundPlayer.stopAll()
-                    onResetDefault()
-                    onDismiss()
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(
+                    onClick = {
+                        com.tirup.app.data.alert.MedicalSoundPlayer.stopAll()
+                        onResetDefault()
+                        onDismiss()
+                    }
+                ) {
+                    Text(if (isRu) "Сброс" else "Default")
                 }
-            ) {
-                Text(if (isRu) "Сброс к норме (<3.0 / >13.9)" else "Default (<3.0 / >13.9)")
+                TextButton(
+                    onClick = {
+                        com.tirup.app.data.alert.MedicalSoundPlayer.stopAll()
+                        onDismiss()
+                    }
+                ) {
+                    Text(if (isRu) "Отмена" else "Cancel")
+                }
             }
         }
     )

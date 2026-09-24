@@ -6,7 +6,6 @@ import com.tirup.app.presentation.settings.dialogs.BleLongRangeConfirmDialog
 import com.tirup.app.presentation.settings.dialogs.BleRangeHelpDialog
 import com.tirup.app.presentation.settings.dialogs.CriticalHypoSafetyDialog
 import com.tirup.app.presentation.settings.dialogs.CriticalThresholdDialog
-import com.tirup.app.presentation.settings.dialogs.ExtraAlertSoundsInfoDialog
 import com.tirup.app.presentation.settings.dialogs.Hba1cHistoryDialog
 import com.tirup.app.presentation.settings.dialogs.MainThresholdDialog
 import com.tirup.app.presentation.settings.dialogs.PatientProfileEditDialog
@@ -211,7 +210,6 @@ fun SettingsScreen(
     var showProfileDialog by rememberSaveable { mutableStateOf(false) }
     var showCriticalHypoSafetyDialog by rememberSaveable { mutableStateOf(false) }
     var showCriticalThresholdDialog by rememberSaveable { mutableStateOf(false) }
-    var showExtraAlertSoundsInfoDialog by rememberSaveable { mutableStateOf(false) }
     var showMainThresholdDialog by rememberSaveable { mutableStateOf(false) }
     var showPredictiveHorizonDialog by rememberSaveable { mutableStateOf(false) }
     var showPredictiveInfoDialog by rememberSaveable { mutableStateOf(false) }
@@ -1286,8 +1284,8 @@ fun SettingsScreen(
                             !alerts.isCriticalEnabled -> {
                                 if (isRu) "Выключено пользователем" else "Disabled by user"
                             }
-                            else -> if (isRu) "Экстра-ГИПО (50с) <${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)}, Экстра-ГИПЕР (16с) >${String.format(Locale.US, "%.1f", alerts.criticalHighThresholdMmol)}, затяжные (12с)"
-                                    else "Extra-HYPO (50s) <${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)}, Extra-HYPER (16s) >${String.format(Locale.US, "%.1f", alerts.criticalHighThresholdMmol)}, prolonged (12s)"
+                            else -> if (isRu) "Опасные (12с): <3.9 (>20 мин) или >10.0 (>90 мин). Критические: экстренные сирены и экран спасения"
+                                    else "Dangerous (12s): <3.9 (>20 min) or >10.0 (>90 min). Critical: emergency alarms & rescue screen"
                         }
 
                         // Tier 3: Critical (Prolonged / Extreme)
@@ -1296,7 +1294,7 @@ fun SettingsScreen(
                         val tier3Tag = if (alerts.isCaregiverRole) "CAREGIVER_SOS" else com.tirup.app.data.alert.AlertTier.CRITICAL.name
 
                         AlertTierConfigRow(
-                            title = if (isRu) "3. Экстренные сирены (критические и затяжные)" else "3. Critical & Prolonged (Alarms)",
+                            title = if (isRu) "3. Опасные и критические" else "3. Dangerous & Critical",
                             subtitle = criticalSub,
                             enabled = isCriticalEffectiveEnabled,
                             onEnabledChange = { isEnabled ->
@@ -1323,7 +1321,10 @@ fun SettingsScreen(
                                     if (alerts.isCaregiverRole) {
                                         viewModel.testCaregiverSosScreen()
                                     } else {
-                                        viewModel.testAlert(com.tirup.app.data.alert.AlertTier.CRITICAL)
+                                        com.tirup.app.data.alert.MedicalSoundPlayer.playSound(
+                                            com.tirup.app.data.alert.AlertTier.CRITICAL,
+                                            alerts.alertVolumePercent
+                                        )
                                     }
                                 }
                             },
@@ -1331,10 +1332,9 @@ fun SettingsScreen(
                             isRu = isRu,
                             timerBadge = criticalBadge,
                             isPaused = isCriticalInPauseState,
-                            thresholdBadge = "< ${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)}  |  > ${String.format(Locale.US, "%.1f", alerts.criticalHighThresholdMmol)}",
-                            extraBadge = if (isRu) "Экстра звуки тревог" else "Extra alert sounds",
-                            onThresholdClick = { showCriticalThresholdDialog = true },
-                            onExtraBadgeClick = { showExtraAlertSoundsInfoDialog = true }
+                            thresholdBadge = if (isRu) "🚨 Критические тревоги (< ${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)}  или  > ${String.format(Locale.US, "%.1f", alerts.criticalHighThresholdMmol)})"
+                                             else "🚨 Critical Alerts (< ${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)}  or  > ${String.format(Locale.US, "%.1f", alerts.criticalHighThresholdMmol)})",
+                            onThresholdClick = { showCriticalThresholdDialog = true }
                         )
                         
                         Spacer(modifier = Modifier.height(6.dp))
@@ -4753,16 +4753,14 @@ fun SettingsScreen(
                     )
                 )
             },
+            onTestRescueScreen = {
+                if (settings.alertSettings.isCaregiverRole) {
+                    viewModel.testCaregiverSosScreen()
+                } else {
+                    viewModel.testAlert(com.tirup.app.data.alert.AlertTier.CRITICAL)
+                }
+            },
             onDismiss = { showCriticalThresholdDialog = false }
-        )
-    }
-
-    if (showExtraAlertSoundsInfoDialog) {
-        ExtraAlertSoundsInfoDialog(
-            lowThresholdMmol = settings.alertSettings.criticalLowThresholdMmol,
-            highThresholdMmol = settings.alertSettings.criticalHighThresholdMmol,
-            isRu = isRu,
-            onDismiss = { showExtraAlertSoundsInfoDialog = false }
         )
     }
 
@@ -5043,9 +5041,7 @@ private fun AlertTierConfigRow(
     timerBadge: String? = null,
     isPaused: Boolean = false,
     thresholdBadge: String? = null,
-    extraBadge: String? = null,
     onThresholdClick: (() -> Unit)? = null,
-    onExtraBadgeClick: (() -> Unit)? = null,
     isTesting: Boolean = false
 ) {
     Surface(
@@ -5078,71 +5074,29 @@ private fun AlertTierConfigRow(
                     )
                     if (thresholdBadge != null && onThresholdClick != null) {
                         Spacer(modifier = Modifier.height(5.dp))
-                        Row(
-                            modifier = Modifier.height(IntrinsicSize.Min),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = accentColor.copy(alpha = 0.14f),
+                            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.4f)),
+                            modifier = Modifier.clickable { onThresholdClick() }
                         ) {
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = accentColor.copy(alpha = 0.14f),
-                                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.4f)),
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .clickable { onThresholdClick() }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = thresholdBadge,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = accentColor
-                                    )
-                                    Icon(
-                                        imageVector = Icons.Default.Tune,
-                                        contentDescription = null,
-                                        tint = accentColor,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                }
-                            }
-
-                            if (extraBadge != null) {
-                                val darkRed = Color(0xFFDC2626) // Darker red (Tailwind Red 600) compared to ColorVeryLow (0xFFEF4444)
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = darkRed.copy(alpha = 0.18f),
-                                    border = BorderStroke(1.dp, darkRed.copy(alpha = 0.55f)),
-                                    modifier = Modifier
-                                        .fillMaxHeight()
-                                        .clickable(enabled = onExtraBadgeClick != null) {
-                                            onExtraBadgeClick?.invoke()
-                                        }
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Info,
-                                            contentDescription = null,
-                                            tint = darkRed,
-                                            modifier = Modifier.size(12.dp)
-                                        )
-                                        Text(
-                                            text = extraBadge,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = darkRed,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
+                                Text(
+                                    text = thresholdBadge,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = accentColor
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = null,
+                                    tint = accentColor,
+                                    modifier = Modifier.size(12.dp)
+                                )
                             }
                         }
                     }
