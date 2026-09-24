@@ -216,10 +216,19 @@ class TrendsViewModel(
                 // Use latest reading timestamp or now as reference point
                 val referenceTime = latestReading?.timestamp ?: now
 
-                val startTime = if (period.days > 0) {
-                    referenceTime - (period.days.toLong() * 86400000L)
-                } else {
-                    0L // All time
+                val startTime = when {
+                    period == TrendPeriod.PERIOD_1D -> {
+                        val cal = Calendar.getInstance().apply {
+                            timeInMillis = referenceTime
+                            set(Calendar.HOUR_OF_DAY, 0)
+                            set(Calendar.MINUTE, 0)
+                            set(Calendar.SECOND, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }
+                        cal.timeInMillis
+                    }
+                    period.days > 0 -> referenceTime - (period.days.toLong() * 86400000L)
+                    else -> 0L // All time
                 }
 
                 val endTime = if (period.days > 0) {

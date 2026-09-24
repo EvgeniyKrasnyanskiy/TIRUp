@@ -104,10 +104,19 @@ class ReportsViewModel(
             }.flatMapLatest { (period, latest) ->
                 val now = System.currentTimeMillis()
                 val referenceTime = latest?.timestamp ?: now
-                val startTime = if (period.days > 0) {
-                    referenceTime - (period.days.toLong() * 86400000L)
-                } else {
-                    0L
+                val startTime = when {
+                    period == TrendPeriod.PERIOD_1D -> {
+                        val cal = java.util.Calendar.getInstance().apply {
+                            timeInMillis = referenceTime
+                            set(java.util.Calendar.HOUR_OF_DAY, 0)
+                            set(java.util.Calendar.MINUTE, 0)
+                            set(java.util.Calendar.SECOND, 0)
+                            set(java.util.Calendar.MILLISECOND, 0)
+                        }
+                        cal.timeInMillis
+                    }
+                    period.days > 0 -> referenceTime - (period.days.toLong() * 86400000L)
+                    else -> 0L
                 }
                 val endTime = if (period.days > 0) referenceTime + 86400000L else Long.MAX_VALUE
 
