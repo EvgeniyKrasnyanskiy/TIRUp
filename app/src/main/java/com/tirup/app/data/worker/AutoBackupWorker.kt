@@ -30,6 +30,10 @@ class AutoBackupWorker(
             val database = app?.database ?: AppDatabase.getInstance(context)
             val settingsRepo = app?.settingsRepository ?: SettingsRepositoryImpl(context)
 
+            // Step 1: End-of-day verification and deep synchronization against xDrip
+            com.tirup.app.data.receiver.DexdripBroadcastReceiver.verifyAndSyncFullDayHistory(context)
+
+            // Step 2: Proceed with auto backup
             AutoBackupManager.maybeTriggerAutoBackup(
                 context = context,
                 database = database,

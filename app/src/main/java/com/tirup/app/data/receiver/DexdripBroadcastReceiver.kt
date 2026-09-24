@@ -703,8 +703,8 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             return try {
                 val url = java.net.URL("http://127.0.0.1:17580/$endpoint")
                 connection = (url.openConnection() as java.net.HttpURLConnection).apply {
-                    connectTimeout = 600
-                    readTimeout = 600
+                    connectTimeout = 2500
+                    readTimeout = 2500
                     requestMethod = "GET"
                     setRequestProperty("Accept", "application/json")
                 }
@@ -1250,29 +1250,32 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         }
                     }
 
-                    // 2. Fetch /sgv.json?count=... to backfill any missing historical points (adaptive depth up to 24h)
+                    // 2. Fetch /sgv.json to backfill any missing historical points (deep multi-batch up to 24-48h)
                     val latestInDbBefore = app.glucoseRepository.getLatestReading().first()
                     val isPeriodicDue = (now - lastPeriodicHistorySync >= 15 * 60_000L)
-                    val needsHistoryBackfill = force || latestInDbBefore == null || (now - latestInDbBefore.timestamp > 300_000L) || isPeriodicDue
+                    val needsHistoryBackfill = force || latestInDbBefore == null || (now - latestInDbBefore.timestamp > 120_000L) || isPeriodicDue
                     val backfilledReadings = mutableListOf<GlucoseReading>()
 
                     if (needsHistoryBackfill) {
                         if (isPeriodicDue) {
                             lastPeriodicHistorySync = now
                         }
-                        val countToFetch = if (latestInDbBefore == null || force) {
-                            1440 // Full 24 hours of 1-minute cadence readings (or 288 for 5-min)
-                        } else {
-                            val gapMs = (now - latestInDbBefore.timestamp).coerceAtLeast(0L)
-                            // Support sensors with 1-minute cadence (Libre 2/3, Dexcom G7) as well as 5-minute
-                            val missingPoints = (gapMs / 60_000L).toInt() + 5
-                            val minPoints = if (isPeriodicDue) 360 else 30 // Periodic pull fetches up to 6h of 1-min history
-                            missingPoints.coerceIn(minPoints, 1440)
-                        }
-                        val sgvJsonStr = queryLocalEndpoint("sgv.json?count=$countToFetch")
-                        if (!sgvJsonStr.isNullOrBlank()) {
+
+                        // Query xDrip /sgv.json (max 1000 points per request)
+                        // If force or first sync, perform multi-batch fetch to cover entire 24h (up to 1440+ points)
+                        val batchesToFetch = if (force || latestInDbBefore == null) 2 else 1
+                        var oldestFetchedTs = Long.MAX_VALUE
+
+                        for (batch in 0 until batchesToFetch) {
+                            val count = 1000
+                            val endpoint = if (batch == 0) "sgv.json?count=$count" else "sgv.json?count=$count&find[date][\$lte]=$oldestFetchedTs"
+                            val sgvJsonStr = queryLocalEndpoint(endpoint)
+                            if (sgvJsonStr.isNullOrBlank()) break
+
                             try {
                                 val array = org.json.JSONArray(sgvJsonStr)
+                                if (array.length() == 0) break
+
                                 for (i in (array.length() - 1) downTo 0) {
                                     val item = array.optJSONObject(i) ?: continue
                                     val dt = item.optLong("date")
@@ -1289,11 +1292,19 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                                         )
                                     }
                                 }
-                                Log.i(TAG, "Fetched ${array.length()} points from xDrip /sgv.json (requested $countToFetch, backfill candidates: ${backfilledReadings.size})")
+
+                                val batchOldest = array.optJSONObject(array.length() - 1)?.optLong("date") ?: 0L
+                                if (batchOldest > 0L && batchOldest < oldestFetchedTs) {
+                                    oldestFetchedTs = batchOldest - 1L
+                                } else {
+                                    break
+                                }
                             } catch (e: Exception) {
                                 Log.w(TAG, "Error parsing /sgv.json: ${e.message}")
+                                break
                             }
                         }
+                        Log.i(TAG, "Fetched ${backfilledReadings.size} points from xDrip /sgv.json (force=$force, batches=$batchesToFetch)")
                     }
 
                     // 3. Batch insert missing historical points into repository
@@ -1302,10 +1313,10 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                     }
 
                     // 4. Ingest latest point with full alert and widget lifecycle
-                    val readingToPersist = latestReadingFromPebble ?: backfilledReadings.lastOrNull()
+                    val readingToPersist = latestReadingFromPebble ?: backfilledReadings.maxByOrNull { it.timestamp }
                     if (readingToPersist != null) {
                         val latestInDb = app.glucoseRepository.getLatestReading().first()
-                        val isNewer = latestInDb == null || (readingToPersist.timestamp - latestInDb.timestamp > 30_000L)
+                        val isNewer = latestInDb == null || (readingToPersist.timestamp - latestInDb.timestamp > 25_000L)
 
                         if (isNewer) {
                             persistAndDistributeReading(context, readingToPersist)
@@ -1324,6 +1335,40 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 } finally {
                     isSyncingFromLocal = false
                 }
+            }
+        }
+
+        /**
+         * End-of-day (23:59) verification and synchronization:
+         * Performs a full-day sync against xDrip, validates data integrity, and recalculates daily summaries.
+         */
+        suspend fun verifyAndSyncFullDayHistory(context: Context) {
+            try {
+                val app = context.applicationContext as? TirupApplication ?: return
+                val calendar = java.util.Calendar.getInstance().apply {
+                    set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    set(java.util.Calendar.MINUTE, 0)
+                    set(java.util.Calendar.SECOND, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                }
+                val startOfDay = calendar.timeInMillis
+                val endOfDay = startOfDay + 86400000L - 1
+
+                val countBefore = app.database.glucoseReadingDao().getCountBetween(startOfDay, endOfDay)
+                Log.i(TAG, "End-of-day check: TIRUp points today before sync = $countBefore")
+
+                // Force full 24h sync (batches of 1000)
+                syncFromLocalXdrip(context, force = true)
+
+                // Give companion scope IO time to finish batch inserts
+                kotlinx.coroutines.delay(2000L)
+
+                val countAfter = app.database.glucoseReadingDao().getCountBetween(startOfDay, endOfDay)
+                Log.i(TAG, "End-of-day check: TIRUp points today after sync = $countAfter (added: ${countAfter - countBefore})")
+
+                app.glucoseRepository.recalculateDailySummaries(startOfDay, endOfDay)
+            } catch (e: Exception) {
+                Log.w(TAG, "verifyAndSyncFullDayHistory error: ${e.message}")
             }
         }
     }

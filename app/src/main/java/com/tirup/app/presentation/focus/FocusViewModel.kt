@@ -63,7 +63,7 @@ class FocusViewModel(
         observeData()
         observeBlePackets()
         checkAndRefreshIobCob()
-        com.tirup.app.data.receiver.DexdripBroadcastReceiver.syncFromLocalXdrip(context)
+        com.tirup.app.data.receiver.DexdripBroadcastReceiver.syncFromLocalXdrip(context, force = true)
         startPeriodicForegroundSync()
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             (context.applicationContext as? com.tirup.app.TirupApplication)?.database?.let { db ->
@@ -109,7 +109,7 @@ class FocusViewModel(
 
             val glucoseDataFlow = combine(
                 glucoseRepository.getLatestReading(),
-                glucoseRepository.getRecentReadings(1440), // up to 24h of 1-min readings
+                glucoseRepository.getRecentReadings(2880), // up to 48h of 1-min readings (ensures full coverage of current calendar day)
                 glucoseRepository.getTreatmentsBetween(startOfDay, endOfDay + 60_000L),
                 glucoseRepository.getDailySummariesBetween(startOfDay - 30 * 86400000L, endOfDay)
             ) { latest, recent, treatments, summaries ->
