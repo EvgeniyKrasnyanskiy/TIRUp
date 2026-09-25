@@ -859,8 +859,8 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 if (days != null && days in 1..365) return days
             }
 
-            // 4. Check for "restart/extend/продл/перезапуск X"
-            val actionNumMatch = Regex("""(?:restart|extend|продл\w*|перезапуск)\s*(\d{1,3})""").find(clean)
+            // 4. Check for "restart/extend/продл/перезапуск [device] X"
+            val actionNumMatch = Regex("""(?:restart|extend|продл\w*|перезапуск)(?:\s+[^\d\n\r]{1,25})?\s+(\d{1,3})""").find(clean)
             if (actionNumMatch != null) {
                 val days = actionNumMatch.groupValues[1].toIntOrNull()
                 if (days != null && days in 1..365) return days
@@ -891,6 +891,60 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             return n.contains("ланцет") || n.contains("lancet") ||
                     n.contains("прокалывател") || n.contains("игла") ||
                     n.contains("иглы") || n.contains("иглу") || n.contains("needle")
+        }
+
+        fun isCannulaNote(note: String?): Boolean {
+            val n = note?.lowercase()?.trim() ?: return false
+            if (n.isBlank()) return false
+
+            val isWarningOrNotice = n.contains("warning") ||
+                    n.contains("alert") ||
+                    n.contains("alarm") ||
+                    n.contains("закончится") ||
+                    n.contains("истек") ||
+                    n.contains("истечёт") ||
+                    n.contains("осталось") ||
+                    n.contains("через") ||
+                    n.contains("error") ||
+                    n.contains("ошибка")
+
+            if (isWarningOrNotice) return false
+
+            return n.contains("канюл") || n.contains("cannula") ||
+                    n.contains("инфуз") || n.contains("infusion") ||
+                    n.contains("катетер") || n.contains("catheter")
+        }
+
+        fun isSensorNote(note: String?): Boolean {
+            val n = note?.lowercase()?.trim() ?: return false
+            if (n.isBlank()) return false
+
+            val isWarningOrNotice = n.contains("warning") ||
+                    n.contains("alert") ||
+                    n.contains("alarm") ||
+                    n.contains("закончится") ||
+                    n.contains("истек") ||
+                    n.contains("истечёт") ||
+                    n.contains("осталось") ||
+                    n.contains("через") ||
+                    n.contains("error") ||
+                    n.contains("ошибка")
+
+            if (isWarningOrNotice) return false
+
+            val hasSensorWord = n.contains("сенсор") || n.contains("sensor") || n.contains("датчик") ||
+                    n.contains("libre") || n.contains("либр") || n.contains("dexcom") || n.contains("декс")
+
+            val hasActionWord = n.contains("старт") || n.contains("пуск") || n.contains("start") ||
+                    n.contains("новый") || n.contains("new") || n.contains("замена") || n.contains("change") ||
+                    n.contains("установ") || n.contains("install") || n.contains("смена") ||
+                    n.contains("продл") || n.contains("рестарт") || n.contains("restart") ||
+                    n.contains("extend") || n.contains("перезапуск")
+
+            val hasDays = parseDaysFromNote(n) != null
+
+            return (hasSensorWord && (hasActionWord || hasDays)) ||
+                    n in listOf("сенсор", "sensor", "датчик", "новый сенсор", "sensor start", "sensor change", "замена сенсора", "смена сенсора")
         }
 
         fun parseTreatmentsJson(jsonStr: String): List<Treatment> {
@@ -1023,22 +1077,27 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
                         // Auto-recover pump cannula installation timestamp if user logged "канюля" in xDrip
                         val cannulaTreatment = treatments
-                            .filter { t ->
-                                val n = t.notes?.lowercase() ?: ""
-                                n.contains("канюл") || n.contains("cannula") || n.contains("инфуз") || n.contains("infusion")
-                            }
+                            .filter { isCannulaNote(it.notes) }
                             .maxByOrNull { it.timestamp }
 
                         if (cannulaTreatment != null) {
                             val currentSettings = app.settingsRepository.getSettings().first()
-                            if (currentSettings.pumpSetStatus.installedAt == 0L ||
-                                cannulaTreatment.timestamp > currentSettings.pumpSetStatus.installedAt
-                            ) {
-                                Log.i(TAG, "Auto-recovering pump set installation timestamp from xDrip note: ${cannulaTreatment.timestamp}")
+                            val note = cannulaTreatment.notes ?: ""
+                            val parsedDays = parseDaysFromNote(note)
+                            val targetDuration = parsedDays ?: (if (currentSettings.pumpSetStatus.durationDays > 0) currentSettings.pumpSetStatus.durationDays else 3)
+
+                            val shouldUpdate = currentSettings.pumpSetStatus.installedAt == 0L ||
+                                    cannulaTreatment.timestamp > currentSettings.pumpSetStatus.installedAt ||
+                                    (cannulaTreatment.timestamp == currentSettings.pumpSetStatus.installedAt && parsedDays != null && parsedDays != currentSettings.pumpSetStatus.durationDays)
+
+                            if (shouldUpdate) {
+                                Log.i(TAG, "Auto-recovering pump set installation timestamp from xDrip note: ${cannulaTreatment.timestamp}, durationDays=$targetDuration (note='$note')")
                                 app.settingsRepository.updateSettings(
                                     currentSettings.copy(
                                         pumpSetStatus = currentSettings.pumpSetStatus.copy(
-                                            installedAt = cannulaTreatment.timestamp
+                                            installedAt = cannulaTreatment.timestamp,
+                                            durationDays = targetDuration,
+                                            lastUsedDurationDays = targetDuration
                                         )
                                     )
                                 )
@@ -1048,47 +1107,27 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         // Auto-recover CGM sensor installation timestamp if user logged "сенсор" / "sensor" in xDrip
                         // Explicitly filters out warnings, expiration notices, alarms, and error alerts
                         val sensorTreatment = treatments
-                            .filter { t ->
-                                val n = t.notes?.lowercase()?.trim() ?: ""
-                                if (n.isBlank()) return@filter false
-
-                                // 1. Exclude warnings, alerts, alarms, countdowns and expiration notices
-                                val isWarningOrNotice = n.contains("warning") ||
-                                        n.contains("alert") ||
-                                        n.contains("alarm") ||
-                                        n.contains("закончится") ||
-                                        n.contains("истек") ||
-                                        n.contains("истечёт") ||
-                                        n.contains("осталось") ||
-                                        n.contains("через") ||
-                                        n.contains("error") ||
-                                        n.contains("ошибка")
-
-                                if (isWarningOrNotice) return@filter false
-
-                                // 2. Match sensor change/start keywords or exact tags
-                                val hasSensorWord = n.contains("сенсор") || n.contains("sensor") || n.contains("датчик") ||
-                                        n.contains("libre") || n.contains("либр") || n.contains("dexcom") || n.contains("декс")
-
-                                val hasActionWord = n.contains("старт") || n.contains("пуск") || n.contains("start") ||
-                                        n.contains("новый") || n.contains("new") || n.contains("замена") || n.contains("change") ||
-                                        n.contains("установ") || n.contains("install") || n.contains("смена")
-
-                                (hasSensorWord && hasActionWord) ||
-                                        n in listOf("сенсор", "sensor", "датчик", "новый сенсор", "sensor start", "sensor change", "замена сенсора", "смена сенсора")
-                            }
+                            .filter { isSensorNote(it.notes) }
                             .maxByOrNull { it.timestamp }
 
                         if (sensorTreatment != null) {
                             val currentSettings = app.settingsRepository.getSettings().first()
-                            if (currentSettings.sensorStatus.installedAt == 0L ||
-                                sensorTreatment.timestamp > currentSettings.sensorStatus.installedAt
-                            ) {
-                                Log.i(TAG, "Auto-recovering CGM sensor installation timestamp from xDrip note: ${sensorTreatment.timestamp}")
+                            val note = sensorTreatment.notes ?: ""
+                            val parsedDays = parseDaysFromNote(note)
+                            val targetDuration = parsedDays ?: (if (currentSettings.sensorStatus.durationDays > 0) currentSettings.sensorStatus.durationDays else 14)
+
+                            val shouldUpdate = currentSettings.sensorStatus.installedAt == 0L ||
+                                    sensorTreatment.timestamp > currentSettings.sensorStatus.installedAt ||
+                                    (sensorTreatment.timestamp == currentSettings.sensorStatus.installedAt && parsedDays != null && parsedDays != currentSettings.sensorStatus.durationDays)
+
+                            if (shouldUpdate) {
+                                Log.i(TAG, "Auto-recovering CGM sensor installation timestamp from xDrip note: ${sensorTreatment.timestamp}, durationDays=$targetDuration (note='$note')")
                                 app.settingsRepository.updateSettings(
                                     currentSettings.copy(
                                         sensorStatus = currentSettings.sensorStatus.copy(
-                                            installedAt = sensorTreatment.timestamp
+                                            installedAt = sensorTreatment.timestamp,
+                                            durationDays = targetDuration,
+                                            lastUsedDurationDays = targetDuration
                                         )
                                     )
                                 )

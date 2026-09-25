@@ -19,7 +19,10 @@ class DexdripNoteParserTest {
         assertEquals(3, DexdripBroadcastReceiver.parseDaysFromNote("продлить 3 дня"))
         assertEquals(7, DexdripBroadcastReceiver.parseDaysFromNote("ланцет на 7 дней"))
         assertEquals(14, DexdripBroadcastReceiver.parseDaysFromNote("restart lancet 14 days"))
-        assertEquals(21, DexdripBroadcastReceiver.parseDaysFromNote("lancet for 21 days"))
+        assertEquals(3, DexdripBroadcastReceiver.parseDaysFromNote("рестарт канюли 3"))
+        assertEquals(7, DexdripBroadcastReceiver.parseDaysFromNote("продлить сенсор 7"))
+        assertEquals(10, DexdripBroadcastReceiver.parseDaysFromNote("продлить сенсор на 10 дней"))
+        assertEquals(4, DexdripBroadcastReceiver.parseDaysFromNote("extend cannula 4"))
     }
 
     @Test
@@ -62,5 +65,54 @@ class DexdripNoteParserTest {
         org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isLancetNote("обед 5 ХЕ"))
         org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isLancetNote(null))
         org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isLancetNote(""))
+    }
+
+    @Test
+    fun testIsCannulaNote() {
+        // Positive matches
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isCannulaNote("канюля"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isCannulaNote("Канюля"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isCannulaNote("канюля продлена на 3 дня"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isCannulaNote("канюля +3"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isCannulaNote("инфузионный набор"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isCannulaNote("cannula change"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isCannulaNote("infusion set"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isCannulaNote("смена катетера"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isCannulaNote("катетер +3"))
+
+        // Warnings / alerts should be excluded
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isCannulaNote("канюля warning: replace"))
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isCannulaNote("инфуз ошибка"))
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isCannulaNote("канюля истек срок"))
+
+        // Unrelated
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isCannulaNote("ланцет"))
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isCannulaNote("сенсор"))
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isCannulaNote(null))
+    }
+
+    @Test
+    fun testIsSensorNote() {
+        // Positive matches
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isSensorNote("сенсор"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isSensorNote("Сенсор"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isSensorNote("новый сенсор"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isSensorNote("sensor start"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isSensorNote("сенсор продлен на 7 дней"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isSensorNote("сенсор +7"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isSensorNote("рестарт сенсора 14 days"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isSensorNote("libre restart"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isSensorNote("dexcom change"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isSensorNote("датчик замена"))
+
+        // Warnings / alerts should be excluded
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isSensorNote("сенсор warning: expired"))
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isSensorNote("сенсор закончится через 2 часа"))
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isSensorNote("сенсор error 373"))
+
+        // Unrelated
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isSensorNote("ланцет"))
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isSensorNote("канюля"))
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isSensorNote(null))
     }
 }

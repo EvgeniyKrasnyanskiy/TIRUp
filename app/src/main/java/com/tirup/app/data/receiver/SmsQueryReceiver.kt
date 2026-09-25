@@ -57,6 +57,13 @@ class SmsQueryReceiver : BroadcastReceiver() {
                 val sosData = com.tirup.app.domain.alert.SosSmsParser.parse(messageBody, senderPhone)
                 if (sosData != null) {
                     Log.i(TAG, "Valid SOS alert from trusted contact $senderPhone! Triggering CaregiverSosAlarmManager...")
+                    val lastMsg = com.tirup.app.domain.model.LastImportantMessage(
+                        senderName = sosData.patientName.ifBlank { "SOS" },
+                        senderPhone = senderPhone,
+                        text = "🚨 SOS: ${sosData.glucoseDisplay} (${sosData.rawText.take(60)})",
+                        timestamp = System.currentTimeMillis()
+                    )
+                    repo.updateSettings(settings.copy(lastImportantMessage = lastMsg))
                     com.tirup.app.data.alert.CaregiverSosAlarmManager.triggerCaregiverSos(context, sosData)
                     return
                 }
@@ -153,6 +160,14 @@ class SmsQueryReceiver : BroadcastReceiver() {
         } else {
             alerts.secondaryEmergencyContactName.ifBlank { if (alerts.isCaregiverRole) "Мастер" else "Фоловер" }
         }
+        val lastMsg = com.tirup.app.domain.model.LastImportantMessage(
+            senderName = contactName,
+            senderPhone = senderPhone,
+            text = messageBody,
+            timestamp = System.currentTimeMillis()
+        )
+        repo.updateSettings(settings.copy(lastImportantMessage = lastMsg))
+
         launchHeadsUpMessage(
             context = context,
             senderName = contactName,

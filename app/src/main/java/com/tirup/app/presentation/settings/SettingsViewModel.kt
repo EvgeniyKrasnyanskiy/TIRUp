@@ -24,6 +24,7 @@ import com.tirup.app.data.backup.BackupSummary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -660,6 +661,16 @@ class SettingsViewModel(
             else "Glucose is 3.4 mmol/L and falling ⇊. Drink fast carbs immediately!"
         }
         val phone = alerts.emergencyContactPhone.ifBlank { "+79991234567" }
+        val lastMsg = com.tirup.app.domain.model.LastImportantMessage(
+            senderName = senderRole,
+            senderPhone = phone,
+            text = sampleText,
+            timestamp = System.currentTimeMillis()
+        )
+        viewModelScope.launch {
+            val current = settingsRepository.getSettings().first()
+            settingsRepository.updateSettings(current.copy(lastImportantMessage = lastMsg))
+        }
         com.tirup.app.data.receiver.SmsQueryReceiver.launchHeadsUpMessage(
             context = context,
             senderName = senderRole,

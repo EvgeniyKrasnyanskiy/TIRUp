@@ -185,11 +185,19 @@ data class UserSettings(
     val hba1cRemindersCountInCycle: Int = 0,
     val lastHba1cReminderTimestamp: Long = 0L,
     val lastYearEndDigestShownYear: Int = 0,
-    val aodSettings: AodSettings = AodSettings()
+    val aodSettings: AodSettings = AodSettings(),
+    val lastImportantMessage: LastImportantMessage? = null
 ) {
     val latestHba1cRecord: LabHba1cRecord?
         get() = hba1cRecords.maxByOrNull { it.timestamp }
 }
+
+data class LastImportantMessage(
+    val senderName: String = "",
+    val senderPhone: String = "",
+    val text: String = "",
+    val timestamp: Long = 0L
+)
 
 fun isPumpTherapy(therapyType: String): Boolean {
     val normalized = therapyType.trim()

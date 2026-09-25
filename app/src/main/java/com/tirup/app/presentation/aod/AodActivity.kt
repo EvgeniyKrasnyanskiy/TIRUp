@@ -12,6 +12,10 @@ import androidx.activity.compose.setContent
 import com.tirup.app.TirupApplication
 import com.tirup.app.presentation.theme.TIRUpTheme
 
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+
 class AodActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,6 +55,18 @@ class AodActivity : ComponentActivity() {
                     latestReadingFlow = glucoseRepo.getLatestReading(),
                     recentReadingsFlow = glucoseRepo.getRecentReadings(12),
                     onSetWindowBrightness = { brightness -> setWindowBrightness(brightness) },
+                    onSaveBrightness = { brightness ->
+                        lifecycleScope.launch {
+                            val current = settingsRepo.getSettings().first()
+                            settingsRepo.updateSettings(
+                                current.copy(
+                                    aodSettings = current.aodSettings.copy(
+                                        customBrightness = brightness
+                                    )
+                                )
+                            )
+                        }
+                    },
                     onExit = { finish() }
                 )
             }
