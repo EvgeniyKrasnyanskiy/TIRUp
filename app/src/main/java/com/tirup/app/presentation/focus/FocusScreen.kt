@@ -258,22 +258,6 @@ fun FocusScreen(
                         )
                     }
 
-                    // Night AOD button
-                    IconButton(
-                        onClick = {
-                            val aodIntent = Intent(context, com.tirup.app.presentation.aod.AodActivity::class.java).apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                            }
-                            context.startActivity(aodIntent)
-                        },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Text(
-                            text = "🌙",
-                            fontSize = 18.sp
-                        )
-                    }
-
                     StreakBadge(
                         streakDays = state.streakDays,
                         onClick = {
@@ -461,6 +445,12 @@ fun FocusScreen(
                     detailDialogInfo = Pair(title, desc)
                 },
                 onBleClick = { showBleStatusDialog = true },
+                onAodClick = {
+                    val aodIntent = Intent(context, com.tirup.app.presentation.aod.AodActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    }
+                    context.startActivity(aodIntent)
+                },
                 onClick = {
                     val r = state.latestReading
                     if (r != null) {
@@ -1888,6 +1878,7 @@ private fun HeroGlucoseCard(
     onIobClick: () -> Unit = {},
     onCobClick: () -> Unit = {},
     onBleClick: () -> Unit = {},
+    onAodClick: () -> Unit = {},
     onClick: () -> Unit
 ) {
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
@@ -2294,39 +2285,70 @@ private fun HeroGlucoseCard(
                         }
                     }
                 }
-            } else if (statusInfo != null || timeLabel.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
+            }
+
+            // Bottom row: Status pill (center) + Moon AOD button (bottom right)
+            Spacer(modifier = Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 2.dp)
+            ) {
+                if (statusInfo != null || timeLabel.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background((statusInfo?.second ?: PrimaryEmerald).copy(alpha = 0.12f))
+                            .padding(horizontal = 12.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        if (statusInfo != null) {
+                            Text(
+                                text = statusInfo.first,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = statusInfo.second,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (statusInfo != null && timeLabel.isNotEmpty()) {
+                            Text(
+                                text = " • ",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = onSurfaceVariant
+                            )
+                        }
+                        if (timeLabel.isNotEmpty()) {
+                            Text(
+                                text = timeLabel,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+
+                // Moon AOD button in the bottom-right corner (mirroring BLE badge in top-right)
+                Surface(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background((statusInfo?.second ?: PrimaryEmerald).copy(alpha = 0.12f))
-                        .padding(horizontal = 12.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+                        .align(Alignment.CenterEnd)
+                        .size(width = 34.dp, height = 26.dp)
+                        .clickable { onAodClick() },
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                    border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
                 ) {
-                    if (statusInfo != null) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
-                            text = statusInfo.first,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = statusInfo.second,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    if (statusInfo != null && timeLabel.isNotEmpty()) {
-                        Text(
-                            text = " • ",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = onSurfaceVariant
-                        )
-                    }
-                    if (timeLabel.isNotEmpty()) {
-                        Text(
-                            text = timeLabel,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = onSurfaceVariant,
-                            maxLines = 1
+                            text = "🌙",
+                            fontSize = 13.sp
                         )
                     }
                 }

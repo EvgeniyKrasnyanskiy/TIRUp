@@ -72,32 +72,25 @@ enum class AodDisplayMode {
 
 ---
 
-## План изменений по файлам
+## Статус этапа: Доработки и исправление падения (Hotfix)
 
-1. **[NEW] `app/src/main/java/com/tirup/app/domain/model/AodSettings.kt`** (или расширение `UserSettings.kt`):
-   - Модель `AodSettings`, `AodDisplayMode`.
-2. **[NEW] `app/src/main/java/com/tirup/app/presentation/aod/AodActivity.kt`**:
-   - Полноэкранная Activity с черным фоном, флагами блокировки, управлением яркостью, Anti-Burn-In смещением, жестами свайпа, фонариком с 15-секундным нарастанием и таймером импульсного показа.
-3. **[NEW] `app/src/main/java/com/tirup/app/presentation/aod/AodScreen.kt`**:
-   - Compose-разметка: гигантский сахар, стрелка, время замера, индикатор режима, экран фонарика, крестик выхода.
-4. **[MODIFY] `AndroidManifest.xml`**:
-   - Регистрация `AodActivity` с параметрами `android:showWhenLocked="true"`, `android:turnScreenOn="true"`, `android:screenOrientation="portrait"`.
-5. **[MODIFY] `UserSettings.kt` & `SettingsRepositoryImpl.kt`**:
-   - Сериализация и хранение `aodSettings`.
-6. **[MODIFY] `FocusScreen.kt`**:
-   - Кнопка 🌙 в верхнем баре для мгновенного перехода в AOD.
-7. **[MODIFY] `SettingsScreen.kt`**:
-   - Bento-карточка настроек AOD с переключателями режимов, автозапуска по зарядке и временем.
+### Выявленная причина падения при запуске AOD:
+1. **R8/ProGuard минификация и `by viewModels` в релизной сборке**: В `AodActivity` использовалась ленивая инициализация `by viewModels` с анонимной фабрикой без правил `-keep` в `proguard-rules.pro`. В сборке `release` с `isMinifyEnabled = true` это приводит к `ClassNotFoundException` / `NoSuchMethodException`.
+2. **Упрощение архитектуры**: `AodScreen` может напрямую собирать потоки данных (`Flow<GlucoseReading?>`, `Flow<UserSettings>`, `Flow<List<GlucoseReading>>`) через `collectAsState`, не требуя тяжеловесного `ViewModel` с рефлексией.
+3. **Безопасная настройка окна**: Обернуть установку `screenBrightness`, скрытие системных панелей (`WindowInsetsController`) и флаги блокировки в блоки `try-catch`, а также обернуть вызов `AodScreen` в `TIRUpTheme(darkTheme = true)`.
 
----
+### Задачи по запросу пользователя:
+1. **[FIX] `AodActivity.kt` & `AodScreen.kt` & `proguard-rules.pro`**:
+   - Передать `Flow` напрямую из `TirupApplication` в `AodScreen` без рефлексивных ViewModel.
+   - Обернуть операции с окном и яркостью в `try-catch`.
+   - Добавить правила сохранения классов ViewModel и AOD в `proguard-rules.pro`.
+2. **[UI] `FocusScreen.kt`**:
+   - Удалить иконку 🌙 из верхнего заголовка.
+   - Перенести пиктограмму «месяц» (🌙) в карточку `HeroGlucoseCard` в **правый нижний угол** (симметрично пиктограмме BLE, которая находится в правом верхнем углу).
+3. **[UI] `SettingsScreen.kt`**:
+   - Добавить пиктограмму-шеврона (`ExpandMore` / `ExpandLess`) рядом со свитчем AOD, чтобы было очевидно, что блок раскрывается.
+   - Сделать плашку подсказки «Режим оптимизирован под экраны AMOLED/OLED...» адаптивной к светлой/темной теме (использовать `MaterialTheme.colorScheme.surfaceVariant` и `onSurfaceVariant` вместо жестко заданного темного `#1E293B`).
 
-## Верификация
-1. Прогон `testReleaseUnitTest`.
-2. Сборка `assembleRelease`.
-3. Установка на тестовый смартфон через `adb install -r`.
-4. Тестирование ручного запуска по иконке 🌙:
-   - Проверка перехода в глубокий черный цвет и минимальную яркость.
-   - Проверка показа огромной цифры сахара и стрелки.
    - Проверка одиночного тапа (пробуждение в режиме Pulse).
    - Проверка двойного тапа (плавный 15-секундный экранный фонарик).
    - Проверка свайпа/крестика (выход обратно в приложение).
