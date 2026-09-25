@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -64,6 +65,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -73,6 +75,7 @@ fun AodScreen(
     latestReadingFlow: kotlinx.coroutines.flow.Flow<com.tirup.app.domain.model.GlucoseReading?>,
     recentReadingsFlow: kotlinx.coroutines.flow.Flow<List<com.tirup.app.domain.model.GlucoseReading>>,
     onSetWindowBrightness: (Float) -> Unit,
+    onSaveBrightness: (Float) -> Unit = {},
     onExit: () -> Unit
 ) {
     val settings by settingsFlow.collectAsState(initial = com.tirup.app.domain.model.UserSettings())
@@ -97,17 +100,38 @@ fun AodScreen(
         }
     }
 
-    // Flashlight state (Double-tap initiates 15s smooth increase to 100% white screen)
+    // Flashlight state (Double-tap initiates 15s smooth increase; Single tap pauses/resumes)
     var isFlashlightActive by remember { mutableStateOf(false) }
-    var flashlightTargetAlpha by remember { mutableFloatStateOf(0f) }
-    val animatedFlashlightAlpha by animateFloatAsState(
-        targetValue = flashlightTargetAlpha,
-        animationSpec = tween(
-            durationMillis = if (flashlightTargetAlpha > 0f) 15_000 else 300,
-            easing = LinearEasing
-        ),
-        label = "FlashlightRamp"
-    )
+    var isFlashlightPaused by remember { mutableStateOf(false) }
+    var flashlightProgress by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(isFlashlightActive, isFlashlightPaused) {
+        if (isFlashlightActive && !isFlashlightPaused) {
+            val stepDelay = 80L
+            val stepIncrement = 80f / 15_000f
+            while (isFlashlightActive && !isFlashlightPaused && flashlightProgress < 1.0f) {
+                delay(stepDelay)
+                flashlightProgress = (flashlightProgress + stepIncrement).coerceAtMost(1.0f)
+            }
+        }
+    }
+
+    // Brightness adjustment state & HUD
+    var currentBrightness by remember { mutableFloatStateOf(aod.customBrightness.coerceIn(0.005f, 1.0f)) }
+    var isBrightnessOverlayVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(aod.customBrightness) {
+        if (!isBrightnessOverlayVisible) {
+            currentBrightness = aod.customBrightness.coerceIn(0.005f, 1.0f)
+        }
+    }
+
+    LaunchedEffect(isBrightnessOverlayVisible) {
+        if (isBrightnessOverlayVisible) {
+            delay(1500L)
+            isBrightnessOverlayVisible = false
+        }
+    }
 
     // Pulse awake timer state for PULSE_ON_UPDATE mode
     var isAwake by remember { mutableStateOf(aod.displayMode == AodDisplayMode.ALWAYS_ON) }
@@ -148,7 +172,7 @@ fun AodScreen(
             onSetWindowBrightness(0.001f) // Ultra-dim sleeping window
         } else if (aod.displayMode == AodDisplayMode.ALWAYS_ON && !isFlashlightActive) {
             isAwake = true
-            onSetWindowBrightness(0.01f)
+            onSetWindowBrightness(currentBrightness)
         }
     }
 
@@ -160,15 +184,14 @@ fun AodScreen(
         }
     }
 
-    // Sync window brightness with flashlight progression
-    LaunchedEffect(animatedFlashlightAlpha, isFlashlightActive) {
+    // Sync window brightness with flashlight progression or AoD brightness
+    LaunchedEffect(flashlightProgress, isFlashlightActive, currentBrightness, isAwake, aod.displayMode) {
         if (isFlashlightActive) {
-            // Brightness follows ramp from 0.05f to 1.0f
-            val b = 0.05f + (0.95f * animatedFlashlightAlpha)
+            val b = 0.05f + (0.95f * flashlightProgress)
             onSetWindowBrightness(b)
         } else {
             if (isAwake || aod.displayMode == AodDisplayMode.ALWAYS_ON) {
-                onSetWindowBrightness(0.01f)
+                onSetWindowBrightness(currentBrightness)
             } else {
                 onSetWindowBrightness(0.001f)
             }
@@ -179,101 +202,166 @@ fun AodScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            // Gesture detector: tap to wake, double tap for flashlight, swipe to exit
+            // Gesture detector: tap to wake / pause flashlight, double tap for flashlight
             .pointerInput(aod.displayMode, isFlashlightActive) {
                 detectTapGestures(
                     onTap = {
-                        if (!isFlashlightActive) {
-                            // Single tap wakes up the screen for pulse duration
+                        if (isFlashlightActive) {
+                            // Single tap during flashlight: pause or resume ramping!
+                            isFlashlightPaused = !isFlashlightPaused
+                        } else {
+                            // Single tap wakes screen in PULSE_ON_UPDATE
                             lastAwakeTriggerTimestamp = System.currentTimeMillis()
                             isAwake = true
-                            onSetWindowBrightness(0.01f)
+                            onSetWindowBrightness(currentBrightness)
                         }
                     },
                     onDoubleTap = {
-                        // Double tap: toggle smooth 15-second flashlight ramp
                         if (!isFlashlightActive) {
                             isFlashlightActive = true
-                            flashlightTargetAlpha = 1.0f
+                            isFlashlightPaused = false
+                            flashlightProgress = 0.05f
                         } else {
                             isFlashlightActive = false
-                            flashlightTargetAlpha = 0f
+                            isFlashlightPaused = false
+                            flashlightProgress = 0f
                         }
                     }
                 )
             }
-            .pointerInput(Unit) {
+            // Vertical drag for brightness, horizontal swipe for exit
+            .pointerInput(isFlashlightActive, currentBrightness) {
                 var totalDragX = 0f
                 var totalDragY = 0f
+                var isVerticalDrag = false
                 detectDragGestures(
                     onDragStart = {
                         totalDragX = 0f
                         totalDragY = 0f
+                        isVerticalDrag = false
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
                         totalDragX += dragAmount.x
                         totalDragY += dragAmount.y
+
+                        if (!isFlashlightActive) {
+                            if (isVerticalDrag || (abs(totalDragY) > 8f && abs(totalDragY) > abs(totalDragX) * 1.2f)) {
+                                isVerticalDrag = true
+                                currentBrightness = (currentBrightness - (dragAmount.y / 500f)).coerceIn(0.005f, 1.0f)
+                                onSetWindowBrightness(currentBrightness)
+                                isBrightnessOverlayVisible = true
+                            }
+                        }
                     },
                     onDragEnd = {
-                        // Any swipe gesture exceeding 80px triggers exit back to app
-                        if (abs(totalDragX) > 80f || abs(totalDragY) > 80f) {
+                        if (abs(totalDragX) > 80f && abs(totalDragX) > abs(totalDragY) * 1.5f) {
                             onExit()
+                        } else if (isVerticalDrag) {
+                            onSaveBrightness(currentBrightness)
                         }
                     }
                 )
             }
     ) {
         val isLandscape = maxWidth > maxHeight
-        val topPadding = if (isLandscape) 14.dp else 36.dp
-        val bottomPadding = if (isLandscape) 10.dp else 28.dp
-        val glucoseFontSize = if (isLandscape) 115.sp else 140.sp
-        val arrowFontSize = if (isLandscape) 46.sp else 62.sp
+        val topPadding = if (isLandscape) 4.dp else 36.dp
+        val bottomPadding = if (isLandscape) 4.dp else 28.dp
+        val glucoseFontSize = if (isLandscape) (maxHeight.value * 0.65f).coerceIn(210f, 280f).sp else 140.sp
+        val arrowFontSize = if (isLandscape) 78.sp else 62.sp
 
         // -------------------------------------------------------------
-        // 1. Flashlight Overlay: Smooth warm white ramp (0 -> 100% in 15s)
+        // 1. Flashlight Overlay: Smooth warm white ramp with pause & progress
         // -------------------------------------------------------------
-        if (animatedFlashlightAlpha > 0.001f) {
+        if (isFlashlightActive || flashlightProgress > 0.001f) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFFFFBEB).copy(alpha = animatedFlashlightAlpha))
+                    .background(Color(0xFFFFFBEB).copy(alpha = flashlightProgress))
             ) {
-                // Adaptive high-contrast hint color during ramp-up
-                val overlayTextColor = if (animatedFlashlightAlpha < 0.45f) Color(0xFFF8FAFC) else Color(0xFF1E293B)
+                val overlayTextColor = if (flashlightProgress < 0.45f) Color(0xFFF8FAFC) else Color(0xFF1E293B)
+                val pct = (flashlightProgress * 100).roundToInt()
 
-                // Flashlight hint & quick close icon
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = topPadding, start = 24.dp, end = 24.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(top = topPadding, start = 20.dp, end = 20.dp)
                 ) {
-                    Text(
-                        text = stringResource(R.string.aod_flashlight_overlay_hint),
-                        color = overlayTextColor,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    IconButton(
-                        onClick = {
-                            isFlashlightActive = false
-                            flashlightTargetAlpha = 0f
-                        }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Off",
-                            tint = overlayTextColor
+                        Text(
+                            text = if (isFlashlightPaused) {
+                                stringResource(R.string.aod_flashlight_paused, pct)
+                            } else {
+                                stringResource(R.string.aod_flashlight_ramping, pct)
+                            },
+                            color = overlayTextColor,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
+                        IconButton(
+                            onClick = {
+                                isFlashlightActive = false
+                                isFlashlightPaused = false
+                                flashlightProgress = 0f
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Off",
+                                tint = overlayTextColor
+                            )
+                        }
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    androidx.compose.material3.LinearProgressIndicator(
+                        progress = { flashlightProgress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp),
+                        color = Color(0xFFF59E0B),
+                        trackColor = overlayTextColor.copy(alpha = 0.2f)
+                    )
                 }
             }
         }
 
         // -------------------------------------------------------------
-        // 2. AOD Glucose Display Content (Visible when isAwake or ALWAYS_ON)
+        // 2. Brightness HUD overlay during vertical drag
+        // -------------------------------------------------------------
+        AnimatedVisibility(
+            visible = isBrightnessOverlayVisible && !isFlashlightActive,
+            enter = fadeIn(tween(150)),
+            exit = fadeOut(tween(300)),
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+            Surface(
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                color = Color(0xEE1E293B),
+                border = BorderStroke(1.dp, Color(0xFF475569)),
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(text = "🔆", fontSize = 20.sp)
+                    Text(
+                        text = stringResource(R.string.aod_brightness_hud, (currentBrightness * 100).roundToInt()),
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // 3. AOD Glucose Display Content (Visible when isAwake or ALWAYS_ON)
         // -------------------------------------------------------------
         AnimatedVisibility(
             visible = (isAwake || aod.displayMode == AodDisplayMode.ALWAYS_ON) && !isFlashlightActive,
@@ -297,7 +385,7 @@ fun AodScreen(
                     Text(
                         text = currentTimeStr,
                         color = Color(0xFF666666),
-                        fontSize = 16.sp,
+                        fontSize = if (isLandscape) 14.sp else 16.sp,
                         fontWeight = FontWeight.Medium
                     )
 
@@ -318,7 +406,7 @@ fun AodScreen(
                     modifier = Modifier
                         .align(Alignment.Center)
                         .offset { IntOffset(jitterOffsetX.dp.roundToPx(), jitterOffsetY.dp.roundToPx()) }
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = if (isLandscape) 8.dp else 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
@@ -328,11 +416,11 @@ fun AodScreen(
                     // Color mapping: muted soft tones for night vision & OLED safety
                     val glucoseColor = when {
                         glucoseValMmol <= 0.0 -> Color(0xFF555555)
-                        glucoseValMmol < ranges.veryLowThresholdMmol -> Color(0xFF991B1B) // Muted deep red
-                        glucoseValMmol < ranges.tirLowMmol -> Color(0xFFB45309)         // Muted amber
-                        glucoseValMmol > ranges.veryHighThresholdMmol -> Color(0xFF9A3412) // Muted orange-red
-                        glucoseValMmol > ranges.tirHighMmol -> Color(0xFFB45309)        // Muted amber
-                        else -> Color(0xFF047857)                                      // Muted emerald green
+                        glucoseValMmol < ranges.veryLowThresholdMmol -> Color(0xFF991B1B)
+                        glucoseValMmol < ranges.tirLowMmol -> Color(0xFFB45309)
+                        glucoseValMmol > ranges.veryHighThresholdMmol -> Color(0xFF9A3412)
+                        glucoseValMmol > ranges.tirHighMmol -> Color(0xFFB45309)
+                        else -> Color(0xFF047857)
                     }
 
                     val glucoseText = if (r != null && r.valueMmol > 0.0) {
@@ -342,7 +430,7 @@ fun AodScreen(
 
                     val arrow = r?.trendArrow ?: ""
 
-                    // Giant Glucose Number (dominating width, +25% enlarged)
+                    // Giant Glucose Number (dominating width/height in landscape)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
@@ -363,12 +451,12 @@ fun AodScreen(
                                 fontSize = arrowFontSize,
                                 fontWeight = FontWeight.Bold,
                                 color = glucoseColor.copy(alpha = 0.85f),
-                                modifier = Modifier.padding(start = 6.dp, bottom = if (isLandscape) 6.dp else 12.dp)
+                                modifier = Modifier.padding(start = if (isLandscape) 10.dp else 6.dp, bottom = if (isLandscape) 4.dp else 12.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(if (isLandscape) 2.dp else 6.dp))
+                    Spacer(modifier = Modifier.height(if (isLandscape) 1.dp else 6.dp))
 
                     // Reading Delta & Timestamp Age (Fully Localized)
                     val ageMins = if (r != null && r.timestamp > 0L) {
@@ -390,7 +478,7 @@ fun AodScreen(
                     Text(
                         text = listOf(deltaStr, ageStr).filter { it.isNotBlank() }.joinToString(" • "),
                         color = Color(0xFF666666),
-                        fontSize = if (isLandscape) 15.sp else 17.sp,
+                        fontSize = if (isLandscape) 14.sp else 17.sp,
                         fontWeight = FontWeight.Normal,
                         textAlign = TextAlign.Center
                     )

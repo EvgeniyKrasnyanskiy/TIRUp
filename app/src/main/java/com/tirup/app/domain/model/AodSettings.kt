@@ -19,5 +19,6 @@ data class AodSettings(
     val autoChargeStartHour: Int = 23,
     val autoChargeStartMinute: Int = 0,
     val autoChargeEndHour: Int = 7,
-    val autoChargeEndMinute: Int = 0
+    val autoChargeEndMinute: Int = 0,
+    val customBrightness: Float = 0.01f
 )

@@ -191,6 +191,11 @@ class SettingsRepositoryImpl(
             .putInt(KEY_AOD_AUTO_CHARGE_START_MIN, settings.aodSettings.autoChargeStartMinute)
             .putInt(KEY_AOD_AUTO_CHARGE_END_HOUR, settings.aodSettings.autoChargeEndHour)
             .putInt(KEY_AOD_AUTO_CHARGE_END_MIN, settings.aodSettings.autoChargeEndMinute)
+            .putFloat(KEY_AOD_CUSTOM_BRIGHTNESS, settings.aodSettings.customBrightness)
+            .putString(KEY_LAST_IMPORTANT_MSG_SENDER, settings.lastImportantMessage?.senderName ?: "")
+            .putString(KEY_LAST_IMPORTANT_MSG_PHONE, settings.lastImportantMessage?.senderPhone ?: "")
+            .putString(KEY_LAST_IMPORTANT_MSG_TEXT, settings.lastImportantMessage?.text ?: "")
+            .putLong(KEY_LAST_IMPORTANT_MSG_TS, settings.lastImportantMessage?.timestamp ?: 0L)
             .apply()
 
         try {
@@ -487,12 +492,31 @@ class SettingsRepositoryImpl(
                 autoChargeStartHour = prefs.getInt(KEY_AOD_AUTO_CHARGE_START_HOUR, 23),
                 autoChargeStartMinute = prefs.getInt(KEY_AOD_AUTO_CHARGE_START_MIN, 0),
                 autoChargeEndHour = prefs.getInt(KEY_AOD_AUTO_CHARGE_END_HOUR, 7),
-                autoChargeEndMinute = prefs.getInt(KEY_AOD_AUTO_CHARGE_END_MIN, 0)
-            )
+                autoChargeEndMinute = prefs.getInt(KEY_AOD_AUTO_CHARGE_END_MIN, 0),
+                customBrightness = prefs.getFloat(KEY_AOD_CUSTOM_BRIGHTNESS, 0.01f)
+            ),
+            lastImportantMessage = run {
+                val text = prefs.getString(KEY_LAST_IMPORTANT_MSG_TEXT, null)
+                val ts = prefs.getLong(KEY_LAST_IMPORTANT_MSG_TS, 0L)
+                if (!text.isNullOrBlank() && ts > 0L) {
+                    com.tirup.app.domain.model.LastImportantMessage(
+                        senderName = prefs.getString(KEY_LAST_IMPORTANT_MSG_SENDER, "") ?: "",
+                        senderPhone = prefs.getString(KEY_LAST_IMPORTANT_MSG_PHONE, "") ?: "",
+                        text = text,
+                        timestamp = ts
+                    )
+                } else null
+            }
         )
     }
 
     companion object {
+        private const val KEY_AOD_CUSTOM_BRIGHTNESS = "key_aod_custom_brightness"
+        private const val KEY_LAST_IMPORTANT_MSG_SENDER = "key_last_important_msg_sender"
+        private const val KEY_LAST_IMPORTANT_MSG_PHONE = "key_last_important_msg_phone"
+        private const val KEY_LAST_IMPORTANT_MSG_TEXT = "key_last_important_msg_text"
+        private const val KEY_LAST_IMPORTANT_MSG_TS = "key_last_important_msg_ts"
+
         private const val KEY_LANG = "key_language"
         private const val KEY_UNIT = "key_unit"
         private const val KEY_TARGET_MODE = "key_target_mode"

@@ -106,5 +106,8 @@
     <string name="widget_medium_label">TIRUp: Compact Dashboard (3x2)</string>
     <string name="widget_medium_description">Compact dashboard featuring glucose, 4-hour sparkline chart, compensator goal, and nightstand mode</string>
     <string name="aod_flashlight_overlay_hint">💡 Flashlight (double-tap to turn off)</string>
-    <string name="aod_gesture_hint">Double-tap: Flashlight • Swipe: Exit</string>
+    <string name="aod_flashlight_ramping">💡 Ramping: %d%% • Tap: Pause</string>
+    <string name="aod_flashlight_paused">⏸ Paused: %d%% • Tap: Resume</string>
+    <string name="aod_brightness_hud">Brightness: %d%%</string>
+    <string name="aod_gesture_hint">Double-tap: Flashlight • Swipe: Exit • Up/down: Brightness</string>
 </resources>
