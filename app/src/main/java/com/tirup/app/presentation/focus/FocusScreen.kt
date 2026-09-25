@@ -62,6 +62,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Tune
@@ -457,6 +458,7 @@ fun FocusScreen(
                     context.startActivity(aodIntent)
                 },
                 lastImportantMessage = userSettings.lastImportantMessage,
+                onDismissImportantMessage = { viewModel.dismissLastImportantMessage() },
                 onImportantMessageClick = { msg ->
                     try {
                         val smsIntent = Intent(Intent.ACTION_SENDTO).apply {
@@ -1900,6 +1902,7 @@ private fun HeroGlucoseCard(
     areAlertsMuted: Boolean = false,
     lastImportantMessage: LastImportantMessage? = null,
     onImportantMessageClick: (LastImportantMessage) -> Unit = {},
+    onDismissImportantMessage: () -> Unit = {},
     onAlertHistoryClick: () -> Unit = {},
     onBatteryClick: () -> Unit = {},
     onIobClick: () -> Unit = {},
@@ -2154,32 +2157,53 @@ private fun HeroGlucoseCard(
                     }
                 }
 
-                // Right: Master/Receiver BLE status badge
-                if (bleBridgeSettings != null) {
-                    BleBridgeBadge(
-                        bleSettings = bleBridgeSettings,
-                        isBleBroadcasting = isBleBroadcasting,
-                        broadcastRemainingSec = broadcastRemainingSec,
-                        nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
-                        blePacketReceivedAt = blePacketReceivedAt,
-                        isRu = isRu,
-                        onClick = onBleClick
-                    )
-                } else {
-                    Spacer(modifier = Modifier.width(62.dp))
+                // Right: Master/Receiver BLE status badge + Moon AOD button (rightmost)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (bleBridgeSettings != null) {
+                        BleBridgeBadge(
+                            bleSettings = bleBridgeSettings,
+                            isBleBroadcasting = isBleBroadcasting,
+                            broadcastRemainingSec = broadcastRemainingSec,
+                            nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
+                            blePacketReceivedAt = blePacketReceivedAt,
+                            isRu = isRu,
+                            onClick = onBleClick
+                        )
+                    }
+                    Surface(
+                        modifier = Modifier
+                            .size(width = 30.dp, height = 24.dp)
+                            .clickable { onAodClick() },
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                        border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "🌙",
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
                 }
             }
 
-            // Sub-row: [ Last Important Message Preview ] ----------- [ Moon AOD Button ]
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (lastImportantMessage != null) {
+            // Sub-row: [ Last Important Message Preview with Dismiss Button ]
+            if (lastImportantMessage != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 2.dp),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     val previewWords = remember(lastImportantMessage.text) {
                         val trimmed = lastImportantMessage.text.trim().replace("\n", " ")
                         val words = trimmed.split(Regex("\\s+")).filter { it.isNotBlank() }
@@ -2200,45 +2224,43 @@ private fun HeroGlucoseCard(
                         border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
                         modifier = Modifier
                             .weight(1f, fill = false)
-                            .padding(end = 8.dp)
-                            .clickable { onImportantMessageClick(lastImportantMessage) }
+                            .padding(end = 4.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
+                            modifier = Modifier.padding(start = 6.dp, end = 3.dp, top = 2.5.dp, bottom = 2.5.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text(text = "💬", fontSize = 11.sp)
-                            Text(
-                                text = "$senderLabel: $previewWords",
-                                style = MaterialTheme.typography.labelSmall,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f, fill = false)
+                                    .clickable { onImportantMessageClick(lastImportantMessage) },
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(text = "💬", fontSize = 11.sp)
+                                Text(
+                                    text = "$senderLabel: $previewWords",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .clickable { onDismissImportantMessage() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Dismiss SMS",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
                         }
-                    }
-                } else {
-                    Spacer(modifier = Modifier.width(1.dp))
-                }
-
-                // Moon AOD button placed directly under the BLE bridge badge
-                Surface(
-                    modifier = Modifier
-                        .size(width = 34.dp, height = 24.dp)
-                        .clickable { onAodClick() },
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-                    border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "🌙",
-                            fontSize = 12.sp
-                        )
                     }
                 }
             }

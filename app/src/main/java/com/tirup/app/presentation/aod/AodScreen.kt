@@ -53,11 +53,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
 import com.tirup.app.R
 import com.tirup.app.domain.model.AodDisplayMode
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorLow
+import com.tirup.app.presentation.theme.ColorTarget
+import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
 import com.tirup.app.presentation.theme.ColorVeryLow
 import kotlinx.coroutines.delay
@@ -78,12 +87,49 @@ fun AodScreen(
     onSaveBrightness: (Float) -> Unit = {},
     onExit: () -> Unit
 ) {
+    val context = LocalContext.current
     val settings by settingsFlow.collectAsState(initial = com.tirup.app.domain.model.UserSettings())
     val reading by latestReadingFlow.collectAsState(initial = null)
     val recentReadings by recentReadingsFlow.collectAsState(initial = emptyList())
     val aod = settings.aodSettings
     val unit = settings.unit
     val ranges = settings.targetRanges
+
+    // Battery monitoring for AoD top bar
+    var batteryPct by remember { mutableIntStateOf(100) }
+    var isCharging by remember { mutableStateOf(false) }
+
+    DisposableEffect(Unit) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context?, intent: Intent?) {
+                intent?.let {
+                    val level = it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                    val scale = it.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                    val status = it.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                    if (level >= 0 && scale > 0) {
+                        batteryPct = (level * 100 / scale.toFloat()).roundToInt()
+                    }
+                    isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                            status == BatteryManager.BATTERY_STATUS_FULL
+                }
+            }
+        }
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        val stickyIntent = context.registerReceiver(receiver, filter)
+        stickyIntent?.let {
+            val level = it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = it.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            val status = it.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            if (level >= 0 && scale > 0) {
+                batteryPct = (level * 100 / scale.toFloat()).roundToInt()
+            }
+            isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                    status == BatteryManager.BATTERY_STATUS_FULL
+        }
+        onDispose {
+            try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
+        }
+    }
 
     val sorted = remember(recentReadings) { recentReadings.sortedBy { it.timestamp } }
     val delta5Min = remember(reading, sorted) {
@@ -265,9 +311,9 @@ fun AodScreen(
             }
     ) {
         val isLandscape = maxWidth > maxHeight
-        val topPadding = if (isLandscape) 4.dp else 36.dp
-        val bottomPadding = if (isLandscape) 4.dp else 28.dp
-        val glucoseFontSize = if (isLandscape) (maxHeight.value * 0.65f).coerceIn(210f, 280f).sp else 140.sp
+        val topPadding = if (isLandscape) 14.dp else 36.dp
+        val bottomPadding = if (isLandscape) 6.dp else 28.dp
+        val glucoseFontSize = if (isLandscape) (maxHeight.value * 0.52f).coerceIn(170f, 220f).sp else 140.sp
         val arrowFontSize = glucoseFontSize
 
         // -------------------------------------------------------------
@@ -380,7 +426,7 @@ fun AodScreen(
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
 
-                // Top Bar: Exit button & Current Clock with Anti-Burn-In Jitter
+                // Top Bar: Exit button, Current Clock & Battery with Anti-Burn-In Jitter
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -391,21 +437,49 @@ fun AodScreen(
                 ) {
                     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
                     val currentTimeStr = timeFormat.format(Date())
-                    Text(
-                        text = currentTimeStr,
-                        color = Color(0xFF666666),
-                        fontSize = if (isLandscape) 14.sp else 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = currentTimeStr,
+                            color = Color(0xFF888888),
+                            fontSize = if (isLandscape) 22.sp else 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+
+                        // Battery badge:
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            val batteryColor = when {
+                                batteryPct <= 15 -> ColorVeryLow
+                                batteryPct <= 25 -> ColorHigh
+                                else -> Color(0xFF888888)
+                            }
+                            Text(
+                                text = if (isCharging) "⚡" else "🔋",
+                                fontSize = if (isLandscape) 16.sp else 13.sp
+                            )
+                            Text(
+                                text = "$batteryPct%",
+                                color = batteryColor,
+                                fontSize = if (isLandscape) 16.sp else 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
 
                     IconButton(
                         onClick = onExit,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(if (isLandscape) 40.dp else 36.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Exit AOD",
-                            tint = Color(0xFF555555)
+                            tint = Color(0xFF666666)
                         )
                     }
                 }
@@ -422,14 +496,17 @@ fun AodScreen(
                     val r = reading
                     val glucoseValMmol = r?.valueMmol ?: 0.0
 
-                    // Color mapping: muted soft tones for night vision & OLED safety
+                    // Color mapping: 6-tier clinical palette
                     val glucoseColor = when {
-                        glucoseValMmol <= 0.0 -> Color(0xFF555555)
-                        glucoseValMmol < ranges.veryLowThresholdMmol -> Color(0xFF991B1B)
-                        glucoseValMmol < ranges.tirLowMmol -> Color(0xFFB45309)
-                        glucoseValMmol > ranges.veryHighThresholdMmol -> Color(0xFF9A3412)
-                        glucoseValMmol > ranges.tirHighMmol -> Color(0xFFB45309)
-                        else -> Color(0xFF047857)
+                        glucoseValMmol <= 0.0 -> Color(0xFF666666)
+                        glucoseValMmol < ranges.veryLowThresholdMmol -> ColorVeryLow
+                        glucoseValMmol < ranges.tirLowMmol -> ColorLow
+                        glucoseValMmol <= ranges.tirHighMmol -> {
+                            if (glucoseValMmol <= 7.8) ColorTight
+                            else ColorTarget
+                        }
+                        glucoseValMmol <= ranges.veryHighThresholdMmol -> ColorHigh
+                        else -> ColorVeryHigh
                     }
 
                     val glucoseText = if (r != null && r.valueMmol > 0.0) {
@@ -437,7 +514,7 @@ fun AodScreen(
                         else String.format(Locale.US, "%.0f", r.getValue(GlucoseUnit.MG_DL))
                     } else "--"
 
-                    val arrow = r?.trendArrow ?: ""
+                    val arrow = if (r != null && r.valueMmol > 0.0) (r.trendArrow ?: "") else ""
 
                     // Giant Glucose Number (dominating width/height in landscape)
                     Row(
@@ -459,36 +536,41 @@ fun AodScreen(
                                 text = arrow,
                                 fontSize = arrowFontSize,
                                 fontWeight = FontWeight.Bold,
-                                color = glucoseColor.copy(alpha = 0.85f),
+                                color = glucoseColor.copy(alpha = 0.9f),
                                 modifier = Modifier.padding(start = if (isLandscape) 10.dp else 6.dp, bottom = if (isLandscape) 4.dp else 12.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(if (isLandscape) 1.dp else 6.dp))
+                    // Surface spacing (~10px): tightly tucked under sugar digits and trend arrow
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     // Reading Delta & Timestamp Age (Fully Localized)
-                    val ageMins = if (r != null && r.timestamp > 0L) {
-                        ((System.currentTimeMillis() - r.timestamp) / 60000L).coerceAtLeast(0L)
-                    } else 0L
-
-                    val ageStr = if (ageMins <= 1L) {
-                        stringResource(R.string.just_now)
+                    val ageStr = if (r != null && r.timestamp > 0L) {
+                        val ageMins = ((System.currentTimeMillis() - r.timestamp) / 60000L).coerceAtLeast(0L)
+                        if (ageMins <= 1L) {
+                            stringResource(R.string.just_now)
+                        } else {
+                            stringResource(R.string.minutes_ago, ageMins.toInt())
+                        }
                     } else {
-                        stringResource(R.string.minutes_ago, ageMins.toInt())
+                        stringResource(R.string.aod_no_data)
                     }
 
-                    val deltaStr = if (delta5Min != null && abs(delta5Min) >= 0.1) {
+                    val deltaStr = if (r != null && delta5Min != null && abs(delta5Min) >= 0.1) {
                         val sign = if (delta5Min > 0) "+" else ""
                         if (unit == GlucoseUnit.MMOL_L) "$sign${String.format(Locale.US, "%.1f", delta5Min)}"
                         else "$sign${(delta5Min * 18.0182).toInt()}"
                     } else ""
 
+                    val sublineText = listOf(deltaStr, ageStr).filter { it.isNotBlank() }.joinToString(" • ")
+
                     Text(
-                        text = listOf(deltaStr, ageStr).filter { it.isNotBlank() }.joinToString(" • "),
-                        color = Color(0xFF666666),
-                        fontSize = if (isLandscape) 14.sp else 17.sp,
-                        fontWeight = FontWeight.Normal,
+                        text = sublineText,
+                        color = Color(0xFF888888),
+                        fontSize = if (isLandscape) 52.sp else 32.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = if (isLandscape) (-0.5).sp else 0.sp,
                         textAlign = TextAlign.Center
                     )
                 }

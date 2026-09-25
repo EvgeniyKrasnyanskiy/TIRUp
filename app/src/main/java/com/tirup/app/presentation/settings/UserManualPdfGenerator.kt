@@ -729,9 +729,9 @@ class UserManualPdfGenerator(private val context: Context) {
                     else "Hold center button 0.33s to summon centered HUD: 108sp glucose, 78sp arrow, centered units, 34sp insulin/carb tiles, and 19sp single-line telemetry. Navigation auto-hides after 2.2s."
                 )
                 flow.bullet(
-                    if (isRu) "Виджеты рабочего стола, экран блокировки/AOD и Пузырёк" else "Widgets, Lockscreen & Floating Bubble",
-                    if (isRu) "5 форматов виджетов рабочего стола (полоса 5х1, Canvas-график 4х2/3х2, квадрат 2х2, стек 1х2). На экране блокировки доступна регулировка прозрачности (0–100%). Плавающий «Пузырёк» виден поверх всех приложений и пульсирует волнами при гипо."
-                    else "5 homescreen widget sizes (strip 5x1, Canvas graph 4x2/3x2, square 2x2, vertical 1x2). Lockscreen opacity slider 0-100%. Floating Bubble pulses ripple waves during hypo."
+                    if (isRu) "Виджеты рабочего стола, экран AoD и Пузырёк" else "Widgets, AoD Screen & Floating Bubble",
+                    if (isRu) "5 форматов виджетов рабочего стола (5х1, 4х2/3х2, 2х2, 1х2). Энергоэффективный Always-On Display (AoD) с защитой OLED от выгорания: ночные часы, гигантский сахар, стрелка тренда, индикатор батареи, жест яркости и фонарик с паузой. Плавающий «Пузырёк» виден поверх всех приложений."
+                    else "5 homescreen widget sizes (5x1, 4x2/3x2, 2x2, 1x2). Ultra-efficient Always-On Display (AoD) with OLED anti-burn-in jitter: bedside clock, giant glucose, battery status, brightness drag, and smooth flashlight with pause. Floating Bubble pulses over apps."
                 )
                 flow.bullet(
                     if (isRu) "Сроки службы расходников и напоминания о замене" else "Supplies Tracking & Expiry Reminders",

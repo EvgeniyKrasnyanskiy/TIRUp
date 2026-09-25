@@ -110,4 +110,5 @@
     <string name="aod_flashlight_paused">⏸ Paused: %d%% • Tap: Resume</string>
     <string name="aod_brightness_hud">Brightness: %d%%</string>
     <string name="aod_gesture_hint">Double-tap: Flashlight • Swipe: Exit • Up/down: Brightness</string>
+    <string name="aod_no_data">No data</string>
 </resources>
