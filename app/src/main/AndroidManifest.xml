@@ -94,7 +94,7 @@
             android:exported="false"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
-            android:screenOrientation="portrait"
+            android:screenOrientation="unspecified"
             android:launchMode="singleTop"
             android:theme="@style/Theme.TIRUp" />
 
