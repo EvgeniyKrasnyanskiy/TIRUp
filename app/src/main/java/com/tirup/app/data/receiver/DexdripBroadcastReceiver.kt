@@ -834,6 +834,65 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             return deleted
         }
 
+        fun parseDaysFromNote(note: String): Int? {
+            val clean = note.lowercase().trim()
+            if (clean.isBlank()) return null
+
+            // 1. Check for "+X" e.g. "+7", "+ 14"
+            val plusMatch = Regex("""\+\s*(\d{1,3})""").find(clean)
+            if (plusMatch != null) {
+                val days = plusMatch.groupValues[1].toIntOrNull()
+                if (days != null && days in 1..365) return days
+            }
+
+            // 2. Check for "на X дней/дн/д" or "на X" or "for X days"
+            val naMatch = Regex("""(?:на|for)\s*(\d{1,3})\s*(?:дн\w*|день|дня|дней|days|day|d|д)?""").find(clean)
+            if (naMatch != null) {
+                val days = naMatch.groupValues[1].toIntOrNull()
+                if (days != null && days in 1..365) return days
+            }
+
+            // 3. Check for "X дней/дня/день/дн/days/day"
+            val daysMatch = Regex("""(\d{1,3})\s*(?:дн\w*|день|дня|дней|days|day)""").find(clean)
+            if (daysMatch != null) {
+                val days = daysMatch.groupValues[1].toIntOrNull()
+                if (days != null && days in 1..365) return days
+            }
+
+            // 4. Check for "restart/extend/продл/перезапуск X"
+            val actionNumMatch = Regex("""(?:restart|extend|продл\w*|перезапуск)\s*(\d{1,3})""").find(clean)
+            if (actionNumMatch != null) {
+                val days = actionNumMatch.groupValues[1].toIntOrNull()
+                if (days != null && days in 1..365) return days
+            }
+
+            return null
+        }
+
+        fun isLancetNote(note: String?): Boolean {
+            val n = note?.lowercase()?.trim() ?: return false
+            if (n.isBlank()) return false
+
+            // 1. Exclude warnings, alerts, alarms, countdowns and expiration notices
+            val isWarningOrNotice = n.contains("warning") ||
+                    n.contains("alert") ||
+                    n.contains("alarm") ||
+                    n.contains("закончится") ||
+                    n.contains("истек") ||
+                    n.contains("истечёт") ||
+                    n.contains("осталось") ||
+                    n.contains("через") ||
+                    n.contains("error") ||
+                    n.contains("ошибка")
+
+            if (isWarningOrNotice) return false
+
+            // 2. Match lancet keywords
+            return n.contains("ланцет") || n.contains("lancet") ||
+                    n.contains("прокалывател") || n.contains("игла") ||
+                    n.contains("иглы") || n.contains("иглу") || n.contains("needle")
+        }
+
         fun parseTreatmentsJson(jsonStr: String): List<Treatment> {
             val list = mutableListOf<Treatment>()
             try {
@@ -1030,6 +1089,36 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                                     currentSettings.copy(
                                         sensorStatus = currentSettings.sensorStatus.copy(
                                             installedAt = sensorTreatment.timestamp
+                                        )
+                                    )
+                                )
+                            }
+                        }
+
+                        // Auto-recover Lancet installation timestamp and duration if user logged "ланцет" in xDrip
+                        // Supports keywords: ланцет, lancet, прокалыватель, игла, needle, продл, рестарт, restart, extend, перезапуск, +N дней
+                        val lancetTreatment = treatments
+                            .filter { isLancetNote(it.notes) }
+                            .maxByOrNull { it.timestamp }
+
+                        if (lancetTreatment != null) {
+                            val currentSettings = app.settingsRepository.getSettings().first()
+                            val note = lancetTreatment.notes ?: ""
+                            val parsedDays = parseDaysFromNote(note)
+                            val targetDuration = parsedDays ?: (if (currentSettings.lancetStatus.durationDays > 0) currentSettings.lancetStatus.durationDays else 7)
+
+                            val shouldUpdate = currentSettings.lancetStatus.installedAt == 0L ||
+                                    lancetTreatment.timestamp > currentSettings.lancetStatus.installedAt ||
+                                    (lancetTreatment.timestamp == currentSettings.lancetStatus.installedAt && parsedDays != null && parsedDays != currentSettings.lancetStatus.durationDays)
+
+                            if (shouldUpdate) {
+                                Log.i(TAG, "Auto-recovering lancet installation timestamp from xDrip note: ${lancetTreatment.timestamp}, durationDays=$targetDuration (note='$note')")
+                                app.settingsRepository.updateSettings(
+                                    currentSettings.copy(
+                                        lancetStatus = currentSettings.lancetStatus.copy(
+                                            installedAt = lancetTreatment.timestamp,
+                                            durationDays = targetDuration,
+                                            lastUsedDurationDays = targetDuration
                                         )
                                     )
                                 )
@@ -1362,18 +1451,31 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                     }
 
                     // 4. Ingest latest point with full alert and widget lifecycle
-                    val readingToPersist = latestReadingFromPebble ?: backfilledReadings.maxByOrNull { it.timestamp }
+                    // Use fresh pebble reading if within 15 mins, or highest timestamp among pebble and backfill
+                    val pebbleCandidate = latestReadingFromPebble?.takeIf { (now - it.timestamp) < 15 * 60_000L }
+                    val backfilledCandidate = backfilledReadings.maxByOrNull { it.timestamp }
+                    val candidate = listOfNotNull(pebbleCandidate, backfilledCandidate).maxByOrNull { it.timestamp }
+                        ?: latestReadingFromPebble
+                    val readingToPersist = if (candidate != null && candidate.iob == null && pebbleCandidate?.iob != null) {
+                        candidate.copy(iob = pebbleCandidate.iob, cob = pebbleCandidate.cob ?: candidate.cob)
+                    } else {
+                        candidate
+                    }
+
                     if (readingToPersist != null) {
-                        val latestInDb = app.glucoseRepository.getLatestReading().first()
-                        val isNewer = latestInDb == null || (readingToPersist.timestamp - latestInDb.timestamp > 25_000L)
+                        // Compare against latestInDbBefore (captured before step 3 batch insert) so fresh readings trigger alert & widget updates
+                        val isNewer = latestInDbBefore == null || (readingToPersist.timestamp - latestInDbBefore.timestamp > 25_000L)
 
                         if (isNewer) {
                             persistAndDistributeReading(context, readingToPersist)
-                        } else if (latestInDb != null && readingToPersist.timestamp == latestInDb.timestamp &&
-                            (readingToPersist.iob != latestInDb.iob || readingToPersist.cob != latestInDb.cob)
-                        ) {
-                            app.database.glucoseReadingDao().updateIobCob(latestInDb.id, readingToPersist.iob, readingToPersist.cob)
-                            com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context)
+                        } else {
+                            val latestInDb = app.glucoseRepository.getLatestReading().first()
+                            if (latestInDb != null && readingToPersist.timestamp == latestInDb.timestamp &&
+                                (readingToPersist.iob != latestInDb.iob || readingToPersist.cob != latestInDb.cob)
+                            ) {
+                                app.database.glucoseReadingDao().updateIobCob(latestInDb.id, readingToPersist.iob, readingToPersist.cob)
+                                com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context)
+                            }
                         }
                     }
 

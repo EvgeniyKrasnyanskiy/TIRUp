@@ -13,6 +13,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -44,12 +45,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tirup.app.R
 import com.tirup.app.domain.model.AodDisplayMode
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.presentation.theme.ColorHigh
@@ -110,13 +113,21 @@ fun AodScreen(
     var isAwake by remember { mutableStateOf(aod.displayMode == AodDisplayMode.ALWAYS_ON) }
     var lastAwakeTriggerTimestamp by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
-    // Anti-Burn-In pixel jitter offsets (-24dp .. +24dp)
+    // Anti-Burn-In pixel jitter offsets (-28dp .. +28dp)
     var jitterOffsetX by remember { mutableIntStateOf(0) }
     var jitterOffsetY by remember { mutableIntStateOf(0) }
 
     fun shiftAntiBurnIn() {
         jitterOffsetX = Random.nextInt(-28, 29)
         jitterOffsetY = Random.nextInt(-36, 37)
+    }
+
+    // Auto-hide bottom hint after 10 seconds of inactivity to protect AMOLED display
+    var isHintVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(lastAwakeTriggerTimestamp) {
+        isHintVisible = true
+        delay(10_000L)
+        isHintVisible = false
     }
 
     // React to new incoming glucose readings: wake screen and jitter position
@@ -164,7 +175,7 @@ fun AodScreen(
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
@@ -172,11 +183,7 @@ fun AodScreen(
             .pointerInput(aod.displayMode, isFlashlightActive) {
                 detectTapGestures(
                     onTap = {
-                        if (isFlashlightActive) {
-                            // Tap immediately switches off flashlight
-                            isFlashlightActive = false
-                            flashlightTargetAlpha = 0f
-                        } else {
+                        if (!isFlashlightActive) {
                             // Single tap wakes up the screen for pulse duration
                             lastAwakeTriggerTimestamp = System.currentTimeMillis()
                             isAwake = true
@@ -217,6 +224,12 @@ fun AodScreen(
                 )
             }
     ) {
+        val isLandscape = maxWidth > maxHeight
+        val topPadding = if (isLandscape) 14.dp else 36.dp
+        val bottomPadding = if (isLandscape) 10.dp else 28.dp
+        val glucoseFontSize = if (isLandscape) 115.sp else 140.sp
+        val arrowFontSize = if (isLandscape) 46.sp else 62.sp
+
         // -------------------------------------------------------------
         // 1. Flashlight Overlay: Smooth warm white ramp (0 -> 100% in 15s)
         // -------------------------------------------------------------
@@ -226,17 +239,20 @@ fun AodScreen(
                     .fillMaxSize()
                     .background(Color(0xFFFFFBEB).copy(alpha = animatedFlashlightAlpha))
             ) {
+                // Adaptive high-contrast hint color during ramp-up
+                val overlayTextColor = if (animatedFlashlightAlpha < 0.45f) Color(0xFFF8FAFC) else Color(0xFF1E293B)
+
                 // Flashlight hint & quick close icon
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 40.dp, start = 24.dp, end = 24.dp),
+                        .padding(top = topPadding, start = 24.dp, end = 24.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "💡 Фонарик (нажмите для выключения)",
-                        color = Color.Black.copy(alpha = 0.7f),
+                        text = stringResource(R.string.aod_flashlight_overlay_hint),
+                        color = overlayTextColor,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -249,7 +265,7 @@ fun AodScreen(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Off",
-                            tint = Color.Black.copy(alpha = 0.8f)
+                            tint = overlayTextColor
                         )
                     }
                 }
@@ -267,11 +283,12 @@ fun AodScreen(
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
 
-                // Top Bar: Exit button & Current Clock
+                // Top Bar: Exit button & Current Clock with Anti-Burn-In Jitter
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 36.dp, start = 24.dp, end = 16.dp),
+                        .offset { IntOffset((jitterOffsetX / 2).dp.roundToPx(), (jitterOffsetY / 2).dp.roundToPx()) }
+                        .padding(top = topPadding, start = 24.dp, end = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -279,7 +296,7 @@ fun AodScreen(
                     val currentTimeStr = timeFormat.format(Date())
                     Text(
                         text = currentTimeStr,
-                        color = Color(0xFF555555),
+                        color = Color(0xFF666666),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -291,7 +308,7 @@ fun AodScreen(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Exit AOD",
-                            tint = Color(0xFF444444)
+                            tint = Color(0xFF555555)
                         )
                     }
                 }
@@ -325,14 +342,14 @@ fun AodScreen(
 
                     val arrow = r?.trendArrow ?: ""
 
-                    // Giant Glucose Number (dominating 80-90% width)
+                    // Giant Glucose Number (dominating width, +25% enlarged)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
                             text = glucoseText,
-                            fontSize = 110.sp,
+                            fontSize = glucoseFontSize,
                             fontWeight = FontWeight.Black,
                             fontFamily = FontFamily.SansSerif,
                             color = glucoseColor,
@@ -343,22 +360,27 @@ fun AodScreen(
                         if (arrow.isNotBlank()) {
                             Text(
                                 text = arrow,
-                                fontSize = 52.sp,
+                                fontSize = arrowFontSize,
                                 fontWeight = FontWeight.Bold,
                                 color = glucoseColor.copy(alpha = 0.85f),
-                                modifier = Modifier.padding(start = 6.dp, bottom = 12.dp)
+                                modifier = Modifier.padding(start = 6.dp, bottom = if (isLandscape) 6.dp else 12.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(if (isLandscape) 2.dp else 6.dp))
 
-                    // Reading Delta & Timestamp Age
+                    // Reading Delta & Timestamp Age (Fully Localized)
                     val ageMins = if (r != null && r.timestamp > 0L) {
                         ((System.currentTimeMillis() - r.timestamp) / 60000L).coerceAtLeast(0L)
                     } else 0L
 
-                    val ageStr = if (ageMins <= 1L) "только что" else "$ageMins мин назад"
+                    val ageStr = if (ageMins <= 1L) {
+                        stringResource(R.string.just_now)
+                    } else {
+                        stringResource(R.string.minutes_ago, ageMins.toInt())
+                    }
+
                     val deltaStr = if (delta5Min != null && abs(delta5Min) >= 0.1) {
                         val sign = if (delta5Min > 0) "+" else ""
                         if (unit == GlucoseUnit.MMOL_L) "$sign${String.format(Locale.US, "%.1f", delta5Min)}"
@@ -367,23 +389,29 @@ fun AodScreen(
 
                     Text(
                         text = listOf(deltaStr, ageStr).filter { it.isNotBlank() }.joinToString(" • "),
-                        color = Color(0xFF555555),
-                        fontSize = 17.sp,
+                        color = Color(0xFF666666),
+                        fontSize = if (isLandscape) 15.sp else 17.sp,
                         fontWeight = FontWeight.Normal,
                         textAlign = TextAlign.Center
                     )
                 }
 
-                // Bottom Hint
-                Text(
-                    text = "Двойной тап: фонарик • Свайп: выход",
-                    color = Color(0xFF333333),
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
+                // Bottom Hint: Auto-fades out after 10s to prevent burn-in; increased brightness (+35%)
+                AnimatedVisibility(
+                    visible = isHintVisible,
+                    enter = fadeIn(tween(400)),
+                    exit = fadeOut(tween(600)),
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 28.dp)
-                )
+                        .padding(bottom = bottomPadding)
+                ) {
+                    Text(
+                        text = stringResource(R.string.aod_gesture_hint),
+                        color = Color(0xFF888888),
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }

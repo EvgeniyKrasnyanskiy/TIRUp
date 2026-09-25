@@ -106,4 +106,6 @@
     <string name="widget_vertical_description">Вертикальный виджет: текущий сахар, стрелка тренда, дельта и показатель TIR</string>
     <string name="widget_medium_label">TIRUp: Компактный дашборд (3x2)</string>
     <string name="widget_medium_description">Компактный дашборд: сахар, 4-часовой график, цель компенсатора и ночник</string>
+    <string name="aod_flashlight_overlay_hint">💡 Фонарик (двойной тап для выключения)</string>
+    <string name="aod_gesture_hint">Двойной тап: фонарик • Свайп: выход</string>
 </resources>

@@ -2127,19 +2127,44 @@ private fun HeroGlucoseCard(
                     }
                 }
 
-                // Right: Master/Receiver BLE status badge
-                if (bleBridgeSettings != null) {
-                    BleBridgeBadge(
-                        bleSettings = bleBridgeSettings,
-                        isBleBroadcasting = isBleBroadcasting,
-                        broadcastRemainingSec = broadcastRemainingSec,
-                        nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
-                        blePacketReceivedAt = blePacketReceivedAt,
-                        isRu = isRu,
-                        onClick = onBleClick
-                    )
-                } else {
-                    Spacer(modifier = Modifier.width(62.dp))
+                // Right: Master/Receiver BLE status badge & Moon AOD button directly under it
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (bleBridgeSettings != null) {
+                        BleBridgeBadge(
+                            bleSettings = bleBridgeSettings,
+                            isBleBroadcasting = isBleBroadcasting,
+                            broadcastRemainingSec = broadcastRemainingSec,
+                            nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
+                            blePacketReceivedAt = blePacketReceivedAt,
+                            isRu = isRu,
+                            onClick = onBleClick
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.width(62.dp))
+                    }
+
+                    // Moon AOD button placed directly under the BLE bridge badge
+                    Surface(
+                        modifier = Modifier
+                            .size(width = 34.dp, height = 26.dp)
+                            .clickable { onAodClick() },
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                        border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "🌙",
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))
@@ -2170,7 +2195,7 @@ private fun HeroGlucoseCard(
                         text = targetVal,
                         style = MaterialTheme.typography.displayLarge,
                         color = valueColor,
-                        fontSize = 54.sp,
+                        fontSize = 68.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -2332,26 +2357,6 @@ private fun HeroGlucoseCard(
                     }
                 }
 
-                // Moon AOD button in the bottom-right corner (mirroring BLE badge in top-right)
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .size(width = 34.dp, height = 26.dp)
-                        .clickable { onAodClick() },
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-                    border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "🌙",
-                            fontSize = 13.sp
-                        )
-                    }
-                }
             }
 
             if (latestReading == null) {
