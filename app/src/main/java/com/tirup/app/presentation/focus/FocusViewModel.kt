@@ -170,6 +170,13 @@ class FocusViewModel(
         }
     }
 
+    fun dismissLastImportantMessage() {
+        viewModelScope.launch {
+            val current = settingsRepository.getSettings().firstOrNull() ?: return@launch
+            settingsRepository.updateSettings(current.copy(lastImportantMessage = null))
+        }
+    }
+
     private fun observeData() {
         viewModelScope.launch {
             val calendar = java.util.Calendar.getInstance().apply {
