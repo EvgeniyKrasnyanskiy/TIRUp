@@ -211,7 +211,10 @@ fun FocusScreen(
 
     val blePacketReceivedAt by viewModel.blePacketReceivedAt.collectAsState()
     var showBleStatusDialog by rememberSaveable { mutableStateOf(false) }
-    // var activeTreatmentInput by remember { mutableStateOf<TreatmentInputType?>(null) }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshLastImportantSmsIfPermitted()
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize()) {

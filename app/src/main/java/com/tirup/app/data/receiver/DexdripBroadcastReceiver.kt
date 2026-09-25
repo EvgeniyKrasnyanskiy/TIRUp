@@ -846,21 +846,21 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             }
 
             // 2. Check for "на X дней/дн/д" or "на X" or "for X days"
-            val naMatch = Regex("""(?:на|for)\s*(\d{1,3})\s*(?:дн\w*|день|дня|дней|days|day|d|д)?""").find(clean)
+            val naMatch = Regex("""(?U)(?:на|for)\s*(\d{1,3})\s*(?:дн\w*|день|дня|дней|days|day|d|д)?""").find(clean)
             if (naMatch != null) {
                 val days = naMatch.groupValues[1].toIntOrNull()
                 if (days != null && days in 1..365) return days
             }
 
             // 3. Check for "X дней/дня/день/дн/days/day"
-            val daysMatch = Regex("""(\d{1,3})\s*(?:дн\w*|день|дня|дней|days|day)""").find(clean)
+            val daysMatch = Regex("""(?U)(\d{1,3})\s*(?:дн\w*|день|дня|дней|days|day)""").find(clean)
             if (daysMatch != null) {
                 val days = daysMatch.groupValues[1].toIntOrNull()
                 if (days != null && days in 1..365) return days
             }
 
-            // 4. Check for "restart/extend/продл/перезапуск [device] X"
-            val actionNumMatch = Regex("""(?:restart|extend|продл\w*|перезапуск)(?:\s+[^\d\n\r]{1,25})?\s+(\d{1,3})""").find(clean)
+            // 4. Check for "restart/рестарт/extend/продл/перезапуск [device] X"
+            val actionNumMatch = Regex("""(?U)(?:restart|рестарт\w*|extend|продл\w*|перезапуск)(?:\s+[^\d\n\r]{1,25})?\s+(\d{1,3})""").find(clean)
             if (actionNumMatch != null) {
                 val days = actionNumMatch.groupValues[1].toIntOrNull()
                 if (days != null && days in 1..365) return days

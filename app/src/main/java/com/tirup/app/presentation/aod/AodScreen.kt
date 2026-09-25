@@ -230,7 +230,7 @@ fun AodScreen(
                 )
             }
             // Vertical drag for brightness, horizontal swipe for exit
-            .pointerInput(isFlashlightActive, currentBrightness) {
+            .pointerInput(isFlashlightActive) {
                 var totalDragX = 0f
                 var totalDragY = 0f
                 var isVerticalDrag = false
@@ -246,9 +246,9 @@ fun AodScreen(
                         totalDragY += dragAmount.y
 
                         if (!isFlashlightActive) {
-                            if (isVerticalDrag || (abs(totalDragY) > 8f && abs(totalDragY) > abs(totalDragX) * 1.2f)) {
+                            if (isVerticalDrag || (abs(totalDragY) > 8f && abs(totalDragY) > abs(totalDragX) * 1.1f)) {
                                 isVerticalDrag = true
-                                currentBrightness = (currentBrightness - (dragAmount.y / 500f)).coerceIn(0.005f, 1.0f)
+                                currentBrightness = (currentBrightness - (dragAmount.y / 450f)).coerceIn(0.005f, 1.0f)
                                 onSetWindowBrightness(currentBrightness)
                                 isBrightnessOverlayVisible = true
                             }
@@ -268,10 +268,10 @@ fun AodScreen(
         val topPadding = if (isLandscape) 4.dp else 36.dp
         val bottomPadding = if (isLandscape) 4.dp else 28.dp
         val glucoseFontSize = if (isLandscape) (maxHeight.value * 0.65f).coerceIn(210f, 280f).sp else 140.sp
-        val arrowFontSize = if (isLandscape) 78.sp else 62.sp
+        val arrowFontSize = glucoseFontSize
 
         // -------------------------------------------------------------
-        // 1. Flashlight Overlay: Smooth warm white ramp with pause & progress
+        // 1. Flashlight Overlay: Smooth warm white ramp with interactive slider & pause
         // -------------------------------------------------------------
         if (isFlashlightActive || flashlightProgress > 0.001f) {
             Box(
@@ -316,44 +316,53 @@ fun AodScreen(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    androidx.compose.material3.LinearProgressIndicator(
-                        progress = { flashlightProgress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp),
-                        color = Color(0xFFF59E0B),
-                        trackColor = overlayTextColor.copy(alpha = 0.2f)
+                    Spacer(modifier = Modifier.height(2.dp))
+                    androidx.compose.material3.Slider(
+                        value = flashlightProgress,
+                        onValueChange = { newValue ->
+                            flashlightProgress = newValue
+                            isFlashlightPaused = true
+                            onSetWindowBrightness(0.05f + 0.95f * newValue)
+                        },
+                        valueRange = 0.05f..1.0f,
+                        colors = androidx.compose.material3.SliderDefaults.colors(
+                            thumbColor = Color(0xFFF59E0B),
+                            activeTrackColor = Color(0xFFF59E0B),
+                            inactiveTrackColor = overlayTextColor.copy(alpha = 0.25f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
         }
 
         // -------------------------------------------------------------
-        // 2. Brightness HUD overlay during vertical drag
+        // 2. Brightness HUD overlay during vertical drag (Placed at TopCenter above glucose)
         // -------------------------------------------------------------
         AnimatedVisibility(
             visible = isBrightnessOverlayVisible && !isFlashlightActive,
             enter = fadeIn(tween(150)),
             exit = fadeOut(tween(300)),
-            modifier = Modifier.align(Alignment.Center)
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = if (isLandscape) 36.dp else 68.dp)
         ) {
             Surface(
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                 color = Color(0xEE1E293B),
                 border = BorderStroke(1.dp, Color(0xFF475569)),
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(horizontal = 16.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(text = "🔆", fontSize = 20.sp)
+                    Text(text = "🔆", fontSize = 18.sp)
                     Text(
                         text = stringResource(R.string.aod_brightness_hud, (currentBrightness * 100).roundToInt()),
                         color = Color.White,
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
