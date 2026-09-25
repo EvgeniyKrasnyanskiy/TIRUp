@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -95,6 +96,78 @@ class FocusViewModel(
         if (now - lastPebbleSyncTime < 30_000L) return
         lastPebbleSyncTime = now
         com.tirup.app.data.receiver.DexdripBroadcastReceiver.syncIobCobFromPebble(context)
+        refreshLastImportantSmsIfPermitted()
+    }
+
+    fun refreshLastImportantSmsIfPermitted() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                if (androidx.core.content.ContextCompat.checkSelfPermission(
+                        context,
+                        android.Manifest.permission.READ_SMS
+                    ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) {
+                    return@launch
+                }
+
+                val settings = settingsRepository.getSettings().first()
+                val alerts = settings.alertSettings
+                val trusted1 = alerts.emergencyContactPhone.trim()
+                val trusted2 = alerts.secondaryEmergencyContactPhone.trim()
+                val trustedPhones = listOf(trusted1, trusted2).filter { it.isNotBlank() }
+                if (trustedPhones.isEmpty()) return@launch
+
+                val uri = android.net.Uri.parse("content://sms/inbox")
+                val projection = arrayOf("_id", "address", "body", "date")
+                val cursor = context.contentResolver.query(
+                    uri,
+                    projection,
+                    null,
+                    null,
+                    "date DESC"
+                )
+
+                cursor?.use { c ->
+                    val addrIdx = c.getColumnIndex("address")
+                    val bodyIdx = c.getColumnIndex("body")
+                    val dateIdx = c.getColumnIndex("date")
+
+                    while (c.moveToNext()) {
+                        val sender = if (addrIdx >= 0) c.getString(addrIdx) ?: "" else ""
+                        val body = if (bodyIdx >= 0) c.getString(bodyIdx) ?: "" else ""
+                        val date = if (dateIdx >= 0) c.getLong(dateIdx) else 0L
+
+                        val matchedTrusted = trustedPhones.firstOrNull { trustedPhone ->
+                            com.tirup.app.data.receiver.SmsQueryReceiver.isMatchingPhone(sender, trustedPhone)
+                        }
+
+                        if (matchedTrusted != null && body.isNotBlank()) {
+                            val isQuery = com.tirup.app.data.receiver.SmsQueryReceiver.isQueryTrigger(body)
+                            if (!isQuery) {
+                                val currentSaved = settings.lastImportantMessage
+                                if (currentSaved == null || date > currentSaved.timestamp) {
+                                    val contactName = if (matchedTrusted == trusted1) {
+                                        alerts.emergencyContactName.ifBlank { if (alerts.isCaregiverRole) "Мастер" else "Фоловер" }
+                                    } else {
+                                        alerts.secondaryEmergencyContactName.ifBlank { if (alerts.isCaregiverRole) "Мастер" else "Фоловер" }
+                                    }
+                                    val newMsg = com.tirup.app.domain.model.LastImportantMessage(
+                                        senderName = contactName,
+                                        senderPhone = sender,
+                                        text = body,
+                                        timestamp = date
+                                    )
+                                    settingsRepository.updateSettings(settings.copy(lastImportantMessage = newMsg))
+                                }
+                                break
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("FocusViewModel", "Failed to query SMS inbox: ${e.message}")
+            }
+        }
     }
 
     private fun observeData() {
