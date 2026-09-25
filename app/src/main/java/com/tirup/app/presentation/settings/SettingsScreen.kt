@@ -997,16 +997,31 @@ fun SettingsScreen(
                             }
                         }
 
-                        Switch(
-                            checked = aod.isEnabled,
-                            onCheckedChange = { isEnabled ->
-                                viewModel.updateAodSettings(aod.copy(isEnabled = isEnabled))
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = PrimaryEmerald
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Switch(
+                                checked = aod.isEnabled,
+                                onCheckedChange = { isEnabled ->
+                                    viewModel.updateAodSettings(aod.copy(isEnabled = isEnabled))
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = PrimaryEmerald
+                                )
                             )
-                        )
+                            IconButton(
+                                onClick = { isAodExpanded = !isAodExpanded },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isAodExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = if (isAodExpanded) "Свернуть" else "Развернуть",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
 
                     if (isAodExpanded) {
@@ -1015,11 +1030,11 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
                         )
 
-                        // OLED Notice Alert
+                        // OLED Notice Alert (Adaptive to light/dark themes)
                         Surface(
                             shape = RoundedCornerShape(10.dp),
-                            color = Color(0xFF1E293B),
-                            border = BorderStroke(1.dp, Color(0xFF334155)),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -1032,7 +1047,7 @@ fun SettingsScreen(
                                     text = if (isRu) "Режим оптимизирован под экраны AMOLED/OLED: абсолютно черный фон (#000000) полностью отключает пиксели матрицы, а микро-смещение Anti-Burn-In защищает экран от выгорания."
                                     else "Optimized for AMOLED/OLED: true black background (#000000) turns off matrix pixels, and Anti-Burn-In micro-jitter protects display.",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF94A3B8)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }

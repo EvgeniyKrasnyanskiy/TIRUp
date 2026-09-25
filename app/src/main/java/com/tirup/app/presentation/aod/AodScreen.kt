@@ -25,8 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FlashlightOff
-import androidx.compose.material.icons.filled.FlashlightOn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -68,13 +66,15 @@ import kotlin.random.Random
 
 @Composable
 fun AodScreen(
-    viewModel: AodViewModel,
+    settingsFlow: kotlinx.coroutines.flow.Flow<com.tirup.app.domain.model.UserSettings>,
+    latestReadingFlow: kotlinx.coroutines.flow.Flow<com.tirup.app.domain.model.GlucoseReading?>,
+    recentReadingsFlow: kotlinx.coroutines.flow.Flow<List<com.tirup.app.domain.model.GlucoseReading>>,
     onSetWindowBrightness: (Float) -> Unit,
     onExit: () -> Unit
 ) {
-    val settings by viewModel.userSettings.collectAsState()
-    val reading by viewModel.latestReading.collectAsState()
-    val recentReadings by viewModel.recentReadings.collectAsState()
+    val settings by settingsFlow.collectAsState(initial = com.tirup.app.domain.model.UserSettings())
+    val reading by latestReadingFlow.collectAsState(initial = null)
+    val recentReadings by recentReadingsFlow.collectAsState(initial = emptyList())
     val aod = settings.aodSettings
     val unit = settings.unit
     val ranges = settings.targetRanges
