@@ -375,7 +375,7 @@ class SettingsRepositoryImpl(
                 lastMasterBattery = prefs.getInt(KEY_BLE_BRIDGE_LAST_MASTER_BATTERY, -1),
                 lastRadioContactMs = prefs.getLong(KEY_BLE_BRIDGE_LAST_RADIO_CONTACT_MS, 0L),
                 useLongRange = prefs.getBoolean(KEY_BLE_BRIDGE_USE_LONG_RANGE, false),
-                showPacketBanner = prefs.getBoolean(KEY_BLE_BRIDGE_SHOW_PACKET_BANNER, true)
+                showPacketBanner = prefs.getBoolean(KEY_BLE_BRIDGE_SHOW_PACKET_BANNER, false)
             ),
             isDeviceRemindersEnabled = prefs.getBoolean(KEY_DEVICE_REMINDERS_ENABLED, true),
             isSensorReminderEnabled = prefs.getBoolean(KEY_SENSOR_REMINDER_ENABLED, true),

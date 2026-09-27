@@ -2175,7 +2175,7 @@ object GlucoseAlertManager {
         val fallback = NotificationCompat.Builder(context, CHANNEL_LOCKSCREEN)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("TIRUp")
-            .setContentText("Мост BLE активен • Ожидание данных")
+            .setContentText("Мониторинг глюкозы")
             .setOngoing(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(true)

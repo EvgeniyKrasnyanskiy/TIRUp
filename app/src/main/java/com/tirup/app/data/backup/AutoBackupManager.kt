@@ -1956,7 +1956,7 @@ object AutoBackupManager {
                     var familyPin = ""
                     var transmitBattery = true
                     var useLongRange = false
-                    var showPacketBanner = true
+                    var showPacketBanner = false
                     reader.beginObject()
                     while (reader.hasNext()) {
                         when (reader.nextName()) {
