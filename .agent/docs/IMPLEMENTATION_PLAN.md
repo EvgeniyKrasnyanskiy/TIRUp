@@ -95,6 +95,35 @@
 
 ---
 
+### Этап 7: Унификация 6-диапазонной клинической шкалы цветов сахара (AGP/TIR) [Completed]
+- **Файлы**:
+  - `app/src/main/java/com/tirup/app/presentation/theme/Theme.kt`
+  - `app/src/main/java/com/tirup/app/presentation/MainActivity.kt`
+  - `app/src/main/java/com/tirup/app/presentation/aod/AodScreen.kt`
+  - `app/src/main/java/com/tirup/app/presentation/trends/AgpChart.kt`
+  - `app/src/main/java/com/tirup/app/presentation/focus/DailyGlucoseChart.kt`
+  - `app/src/main/java/com/tirup/app/presentation/focus/FocusScreen.kt`
+  - `app/src/main/java/com/tirup/app/presentation/widget/TirupWidgetUpdater.kt`
+  - `app/src/main/java/com/tirup/app/presentation/overlay/FloatingBubbleService.kt`
+- **Изменения**:
+  - В `Theme.kt` внедрены централизованные функции и константы 6-диапазонной клинической шкалы AGP/TIR:
+    - `< 3.0` ммоль/л — `ColorVeryLow` (`#EF4444`, Критически низкий)
+    - `3.0 – 3.8` ммоль/л — `ColorLow` (`#F59E0B`, Низкий)
+    - `3.9 – 7.8` ммоль/л — `ColorTight` (`#4ADE80`, Целевой идеальный)
+    - `7.9 – 10.0` ммоль/л — `ColorTarget` (`#10B981`, Допустимый верхний)
+    - `10.1 – 13.9` ммоль/л — `ColorHigh` (`#F59E0B`, Высокий)
+    - `> 13.9` ммоль/л — `ColorVeryHigh` (`#EF4444`, Критически высокий)
+    - Добавлены хелперы `getGlucoseColor` (для Compose), `getGlucoseColorInt` (для Canvas/RemoteViews/Drawables) и `getGlucoseColorHex`.
+  - В `MainActivity.kt`: исправлен расчет цвета сахара для плашки и QuickHUD оверлея, устранена ошибка пропуска `ColorLow` для сахара 3.0–3.8.
+  - В `AodScreen.kt`: цвета сахара переведены на `getGlucoseColor`, отступ между сахаром со стрелкой и подстрокой уменьшен в 2 раза (до 4dp/2dp).
+  - В `AgpChart.kt`: исправлена верхняя направляющая целевого диапазона (10.0) на `ColorHigh`, добавлены направляющие критических уровней (<3.0 и >13.9).
+  - В `DailyGlucoseChart.kt`: цвета точек `dotColor`, выбранной точки `selColor` и фоновые направляющие переведены на унифицированные 6 диапазонов.
+  - В `FocusScreen.kt`: цвет карточки `HeroGlucoseCard` (`valueColor`) переведён на `getGlucoseColor`.
+  - В `TirupWidgetUpdater.kt`: все 5 форматов виджетов рабочего стола (полоса, дашборд, компакт и график тренда) переведены на `getGlucoseColorInt`.
+  - В `FloatingBubbleService.kt`: цвет прогресс-кольца плавающего пузырька переведён на `getGlucoseColorInt`.
+
+---
+
 ## План верификации
 
 1. **Юнит-тесты**:
@@ -102,9 +131,8 @@
 2. **Сборка проекта**:
    - `.\gradlew.bat assembleRelease` (успешно собрано).
 3. **Установка на устройство**:
-   - `adb -s af27386b install -r app\build\outputs\apk\release\TIRUp-v2.2.4-release.apk` (успешно установлено).
+   - `adb -s af27386b install -r app\build\outputs\apk\release\TIRUp-v2.2.4-release.apk` (успешно установлено на `af27386b`).
 4. **Проверка на смартфоне**:
-   - **AoD**: проверить, что дельта сахара, время замера (`0 мин` / `2 мин`) и IoB (`💧 0.50 U`) находятся в одной аккуратной строке без переноса.
-   - **Настройки**: в блоке тревог строка «🔋 Критический разряд телефона» отображается без лишнего бейджа.
-   - **Скрытые настройки**: перед «Тест дальности» отсутствуют лишние разнородные кнопки сирен.
-   - **Диплинки**: клик по уведомлениям недельного дайджеста / годового отчёта / гликированного гемоглобина сразу отображает соответствующий экран или диалог.
+   - Сахар в диапазоне 3.0–3.8 корректно отображается янтарным цветом на всех экранах и в виджетах.
+   - Критический сахар <3.0 и >13.9 отображается ярко-красным.
+   - В AoD отступ между крупным сахаром и строкой телеметрии аккуратно уменьшен в 2 раза.
