@@ -641,6 +641,7 @@ object AutoBackupManager {
         writer.name("isSmsQueryReplyEnabled").value(a.isSmsQueryReplyEnabled)
         writer.name("isCaregiverSosWakeupEnabled").value(a.isCaregiverSosWakeupEnabled)
         writer.name("isCaregiverRole").value(a.isCaregiverRole)
+        writer.name("isLowBatteryAlertEnabled").value(a.isLowBatteryAlertEnabled)
         writer.endObject()
 
         // BLE Bridge Settings
@@ -2215,6 +2216,7 @@ object AutoBackupManager {
         var smsQueryReply = true
         var caregiverSosWakeup = true
         var isCaregiverRole = false
+        var lowBatEnabled = true
 
         reader.beginObject()
         while (reader.hasNext()) {
@@ -2260,6 +2262,7 @@ object AutoBackupManager {
                 "isSmsQueryReplyEnabled" -> smsQueryReply = reader.nextBoolean()
                 "isCaregiverSosWakeupEnabled" -> caregiverSosWakeup = reader.nextBoolean()
                 "isCaregiverRole" -> isCaregiverRole = reader.nextBoolean()
+                "isLowBatteryAlertEnabled" -> lowBatEnabled = reader.nextBoolean()
                 else -> reader.skipValue()
             }
         }
@@ -2306,7 +2309,8 @@ object AutoBackupManager {
             lastEmergencySmsTimestamp = lastEmergencySms,
             isSmsQueryReplyEnabled = smsQueryReply,
             isCaregiverSosWakeupEnabled = caregiverSosWakeup,
-            isCaregiverRole = isCaregiverRole
+            isCaregiverRole = isCaregiverRole,
+            isLowBatteryAlertEnabled = lowBatEnabled
         )
     }
 

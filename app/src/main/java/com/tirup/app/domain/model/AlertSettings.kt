@@ -65,5 +65,8 @@ data class AlertSettings(
     val isCaregiverRole: Boolean = false,
 
     // Heads-Up SMS display in TIRUp: show incoming SMS from follower/master directly in the app overlay
-    val isHeadsUpMessagingEnabled: Boolean = true
+    val isHeadsUpMessagingEnabled: Boolean = true,
+
+    // Critical Low Battery Alert (<15%, <10%, <5%) to prevent monitoring cutoff
+    val isLowBatteryAlertEnabled: Boolean = true
 )
