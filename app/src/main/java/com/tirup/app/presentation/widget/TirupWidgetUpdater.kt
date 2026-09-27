@@ -27,6 +27,7 @@ import com.tirup.app.domain.model.TargetMode
 import com.tirup.app.domain.model.TargetRanges
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.presentation.MainActivity
+import com.tirup.app.presentation.theme.getGlucoseColorInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -555,15 +556,8 @@ object TirupWidgetUpdater {
         }
         views.setTextViewText(R.id.widget_glucose_value, displayGlucose)
 
-        // Range color (Pale Green for 3.9..7.8, Emerald for 7.9..10.0)
-        val glucoseColor = when {
-            isStale -> grayColor // Gray when stale!
-            latest.valueMmol < 3.9 -> Color.parseColor("#EF4444")
-            latest.valueMmol <= 7.8 -> Color.parseColor("#4ADE80") // Pale Green 3.9 - 7.8
-            latest.valueMmol <= settings.targetRanges.tirHighMmol -> Color.parseColor("#10B981") // Saturated Emerald 7.9 - 10.0
-            latest.valueMmol <= 13.9 -> Color.parseColor("#F59E0B")
-            else -> Color.parseColor("#EF4444")
-        }
+        // Range color (6-band clinical AGP/TIR scale)
+        val glucoseColor = if (isStale) grayColor else getGlucoseColorInt(latest.valueMmol, settings.targetRanges)
         views.setTextColor(R.id.widget_glucose_value, glucoseColor)
         views.setTextColor(R.id.widget_trend_arrow, glucoseColor)
         views.setTextViewText(R.id.widget_trend_arrow, formatCompactTrendArrow(latest.trendArrow))
@@ -946,14 +940,7 @@ object TirupWidgetUpdater {
         }
         views.setTextViewText(R.id.widget_glucose_value, displayGlucose)
 
-        val glucoseColor = when {
-            isStale -> grayColor // Gray when stale!
-            latest.valueMmol < 3.9 -> Color.parseColor("#EF4444")
-            latest.valueMmol <= 7.8 -> Color.parseColor("#4ADE80") // Pale Green 3.9 - 7.8
-            latest.valueMmol <= settings.targetRanges.tirHighMmol -> Color.parseColor("#10B981") // Saturated Emerald 7.9 - 10.0
-            latest.valueMmol <= 13.9 -> Color.parseColor("#F59E0B") // ColorHigh
-            else -> Color.parseColor("#EF4444") // ColorVeryHigh
-        }
+        val glucoseColor = if (isStale) grayColor else getGlucoseColorInt(latest.valueMmol, settings.targetRanges)
         views.setTextColor(R.id.widget_glucose_value, glucoseColor)
         views.setTextColor(R.id.widget_trend_arrow, glucoseColor)
 
@@ -1500,14 +1487,8 @@ object TirupWidgetUpdater {
         timeLabelPaint.textAlign = Paint.Align.RIGHT
         canvas.drawText(if (isRu) "сейчас" else "now", nowX, heightPx - 4f, timeLabelPaint)
 
-        // 4. Draw Trajectory Line (color segments dynamically by range)
-        fun getReadingColor(value: Double): Int = when {
-            value < 3.9 -> Color.parseColor("#EF4444")
-            value <= 7.8 -> Color.parseColor("#4ADE80") // Pale Green 3.9..7.8
-            value <= high -> Color.parseColor("#10B981") // Emerald 7.9..10.0
-            value <= 13.9 -> Color.parseColor("#F59E0B")
-            else -> Color.parseColor("#EF4444")
-        }
+        // 4. Draw Trajectory Line (color segments dynamically by 6-band clinical range)
+        fun getReadingColor(value: Double): Int = getGlucoseColorInt(value, ranges)
 
         val solidPaint = Paint().apply {
             style = Paint.Style.STROKE

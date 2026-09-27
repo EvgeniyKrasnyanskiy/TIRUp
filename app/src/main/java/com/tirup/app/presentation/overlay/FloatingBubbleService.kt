@@ -41,6 +41,7 @@ import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.presentation.MainActivity
+import com.tirup.app.presentation.theme.getGlucoseColorInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -665,15 +666,8 @@ class FloatingBubbleService : Service() {
         tvGlucose?.text = displayVal
         tvArrow?.text = arrow
 
-        // Range colors strictly adhering to requirements:
-        // <3.9 Red, 3.9..7.8 Pale Green (#4ADE80), 7.9..10.0 Emerald (#10B981), 10.1..13.9 Orange, >13.9 Purple
-        val ringColor = when {
-            valueMmol < 3.9 -> Color.parseColor("#EF4444")
-            valueMmol <= 7.8 -> Color.parseColor("#4ADE80")
-            valueMmol <= 10.0 -> Color.parseColor("#10B981")
-            valueMmol <= 13.9 -> Color.parseColor("#F59E0B")
-            else -> Color.parseColor("#EF4444")
-        }
+        // Range colors strictly adhering to 6-band clinical AGP/TIR scale
+        val ringColor = getGlucoseColorInt(valueMmol, settings.targetRanges)
 
         val strokeWidthPx = if (isCurrentlyMiniMode) dpToPxF(2.2f) else dpToPxF(3.2f)
         val tirProgress = if (isOutOfRange) 100f else todayTir.coerceIn(0f, 100f)
