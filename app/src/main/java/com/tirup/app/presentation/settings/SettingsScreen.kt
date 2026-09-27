@@ -1378,29 +1378,12 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(
-                                        text = if (isRu) "🔋 Критический разряд телефона" else "🔋 Low Phone Battery Alert",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Surface(
-                                        shape = RoundedCornerShape(4.dp),
-                                        color = Color(0xFFEF4444).copy(alpha = 0.15f)
-                                    ) {
-                                        Text(
-                                            text = "< 15%, 10%, 5%",
-                                            color = Color(0xFFEF4444),
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                        )
-                                    }
-                                }
+                                Text(
+                                    text = if (isRu) "🔋 Критический разряд телефона" else "🔋 Low Phone Battery Alert",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = if (isRu) "Предупреждать при разряде ниже 15%, 10% и 5%, чтобы не прерывать мониторинг глюкозы"
@@ -3347,7 +3330,7 @@ fun SettingsScreen(
                         Text("🌙", fontSize = 22.sp)
                         Column {
                             Text(
-                                text = if (isRu) "Ночной AOD (Always-On Display)" else "Night AOD (Always-On Display)",
+                                text = if (isRu) "Ночной экран (AoD)" else "Night screen (AoD)",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -4378,65 +4361,6 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = if (testSosSmsCooldownSec == 0) TestButtonAmber else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                             )
-                        }
-
-                        // Test 5: Direct Sound Previews (Extra-HYPO 50s & Extra-HYPER 16s)
-                        val isHypoTesting = (currentlyPlayingTag == "EXTRA_HYPO")
-                        val isHyperTesting = (currentlyPlayingTag == "EXTRA_HYPER")
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedButton(
-                                onClick = { handleSoundClick("EXTRA_HYPO") { viewModel.playExtraHypoTestSound() } },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (isHypoTesting) MaterialTheme.colorScheme.error
-                                    else ColorVeryLow.copy(alpha = 0.7f)
-                                )
-                            ) {
-                                Text(text = if (isHypoTesting) "⏹️" else "🚨", fontSize = 14.sp)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = if (isHypoTesting) (if (isRu) "Стоп" else "Stop")
-                                           else (if (isRu) "Экстра-ГИПО (50с)" else "Extra-HYPO (50s)"),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isHypoTesting) MaterialTheme.colorScheme.error else ColorVeryLow
-                                )
-                            }
-
-                            OutlinedButton(
-                                onClick = { handleSoundClick("EXTRA_HYPER") { viewModel.playExtraHyperTestSound() } },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (isHyperTesting) MaterialTheme.colorScheme.error
-                                    else ColorHigh.copy(alpha = 0.7f)
-                                )
-                            ) {
-                                Text(text = if (isHyperTesting) "⏹️" else "⚠️", fontSize = 14.sp)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = if (isHyperTesting) (if (isRu) "Стоп" else "Stop")
-                                           else (if (isRu) "Экстра-ГИПЕР (16с)" else "Extra-HYPER (16s)"),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isHyperTesting) MaterialTheme.colorScheme.error else ColorHigh
-                                )
-                            }
-
-                            OutlinedButton(
-                                onClick = { viewModel.stopAlertSounds() },
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-                            ) {
-                                Text(text = "⏹️", fontSize = 14.sp)
-                            }
                         }
 
                         // Confirmation dialog for SOS SMS sending

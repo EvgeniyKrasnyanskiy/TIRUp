@@ -559,14 +559,11 @@ fun AodScreen(
                     // Surface spacing (~10px): tightly tucked under sugar digits and trend arrow
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // Reading Delta & Timestamp Age (Fully Localized)
+                    // Reading Delta & Timestamp Age (Fully Localized, Ultra-Compact for AoD)
                     val ageStr = if (r != null && r.timestamp > 0L) {
                         val ageMins = ((System.currentTimeMillis() - r.timestamp) / 60000L).coerceAtLeast(0L)
-                        if (ageMins <= 1L) {
-                            stringResource(R.string.just_now)
-                        } else {
-                            stringResource(R.string.minutes_ago, ageMins.toInt())
-                        }
+                        val minSuffix = if (Locale.getDefault().language.equals("ru", ignoreCase = true)) "мин" else "min"
+                        "$ageMins $minSuffix"
                     } else {
                         stringResource(R.string.aod_no_data)
                     }
@@ -602,10 +599,11 @@ fun AodScreen(
                     Text(
                         text = annotatedSubline,
                         color = Color(0xFF888888),
-                        fontSize = if (isLandscape) 52.sp else 32.sp,
+                        fontSize = if (isLandscape) 46.sp else 24.sp,
                         fontWeight = FontWeight.Medium,
                         letterSpacing = if (isLandscape) (-0.5).sp else 0.sp,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        maxLines = 1
                     )
                 }
 
