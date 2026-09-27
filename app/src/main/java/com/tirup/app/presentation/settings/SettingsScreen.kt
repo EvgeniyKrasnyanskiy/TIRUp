@@ -1363,6 +1363,65 @@ fun SettingsScreen(
                             isTesting = (currentlyPlayingTag == com.tirup.app.data.alert.AlertTier.SIGNAL_LOSS.name),
                             isRu = isRu
                         )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                            thickness = 1.dp
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Low Battery Alert Row (<15%, <10%, <5%)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = if (isRu) "🔋 Критический разряд телефона" else "🔋 Low Phone Battery Alert",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = Color(0xFFEF4444).copy(alpha = 0.15f)
+                                    ) {
+                                        Text(
+                                            text = "< 15%, 10%, 5%",
+                                            color = Color(0xFFEF4444),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (isRu) "Предупреждать при разряде ниже 15%, 10% и 5%, чтобы не прерывать мониторинг глюкозы"
+                                           else "Alert when phone battery drops below 15%, 10%, and 5% to prevent monitoring cutoff",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Switch(
+                                checked = alerts.isLowBatteryAlertEnabled,
+                                onCheckedChange = { isChecked ->
+                                    viewModel.updateAlertSettings(alerts.copy(isLowBatteryAlertEnabled = isChecked))
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = Color(0xFFEF4444)
+                                )
+                            )
+                        }
                     }
                 }
             }

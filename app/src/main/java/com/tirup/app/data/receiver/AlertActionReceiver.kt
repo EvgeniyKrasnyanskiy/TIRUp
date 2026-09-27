@@ -29,6 +29,7 @@ class AlertActionReceiver : BroadcastReceiver() {
                 nm?.cancel(GlucoseAlertManager.NOTIFICATION_ID_MAIN)
                 nm?.cancel(GlucoseAlertManager.NOTIFICATION_ID_PREDICTIVE)
                 nm?.cancel(GlucoseAlertManager.NOTIFICATION_ID_SIGNAL_LOSS)
+                nm?.cancel(GlucoseAlertManager.NOTIFICATION_ID_LOW_BATTERY)
                 GlucoseAlertManager.silenceCurrentSoundOnly()
                 GlucoseAlertManager.dismissCriticalAlarm(context, fromUser = true)
                 GlucoseAlertManager.clearActiveAlertBanner()

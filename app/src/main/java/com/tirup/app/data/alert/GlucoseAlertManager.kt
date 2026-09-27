@@ -8,7 +8,9 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.hardware.camera2.CameraManager
+import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
 import android.os.VibrationEffect
@@ -268,6 +270,7 @@ object GlucoseAlertManager {
     const val NOTIFICATION_ID_CRITICAL = 1003
     const val NOTIFICATION_ID_SIGNAL_LOSS = 1004
     const val NOTIFICATION_ID_LAST_CHANCE = 1005
+    const val NOTIFICATION_ID_LOW_BATTERY = 1006
     const val NOTIFICATION_ID_WEEKLY_DIGEST = 6000
     const val NOTIFICATION_ID_SENSOR_REMINDER = 9201
     const val NOTIFICATION_ID_PUMP_REMINDER = 9202
@@ -283,6 +286,9 @@ object GlucoseAlertManager {
     // Timestamps for Smart Snooze / Anti-spam
     @Volatile
     private var lastHypoAlertTimestamp: Long = 0L
+
+    @Volatile
+    private var lastBatteryAlertThreshold: Int = 100
 
     @Volatile
     private var lastHyperAlertTimestamp: Long = 0L
@@ -1188,6 +1194,94 @@ object GlucoseAlertManager {
     }
 
     /**
+     * Checks device battery level and fires alert on critical thresholds (<15%, <10%, <5%).
+     * Uses hysteresis (fires once per threshold downwards; resets when plugged in or recharged >20%).
+     */
+    fun checkDeviceBattery(context: Context, settings: UserSettings) {
+        val alerts = settings.alertSettings
+        if (!alerts.isLowBatteryAlertEnabled) return
+
+        val now = System.currentTimeMillis()
+        if (alerts.alertsMuteUntilTimestamp > now) return
+
+        try {
+            val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            val batteryStatus = context.registerReceiver(null, filter) ?: return
+            val level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            val status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                    status == BatteryManager.BATTERY_STATUS_FULL
+
+            if (level < 0 || scale <= 0) return
+            val batteryPct = (level * 100 / scale.toFloat()).roundToInt()
+
+            // If phone is connected to charger or battery increased above 20%, reset hysteresis
+            if (isCharging || batteryPct > 20) {
+                lastBatteryAlertThreshold = 100
+                return
+            }
+
+            val targetThreshold = when {
+                batteryPct <= 5 -> 5
+                batteryPct <= 10 -> 10
+                batteryPct <= 15 -> 15
+                else -> 100
+            }
+
+            if (targetThreshold < lastBatteryAlertThreshold) {
+                lastBatteryAlertThreshold = targetThreshold
+
+                val isRu = settings.language.equals("RU", ignoreCase = true)
+                val tier = when (targetThreshold) {
+                    5 -> AlertTier.CRITICAL
+                    10 -> AlertTier.MAIN
+                    else -> AlertTier.PREDICTIVE
+                }
+
+                val title = when (targetThreshold) {
+                    5 -> if (isRu) "🔋 Критический разряд: $batteryPct%" else "🔋 Critical battery: $batteryPct%"
+                    10 -> if (isRu) "🔋 Сильный разряд батареи: $batteryPct%" else "🔋 Very low battery: $batteryPct%"
+                    else -> if (isRu) "🔋 Низкий заряд батареи: $batteryPct%" else "🔋 Low battery: $batteryPct%"
+                }
+
+                val body = if (isRu) {
+                    "Осталось $batteryPct%. Подключите зарядное устройство, чтобы не прерывать мониторинг глюкозы."
+                } else {
+                    "Only $batteryPct% remaining. Connect charger to keep glucose monitoring active."
+                }
+
+                val channelId = if (targetThreshold <= 5) CHANNEL_CRITICAL else CHANNEL_MAIN
+                val volume = alerts.alertVolumePercent
+                val vibrate = when (tier) {
+                    AlertTier.CRITICAL -> alerts.isCriticalVibrate
+                    AlertTier.MAIN -> alerts.isMainVibrate
+                    else -> alerts.isPredictiveVibrate
+                }
+                val flash = when (tier) {
+                    AlertTier.CRITICAL -> alerts.isCriticalFlash
+                    AlertTier.MAIN -> alerts.isMainFlash
+                    else -> alerts.isPredictiveFlash
+                }
+
+                sendNotification(
+                    context = context,
+                    channelId = channelId,
+                    notificationId = NOTIFICATION_ID_LOW_BATTERY,
+                    title = title,
+                    text = body,
+                    tier = tier,
+                    vibrate = vibrate,
+                    flash = flash,
+                    volumePercent = volume
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking device battery: ${e.message}", e)
+        }
+    }
+
+    /**
      * Inspects recent readings against settings and triggers the appropriate alert tier.
      * Uses Smart Adaptive Snooze for Hypo and Hyper, and Exponential Backoff for Signal Loss.
      */
@@ -1197,6 +1291,10 @@ object GlucoseAlertManager {
         settings: UserSettings
     ) {
         if (recentReadings.isEmpty()) return
+
+        // Check device battery level for low battery warning (<15%, <10%, <5%)
+        checkDeviceBattery(context, settings)
+
         val alerts = settings.alertSettings
         val now = System.currentTimeMillis()
         val isHypoProtectionActive = alerts.isCriticalEnabled &&
@@ -1664,14 +1762,14 @@ object GlucoseAlertManager {
             builder.setCategory(NotificationCompat.CATEGORY_ALARM)
         }
 
-        if (tier == AlertTier.CRITICAL) {
+        if (tier == AlertTier.CRITICAL && notificationId != NOTIFICATION_ID_LOW_BATTERY) {
             isCriticalAlarmActive = true
 
-            val isHypo = title.contains("гипо", true) ||
+            val isHypo = (title.contains("гипо", true) ||
                     title.contains("низкий", true) ||
                     title.contains("low", true) ||
                     title.contains("Тест", true) ||
-                    title.contains("Test", true)
+                    title.contains("Test", true)) && !title.contains("батаре", true) && !title.contains("battery", true)
             if (isHypo) {
                 // Wake up screen and hold CPU
                 try {
@@ -2301,6 +2399,9 @@ object GlucoseAlertManager {
                 alerts = settings.alertSettings,
                 settings = settings
             )
+
+            // Also check device battery level
+            checkDeviceBattery(context, settings)
 
             // Keep persistent notification in sync with signal state even when no new sensor broadcasts arrive
             if (settings.isLockscreenNotificationEnabled) {
