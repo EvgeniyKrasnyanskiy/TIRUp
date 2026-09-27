@@ -58,18 +58,34 @@
 
 ---
 
+### Этап 4: Отображение IoB в режиме Always-on Display (AoD) [Completed]
+- **Файлы**:
+  - `app/src/main/java/com/tirup/app/presentation/aod/AodScreen.kt`
+- **Изменения**:
+  - Под строкой сахара, если `reading.iob > 0.01`, добавлено компактное отображение активного инсулина: `💧 X.XX U` с мягким голубым акцентом (`#38BDF8`), отделённое точкой `•` от дельты и времени замера.
+
+### Этап 5: Оповещение о критическом разряде батареи телефона (<15%, <10%, <5%) [Completed]
+- **Файлы**:
+  - `app/src/main/java/com/tirup/app/domain/model/AlertSettings.kt`
+  - `app/src/main/java/com/tirup/app/data/repository/SettingsRepositoryImpl.kt`
+  - `app/src/main/java/com/tirup/app/data/backup/AutoBackupManager.kt`
+  - `app/src/main/java/com/tirup/app/data/alert/GlucoseAlertManager.kt`
+  - `app/src/main/java/com/tirup/app/data/receiver/AlertActionReceiver.kt`
+  - `app/src/main/java/com/tirup/app/presentation/settings/SettingsScreen.kt`
+- **Изменения**:
+  - В модель `AlertSettings` добавлено поле `isLowBatteryAlertEnabled = true`, поддержано сохранение в `SharedPreferences` и резервных копиях `AutoBackupManager`.
+  - В `GlucoseAlertManager` реализован метод `checkDeviceBattery`: мгновенный опрос батареи через sticky-интент, ступенчатые пороги 15%, 10% и 5% с гистерезисом (срабатывает однократно на каждый порог, предотвращая повторный спам; сбрасывается при подключении к зарядному устройству или уровне >20%).
+  - Поддержка отмены тревоги через кнопку «ОК» в шторке (`AlertActionReceiver`).
+  - В `SettingsScreen` в блок «Настройки тревог» добавлена карточка с бейджем `< 15%, 10%, 5%` и тумблером для управления оповещением.
+
+---
+
 ## План верификации
 
 1. **Юнит-тесты**:
-   - `.\gradlew.bat testDebugUnitTest --tests com.tirup.app.data.receiver.DexdripNoteParserTest`
-   - Запуск полного набора юнит-тестов `.\gradlew.bat testDebugUnitTest`
+   - `.\gradlew.bat testDebugUnitTest` (успешно пройдены, 26 задач).
 2. **Сборка проекта**:
-   - `.\gradlew.bat assembleDebug`
+   - `.\gradlew.bat assembleRelease` или `assembleDebug`.
 3. **Проверка на подключенном смартфоне через adb**:
-   - Установка и проверка логов `DexdripReceiver`: отсутствие ошибок `PatternSyntaxException`.
-   - Проверка работы заметки `канюля → ланцет`: успешный сброс обоих счётчиков.
-   - Проверка AoD: поворот экрана при активном фонарике и при разгорании (фонарик не гаснет).
-   - Проверка положения бегунка фонарика (внизу) и времени разгорания (5 секунд).
-   - Проверка плавного скрытия плашки яркости без залипаний.
-   - Проверка экрана Настроек: блок AoD находится под «Плавающий пузырёк».
-   - Проверка отсутствия баннеров и лишних уведомлений BLE.
+   - **AoD IoB**: убедиться, что при `iob > 0.01` под сахаром отображается `💧 X.XX U` голубоватым цветом, а при отсутствии болюса — только дельта и возраст точки.
+   - **Батарея**: убедиться в наличии карточки выключателя в блоке «Настройки тревог», проверить срабатывание при падении уровня заряда ниже 15%, 10%, 5% с защитой от повторного спама.
