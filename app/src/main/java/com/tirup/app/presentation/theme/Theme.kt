@@ -13,6 +13,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tirup.app.domain.model.GlucoseRangeCategory
+import com.tirup.app.domain.model.TargetRanges
 
 // Modern Youth Aesthetic Colors
 val PrimaryEmerald = Color(0xFF10B981)
@@ -20,6 +22,14 @@ val PrimaryEmeraldDark = Color(0xFF059669)
 val SecondaryTeal = Color(0xFF14B8A6)
 val AccentCyan = Color(0xFF06B6D4)
 val ActionBlue = Color(0xFF0284C7)
+
+// Range Hex Values (consistent across Android Views, Canvas & Web)
+const val HexColorVeryLow = "#EF4444"
+const val HexColorLow = "#F59E0B"
+const val HexColorTight = "#4ADE80"
+const val HexColorTarget = "#10B981"
+const val HexColorHigh = "#F59E0B"
+const val HexColorVeryHigh = "#EF4444"
 
 // Range Colors (consistent across themes)
 val ColorVeryLow = Color(0xFFEF4444)      // Urgent Red < 3.0
@@ -29,6 +39,57 @@ val ColorTargetSoft = Color(0xFF4ADE80)   // Pale Green 3.9 - 7.8
 val ColorTarget = Color(0xFF10B981)       // Saturated Green / Emerald 7.9 - 10.0
 val ColorHigh = Color(0xFFF59E0B)         // Warning Amber 10.1 - 13.9
 val ColorVeryHigh = Color(0xFFEF4444)     // Urgent Red >= 14.0
+
+/**
+ * Returns unified Compose Color for given glucose value in mmol/L strictly conforming to the 6-band clinical AGP/TIR standard:
+ * < 3.0: ColorVeryLow (#EF4444)
+ * 3.0..3.8: ColorLow (#F59E0B)
+ * 3.9..7.8: ColorTight (#4ADE80)
+ * 7.9..10.0: ColorTarget (#10B981)
+ * 10.1..13.9: ColorHigh (#F59E0B)
+ * >= 14.0: ColorVeryHigh (#EF4444)
+ */
+fun getGlucoseColor(valueMmol: Double, ranges: TargetRanges = TargetRanges()): Color {
+    if (valueMmol <= 0.0) return Color(0xFF94A3B8)
+    return when (ranges.categorize(valueMmol)) {
+        GlucoseRangeCategory.VERY_LOW -> ColorVeryLow
+        GlucoseRangeCategory.LOW -> ColorLow
+        GlucoseRangeCategory.TIGHT -> ColorTight
+        GlucoseRangeCategory.TARGET -> ColorTarget
+        GlucoseRangeCategory.HIGH -> ColorHigh
+        GlucoseRangeCategory.VERY_HIGH -> ColorVeryHigh
+    }
+}
+
+/**
+ * Returns Android graphics Color Int (e.g. for RemoteViews, Paint, Drawables).
+ */
+fun getGlucoseColorInt(valueMmol: Double, ranges: TargetRanges = TargetRanges()): Int {
+    if (valueMmol <= 0.0) return 0xFF94A3B8.toInt()
+    return when (ranges.categorize(valueMmol)) {
+        GlucoseRangeCategory.VERY_LOW -> 0xFFEF4444.toInt()
+        GlucoseRangeCategory.LOW -> 0xFFF59E0B.toInt()
+        GlucoseRangeCategory.TIGHT -> 0xFF4ADE80.toInt()
+        GlucoseRangeCategory.TARGET -> 0xFF10B981.toInt()
+        GlucoseRangeCategory.HIGH -> 0xFFF59E0B.toInt()
+        GlucoseRangeCategory.VERY_HIGH -> 0xFFEF4444.toInt()
+    }
+}
+
+/**
+ * Returns Hex color string (e.g. for Color.parseColor).
+ */
+fun getGlucoseColorHex(valueMmol: Double, ranges: TargetRanges = TargetRanges()): String {
+    if (valueMmol <= 0.0) return "#94A3B8"
+    return when (ranges.categorize(valueMmol)) {
+        GlucoseRangeCategory.VERY_LOW -> HexColorVeryLow
+        GlucoseRangeCategory.LOW -> HexColorLow
+        GlucoseRangeCategory.TIGHT -> HexColorTight
+        GlucoseRangeCategory.TARGET -> HexColorTarget
+        GlucoseRangeCategory.HIGH -> HexColorHigh
+        GlucoseRangeCategory.VERY_HIGH -> HexColorVeryHigh
+    }
+}
 
 // Dark Palette
 val DarkBg = Color(0xFF0B0F17)

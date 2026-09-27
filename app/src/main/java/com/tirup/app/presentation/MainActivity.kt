@@ -35,6 +35,7 @@ import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
 import com.tirup.app.presentation.theme.ColorVeryLow
+import com.tirup.app.presentation.theme.getGlucoseColor
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
@@ -720,15 +721,7 @@ fun MainPagerScaffold(
     val trendArrow = latestReading?.trendArrow ?: ""
 
     val glucoseColor = if (latestReading != null) {
-        val v = latestReading.valueMmol
-        when {
-            v < 3.0 -> ColorVeryLow
-            v < 3.9 -> ColorVeryLow
-            v <= 7.8 -> ColorTight
-            v <= 10.0 -> PrimaryEmerald
-            v <= 13.9 -> ColorHigh
-            else -> ColorVeryHigh
-        }
+        getGlucoseColor(latestReading.valueMmol, userSettings.targetRanges)
     } else ActionBlue
 
     val rateStr = remember(focusState.recentReadings, isMmol, isRu) {

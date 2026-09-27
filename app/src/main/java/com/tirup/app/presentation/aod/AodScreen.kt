@@ -73,6 +73,7 @@ import com.tirup.app.presentation.theme.ColorTarget
 import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
 import com.tirup.app.presentation.theme.ColorVeryLow
+import com.tirup.app.presentation.theme.getGlucoseColor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -510,17 +511,14 @@ fun AodScreen(
                     val r = reading
                     val glucoseValMmol = r?.valueMmol ?: 0.0
 
+                    val isStale = (r != null && r.timestamp > 0L && (System.currentTimeMillis() - r.timestamp) > 20 * 60_000L)
                     // Color mapping: 6-tier clinical palette
-                    val glucoseColor = when {
-                        glucoseValMmol <= 0.0 -> Color(0xFF666666)
-                        glucoseValMmol < ranges.veryLowThresholdMmol -> ColorVeryLow
-                        glucoseValMmol < ranges.tirLowMmol -> ColorLow
-                        glucoseValMmol <= ranges.tirHighMmol -> {
-                            if (glucoseValMmol <= 7.8) ColorTight
-                            else ColorTarget
-                        }
-                        glucoseValMmol <= ranges.veryHighThresholdMmol -> ColorHigh
-                        else -> ColorVeryHigh
+                    val glucoseColor = if (r == null || glucoseValMmol <= 0.0) {
+                        Color(0xFF666666)
+                    } else if (isStale) {
+                        Color(0xFF888888)
+                    } else {
+                        getGlucoseColor(glucoseValMmol, ranges)
                     }
 
                     val glucoseText = if (r != null && r.valueMmol > 0.0) {
@@ -551,13 +549,13 @@ fun AodScreen(
                                 fontSize = arrowFontSize,
                                 fontWeight = FontWeight.Bold,
                                 color = glucoseColor.copy(alpha = 0.9f),
-                                modifier = Modifier.padding(start = if (isLandscape) 10.dp else 6.dp, bottom = if (isLandscape) 4.dp else 12.dp)
+                                modifier = Modifier.padding(start = if (isLandscape) 8.dp else 4.dp, bottom = if (isLandscape) 2.dp else 4.dp)
                             )
                         }
                     }
 
-                    // Surface spacing (~10px): tightly tucked under sugar digits and trend arrow
-                    Spacer(modifier = Modifier.height(4.dp))
+                    // Surface spacing: tightly tucked under sugar digits and trend arrow (halved)
+                    Spacer(modifier = Modifier.height(2.dp))
 
                     // Reading Delta & Timestamp Age (Fully Localized, Ultra-Compact for AoD)
                     val ageStr = if (r != null && r.timestamp > 0L) {
