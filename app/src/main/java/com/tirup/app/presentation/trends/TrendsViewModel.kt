@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -187,6 +188,23 @@ class TrendsViewModel(
 
     fun openWeeklyDigest() {
         _isDigestSheetOpen.value = true
+        if (_weeklyDigest.value == null) {
+            viewModelScope.launch {
+                try {
+                    val settings = settingsRepository.getSettings().first()
+                    val referenceTime = System.currentTimeMillis()
+                    val digestStartTime = referenceTime - (14L * 86400000L)
+                    val readings = glucoseRepository.getReadingsBetween(digestStartTime, referenceTime).first()
+                    _weeklyDigest.value = WeeklyDigestCalculator.calculateForReferenceTimestamp(
+                        allReadings = readings,
+                        referenceTime = referenceTime,
+                        settings = settings
+                    )
+                } catch (e: Exception) {
+                    android.util.Log.e("TrendsViewModel", "Error calculating weekly digest eagerly: ${e.message}")
+                }
+            }
+        }
     }
 
     fun closeWeeklyDigest() {

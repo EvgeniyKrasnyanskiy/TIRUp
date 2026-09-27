@@ -244,47 +244,41 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_GOTO_WEEKLY_DIGEST = "com.tirup.app.GOTO_WEEKLY_DIGEST"
         const val EXTRA_GOTO_HBA1C = "com.tirup.app.GOTO_HBA1C"
         const val EXTRA_GOTO_YEAR_END = "com.tirup.app.GOTO_YEAR_END"
-        val navigateToFocusEvent = kotlinx.coroutines.flow.MutableSharedFlow<Long>(extraBufferCapacity = 1)
-        val navigateToDigestEvent = kotlinx.coroutines.flow.MutableSharedFlow<Long>(extraBufferCapacity = 1)
-        val navigateToHba1cEvent = kotlinx.coroutines.flow.MutableSharedFlow<Long>(extraBufferCapacity = 1)
-        val navigateToYearEndEvent = kotlinx.coroutines.flow.MutableSharedFlow<Long>(extraBufferCapacity = 1)
+        val navigateToFocusEvent = kotlinx.coroutines.flow.MutableSharedFlow<Long>(replay = 1, extraBufferCapacity = 1)
+        val navigateToDigestEvent = kotlinx.coroutines.flow.MutableSharedFlow<Long>(replay = 1, extraBufferCapacity = 1)
+        val navigateToHba1cEvent = kotlinx.coroutines.flow.MutableSharedFlow<Long>(replay = 1, extraBufferCapacity = 1)
+        val navigateToYearEndEvent = kotlinx.coroutines.flow.MutableSharedFlow<Long>(replay = 1, extraBufferCapacity = 1)
+    }
+
+    private fun handleNotificationIntent(intent: Intent?) {
+        if (intent == null) return
+        if (intent.getBooleanExtra(EXTRA_GOTO_FOCUS, false)) {
+            navigateToFocusEvent.tryEmit(System.currentTimeMillis())
+            intent.removeExtra(EXTRA_GOTO_FOCUS)
+        }
+        if (intent.getBooleanExtra(EXTRA_GOTO_WEEKLY_DIGEST, false)) {
+            navigateToDigestEvent.tryEmit(System.currentTimeMillis())
+            intent.removeExtra(EXTRA_GOTO_WEEKLY_DIGEST)
+        }
+        if (intent.getBooleanExtra(EXTRA_GOTO_HBA1C, false)) {
+            navigateToHba1cEvent.tryEmit(System.currentTimeMillis())
+            intent.removeExtra(EXTRA_GOTO_HBA1C)
+        }
+        if (intent.getBooleanExtra(EXTRA_GOTO_YEAR_END, false)) {
+            navigateToYearEndEvent.tryEmit(System.currentTimeMillis())
+            intent.removeExtra(EXTRA_GOTO_YEAR_END)
+        }
     }
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent?.getBooleanExtra(EXTRA_GOTO_FOCUS, false) == true) {
-            navigateToFocusEvent.tryEmit(System.currentTimeMillis())
-        }
-        if (intent?.getBooleanExtra(EXTRA_GOTO_WEEKLY_DIGEST, false) == true) {
-            navigateToDigestEvent.tryEmit(System.currentTimeMillis())
-        }
-        if (intent?.getBooleanExtra(EXTRA_GOTO_HBA1C, false) == true) {
-            navigateToHba1cEvent.tryEmit(System.currentTimeMillis())
-        }
-        if (intent?.getBooleanExtra(EXTRA_GOTO_YEAR_END, false) == true) {
-            navigateToYearEndEvent.tryEmit(System.currentTimeMillis())
-        }
+        handleNotificationIntent(intent)
     }
 
     override fun onResume() {
         super.onResume()
-        if (intent?.getBooleanExtra(EXTRA_GOTO_FOCUS, false) == true) {
-            navigateToFocusEvent.tryEmit(System.currentTimeMillis())
-            intent.removeExtra(EXTRA_GOTO_FOCUS)
-        }
-        if (intent?.getBooleanExtra(EXTRA_GOTO_WEEKLY_DIGEST, false) == true) {
-            navigateToDigestEvent.tryEmit(System.currentTimeMillis())
-            intent.removeExtra(EXTRA_GOTO_WEEKLY_DIGEST)
-        }
-        if (intent?.getBooleanExtra(EXTRA_GOTO_HBA1C, false) == true) {
-            navigateToHba1cEvent.tryEmit(System.currentTimeMillis())
-            intent.removeExtra(EXTRA_GOTO_HBA1C)
-        }
-        if (intent?.getBooleanExtra(EXTRA_GOTO_YEAR_END, false) == true) {
-            navigateToYearEndEvent.tryEmit(System.currentTimeMillis())
-            intent.removeExtra(EXTRA_GOTO_YEAR_END)
-        }
+        handleNotificationIntent(intent)
         GlucoseAlertManager.dismissCriticalAlarm(this, fromUser = true)
         DexdripBroadcastReceiver.syncFromLocalXdrip(this@MainActivity)
         com.tirup.app.data.worker.AutoBackupWorker.enqueue(applicationContext, force = false)
@@ -353,6 +347,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @Composable
 fun AppNavigationRoot(
     focusViewModel: FocusViewModel,
@@ -516,6 +511,7 @@ fun AppNavigationRoot(
 
     LaunchedEffect(Unit) {
         MainActivity.navigateToYearEndEvent.collect {
+            MainActivity.navigateToYearEndEvent.resetReplayCache()
             navController.navigate("settings?target=year_end")
         }
     }
@@ -631,7 +627,7 @@ fun AppNavigationRoot(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @Composable
 fun MainPagerScaffold(
     focusViewModel: FocusViewModel,
@@ -678,17 +674,20 @@ fun MainPagerScaffold(
     LaunchedEffect(Unit) {
         launch {
             MainActivity.navigateToFocusEvent.collect {
+                MainActivity.navigateToFocusEvent.resetReplayCache()
                 pagerState.animateScrollToPage(1)
             }
         }
         launch {
             MainActivity.navigateToDigestEvent.collect {
+                MainActivity.navigateToDigestEvent.resetReplayCache()
                 pagerState.animateScrollToPage(0)
                 trendsViewModel.openWeeklyDigest()
             }
         }
         launch {
             MainActivity.navigateToHba1cEvent.collect {
+                MainActivity.navigateToHba1cEvent.resetReplayCache()
                 showHba1cDialog = true
             }
         }
