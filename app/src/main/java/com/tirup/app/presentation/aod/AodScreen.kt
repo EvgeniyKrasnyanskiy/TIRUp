@@ -41,6 +41,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -146,15 +147,15 @@ fun AodScreen(
         }
     }
 
-    // Flashlight state (Double-tap initiates 15s smooth increase; Single tap pauses/resumes)
-    var isFlashlightActive by remember { mutableStateOf(false) }
-    var isFlashlightPaused by remember { mutableStateOf(false) }
-    var flashlightProgress by remember { mutableFloatStateOf(0f) }
+    // Flashlight state (Double-tap initiates 5s smooth increase; Single tap pauses/resumes)
+    var isFlashlightActive by rememberSaveable { mutableStateOf(false) }
+    var isFlashlightPaused by rememberSaveable { mutableStateOf(false) }
+    var flashlightProgress by rememberSaveable { mutableFloatStateOf(0f) }
 
     LaunchedEffect(isFlashlightActive, isFlashlightPaused) {
         if (isFlashlightActive && !isFlashlightPaused) {
-            val stepDelay = 80L
-            val stepIncrement = 80f / 15_000f
+            val stepDelay = 50L
+            val stepIncrement = 50f / 5_000f
             while (isFlashlightActive && !isFlashlightPaused && flashlightProgress < 1.0f) {
                 delay(stepDelay)
                 flashlightProgress = (flashlightProgress + stepIncrement).coerceAtMost(1.0f)
@@ -165,6 +166,7 @@ fun AodScreen(
     // Brightness adjustment state & HUD
     var currentBrightness by remember { mutableFloatStateOf(aod.customBrightness.coerceIn(0.005f, 1.0f)) }
     var isBrightnessOverlayVisible by remember { mutableStateOf(false) }
+    var brightnessOverlayTrigger by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(aod.customBrightness) {
         if (!isBrightnessOverlayVisible) {
@@ -172,8 +174,8 @@ fun AodScreen(
         }
     }
 
-    LaunchedEffect(isBrightnessOverlayVisible) {
-        if (isBrightnessOverlayVisible) {
+    LaunchedEffect(brightnessOverlayTrigger) {
+        if (brightnessOverlayTrigger > 0L) {
             delay(1500L)
             isBrightnessOverlayVisible = false
         }
@@ -297,6 +299,7 @@ fun AodScreen(
                                 currentBrightness = (currentBrightness - (dragAmount.y / 450f)).coerceIn(0.005f, 1.0f)
                                 onSetWindowBrightness(currentBrightness)
                                 isBrightnessOverlayVisible = true
+                                brightnessOverlayTrigger = System.currentTimeMillis()
                             }
                         }
                     },
@@ -305,6 +308,13 @@ fun AodScreen(
                             onExit()
                         } else if (isVerticalDrag) {
                             onSaveBrightness(currentBrightness)
+                            brightnessOverlayTrigger = System.currentTimeMillis()
+                        }
+                    },
+                    onDragCancel = {
+                        if (isVerticalDrag) {
+                            onSaveBrightness(currentBrightness)
+                            brightnessOverlayTrigger = System.currentTimeMillis()
                         }
                     }
                 )
@@ -330,8 +340,9 @@ fun AodScreen(
 
                 Column(
                     modifier = Modifier
+                        .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(top = topPadding, start = 20.dp, end = 20.dp)
+                        .padding(bottom = bottomPadding + 16.dp, start = 20.dp, end = 20.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),

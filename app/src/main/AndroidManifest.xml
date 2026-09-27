@@ -96,6 +96,7 @@
             android:showWhenLocked="true"
             android:turnScreenOn="true"
             android:screenOrientation="unspecified"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
             android:launchMode="singleTop"
             android:theme="@style/Theme.TIRUp" />
 

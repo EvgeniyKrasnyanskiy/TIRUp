@@ -38,8 +38,10 @@ class AodActivity : ComponentActivity() {
             e.printStackTrace()
         }
 
-        // Set low initial window brightness
-        setWindowBrightness(0.01f)
+        // Set low initial window brightness on first launch
+        if (savedInstanceState == null) {
+            setWindowBrightness(0.01f)
+        }
 
         // Immersive sticky fullscreen
         hideSystemBars()
