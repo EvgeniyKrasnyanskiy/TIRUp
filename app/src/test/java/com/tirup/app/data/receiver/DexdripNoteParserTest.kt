@@ -115,4 +115,38 @@ class DexdripNoteParserTest {
         org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isSensorNote("канюля"))
         org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isSensorNote(null))
     }
+
+    @Test
+    fun testCompoundNotes() {
+        val compoundArrow = "канюля → ланцет"
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isCannulaNote(compoundArrow))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isLancetNote(compoundArrow))
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isSensorNote(compoundArrow))
+
+        val compoundAsciiArrow = "канюля -> ланцет"
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isCannulaNote(compoundAsciiArrow))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isLancetNote(compoundAsciiArrow))
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isSensorNote(compoundAsciiArrow))
+
+        val compoundComma = "канюля, ланцет"
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isCannulaNote(compoundComma))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isLancetNote(compoundComma))
+
+        val compoundReverse = "ланцет + канюля"
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isCannulaNote(compoundReverse))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isLancetNote(compoundReverse))
+
+        // Compound note with days
+        val compoundWithDays = "канюля → ланцет на 3 дня"
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isCannulaNote(compoundWithDays))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isLancetNote(compoundWithDays))
+        assertEquals(3, DexdripBroadcastReceiver.parseDaysFromNote(compoundWithDays))
+
+        // Compound note with all three: cannula, lancet, sensor
+        val compoundTriple = "канюля → ланцет - сенсор"
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isCannulaNote(compoundTriple))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isLancetNote(compoundTriple))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isSensorNote(compoundTriple))
+    }
 }
+

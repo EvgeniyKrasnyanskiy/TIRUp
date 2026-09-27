@@ -48,6 +48,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         val db = app?.database
                         if (db != null && treatment != null) {
                             saveTreatmentIfNew(db, treatment)
+                            processDeviceRenewals(context, listOf(treatment))
                         }
                         if (db != null && (standaloneIob != null || standaloneCob != null)) {
                             val latestEntity = db.glucoseReadingDao().getRecentReadingsSync(1).firstOrNull()
@@ -538,6 +539,10 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         val notes = extras.getString("treatment.notes")
             ?: extras.getString("notes")
             ?: extras.getString("notes_text")
+            ?: extras.getString("note")
+            ?: extras.getString("description")
+            ?: extras.getString("com.eveningoutpost.dexdrip.Extras.Notes")
+            ?: extras.getString("com.eveningoutpost.dexdrip.Extras.Note")
 
         val ts = getLongFromBundle(extras, "treatment.timeStamp")
             ?: getLongFromBundle(extras, "treatment.timestamp")
@@ -834,6 +839,100 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             return deleted
         }
 
+        suspend fun processDeviceRenewals(context: Context, treatments: List<Treatment>) {
+            if (treatments.isEmpty()) return
+            try {
+                val app = context.applicationContext as? TirupApplication ?: return
+                val currentSettings = app.settingsRepository.getSettings().first()
+                var updatedSettings = currentSettings
+                var hasChanges = false
+
+                // 1. Cannula
+                val cannulaTreatment = treatments
+                    .filter { isCannulaNote(it.notes) }
+                    .maxByOrNull { it.timestamp }
+
+                if (cannulaTreatment != null) {
+                    val note = cannulaTreatment.notes ?: ""
+                    val parsedDays = parseDaysFromNote(note)
+                    val targetDuration = parsedDays ?: (if (currentSettings.pumpSetStatus.durationDays > 0) currentSettings.pumpSetStatus.durationDays else 3)
+                    val shouldUpdate = currentSettings.pumpSetStatus.installedAt == 0L ||
+                            cannulaTreatment.timestamp > currentSettings.pumpSetStatus.installedAt ||
+                            (cannulaTreatment.timestamp == currentSettings.pumpSetStatus.installedAt && parsedDays != null && parsedDays != currentSettings.pumpSetStatus.durationDays)
+
+                    if (shouldUpdate) {
+                        Log.i(TAG, "Auto-recovering cannula installation timestamp from xDrip note: ${cannulaTreatment.timestamp}, durationDays=$targetDuration (note='$note')")
+                        updatedSettings = updatedSettings.copy(
+                            pumpSetStatus = updatedSettings.pumpSetStatus.copy(
+                                installedAt = cannulaTreatment.timestamp,
+                                durationDays = targetDuration,
+                                lastUsedDurationDays = targetDuration
+                            )
+                        )
+                        hasChanges = true
+                    }
+                }
+
+                // 2. Sensor
+                val sensorTreatment = treatments
+                    .filter { isSensorNote(it.notes) }
+                    .maxByOrNull { it.timestamp }
+
+                if (sensorTreatment != null) {
+                    val note = sensorTreatment.notes ?: ""
+                    val parsedDays = parseDaysFromNote(note)
+                    val targetDuration = parsedDays ?: (if (currentSettings.sensorStatus.durationDays > 0) currentSettings.sensorStatus.durationDays else 14)
+                    val shouldUpdate = currentSettings.sensorStatus.installedAt == 0L ||
+                            sensorTreatment.timestamp > currentSettings.sensorStatus.installedAt ||
+                            (sensorTreatment.timestamp == currentSettings.sensorStatus.installedAt && parsedDays != null && parsedDays != currentSettings.sensorStatus.durationDays)
+
+                    if (shouldUpdate) {
+                        Log.i(TAG, "Auto-recovering CGM sensor installation timestamp from xDrip note: ${sensorTreatment.timestamp}, durationDays=$targetDuration (note='$note')")
+                        updatedSettings = updatedSettings.copy(
+                            sensorStatus = updatedSettings.sensorStatus.copy(
+                                installedAt = sensorTreatment.timestamp,
+                                durationDays = targetDuration,
+                                lastUsedDurationDays = targetDuration
+                            )
+                        )
+                        hasChanges = true
+                    }
+                }
+
+                // 3. Lancet
+                val lancetTreatment = treatments
+                    .filter { isLancetNote(it.notes) }
+                    .maxByOrNull { it.timestamp }
+
+                if (lancetTreatment != null) {
+                    val note = lancetTreatment.notes ?: ""
+                    val parsedDays = parseDaysFromNote(note)
+                    val targetDuration = parsedDays ?: (if (currentSettings.lancetStatus.durationDays > 0) currentSettings.lancetStatus.durationDays else 7)
+                    val shouldUpdate = currentSettings.lancetStatus.installedAt == 0L ||
+                            lancetTreatment.timestamp > currentSettings.lancetStatus.installedAt ||
+                            (lancetTreatment.timestamp == currentSettings.lancetStatus.installedAt && parsedDays != null && parsedDays != currentSettings.lancetStatus.durationDays)
+
+                    if (shouldUpdate) {
+                        Log.i(TAG, "Auto-recovering lancet installation timestamp from xDrip note: ${lancetTreatment.timestamp}, durationDays=$targetDuration (note='$note')")
+                        updatedSettings = updatedSettings.copy(
+                            lancetStatus = updatedSettings.lancetStatus.copy(
+                                installedAt = lancetTreatment.timestamp,
+                                durationDays = targetDuration,
+                                lastUsedDurationDays = targetDuration
+                            )
+                        )
+                        hasChanges = true
+                    }
+                }
+
+                if (hasChanges) {
+                    app.settingsRepository.updateSettings(updatedSettings)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to process device renewals: ${e.message}")
+            }
+        }
+
         fun parseDaysFromNote(note: String): Int? {
             val clean = note.lowercase().trim()
             if (clean.isBlank()) return null
@@ -846,21 +945,21 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             }
 
             // 2. Check for "на X дней/дн/д" or "на X" or "for X days"
-            val naMatch = Regex("""(?U)(?:на|for)\s*(\d{1,3})\s*(?:дн\w*|день|дня|дней|days|day|d|д)?""").find(clean)
+            val naMatch = Regex("""(?:на|for)\s*(\d{1,3})\s*(?:[а-яёa-z]+)?""", RegexOption.IGNORE_CASE).find(clean)
             if (naMatch != null) {
                 val days = naMatch.groupValues[1].toIntOrNull()
                 if (days != null && days in 1..365) return days
             }
 
             // 3. Check for "X дней/дня/день/дн/days/day"
-            val daysMatch = Regex("""(?U)(\d{1,3})\s*(?:дн\w*|день|дня|дней|days|day)""").find(clean)
+            val daysMatch = Regex("""(\d{1,3})\s*(?:дн[а-яёa-z]*|день|дня|дней|days|day)""", RegexOption.IGNORE_CASE).find(clean)
             if (daysMatch != null) {
                 val days = daysMatch.groupValues[1].toIntOrNull()
                 if (days != null && days in 1..365) return days
             }
 
             // 4. Check for "restart/рестарт/extend/продл/перезапуск [device] X"
-            val actionNumMatch = Regex("""(?U)(?:restart|рестарт\w*|extend|продл\w*|перезапуск)(?:\s+[^\d\n\r]{1,25})?\s+(\d{1,3})""").find(clean)
+            val actionNumMatch = Regex("""(?:restart|рестарт[а-яёa-z]*|extend|продл[а-яёa-z]*|перезапуск)(?:\s+[^\d\n\r]{1,25})?\s+(\d{1,3})""", RegexOption.IGNORE_CASE).find(clean)
             if (actionNumMatch != null) {
                 val days = actionNumMatch.groupValues[1].toIntOrNull()
                 if (days != null && days in 1..365) return days
@@ -928,7 +1027,9 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                     n.contains("осталось") ||
                     n.contains("через") ||
                     n.contains("error") ||
-                    n.contains("ошибка")
+                    n.contains("ошибка") ||
+                    n.contains("калибр") ||
+                    n.contains("calibrat")
 
             if (isWarningOrNotice) return false
 
@@ -943,7 +1044,9 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
             val hasDays = parseDaysFromNote(n) != null
 
+            // Match if has action, has days, exact list, or clean sensor word in note/compound note
             return (hasSensorWord && (hasActionWord || hasDays)) ||
+                    n.contains("сенсор") || n.contains("sensor") || n.contains("датчик") ||
                     n in listOf("сенсор", "sensor", "датчик", "новый сенсор", "sensor start", "sensor change", "замена сенсора", "смена сенсора")
         }
 
@@ -1075,97 +1178,21 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         // Purge any duplicate records in DB
                         purgeDuplicateTreatments(db)
 
-                        // Auto-recover pump cannula installation timestamp if user logged "канюля" in xDrip
-                        val cannulaTreatment = treatments
-                            .filter { isCannulaNote(it.notes) }
-                            .maxByOrNull { it.timestamp }
-
-                        if (cannulaTreatment != null) {
-                            val currentSettings = app.settingsRepository.getSettings().first()
-                            val note = cannulaTreatment.notes ?: ""
-                            val parsedDays = parseDaysFromNote(note)
-                            val targetDuration = parsedDays ?: (if (currentSettings.pumpSetStatus.durationDays > 0) currentSettings.pumpSetStatus.durationDays else 3)
-
-                            val shouldUpdate = currentSettings.pumpSetStatus.installedAt == 0L ||
-                                    cannulaTreatment.timestamp > currentSettings.pumpSetStatus.installedAt ||
-                                    (cannulaTreatment.timestamp == currentSettings.pumpSetStatus.installedAt && parsedDays != null && parsedDays != currentSettings.pumpSetStatus.durationDays)
-
-                            if (shouldUpdate) {
-                                Log.i(TAG, "Auto-recovering pump set installation timestamp from xDrip note: ${cannulaTreatment.timestamp}, durationDays=$targetDuration (note='$note')")
-                                app.settingsRepository.updateSettings(
-                                    currentSettings.copy(
-                                        pumpSetStatus = currentSettings.pumpSetStatus.copy(
-                                            installedAt = cannulaTreatment.timestamp,
-                                            durationDays = targetDuration,
-                                            lastUsedDurationDays = targetDuration
-                                        )
-                                    )
-                                )
-                            }
-                        }
-
-                        // Auto-recover CGM sensor installation timestamp if user logged "сенсор" / "sensor" in xDrip
-                        // Explicitly filters out warnings, expiration notices, alarms, and error alerts
-                        val sensorTreatment = treatments
-                            .filter { isSensorNote(it.notes) }
-                            .maxByOrNull { it.timestamp }
-
-                        if (sensorTreatment != null) {
-                            val currentSettings = app.settingsRepository.getSettings().first()
-                            val note = sensorTreatment.notes ?: ""
-                            val parsedDays = parseDaysFromNote(note)
-                            val targetDuration = parsedDays ?: (if (currentSettings.sensorStatus.durationDays > 0) currentSettings.sensorStatus.durationDays else 14)
-
-                            val shouldUpdate = currentSettings.sensorStatus.installedAt == 0L ||
-                                    sensorTreatment.timestamp > currentSettings.sensorStatus.installedAt ||
-                                    (sensorTreatment.timestamp == currentSettings.sensorStatus.installedAt && parsedDays != null && parsedDays != currentSettings.sensorStatus.durationDays)
-
-                            if (shouldUpdate) {
-                                Log.i(TAG, "Auto-recovering CGM sensor installation timestamp from xDrip note: ${sensorTreatment.timestamp}, durationDays=$targetDuration (note='$note')")
-                                app.settingsRepository.updateSettings(
-                                    currentSettings.copy(
-                                        sensorStatus = currentSettings.sensorStatus.copy(
-                                            installedAt = sensorTreatment.timestamp,
-                                            durationDays = targetDuration,
-                                            lastUsedDurationDays = targetDuration
-                                        )
-                                    )
-                                )
-                            }
-                        }
-
-                        // Auto-recover Lancet installation timestamp and duration if user logged "ланцет" in xDrip
-                        // Supports keywords: ланцет, lancet, прокалыватель, игла, needle, продл, рестарт, restart, extend, перезапуск, +N дней
-                        val lancetTreatment = treatments
-                            .filter { isLancetNote(it.notes) }
-                            .maxByOrNull { it.timestamp }
-
-                        if (lancetTreatment != null) {
-                            val currentSettings = app.settingsRepository.getSettings().first()
-                            val note = lancetTreatment.notes ?: ""
-                            val parsedDays = parseDaysFromNote(note)
-                            val targetDuration = parsedDays ?: (if (currentSettings.lancetStatus.durationDays > 0) currentSettings.lancetStatus.durationDays else 7)
-
-                            val shouldUpdate = currentSettings.lancetStatus.installedAt == 0L ||
-                                    lancetTreatment.timestamp > currentSettings.lancetStatus.installedAt ||
-                                    (lancetTreatment.timestamp == currentSettings.lancetStatus.installedAt && parsedDays != null && parsedDays != currentSettings.lancetStatus.durationDays)
-
-                            if (shouldUpdate) {
-                                Log.i(TAG, "Auto-recovering lancet installation timestamp from xDrip note: ${lancetTreatment.timestamp}, durationDays=$targetDuration (note='$note')")
-                                app.settingsRepository.updateSettings(
-                                    currentSettings.copy(
-                                        lancetStatus = currentSettings.lancetStatus.copy(
-                                            installedAt = lancetTreatment.timestamp,
-                                            durationDays = targetDuration,
-                                            lastUsedDurationDays = targetDuration
-                                        )
-                                    )
-                                )
-                            }
-                        }
+                        // Process device renewals from fetched xDrip treatments
+                        processDeviceRenewals(context, treatments)
 
                         // Calculate active CoB
                         computedCob = calculateActiveCob(treatments, now)
+                    } else {
+                        // Fallback: process device renewals from recent treatments in local DB
+                        try {
+                            val recentLocal = db.treatmentDao().getRecentTreatmentsSync(50).map { it.toDomain() }
+                            if (recentLocal.isNotEmpty()) {
+                                processDeviceRenewals(context, recentLocal)
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Fallback device renewals from DB failed: ${e.message}")
+                        }
                     }
 
                     // 2. Fetch IoB/CoB from pebble / status endpoints
@@ -1280,6 +1307,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             val repository = app.glucoseRepository
             if (treatment != null) {
                 saveTreatmentIfNew(app.database, treatment)
+                processDeviceRenewals(context, listOf(treatment))
             }
             repository.insertReading(reading)
             Log.i(TAG, "Successfully persisted reading: ${reading.valueMmol} mmol/L at ${reading.timestamp}")
