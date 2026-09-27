@@ -48,9 +48,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -574,10 +577,30 @@ fun AodScreen(
                         else "$sign${(delta5Min * 18.0182).toInt()}"
                     } else ""
 
-                    val sublineText = listOf(deltaStr, ageStr).filter { it.isNotBlank() }.joinToString(" • ")
+                    val iobStr = if (r != null && r.iob != null && r.iob > 0.01) {
+                        String.format(Locale.US, "💧 %.2f U", r.iob)
+                    } else ""
+
+                    val baseParts = listOf(deltaStr, ageStr).filter { it.isNotBlank() }.joinToString(" • ")
+
+                    val annotatedSubline = remember(baseParts, iobStr) {
+                        buildAnnotatedString {
+                            if (baseParts.isNotBlank()) {
+                                append(baseParts)
+                            }
+                            if (iobStr.isNotBlank()) {
+                                if (baseParts.isNotBlank()) {
+                                    append(" • ")
+                                }
+                                withStyle(SpanStyle(color = Color(0xFF38BDF8), fontWeight = FontWeight.SemiBold)) {
+                                    append(iobStr)
+                                }
+                            }
+                        }
+                    }
 
                     Text(
-                        text = sublineText,
+                        text = annotatedSubline,
                         color = Color(0xFF888888),
                         fontSize = if (isLandscape) 52.sp else 32.sp,
                         fontWeight = FontWeight.Medium,
