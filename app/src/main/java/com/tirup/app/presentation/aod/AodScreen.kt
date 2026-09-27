@@ -48,7 +48,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -540,7 +542,10 @@ fun AodScreen(
                             fontFamily = FontFamily.SansSerif,
                             color = glucoseColor,
                             letterSpacing = (-2).sp,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
+                            style = TextStyle(
+                                platformStyle = @Suppress("DEPRECATION") PlatformTextStyle(includeFontPadding = false)
+                            )
                         )
 
                         if (arrow.isNotBlank()) {
@@ -549,13 +554,13 @@ fun AodScreen(
                                 fontSize = arrowFontSize,
                                 fontWeight = FontWeight.Bold,
                                 color = glucoseColor.copy(alpha = 0.9f),
-                                modifier = Modifier.padding(start = if (isLandscape) 8.dp else 4.dp, bottom = if (isLandscape) 2.dp else 4.dp)
+                                modifier = Modifier.padding(start = if (isLandscape) 8.dp else 4.dp, bottom = if (isLandscape) 2.dp else 4.dp),
+                                style = TextStyle(
+                                    platformStyle = @Suppress("DEPRECATION") PlatformTextStyle(includeFontPadding = false)
+                                )
                             )
                         }
                     }
-
-                    // Surface spacing: tightly tucked under sugar digits and trend arrow (halved)
-                    Spacer(modifier = Modifier.height(2.dp))
 
                     // Reading Delta & Timestamp Age (Fully Localized, Ultra-Compact for AoD)
                     val ageStr = if (r != null && r.timestamp > 0L) {
@@ -601,7 +606,11 @@ fun AodScreen(
                         fontWeight = FontWeight.Medium,
                         letterSpacing = if (isLandscape) (-0.5).sp else 0.sp,
                         textAlign = TextAlign.Center,
-                        maxLines = 1
+                        maxLines = 1,
+                        style = TextStyle(
+                            platformStyle = @Suppress("DEPRECATION") PlatformTextStyle(includeFontPadding = false)
+                        ),
+                        modifier = Modifier.offset(y = if (isLandscape) (-22).dp else (-14).dp)
                     )
                 }
 
