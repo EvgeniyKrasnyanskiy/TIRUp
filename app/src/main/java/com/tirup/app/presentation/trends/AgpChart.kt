@@ -25,8 +25,11 @@ import androidx.compose.ui.unit.dp
 import com.tirup.app.domain.model.AGPPercentileBin
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.TargetRanges
+import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorLow
 import com.tirup.app.presentation.theme.ColorTight
+import com.tirup.app.presentation.theme.ColorVeryHigh
+import com.tirup.app.presentation.theme.ColorVeryLow
 import com.tirup.app.presentation.theme.PrimaryEmerald
 
 @Composable
@@ -81,27 +84,51 @@ fun AgpChart(
 
             val dashEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f)
 
-            // Horizontal target guides
+            // Horizontal target guides (6 clinical ranges)
+            val yVeryLow = yForMmol(targetRanges.veryLowThresholdMmol)
+            val yVeryHigh = yForMmol(targetRanges.veryHighThresholdMmol)
+
+            // Critical Very Low (<3.0)
             drawLine(
-                color = ColorLow.copy(alpha = 0.4f),
+                color = ColorVeryLow.copy(alpha = 0.35f),
+                start = Offset(0f, yVeryLow),
+                end = Offset(width, yVeryLow),
+                strokeWidth = 1f,
+                pathEffect = dashEffect
+            )
+
+            // Target Low (3.9)
+            drawLine(
+                color = ColorLow.copy(alpha = 0.45f),
                 start = Offset(0f, yTirLow),
                 end = Offset(width, yTirLow),
                 strokeWidth = 1.5f,
                 pathEffect = dashEffect
             )
 
+            // Target High (10.0)
             drawLine(
-                color = ColorLow.copy(alpha = 0.4f),
+                color = ColorHigh.copy(alpha = 0.45f),
                 start = Offset(0f, yTirHigh),
                 end = Offset(width, yTirHigh),
                 strokeWidth = 1.5f,
                 pathEffect = dashEffect
             )
 
+            // Tight Target High (7.8)
             drawLine(
                 color = ColorTight.copy(alpha = 0.3f),
                 start = Offset(0f, yTingHigh),
                 end = Offset(width, yTingHigh),
+                strokeWidth = 1f,
+                pathEffect = dashEffect
+            )
+
+            // Critical Very High (>13.9)
+            drawLine(
+                color = ColorVeryHigh.copy(alpha = 0.35f),
+                start = Offset(0f, yVeryHigh),
+                end = Offset(width, yVeryHigh),
                 strokeWidth = 1f,
                 pathEffect = dashEffect
             )

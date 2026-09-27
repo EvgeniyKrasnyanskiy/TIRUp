@@ -125,9 +125,11 @@ import com.tirup.app.presentation.theme.ColorLow
 import com.tirup.app.presentation.theme.ColorTarget
 import com.tirup.app.presentation.theme.ColorTargetSoft
 import com.tirup.app.presentation.theme.ColorTight
+import com.tirup.app.domain.model.TargetRanges
 import com.tirup.app.presentation.theme.ColorVeryHigh
 import com.tirup.app.presentation.theme.ColorVeryLow
 import com.tirup.app.presentation.theme.PrimaryEmerald
+import com.tirup.app.presentation.theme.getGlucoseColor
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -298,6 +300,7 @@ fun FocusScreen(
             HeroGlucoseCard(
                 latestReading = state.latestReading,
                 recentReadings = state.recentReadings,
+                targetRanges = userSettings.targetRanges,
                 unit = unit,
                 isRu = isRu,
                 activeAlertBanner = state.activeAlertBanner,
@@ -1887,6 +1890,7 @@ private fun BleStatusDialog(
 private fun HeroGlucoseCard(
     latestReading: GlucoseReading?,
     recentReadings: List<GlucoseReading>,
+    targetRanges: TargetRanges = TargetRanges(),
     unit: GlucoseUnit,
     isRu: Boolean,
     activeAlertBanner: ActiveAlertBanner? = null,
@@ -1919,13 +1923,7 @@ private fun HeroGlucoseCard(
     val valueColor = when {
         latestReading == null -> onSurfaceVariant
         isStale -> onSurfaceVariant.copy(alpha = 0.55f)
-        latestReading.valueMmol < 3.0 -> ColorVeryLow
-        latestReading.valueMmol < 3.9 -> ColorLow
-        latestReading.valueMmol in 3.9..7.0 -> ColorTight
-        latestReading.valueMmol in 7.01..7.8 -> ColorTargetSoft
-        latestReading.valueMmol in 7.81..10.0 -> ColorTarget
-        latestReading.valueMmol in 10.01..13.9 -> ColorHigh
-        else -> ColorVeryHigh
+        else -> getGlucoseColor(latestReading.valueMmol, targetRanges)
     }
 
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f

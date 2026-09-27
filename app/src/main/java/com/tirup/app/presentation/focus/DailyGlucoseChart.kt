@@ -70,6 +70,7 @@ import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
 import com.tirup.app.presentation.theme.ColorVeryLow
 import com.tirup.app.presentation.theme.PrimaryEmerald
+import com.tirup.app.presentation.theme.getGlucoseColor
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -789,15 +790,7 @@ fun DailyGlucoseChart(
                     val selUnit = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL")
                     val selTime = timeFormatter.format(Date(sel.timestamp))
 
-                    val selColor = when {
-                        sel.valueMmol < 3.0 -> ColorVeryLow
-                        sel.valueMmol < 3.9 -> ColorLow
-                        sel.valueMmol in 3.9..7.0 -> ColorTight
-                        sel.valueMmol in 7.01..7.8 -> ColorTargetSoft
-                        sel.valueMmol in 7.81..10.0 -> ColorTarget
-                        sel.valueMmol in 10.01..13.9 -> ColorHigh
-                        else -> ColorVeryHigh
-                    }
+                    val selColor = getGlucoseColor(sel.valueMmol, targetRanges)
 
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -1138,6 +1131,19 @@ fun DailyGlucoseChart(
                         size = Size(chartRight, (yTirLow - yTirHigh).coerceAtLeast(0f))
                     )
 
+                    // 6-Band clinical guidelines
+                    val yVeryLow = yForMmol(targetRanges.veryLowThresholdMmol)
+                    val yVeryHigh = yForMmol(targetRanges.veryHighThresholdMmol)
+
+                    // Critical Very Low (<3.0)
+                    drawLine(
+                        color = ColorVeryLow.copy(alpha = 0.35f),
+                        start = Offset(0f, yVeryLow),
+                        end = Offset(chartRight, yVeryLow),
+                        strokeWidth = 1.0f,
+                        pathEffect = dash4_8
+                    )
+
                     // Target range threshold lines
                     drawLine(
                         color = ColorLow.copy(alpha = 0.45f),
@@ -1163,6 +1169,17 @@ fun DailyGlucoseChart(
                         strokeWidth = 1.0f,
                         pathEffect = dash4_8
                     )
+
+                    // Critical Very High (>13.9)
+                    if (targetRanges.veryHighThresholdMmol < maxMmol) {
+                        drawLine(
+                            color = ColorVeryHigh.copy(alpha = 0.35f),
+                            start = Offset(0f, yVeryHigh),
+                            end = Offset(chartRight, yVeryHigh),
+                            strokeWidth = 1.0f,
+                            pathEffect = dash4_8
+                        )
+                    }
 
                     // 2. Vertical Time Grid & Bottom Labels
                     val textPaint = axisTextPaint
@@ -1305,16 +1322,8 @@ fun DailyGlucoseChart(
                             val y = yForMmol(r.valueMmol)
 
                             val isLast = (index == lastIndex)
-                            val dotColor = when {
-                                isLast && isDataStale -> onSurfaceVariant.copy(alpha = 0.55f)
-                                r.valueMmol < 3.0 -> ColorVeryLow
-                                r.valueMmol < 3.9 -> ColorLow
-                                r.valueMmol in 3.9..7.0 -> ColorTight
-                                r.valueMmol in 7.01..7.8 -> ColorTargetSoft
-                                r.valueMmol in 7.81..10.0 -> ColorTarget
-                                r.valueMmol in 10.01..13.9 -> ColorHigh
-                                else -> ColorVeryHigh
-                            }
+                            val dotColor = if (isLast && isDataStale) onSurfaceVariant.copy(alpha = 0.55f)
+                            else getGlucoseColor(r.valueMmol, targetRanges)
 
                             val isSelected = (selectedReading == r)
                             val radius = if (isSelected) 6.5f else if (visibleMinutes <= 360f) 3.8f else 2.5f
