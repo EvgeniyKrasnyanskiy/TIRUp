@@ -15,13 +15,16 @@
 ---
 
 ## 2. Архитектурный рефакторинг и декомпозиция SettingsScreen.kt
-- [ ] **Модульное разделение экрана настроек (устранение техдолга)**:
-  - Вынести монолитный файл (~6 100 строк) в структурированный пакет `presentation/settings/sections/`:
-    - `AlertsConfigSection.kt` — пороги гликемии, эшелоны звука, тестирование звуков батареи, DND;
-    - `IntegrationsSection.kt` — настройки Wi-Fi LAN Follower, BLE радиомост, Nightscout Cloud API;
-    - `ProfileTargetsSection.kt` — профиль пациента, целевые диапазоны TIR/TING, коэффициенты инсулинотерапии;
-    - `SystemDisplaySection.kt` — Always-on Display 2.0, виджеты, плавающий пузырь, резервное копирование Room DB.
-  - Ускорить перекомпиляцию Jetpack Compose и изолировать UI-логику.
+- [x] **Модульное разделение экрана настроек (устранение техдолга)**:
+  - Монолитный `SettingsScreen.kt` (~6 200 строк) полностью декомпозирован в модули пакета `presentation/settings/sections/`:
+    - `AlertsConfigSection.kt` — 4-уровневые пороги гликемии, эшелоны сирен, звуки батареи, DND, Last Chance TIR;
+    - `IntegrationsSection.kt` — BLE-мост, Wi-Fi LAN Follower, Nightscout Sync API;
+    - `SafetySmsSection.kt` — роли Master/Follower, доверенные контакты SOS, геолокация, пермишены SMS;
+    - `SystemDisplaySection.kt` — языки, единицы, Always-On Display 2.0, превью виджетов, плавающий пузырёк, дайджест недели, напоминания;
+    - `DataBackupSection.kt` — автоматический и ручной бэкап, экспорт/импорт zip/json/csv, сброс данных;
+    - `DeveloperTestingSection.kt` — инструменты стресс-тестирования систем, эмуляция тревог и сирен, дальномер BLE.
+  - Размер `SettingsScreen.kt` сокращён с ~6 200 до 1 310 строк (на 79%). Все unit-тесты успешно пройдены.
+
 
 ---
 

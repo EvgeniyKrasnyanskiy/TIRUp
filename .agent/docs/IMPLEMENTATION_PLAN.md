@@ -60,19 +60,34 @@ com.tirup.app.presentation.settings/
 - Из `SettingsScreen.kt` убрано 875 строк и очищены локальные переменные телефонов и таймеров.
 - Проверена компиляция Kotlin и unit-тесты (BUILD SUCCESSFUL).
 
-### Этап 2.4: Выделение `SystemDisplaySection.kt`
-- Создать `SystemDisplaySection.kt`.
-- Вынести:
-  - `DisplayPreferencesCard` (язык, единицы ммоль/л vs мг/дл, темы, контрастность, предикция на графике).
-  - `AlwaysOnDisplayCard` (AOD 2.0, ночной монитор, яркость, фонарик, жесты).
-  - `WidgetPreviewCard` (интерактивное превью виджетов и прозрачность фона).
-  - `DeviceRemindersCard` (напоминания о сенсоре, замене ланцета, тихий ночной режим).
-  - `LockscreenAndBubbleCard` (плавающий пузырёк поверх всех окон и уведомление на экране блокировки).
-  - `WeeklyDigestCard` (воскресный дайджест недели).
-- Подключить в `SettingsScreen.kt`.
-- Проверить компиляцию и тесты.
+### Этап 2.4: Выделение `SystemDisplaySection.kt` [Completed]
+- Создан [SystemDisplaySection.kt](file:///h:/Diabetes/TIRUp/app/src/main/java/com/tirup/app/presentation/settings/sections/SystemDisplaySection.kt).
+- Вынесены карточки:
+  - `DisplayPreferencesCard` (язык, единицы ммоль/л vs мг/дл, темная/светлая тема, метки на графике, предикция).
+  - `WeeklyDigestCard` (воскресный дайджест недели и ручной запуск).
+  - `DeviceRemindersCard` (напоминания о замене сенсора CGM, инфузионного набора, ланцета, контроль HbA1c 90 дней).
+  - `ClinicalStandardsCard` (стандарты ATTD/ADA TIR/TING и часы окна сна).
+  - `LockscreenNotificationCard` (постоянный статус на экране блокировки).
+  - `FloatingGlucoseBubbleCard` (плавающий пузырёк с сахаром поверх всех окон и режим Always Visible).
+  - `AlwaysOnDisplayCard` (AOD 2.0, режимы пробуждения/постоянного отображения, зарядка, тест).
+  - `WidgetPreviewCard` (интерактивное превью полосы 5x1 на фоне обоев и слайдер прозрачности).
+  - Вынесены вспомогательные компоненты `LanguageChip` и `DropdownHourSelector`.
+- Из `SettingsScreen.kt` удалено 1073 строки.
+- Компиляция и все unit-тесты успешно пройдены (коммит `ea43559`).
 
-### Этап 2.5: Выделение `DeveloperTestingSection.kt` и финализация `SettingsScreen.kt`
-- Создать `DeveloperTestingSection.kt` (инструменты разработчика, эмуляция стрессовых ситуаций, экстренный тест сирен).
-- Очистить `SettingsScreen.kt`, оставив лаконичный декларативный каркас (~500 строк).
-- Финальная верификация, компиляция и прогон unit-тестов.
+### Этап 2.5: Выделение `DeveloperTestingSection.kt`, `DataBackupSection.kt` и финализация `SettingsScreen.kt` [Completed]
+- Создан [DataBackupSection.kt](file:///h:/Diabetes/TIRUp/app/src/main/java/com/tirup/app/presentation/settings/sections/DataBackupSection.kt):
+  - `AutoBackupCard` (ежедневный автобэкап, бэкап в Zip, экспорт/импорт, права доступа к файлам, дайджест года).
+  - `ClearDataCard` (очистка данных приложения).
+  - `RestoreOptionsModal` (модальное окно выбора типа восстановления).
+  - `PendingRestoreDialog` (диалог подтверждения данных бэкапа).
+  - `ClearDataConfirmDialog` (подтверждение сброса данных).
+- Создан [DeveloperTestingSection.kt](file:///h:/Diabetes/TIRUp/app/src/main/java/com/tirup/app/presentation/settings/sections/DeveloperTestingSection.kt):
+  - `DeveloperTestingCard` (тестирование экрана спасения, сирены фоловера, важное Heads-Up SMS, тест SOS-SMS с подтверждением, тест дальности BLE-моста).
+  - Инкапсулированы локальные таймеры и диалоги подтверждения тестов.
+- `SettingsScreen.kt` очищен от монолитного кода: общий объем уменьшился с ~6200 строк до 1310 строк.
+- Все карточки настроек распределены по 6 модулям в `com.tirup.app.presentation.settings.sections`.
+- Финальная верификация: `.\gradlew compileDebugKotlin` и `.\gradlew testDebugUnitTest` успешно пройдены (коммит `2b9934c`).
+- **Задача 2 полностью выполнена.**
+
+
