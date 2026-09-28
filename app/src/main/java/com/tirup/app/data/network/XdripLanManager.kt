@@ -214,7 +214,8 @@ object XdripLanManager {
         // 2. Fetch SGV
         val sgvResult = XdripLanClient.fetchSgv(settings, count = 10)
         if (sgvResult.isSuccess) {
-            val readings = sgvResult.getOrNull() ?: emptyList()
+            val rawReadings = sgvResult.getOrNull() ?: emptyList()
+            val readings = rawReadings.sortedByDescending { it.timestamp }
             if (readings.isNotEmpty()) {
                 // Enrich latest reading with IoB/CoB from pebble if available
                 val enrichedReadings = readings.mapIndexed { index, r ->
@@ -234,9 +235,9 @@ object XdripLanManager {
                 val latest = enrichedReadings.first()
                 val now = System.currentTimeMillis()
 
-                // Update widgets and evaluate alerts if reading is fresh (< 15 min)
+                // Update widgets, lockscreen notification and evaluate alerts if reading is fresh (< 15 min)
                 if (now - latest.timestamp < 15 * 60_000L) {
-                    TirupWidgetUpdater.updateAllWidgets(ctx)
+                    GlucoseAlertManager.refreshLockscreenNotificationAndWidgets(ctx, userSettings, latest)
                     val recent = glucoseRepo.getRecentReadings(30).firstOrNull() ?: listOf(latest)
                     GlucoseAlertManager.checkAndAlert(
                         context = ctx,

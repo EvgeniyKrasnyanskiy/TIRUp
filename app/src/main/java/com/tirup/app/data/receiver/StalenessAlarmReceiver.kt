@@ -24,42 +24,26 @@ class StalenessAlarmReceiver : BroadcastReceiver() {
 
         scope.launch {
             try {
-                // Attempt to recover fresh data from local xDrip service (port 17580)
-                DexdripBroadcastReceiver.syncFromLocalXdrip(context, force = true)
-
                 val app = context.applicationContext as? TirupApplication ?: return@launch
                 val settings = app.settingsRepository.getSettings().firstOrNull() ?: return@launch
+
+                // Attempt to recover fresh data from active source (LAN Follower or local xDrip service)
+                if (settings.xdripLanSettings.isEnabled && settings.xdripLanSettings.isConfigured) {
+                    com.tirup.app.data.network.XdripLanManager.pollNow()
+                } else {
+                    DexdripBroadcastReceiver.syncFromLocalXdrip(context, force = true)
+                }
+
                 val latest = app.glucoseRepository.getLatestReading().firstOrNull() ?: return@launch
 
-                val calendar = Calendar.getInstance().apply {
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }
-                val todayEntities = app.database.glucoseReadingDao().getReadingsBetweenSync(
-                    calendar.timeInMillis,
-                    System.currentTimeMillis() + 60_000L
-                )
-                val todayDomain = todayEntities.map { it.toDomain() }
+                // 1. Re-render lockscreen notification & widgets with current status
+                GlucoseAlertManager.refreshLockscreenNotificationAndWidgets(context, settings, latest)
 
-                // 1. Re-render lockscreen notification with current stale status
-                GlucoseAlertManager.updateLockscreenNotification(
-                    context = context,
-                    latestReading = latest,
-                    todayReadings = todayDomain,
-                    settings = settings,
-                    streakDays = app.glucoseRepository.getStreakDays().firstOrNull() ?: 0
-                )
-
-                // 2. Re-render all homescreen widgets with current stale status
-                TirupWidgetUpdater.updateAllWidgets(context)
-
-                // 3. Dismiss outdated predictive alert if reading is stale
+                // 2. Dismiss outdated predictive alert if reading is stale
                 val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
                 nm?.cancel(GlucoseAlertManager.NOTIFICATION_ID_PREDICTIVE)
 
-                // 4. Schedule next periodic tick while stale (to update elapsed minutes string)
+                // 3. Schedule next periodic tick while stale (to update elapsed minutes string)
                 GlucoseAlertManager.scheduleNextStalenessCheck(context, latest.timestamp)
                 Log.d(TAG, "Successfully refreshed stale notification and widgets for ts=${latest.timestamp}")
             } catch (e: Exception) {

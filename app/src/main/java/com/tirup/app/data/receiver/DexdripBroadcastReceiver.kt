@@ -1366,7 +1366,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             // Update Lockscreen status notification if enabled
             com.tirup.app.data.alert.GlucoseAlertManager.updateLockscreenNotification(
                 context = context.applicationContext,
-                latestReading = todayDomain.lastOrNull() ?: recentDomain.lastOrNull(),
+                latestReading = todayDomain.lastOrNull() ?: recentDomain.firstOrNull(),
                 todayReadings = todayDomain,
                 settings = userSettings,
                 streakDays = app.glucoseRepository.getStreakDays().first()

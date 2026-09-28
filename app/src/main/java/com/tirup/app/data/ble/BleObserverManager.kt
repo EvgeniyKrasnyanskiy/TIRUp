@@ -621,8 +621,8 @@ object BleObserverManager {
                 )
                 glucoseRepository.insertReading(newReading)
 
-                // Update widgets and clinical evaluations
-                TirupWidgetUpdater.updateAllWidgets(context)
+                // Update widgets, lockscreen notification and clinical evaluations
+                GlucoseAlertManager.refreshLockscreenNotificationAndWidgets(context, currentSettings, newReading)
 
                 val recent = glucoseRepository.getRecentReadings(30).firstOrNull() ?: listOf(newReading)
 

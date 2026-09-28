@@ -45,6 +45,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -2388,11 +2389,55 @@ object GlucoseAlertManager {
         } catch (_: Exception) {}
     }
 
+    suspend fun refreshLockscreenNotificationAndWidgets(
+        context: Context,
+        settings: UserSettings,
+        explicitLatest: GlucoseReading? = null
+    ) {
+        val app = context.applicationContext as? com.tirup.app.TirupApplication ?: return
+        val latest = explicitLatest ?: app.glucoseRepository.getLatestReading().firstOrNull() ?: return
+
+        if (settings.isLockscreenNotificationEnabled) {
+            val calendar = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val todayEntities = app.database.glucoseReadingDao().getReadingsBetweenSync(
+                calendar.timeInMillis,
+                System.currentTimeMillis() + 60_000L
+            )
+            val todayDomain = todayEntities.map { it.toDomain() }
+            val streak = try { app.glucoseRepository.getStreakDays().firstOrNull() ?: 0 } catch (_: Exception) { 0 }
+            updateLockscreenNotification(
+                context = context,
+                latestReading = latest,
+                todayReadings = todayDomain,
+                settings = settings,
+                streakDays = streak
+            )
+        }
+        com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context)
+    }
+
     suspend fun checkSignalLossDirectly(context: Context) {
         try {
             val app = context.applicationContext as? com.tirup.app.TirupApplication ?: return
-            val latestEntity = app.database.glucoseReadingDao().getRecentReadingsSync(1).firstOrNull() ?: return
             val settings = app.settingsRepository.getSettings().first()
+
+            // 1. Proactively attempt to recover fresh data from available active sources before declaring staleness
+            try {
+                if (settings.xdripLanSettings.isEnabled && settings.xdripLanSettings.isConfigured) {
+                    com.tirup.app.data.network.XdripLanManager.pollNow()
+                } else {
+                    com.tirup.app.data.receiver.DexdripBroadcastReceiver.syncFromLocalXdrip(context, force = true)
+                }
+            } catch (eSync: Exception) {
+                Log.w(TAG, "Proactive sync in checkSignalLossDirectly failed: ${eSync.message}")
+            }
+
+            val latestEntity = app.database.glucoseReadingDao().getRecentReadingsSync(1).firstOrNull() ?: return
             checkSignalLoss(
                 context = context,
                 latestTimestamp = latestEntity.timestamp,
@@ -2403,29 +2448,8 @@ object GlucoseAlertManager {
             // Also check device battery level
             checkDeviceBattery(context, settings)
 
-            // Keep persistent notification in sync with signal state even when no new sensor broadcasts arrive
-            if (settings.isLockscreenNotificationEnabled) {
-                val calendar = Calendar.getInstance().apply {
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }
-                val todayEntities = app.database.glucoseReadingDao().getReadingsBetweenSync(
-                    calendar.timeInMillis,
-                    System.currentTimeMillis() + 60_000L
-                )
-                val todayDomain = todayEntities.map { it.toDomain() }
-                updateLockscreenNotification(
-                    context = context,
-                    latestReading = latestEntity.toDomain(),
-                    todayReadings = todayDomain,
-                    settings = settings
-                )
-            }
-
-            // Also keep widgets updated with latest staleness/signal state
-            com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context)
+            // Refresh persistent notification & widgets with latest state and streak
+            refreshLockscreenNotificationAndWidgets(context, settings, latestEntity.toDomain())
         } catch (e: Exception) {
             Log.e(TAG, "Error in checkSignalLossDirectly: ${e.message}", e)
         }
