@@ -1823,6 +1823,13 @@ object GlucoseAlertManager {
 
         if (notificationId == NOTIFICATION_ID_LAST_CHANCE) {
             MedicalSoundPlayer.playLastChanceAlertTone()
+        } else if (notificationId == NOTIFICATION_ID_LOW_BATTERY) {
+            val batThreshold = when (tier) {
+                AlertTier.CRITICAL -> 5
+                AlertTier.MAIN -> 10
+                else -> 15
+            }
+            MedicalSoundPlayer.playBatteryAlert(batThreshold, volumePercent)
         } else if (tier == AlertTier.CRITICAL) {
             when (criticalToneType) {
                 MedicalSoundPlayer.CriticalToneType.EXTRA_HYPO -> MedicalSoundPlayer.playExtraHypoSiren()

@@ -2,6 +2,7 @@ package com.tirup.app.presentation.focus
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -57,6 +60,9 @@ import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorLow
 import com.tirup.app.presentation.theme.PrimaryEmerald
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
 enum class TreatmentInputType {
@@ -73,14 +79,16 @@ fun TreatmentInputBottomSheet(
     unit: GlucoseUnit,
     isRu: Boolean,
     onDismiss: () -> Unit,
-    onSubmit: (insulin: Double?, carbs: Double?, bg: Double?, notes: String?) -> Unit
+    onSubmit: (insulin: Double?, carbs: Double?, bg: Double?, notes: String?, timestamp: Long) -> Unit
 ) {
+    val context = LocalContext.current
     var selectedType by remember { mutableStateOf(initialType) }
 
     var insulinText by remember { mutableStateOf("") }
     var carbsText by remember { mutableStateOf("") }
     var bgText by remember { mutableStateOf("") }
     var notesText by remember { mutableStateOf("") }
+    var customTimestamp by remember { mutableStateOf<Long?>(null) }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -403,7 +411,128 @@ fun TreatmentInputBottomSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Time Selector Row with Standard Clock Dial Picker
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "🕒",
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = if (isRu) "Время события" else "Event Time",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        val timeSub = if (customTimestamp == null) {
+                            if (isRu) "Текущее время (сейчас)" else "Current time (now)"
+                        } else {
+                            val fmt = SimpleDateFormat("dd MMM, HH:mm", if (isRu) Locale("ru") else Locale.US)
+                            fmt.format(Date(customTimestamp!!))
+                        }
+                        Text(
+                            text = timeSub,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (customTimestamp != null) ActionBlue else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (customTimestamp != null) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                            modifier = Modifier.clickable { customTimestamp = null }
+                        ) {
+                            Text(
+                                text = if (isRu) "Сброс" else "Reset",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = ActionBlue.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.5f)),
+                        modifier = Modifier.clickable {
+                            val now = Calendar.getInstance()
+                            val initialCal = Calendar.getInstance().apply {
+                                if (customTimestamp != null) timeInMillis = customTimestamp!!
+                            }
+                            android.app.TimePickerDialog(
+                                context,
+                                { _, hourOfDay, minute ->
+                                    val newCal = Calendar.getInstance().apply {
+                                        set(Calendar.HOUR_OF_DAY, hourOfDay)
+                                        set(Calendar.MINUTE, minute)
+                                        set(Calendar.SECOND, 0)
+                                        set(Calendar.MILLISECOND, 0)
+                                        // If selected time is > 1 min in the future, assume it was yesterday
+                                        if (timeInMillis > now.timeInMillis + 60_000L) {
+                                            add(Calendar.DAY_OF_YEAR, -1)
+                                        }
+                                    }
+                                    customTimestamp = newCal.timeInMillis
+                                },
+                                initialCal.get(Calendar.HOUR_OF_DAY),
+                                initialCal.get(Calendar.MINUTE),
+                                true // 24-hour mode with dial
+                            ).show()
+                        }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            val displayTime = remember(customTimestamp) {
+                                val cal = Calendar.getInstance()
+                                if (customTimestamp != null) cal.timeInMillis = customTimestamp!!
+                                String.format(Locale.US, "%02d:%02d", cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE))
+                            }
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null,
+                                tint = ActionBlue,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = displayTime,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = ActionBlue
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Submit Button
             val canSubmit = when (selectedType) {
@@ -419,8 +548,9 @@ fun TreatmentInputBottomSheet(
                     val carbs = carbsText.toDoubleOrNull()?.takeIf { it > 0.0 }
                     val bg = bgText.toDoubleOrNull()?.takeIf { it > 0.0 }
                     val note = notesText.trim().takeIf { it.isNotBlank() }
+                    val ts = customTimestamp ?: System.currentTimeMillis()
 
-                    onSubmit(ins, carbs, bg, note)
+                    onSubmit(ins, carbs, bg, note, ts)
                     onDismiss()
                 },
                 enabled = canSubmit,

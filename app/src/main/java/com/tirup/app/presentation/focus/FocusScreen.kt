@@ -1118,12 +1118,13 @@ fun FocusScreen(
             unit = unit,
             isRu = isRu,
             onDismiss = { activeTreatmentInput = null },
-            onSubmit = { insulin, carbs, bg, notes ->
+            onSubmit = { insulin, carbs, bg, notes, timestamp ->
                 viewModel.addTreatment(
                     insulinUnits = insulin,
                     carbsGrams = carbs,
                     glucoseValue = bg,
-                    notes = notes
+                    notes = notes,
+                    timestamp = timestamp
                 )
                 activeTreatmentInput = null
             }

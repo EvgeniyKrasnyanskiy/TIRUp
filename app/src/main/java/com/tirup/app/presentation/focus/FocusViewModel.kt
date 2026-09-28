@@ -461,20 +461,22 @@ class FocusViewModel(
                 }
             }
 
-            // 2. Local database insertion
-            // If requireXdripConfirmation is false OR Nightscout upload is disabled, insert locally
-            if (!ns.isEnabled || !ns.requireXdripConfirmation) {
-                if (hasInsulin || hasCarbs || hasNotes) {
-                    val treatment = Treatment(
-                        timestamp = timestamp,
-                        insulinUnits = if (hasInsulin) insulinUnits else null,
-                        carbsGrams = if (hasCarbs) carbsGrams else null,
-                        notes = notes,
-                        source = "TIRUP",
-                        uuid = uploadedUuid
-                    )
+            // 2. Local database insertion & device renewals processing
+            if (hasInsulin || hasCarbs || hasNotes) {
+                val treatment = Treatment(
+                    timestamp = timestamp,
+                    insulinUnits = if (hasInsulin) insulinUnits else null,
+                    carbsGrams = if (hasCarbs) carbsGrams else null,
+                    notes = notes,
+                    source = "TIRUP",
+                    uuid = uploadedUuid
+                )
+                // If requireXdripConfirmation is false OR Nightscout upload is disabled, insert locally
+                if (!ns.isEnabled || !ns.requireXdripConfirmation) {
                     glucoseRepository.insertTreatment(treatment)
                 }
+                // Immediately check and update device lifespans if note contains sensor/cannula/lancet
+                com.tirup.app.data.receiver.DexdripBroadcastReceiver.processDeviceRenewals(context, listOf(treatment))
             }
 
             // 3. Post to xDrip via local broadcast as extra attempt

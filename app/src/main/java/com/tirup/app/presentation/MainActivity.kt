@@ -31,16 +31,16 @@ import androidx.compose.runtime.mutableLongStateOf
 import com.tirup.app.domain.model.BleBridgeRole
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.formatDeviceRemainingTime
+import com.tirup.app.domain.model.isExpired
+import com.tirup.app.domain.model.millisRemaining
 import com.tirup.app.presentation.theme.ColorHigh
-import com.tirup.app.presentation.theme.ColorTight
-import com.tirup.app.presentation.theme.ColorVeryHigh
 import com.tirup.app.presentation.theme.ColorVeryLow
+import com.tirup.app.presentation.theme.PrimaryEmerald
 import com.tirup.app.presentation.theme.getGlucoseColor
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.unit.sp
-import com.tirup.app.domain.model.millisRemaining
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -644,7 +644,6 @@ fun MainPagerScaffold(
     var showQuickHud by remember { mutableStateOf(false) }
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val haptic = LocalHapticFeedback.current
-    val context = LocalContext.current
 
     val focusState by focusViewModel.uiState.collectAsState()
     val settingsState by settingsViewModel.uiState.collectAsState()
@@ -747,18 +746,18 @@ fun MainPagerScaffold(
         isRu = isRu,
         isCompact = true
     )
-
-    val bleSettings = userSettings.bleBridgeSettings
-    val batteryStr = remember(bleSettings, context) {
-        val bat = if (bleSettings.role == BleBridgeRole.OBSERVER && bleSettings.lastMasterBattery in 0..100) {
-            bleSettings.lastMasterBattery
-        } else {
-            val bm = context.getSystemService(Context.BATTERY_SERVICE) as? android.os.BatteryManager
-            bm?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
-        }
-        if (bat in 0..100) "🔋 $bat%" else ""
-    }
-    val rssiStr = if (bleSettings.role == BleBridgeRole.OBSERVER && bleSettings.lastRssi != 0) "📶 ${bleSettings.lastRssi} dBm" else ""
+    val cannulaRemaining = formatDeviceRemainingTime(
+        millisRemaining = focusState.pumpSetStatus.millisRemaining,
+        installedAt = focusState.pumpSetStatus.installedAt,
+        isRu = isRu,
+        isCompact = true
+    )
+    val lancetRemaining = formatDeviceRemainingTime(
+        millisRemaining = focusState.lancetStatus.millisRemaining,
+        installedAt = focusState.lancetStatus.installedAt,
+        isRu = isRu,
+        isCompact = true
+    )
 
     val tabs = listOf(
         NavigationItem(
@@ -946,7 +945,7 @@ fun MainPagerScaffold(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth(0.92f)
-                        .fillMaxHeight(0.60f),
+                        .fillMaxHeight(0.64f),
                     shape = RoundedCornerShape(32.dp),
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
                     border = BorderStroke(2.dp, glucoseColor.copy(alpha = 0.7f)),
@@ -1115,45 +1114,39 @@ fun MainPagerScaffold(
                             }
                         }
 
-                        // 4. Telemetry Footer: Sensor Remaining & Battery / RSSI
+                        // 4. Device Timers Footer: Sensor, Cannula, Lancet
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f, fill = false)
-                            ) {
-                                Text(text = "⏱️", fontSize = 18.sp)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "${if (isRu) "Сенс." else "Sens."}: $sensorRemaining",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-                            }
-
-                            val telemetryParts = listOfNotNull(
-                                batteryStr.ifBlank { null },
-                                rssiStr.ifBlank { null }
+                            QuickHudDeviceChip(
+                                modifier = Modifier.weight(1f),
+                                icon = "🩺",
+                                title = if (isRu) "Сенсор" else "Sensor",
+                                timeText = sensorRemaining,
+                                installedAt = focusState.sensorStatus.installedAt,
+                                isExpired = focusState.sensorStatus.isExpired,
+                                millisRemaining = focusState.sensorStatus.millisRemaining
                             )
-                            if (telemetryParts.isNotEmpty()) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = telemetryParts.joinToString("  "),
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-                            }
+                            QuickHudDeviceChip(
+                                modifier = Modifier.weight(1f),
+                                icon = "💉",
+                                title = if (isRu) "Канюля" else "Cannula",
+                                timeText = cannulaRemaining,
+                                installedAt = focusState.pumpSetStatus.installedAt,
+                                isExpired = focusState.pumpSetStatus.isExpired,
+                                millisRemaining = focusState.pumpSetStatus.millisRemaining
+                            )
+                            QuickHudDeviceChip(
+                                modifier = Modifier.weight(1f),
+                                icon = "🩸",
+                                title = if (isRu) "Ланцет" else "Lancet",
+                                timeText = lancetRemaining,
+                                installedAt = focusState.lancetStatus.installedAt,
+                                isExpired = focusState.lancetStatus.isExpired,
+                                millisRemaining = focusState.lancetStatus.millisRemaining
+                            )
                         }
                     }
                 }
@@ -1191,3 +1184,61 @@ data class NavigationItem(
     val title: String,
     val icon: ImageVector
 )
+
+@Composable
+private fun QuickHudDeviceChip(
+    modifier: Modifier = Modifier,
+    icon: String,
+    title: String,
+    timeText: String,
+    installedAt: Long,
+    isExpired: Boolean,
+    millisRemaining: Long
+) {
+    val statusColor = when {
+        installedAt <= 0L -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        isExpired -> ColorVeryLow
+        millisRemaining < 86_400_000L -> ColorHigh
+        else -> PrimaryEmerald
+    }
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = statusColor.copy(alpha = 0.10f),
+        border = BorderStroke(1.2.dp, statusColor.copy(alpha = 0.35f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(text = icon, fontSize = 13.sp)
+                Spacer(modifier = Modifier.width(3.dp))
+                Text(
+                    text = title,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = timeText,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Black,
+                color = if (installedAt <= 0L) MaterialTheme.colorScheme.onSurfaceVariant else statusColor,
+                maxLines = 1,
+                softWrap = false
+            )
+        }
+    }
+}

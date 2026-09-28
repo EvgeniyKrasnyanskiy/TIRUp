@@ -1,42 +1,8 @@
 # Дорожная карта развития TIRUp (Roadmap v2.5+)
 
-> **Архив выполненных задач**: Все реализованные задачи перенесены в [.agent/docs/ARCHIVE.md](file:///h:/Diabetes/TIRUp/.agent/docs/ARCHIVE.md).  
-> **Аудит проекта**: Результаты комплексного аудита зафиксированы в [.agent/docs/AUDIT_v2.4.0.md](file:///h:/Diabetes/TIRUp/.agent/docs/AUDIT_v2.4.0.md).
+> **Архив выполненных задач**: Все реализованные задачи перенесены в [.agent/docs/ARCHIVE.md](file:///d:/Users/physicist/Desktop/ken/TIRUp/.agent/docs/ARCHIVE.md).  
+> **Аудит проекта**: Результаты комплексного аудита зафиксированы в [.agent/docs/AUDIT_v2.4.0.md](file:///d:/Users/physicist/Desktop/ken/TIRUp/.agent/docs/AUDIT_v2.4.0.md).
 
 ---
 
-## 1. Непрерывный фоновый приём Wi-Fi LAN Follower в режиме глубокого сна (Doze Resilience)
-- [x] **Гарантированное пробуждение сетевого стека по AlarmManager**:
-  - Привязан цикл фонового опроса `XdripLanManager` к точному таймеру `AlarmManager.setExactAndAllowWhileIdle`, предотвращая засыпание корутин в Android Doze Mode при выключенном экране.
-  - Добавлена обработка `ACTION_POLL_XDRIP_LAN` в `AlertActionReceiver` с удержанием безопасного `PARTIAL_WAKE_LOCK` (8 сек) и освобождением через `goAsync()`.
-  - Реализована динамическая адаптивная сетка опроса (35 с после замера, 15 с перед ожиданием 1-мин и 5-мин замеров, 60 с при потере сигнала).
-  - Подключен `ConnectivityManager.NetworkCallback` для мгновенного опроса при появлении Wi-Fi и остановки таймеров при отключении.
-
----
-
-## 2. Архитектурный рефакторинг и декомпозиция SettingsScreen.kt
-- [x] **Модульное разделение экрана настроек (устранение техдолга)**:
-  - Монолитный `SettingsScreen.kt` (~6 200 строк) полностью декомпозирован в модули пакета `presentation/settings/sections/`:
-    - `AlertsConfigSection.kt` — 4-уровневые пороги гликемии, эшелоны сирен, звуки батареи, DND, Last Chance TIR;
-    - `IntegrationsSection.kt` — BLE-мост, Wi-Fi LAN Follower, Nightscout Sync API;
-    - `SafetySmsSection.kt` — роли Master/Follower, доверенные контакты SOS, геолокация, пермишены SMS;
-    - `SystemDisplaySection.kt` — языки, единицы, Always-On Display 2.0, превью виджетов, плавающий пузырёк, дайджест недели, напоминания;
-    - `DataBackupSection.kt` — автоматический и ручной бэкап, экспорт/импорт zip/json/csv, сброс данных;
-    - `DeveloperTestingSection.kt` — инструменты стресс-тестирования систем, эмуляция тревог и сирен, дальномер BLE.
-  - Размер `SettingsScreen.kt` сокращён с ~6 200 до 1 310 строк (на 79%). Все unit-тесты успешно пройдены.
-
-
----
-
-## 3. Быстрый доступ к лечению с экрана Always-on Display (AoD Quick Actions)
-- [ ] **Интерактивные действия на экране блокировки AoD 2.0**:
-  - Добавить опциональный запуск шторки быстрого ввода (`TreatmentInputBottomSheet`) по защищённому жесту (двойной тап / свайп) без необходимости полной разблокировки телефона.
-  - Вывод последних применённых доз инсулина и углеводов на AoD в течение 30 минут после ввода.
-
----
-
-## 4. Клинический экспорт отчёта AGP / TIR в PDF для эндокринолога
-- [ ] **Формирование стандартизированного медицинского PDF-отчёта**:
-  - Генерация PDF-документа по международному шаблону AGP (Ambulatory Glucose Profile) за 14, 30 и 90 дней.
-  - Включение кривых процентилей (5%, 25%, 50%, 75%, 95%), коэффициента вариации (CV), среднего сахара, расчётного HbA1c и круговой диаграммы TIR/TBR/TAR.
-  - Кнопка быстрой отправки врачу через системное меню «Поделиться» (мессенджеры, почта, печать).
+*(Все предыдущие задачи успешно реализованы и заархивированы. Активные планы фиксируются в [.agent/docs/IMPLEMENTATION_PLAN.md](file:///d:/Users/physicist/Desktop/ken/TIRUp/.agent/docs/IMPLEMENTATION_PLAN.md)).*

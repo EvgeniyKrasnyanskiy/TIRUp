@@ -1,93 +1,50 @@
-# План реализации: Архитектурный рефакторинг и декомпозиция SettingsScreen.kt (v2.5+)
+# План реализации: Уникальные звуки батарейки, выбор времени терапии циферблатом и таймеры устройств в Quick HUD
 
-## Описание задачи
-Файл `SettingsScreen.kt` достиг монолитного размера в 6 203 строки (368 КБ). 
-Цель рефакторинга — разбить экран настроек на слабосвязанные модульные секции внутри пакета `com.tirup.app.presentation.settings.sections`:
-1. **`AlertsConfigSection.kt`**: Настройки порогов тревог (критическая гипо, основная гипо/гипер, предиктивная тревога, потеря сигнала, разряд батареи с чипами тестирования звуков, DND, тихий режим, вибрация).
-2. **`IntegrationsSection.kt`**: Внешние интеграции (Wi-Fi LAN Follower, BLE радиомост Broadcaster/Observer, Nightscout Cloud API, диалоги конфигурации).
-3. **`ProfileTargetsSection.kt`**: Профиль пациента (тип СД, терапия, вес, рост), целевые диапазоны сахара (TIR/TING, ADA/ATTD), коэффициенты инсулинотерапии (IC/CF), расчет дозировок.
-4. **`SystemDisplaySection.kt`**: Системный UI и отображение (Always-on Display 2.0, системные виджеты, плавающий пузырь, резервное копирование и восстановление Room DB, экспорт/импорт настроек, сброс к заводским значениям).
-5. **Облегчённый `SettingsScreen.kt`**: Компактный координирующий экран (~600–700 строк), управляющий `Scaffold`, верхним тулбаром, скроллом, диалогами верхнего уровня и вызовом секций.
-
----
-
-## Архитектура модулей
-
-```
-com.tirup.app.presentation.settings/
-├── SettingsScreen.kt              <-- Тулбар, верхние стейты диалогов, сборка секций
-├── SettingsViewModel.kt           <-- Единое состояние UiState, сохранение через SettingsRepository
-├── dialogs/                       <-- Вынесенные модальные диалоги ввода
-│   ├── BleBridgeHelpDialog.kt
-│   ├── BleFamilyPinDialog.kt
-│   ├── CriticalThresholdDialog.kt
-│   ├── MainThresholdDialog.kt
-│   ├── PatientProfileDialogs.kt
-│   ├── NightscoutSettingsDialog.kt
-│   └── XdripLanSettingsDialog.kt
-└── sections/                      <-- Новые специализированные секции (Jetpack Compose)
-    ├── AlertsConfigSection.kt     <-- Пороги, эшелоны, звуки батареи, DND
-    ├── IntegrationsSection.kt     <-- Wi-Fi LAN Follower, BLE Bridge, Nightscout
-    ├── ProfileTargetsSection.kt   <-- Профиль пациента, TIR/TING, калькулятор IC/CF
-    └── SystemDisplaySection.kt    <-- AoD 2.0, виджеты, оверлей, бэкапы Room DB
-```
+## 1. Контекст и цели
+1. **Уникальные звуки тревог разряда батареи телефона (<15%, <10%, <5%)**:
+   - Сейчас оповещения батареи дублируют сигналы гликемии (`PREDICTIVE`, `MAIN`, `CRITICAL`).
+   - Синтезировать 3 уникальных медицинских сигнала низкой энергии, чётко отличимых от трекеров сахара.
+2. **Выбор времени терапии стандартным циферблатом (TimePicker)**:
+   - В шторке ввода данных (`TreatmentInputBottomSheet`) добавить селектор времени со стандартным Compose Material 3 циферблатом (`TimePicker`).
+   - Ответ на вопрос пользователя: дату вручную выбирать не нужно, она автоматически привязывается к текущему дню (или вчерашнему, если выбрано недавнее время до полуночи), формируя точный `timestamp`. При вводе заметки «сенсор» TIRUp моментально подхватывает метку обновления и сбрасывает таймер.
+3. **Отображение таймеров устройств (сенсор, канюля, ланцет) в Quick Glance HUD**:
+   - При удержании центральной кнопки навигации (Quick HUD) убрать устаревшие данные BLE-моста (`batteryStr`, `rssiStr`).
+   - Вывести крупно 3 информативных таймера устройств (сенсор, канюля, ланцет) с цветными статусами остатка.
+4. **Актуализация роадмапа и архива**:
+   - Перенос задачи 3 (PDF AGP отчёт) в `ARCHIVE.md` и очистка `ROADMAP.md`.
 
 ---
 
-## Этапы выполнения (Task Splitting)
+## 2. Пошаговый план изменений
 
-### Этап 2.1: Выделение `AlertsConfigSection.kt` [Completed]
-- Создан файл `app/src/main/java/com/tirup/app/presentation/settings/sections/AlertsConfigSection.kt`.
-- Вынесены карточки 4 эшелонов тревог, слайдер громкости, тест звуков разряда батареи, Last Chance TIR.
-- Заменено в `SettingsScreen.kt`, проверена компиляция и тесты.
-- Коммит: `c27415e`.
+### Этап 1: Документация (Roadmap & Archive)
+- Перенести описание задачи 3 в `.agent/docs/ARCHIVE.md`.
+- Очистить выполненный список в `.agent/docs/ROADMAP.md`.
 
-### Этап 2.2: Выделение `IntegrationsSection.kt` [Completed]
-- Создан файл `app/src/main/java/com/tirup/app/presentation/settings/sections/IntegrationsSection.kt`.
-- Вынесены карточки:
-  - `BleBridgeCard` (роли, радиомост, аппаратный скан, Long Range, PIN).
-  - `XdripLanFollowerCard` (Wi-Fi LAN приёмник, прямой опрос порта 17580, автопоиск).
-  - `NightscoutSyncCard` (синхронизация treatments, URL, Secret).
-- Удален дубликат `BleCountdownText`, из `SettingsScreen.kt` убрано 1190 строк.
-- Проверена компиляция и тесты.
-- Коммит: `351a492`.
+### Этап 2: Уникальные звуки батарейки телефона
+- В `MedicalSoundPlayer.kt`:
+  - `playBatteryLow15(volumePercent)`: мягкий трёхтоновый каскад «Energy Drop» (523 Гц ➔ 440 Гц ➔ 349 Гц).
+  - `playBatteryLow10(volumePercent)`: двойной настойчивый нисходящий сигнал предупреждения (587 Гц ➔ 392 Гц).
+  - `playBatteryLow5(volumePercent)`: 4-импульсный тревожный маяк разряда на `USAGE_ALARM`.
+  - Метод `playBatteryAlert(threshold, volumePercent, customTag)`.
+- В `GlucoseAlertManager.kt`: в `sendNotification` при `NOTIFICATION_ID_LOW_BATTERY` проигрывать персональный звук батареи.
+- В `AlertsConfigSection.kt`: подключить `playBatteryAlert` в кнопки прослушивания.
 
-### Этап 2.3: Выделение `SafetySmsSection.kt` [Completed]
-- Создан файл `app/src/main/java/com/tirup/app/presentation/settings/sections/SafetySmsSection.kt`.
-- Вынесены:
-  - `DeviceRoleCard` (роль устройства: Мастер vs Фоловер, переключение, объяснения).
-  - `EmergencySmsCard` (экстренные SMS, SOS-сирена фоловера, телефонные номера, шаблоны сообщений, обратные отсчёты тестов).
-- Из `SettingsScreen.kt` убрано 875 строк и очищены локальные переменные телефонов и таймеров.
-- Проверена компиляция Kotlin и unit-тесты (BUILD SUCCESSFUL).
+### Этап 3: Выбор времени терапии стандартным циферблатом
+- В `TreatmentInputDialog.kt`:
+  - Добавить чип выбора времени («🕒 Сейчас» / «🕒 ЧЧ:ММ») и модальный диалог со стандартным `TimePicker` в режиме циферблата.
+  - Расчет `timestamp` (выбранные часы и минуты текущего дня с защитой от времени из будущего).
+  - Передача `timestamp` в `onSubmit`.
+- В `FocusScreen.kt`: проброс `timestamp` в `viewModel.addTreatment`.
+- В `FocusViewModel.kt`: немедленный вызов `DexdripBroadcastReceiver.processDeviceRenewals` при сохранении локального лечения.
 
-### Этап 2.4: Выделение `SystemDisplaySection.kt` [Completed]
-- Создан [SystemDisplaySection.kt](file:///h:/Diabetes/TIRUp/app/src/main/java/com/tirup/app/presentation/settings/sections/SystemDisplaySection.kt).
-- Вынесены карточки:
-  - `DisplayPreferencesCard` (язык, единицы ммоль/л vs мг/дл, темная/светлая тема, метки на графике, предикция).
-  - `WeeklyDigestCard` (воскресный дайджест недели и ручной запуск).
-  - `DeviceRemindersCard` (напоминания о замене сенсора CGM, инфузионного набора, ланцета, контроль HbA1c 90 дней).
-  - `ClinicalStandardsCard` (стандарты ATTD/ADA TIR/TING и часы окна сна).
-  - `LockscreenNotificationCard` (постоянный статус на экране блокировки).
-  - `FloatingGlucoseBubbleCard` (плавающий пузырёк с сахаром поверх всех окон и режим Always Visible).
-  - `AlwaysOnDisplayCard` (AOD 2.0, режимы пробуждения/постоянного отображения, зарядка, тест).
-  - `WidgetPreviewCard` (интерактивное превью полосы 5x1 на фоне обоев и слайдер прозрачности).
-  - Вынесены вспомогательные компоненты `LanguageChip` и `DropdownHourSelector`.
-- Из `SettingsScreen.kt` удалено 1073 строки.
-- Компиляция и все unit-тесты успешно пройдены (коммит `ea43559`).
+### Этап 4: Таймеры устройств в Quick Glance HUD
+- В `MainActivity.kt`:
+  - Убрать расчеты `batteryStr` и `rssiStr` от BLE-моста.
+  - В нижнем блоке `showQuickHud` разместить 3 крупные плашки расходников: 🩺 Сенсор, 💉 Канюля, 🩸 Ланцет со значениями `formatDeviceRemainingTime`.
 
-### Этап 2.5: Выделение `DeveloperTestingSection.kt`, `DataBackupSection.kt` и финализация `SettingsScreen.kt` [Completed]
-- Создан [DataBackupSection.kt](file:///h:/Diabetes/TIRUp/app/src/main/java/com/tirup/app/presentation/settings/sections/DataBackupSection.kt):
-  - `AutoBackupCard` (ежедневный автобэкап, бэкап в Zip, экспорт/импорт, права доступа к файлам, дайджест года).
-  - `ClearDataCard` (очистка данных приложения).
-  - `RestoreOptionsModal` (модальное окно выбора типа восстановления).
-  - `PendingRestoreDialog` (диалог подтверждения данных бэкапа).
-  - `ClearDataConfirmDialog` (подтверждение сброса данных).
-- Создан [DeveloperTestingSection.kt](file:///h:/Diabetes/TIRUp/app/src/main/java/com/tirup/app/presentation/settings/sections/DeveloperTestingSection.kt):
-  - `DeveloperTestingCard` (тестирование экрана спасения, сирены фоловера, важное Heads-Up SMS, тест SOS-SMS с подтверждением, тест дальности BLE-моста).
-  - Инкапсулированы локальные таймеры и диалоги подтверждения тестов.
-- `SettingsScreen.kt` очищен от монолитного кода: общий объем уменьшился с ~6200 строк до 1310 строк.
-- Все карточки настроек распределены по 6 модулям в `com.tirup.app.presentation.settings.sections`.
-- Финальная верификация: `.\gradlew compileDebugKotlin` и `.\gradlew testDebugUnitTest` успешно пройдены (коммит `2b9934c`).
-- **Задача 2 полностью выполнена.**
+---
 
-
+## 3. Верификация
+- Запуск тестов `./gradlew testDebugUnitTest`.
+- Проверка интерфейса и звуков.

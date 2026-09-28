@@ -274,6 +274,109 @@ object MedicalSoundPlayer {
     }
 
     /**
+     * Plays a unique, dedicated battery alert tone based on the threshold (15%, 10%, or 5%).
+     * Decoupled from glucose alerts to allow instant auditory recognition of phone battery level.
+     */
+    fun playBatteryAlert(threshold: Int, volumePercent: Int = 80, customTag: String? = null) {
+        isPlayingActive = true
+        _isPlaying.value = true
+        _currentlyPlayingTag.value = customTag ?: "BATTERY_$threshold"
+        audioScope.launch {
+            try {
+                when {
+                    threshold <= 5 -> {
+                        boostAlarmVolumeIfNeeded()
+                        try {
+                            playBatteryLow5(volumePercent)
+                        } finally {
+                            restoreAlarmVolumeIfNeeded()
+                        }
+                    }
+                    threshold <= 10 -> playBatteryLow10(volumePercent)
+                    else -> playBatteryLow15(volumePercent)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to play battery alert sound for threshold=$threshold: ${e.message}")
+            } finally {
+                _isPlaying.value = false
+                _currentlyPlayingTag.value = null
+            }
+        }
+    }
+
+    /**
+     * Battery < 15%: Soft melodic descending 3-note chime «Energy Drop» (523 Hz -> 440 Hz -> 349 Hz).
+     */
+    private fun playBatteryLow15(volumePercent: Int = 80) {
+        ensureAlarmStreamAudible()
+        val factor = (volumePercent / 100f).coerceIn(0.15f, 1.0f)
+        val note1 = generateSineWave(freq = 523.25, durationMs = 150, volume = 0.65f * factor) // C5
+        val note2 = generateSineWave(freq = 440.00, durationMs = 160, volume = 0.60f * factor) // A4
+        val note3 = generateSineWave(freq = 349.23, durationMs = 280, volume = 0.70f * factor) // F4
+        val totalLen = note1.size + note2.size + note3.size
+        val audioData = ShortArray(totalLen)
+        var off = 0
+        System.arraycopy(note1, 0, audioData, off, note1.size); off += note1.size
+        System.arraycopy(note2, 0, audioData, off, note2.size); off += note2.size
+        System.arraycopy(note3, 0, audioData, off, note3.size)
+        playRawPcm(audioData, usage = AudioAttributes.USAGE_ALARM)
+    }
+
+    /**
+     * Battery < 10%: Urgent double descending warning pulses ([587 Hz -> 392 Hz], 140ms pause, [587 Hz -> 392 Hz]).
+     */
+    private fun playBatteryLow10(volumePercent: Int = 80) {
+        ensureAlarmStreamAudible()
+        val factor = (volumePercent / 100f).coerceIn(0.15f, 1.0f)
+        val note1 = generateSineWave(freq = 587.33, durationMs = 120, volume = 0.80f * factor) // D5
+        val note2 = generateSineWave(freq = 392.00, durationMs = 180, volume = 0.85f * factor) // G4
+        val pulse = ShortArray(note1.size + note2.size)
+        System.arraycopy(note1, 0, pulse, 0, note1.size)
+        System.arraycopy(note2, 0, pulse, note1.size, note2.size)
+
+        val pause = ShortArray((SAMPLE_RATE * 0.14).toInt()) // 140ms silence
+        val totalLen = (pulse.size * 2) + pause.size
+        val audioData = ShortArray(totalLen)
+        var off = 0
+        System.arraycopy(pulse, 0, audioData, off, pulse.size); off += pulse.size
+        System.arraycopy(pause, 0, audioData, off, pause.size); off += pause.size
+        System.arraycopy(pulse, 0, audioData, off, pulse.size)
+        playRawPcm(audioData, usage = AudioAttributes.USAGE_ALARM)
+    }
+
+    /**
+     * Battery < 5%: Critical low battery alarm beacon (4 rapid descending pulses x 2 series on STREAM_ALARM).
+     */
+    private fun playBatteryLow5(volumePercent: Int = 80) {
+        val factor = (volumePercent / 100f).coerceIn(0.20f, 1.0f)
+        val nHigh = generateSineWave(freq = 659.25, durationMs = 75, volume = 0.95f * factor) // E5
+        val nLow = generateSineWave(freq = 523.25, durationMs = 95, volume = 1.0f * factor)   // C5
+        val gap = ShortArray((SAMPLE_RATE * 0.05).toInt()) // 50ms gap
+
+        val burstUnit = ShortArray(nHigh.size + nLow.size + gap.size)
+        var bOff = 0
+        System.arraycopy(nHigh, 0, burstUnit, bOff, nHigh.size); bOff += nHigh.size
+        System.arraycopy(nLow, 0, burstUnit, bOff, nLow.size); bOff += nLow.size
+        System.arraycopy(gap, 0, burstUnit, bOff, gap.size)
+
+        val seriesLen = burstUnit.size * 4
+        val singleSeries = ShortArray(seriesLen)
+        for (i in 0 until 4) {
+            System.arraycopy(burstUnit, 0, singleSeries, i * burstUnit.size, burstUnit.size)
+        }
+
+        val pause = ShortArray((SAMPLE_RATE * 0.25).toInt()) // 250ms silence between series
+        val totalLen = (singleSeries.size * 2) + pause.size
+        val audioData = ShortArray(totalLen)
+        var off = 0
+        System.arraycopy(singleSeries, 0, audioData, off, singleSeries.size); off += singleSeries.size
+        System.arraycopy(pause, 0, audioData, off, pause.size); off += pause.size
+        System.arraycopy(singleSeries, 0, audioData, off, singleSeries.size)
+
+        playRawPcm(audioData, usage = AudioAttributes.USAGE_ALARM)
+    }
+
+    /**
      * Tier 1: Soft melodic dual-tone chime (587 Hz -> 880 Hz).
      */
     private fun playPredictiveChime(volumePercent: Int = 80) {

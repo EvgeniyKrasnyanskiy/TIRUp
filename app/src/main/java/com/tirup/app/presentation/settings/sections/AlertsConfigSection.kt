@@ -551,8 +551,8 @@ fun AlertsConfigSection(
                                 isRu = isRu,
                                 onClick = {
                                     onSoundClick("BATTERY_15") {
-                                        MedicalSoundPlayer.playSound(
-                                            AlertTier.PREDICTIVE,
+                                        MedicalSoundPlayer.playBatteryAlert(
+                                            15,
                                             alerts.alertVolumePercent,
                                             customTag = "BATTERY_15"
                                         )
@@ -562,14 +562,14 @@ fun AlertsConfigSection(
                             BatterySoundTestChip(
                                 modifier = Modifier.weight(1f),
                                 thresholdText = "<10%",
-                                tierLabel = if (isRu) "Тройной" else "Main",
+                                tierLabel = if (isRu) "Двойной" else "Warning",
                                 accentColor = Color(0xFFEA580C),
                                 isPlaying = (currentlyPlayingTag == "BATTERY_10"),
                                 isRu = isRu,
                                 onClick = {
                                     onSoundClick("BATTERY_10") {
-                                        MedicalSoundPlayer.playSound(
-                                            AlertTier.MAIN,
+                                        MedicalSoundPlayer.playBatteryAlert(
+                                            10,
                                             alerts.alertVolumePercent,
                                             customTag = "BATTERY_10"
                                         )
@@ -585,8 +585,8 @@ fun AlertsConfigSection(
                                 isRu = isRu,
                                 onClick = {
                                     onSoundClick("BATTERY_5") {
-                                        MedicalSoundPlayer.playSound(
-                                            AlertTier.CRITICAL,
+                                        MedicalSoundPlayer.playBatteryAlert(
+                                            5,
                                             alerts.alertVolumePercent,
                                             customTag = "BATTERY_5"
                                         )
