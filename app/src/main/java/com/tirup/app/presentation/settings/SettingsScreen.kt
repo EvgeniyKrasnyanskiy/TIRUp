@@ -234,13 +234,11 @@ fun SettingsScreen(
     var showBleHelpModal by rememberSaveable { mutableStateOf(false) }
     var showBlePinDialog by rememberSaveable { mutableStateOf(false) }
     var showRestoreOptionsModal by rememberSaveable { mutableStateOf(false) }
-    var showBleRangeHelpDialog by rememberSaveable { mutableStateOf(false) }
     var showNightscoutDialog by rememberSaveable { mutableStateOf(false) }
     var showXdripLanDialog by rememberSaveable { mutableStateOf(false) }
     val isDevTestsUnlocked by viewModel.isDevTestsUnlocked.collectAsState()
     var devTapCount by remember { mutableStateOf(0) }
     var lastDevTapTime by remember { mutableStateOf(0L) }
-    var bleRangeCooldownSec by remember { mutableStateOf(0) }
     val currentlyPlayingTag by com.tirup.app.data.alert.MedicalSoundPlayer.currentlyPlayingTag.collectAsState()
     var lastSoundClickTime by remember { mutableStateOf(0L) }
     val handleSoundClick: (String, () -> Unit) -> Unit = { tag, action ->
@@ -260,13 +258,6 @@ fun SettingsScreen(
         viewModel.checkDevTestsLockOnResume()
         onDispose {
             viewModel.onSettingsScreenDisposed()
-        }
-    }
-
-    LaunchedEffect(bleRangeCooldownSec) {
-        if (bleRangeCooldownSec > 0) {
-            delay(1000L)
-            bleRangeCooldownSec -= 1
         }
     }
 
@@ -458,22 +449,6 @@ fun SettingsScreen(
 
     val latestReading by viewModel.latestReading.collectAsState()
 
-    var testSosSmsCooldownSec by remember { mutableStateOf(0) }
-    LaunchedEffect(testSosSmsCooldownSec) {
-        if (testSosSmsCooldownSec > 0) {
-            delay(1000L)
-            testSosSmsCooldownSec -= 1
-        }
-    }
-
-    var testRescueCountdownSec by remember { mutableStateOf(0) }
-    LaunchedEffect(testRescueCountdownSec) {
-        if (testRescueCountdownSec > 0) {
-            delay(1000L)
-            testRescueCountdownSec -= 1
-        }
-    }
-
     var testCaregiverSosCountdownSec by remember { mutableStateOf(0) }
     LaunchedEffect(testCaregiverSosCountdownSec) {
         if (testCaregiverSosCountdownSec > 0) {
@@ -482,15 +457,6 @@ fun SettingsScreen(
         }
     }
 
-    var testHeadsUpCountdownSec by remember { mutableStateOf(0) }
-    LaunchedEffect(testHeadsUpCountdownSec) {
-        if (testHeadsUpCountdownSec > 0) {
-            delay(1000L)
-            testHeadsUpCountdownSec -= 1
-        }
-    }
-
-    var showSosSmsSendConfirmDialog by remember { mutableStateOf(false) }
     var isRoleSectionExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.infoMessage) {
@@ -824,710 +790,47 @@ fun SettingsScreen(
                 onUpdateWidgetBackgroundOpacity = { viewModel.updateWidgetBackgroundOpacity(it) }
             )
 
-        // Section 4: Auto-Backup
-        BentoCard(modifier = Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (isRu) "Ежедневный автобэкап" else "Daily Auto-Backup",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (isRu) "В Документы/TIRUp/Backups (2 CSV + JSON)" else "In Documents/TIRUp/Backups (2 CSV + JSON)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = settings.isAutoBackupEnabled,
-                            onCheckedChange = { viewModel.toggleAutoBackup(it) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = ActionBlue
-                            )
-                        )
-                    }
+            AutoBackupCard(
+                settings = settings,
+                backupSummary = state.backupSummary,
+                isBackupInProgress = state.isBackupInProgress,
+                isRestoreInProgress = state.isRestoreInProgress,
+                isRu = isRu,
+                onToggleAutoBackup = { viewModel.toggleAutoBackup(it) },
+                onCreateBackupNow = { viewModel.createBackupNow() },
+                onShareBackup = { viewModel.shareBackup() },
+                onExportZip = { fileName -> createBackupLauncher.launch(fileName) },
+                onShowRestoreOptionsModal = { showRestoreOptionsModal = true },
+                onShowYearEndDialog = { year -> viewModel.setShowYearEndDialog(true, year) }
+            )
 
-                    // Status and stats
-                    val summary = state.backupSummary
-                    if (summary != null && summary.readingsCount > 0) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = PrimaryEmerald.copy(alpha = 0.08f),
-                            border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.25f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(10.dp),
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                val fmt = SimpleDateFormat("dd.MM.yyyy 'в' HH:mm", Locale.getDefault())
-                                val lastDateStr = if (summary.exportedAt > 0L) fmt.format(Date(summary.exportedAt)) else "—"
-                                Text(
-                                    text = if (isRu) "📦 Сохранённая копия: $lastDateStr" else "📦 Saved backup: $lastDateStr",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = PrimaryEmerald
-                                )
-                                Text(
-                                    text = if (isRu) "🩸 ${summary.readingsCount} замеров | 💉 ${summary.treatmentsCount} меток терапии"
-                                    else "🩸 ${summary.readingsCount} readings | 💉 ${summary.treatmentsCount} treatments",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = if (isRu) "📁 Папка: Documents/TIRUp/Backups/"
-                                    else "📁 Folder: Documents/TIRUp/Backups/",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                )
-                            }
-                        }
-                    } else if (settings.isAutoBackupEnabled) {
-                        Text(
-                            text = if (isRu) "Запланирован на сегодня в 00:00" else "Scheduled for today at 00:00",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ActionBlue
-                        )
-                    }
+            ClearDataCard(
+                infoMessage = state.infoMessage,
+                onShowClearConfirm = { viewModel.showClearConfirm(true) }
+            )
 
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                        val hasAllFilesAccess = android.os.Environment.isExternalStorageManager()
-                        if (!hasAllFilesAccess) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = ActionBlue.copy(alpha = 0.08f),
-                                border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.25f)),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(
-                                        text = if (isRu) "ℹ️ Для бэкапа в общедоступную папку Documents/TIRUp/Backups предоставьте доступ к файлам"
-                                        else "ℹ️ To access backups in public Documents/TIRUp/Backups grant all files access",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    OutlinedButton(
-                                        onClick = {
-                                            try {
-                                                val intent = android.content.Intent(
-                                                    android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                                                    android.net.Uri.parse("package:${context.packageName}")
-                                                )
-                                                context.startActivity(intent)
-                                            } catch (_: Exception) {
-                                                val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                                                context.startActivity(intent)
-                                            }
-                                        },
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(
-                                            text = if (isRu) "Предоставить доступ к файлам" else "Grant all files access",
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = PrimaryEmerald.copy(alpha = 0.08f),
-                                border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.25f)),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Text(
-                                        text = "✓",
-                                        fontWeight = FontWeight.Bold,
-                                        color = PrimaryEmerald,
-                                        fontSize = 14.sp
-                                    )
-                                    Text(
-                                        text = if (isRu) "Доступ к файлам разрешён" else "All files access granted",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = PrimaryEmerald
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    if (state.isBackupInProgress) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            Text(
-                                text = if (isRu) "Создание резервной копии..." else "Creating backup...",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ActionBlue
-                            )
-                        }
-                    }
-
-                    // Action buttons (Row 1: Create & Share)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = { viewModel.createBackupNow() },
-                            enabled = !state.isBackupInProgress,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.5f))
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = null,
-                                tint = ActionBlue,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = if (isRu) "Создать" else "Backup",
-                                fontSize = 13.sp,
-                                color = ActionBlue,
-                                maxLines = 1
-                            )
-                        }
-
-                        OutlinedButton(
-                            onClick = { viewModel.shareBackup() },
-                            enabled = !state.isBackupInProgress,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.5f))
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = null,
-                                tint = ActionBlue,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = if (isRu) "Поделиться" else "Share",
-                                fontSize = 13.sp,
-                                color = ActionBlue,
-                                maxLines = 1
-                            )
-                        }
-                    }
-
-                    // Action buttons (Row 2: Save to zip file & Restore)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                val dateStr = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
-                                createBackupLauncher.launch("tirup_backup_$dateStr.zip")
-                            },
-                            enabled = !state.isBackupInProgress,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.5f))
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Download,
-                                contentDescription = null,
-                                tint = ActionBlue,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = if (isRu) "В Zip-файл" else "To Zip file",
-                                fontSize = 13.sp,
-                                color = ActionBlue,
-                                maxLines = 1
-                            )
-                        }
-
-                        OutlinedButton(
-                            onClick = {
-                                showRestoreOptionsModal = true
-                            },
-                            enabled = !state.isRestoreInProgress,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.5f))
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FileUpload,
-                                contentDescription = null,
-                                tint = ActionBlue,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = if (isRu) "Восстановить" else "Restore",
-                                fontSize = 13.sp,
-                                color = ActionBlue,
-                                maxLines = 1
-                            )
-                        }
-                    }
-
-                    // Row 3: Year-End Digest & Annual Archives
-                    val activeYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
-                    OutlinedButton(
-                        onClick = { viewModel.setShowYearEndDialog(true, activeYear) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.7f)),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = ActionBlue.copy(alpha = 0.05f)
-                        )
-                    ) {
-                        Text(
-                            text = "🎄",
-                            fontSize = 16.sp
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isRu) "Итоги года и архив" else "Year-End Digest & Archive",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = ActionBlue
-                        )
-                    }
-                }
-            }
-
-        // Section 5: Data Management (Clear Data)
-        BentoCard(modifier = Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = stringResource(R.string.clear_data),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    Text(
-                        text = stringResource(R.string.clear_data_confirm),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    OutlinedButton(
-                        onClick = { viewModel.showClearConfirm(true) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, ColorVeryLow),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = ColorVeryLow
-                        )
-                    ) {
-                        Icon(imageVector = Icons.Default.DeleteSweep, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = stringResource(R.string.clear_data))
-                    }
-
-
-
-                    if (state.infoMessage != null) {
-                        Text(
-                            text = state.infoMessage ?: "",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = PrimaryEmerald
-                        )
-                    }
-                }
-            }
-
-            // Section: Developer Mode - System Testing Block
-            if (isDevTestsUnlocked) {
-                BentoCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 2.dp, vertical = 2.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(text = "🛠️", fontSize = 18.sp)
-                            Text(
-                                text = if (isRu) "Тестирование систем" else "System Testing",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = ActionBlue
-                            )
-                        }
-
-                        Text(
-                            text = if (isRu)
-                                "Инструменты проверки тревог и каналов связи:"
-                            else
-                                "Alert and communication channel testing tools:",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        val TestButtonAmber = Color(0xFFEAB308)
-
-                        // Test 1: Patient Rescue Screen (5 sec delay with Cancel)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    if (testRescueCountdownSec == 0) {
-                                        Toast.makeText(
-                                            context,
-                                            if (isRu) "Заблокируйте экран! Экран спасения появится через 5 секунд..."
-                                            else "Lock your screen! Rescue screen in 5 seconds...",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                        testRescueCountdownSec = 5
-                                        viewModel.startPatientRescueTestCountdown(5)
-                                    }
-                                },
-                                enabled = testRescueCountdownSec == 0,
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, TestButtonAmber.copy(alpha = 0.7f))
-                            ) {
-                                Text(text = "🚨", fontSize = 16.sp)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = if (testRescueCountdownSec > 0) {
-                                        if (isRu) "Запуск через ${testRescueCountdownSec}с..." else "Starting in ${testRescueCountdownSec}s..."
-                                    } else {
-                                        if (isRu) "Экран спасения (5 сек)" else "Rescue Screen (5s)"
-                                    },
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = if (testRescueCountdownSec == 0) TestButtonAmber
-                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                )
-                            }
-
-                            if (testRescueCountdownSec > 0) {
-                                OutlinedButton(
-                                    onClick = {
-                                        testRescueCountdownSec = 0
-                                        viewModel.cancelPatientRescueTest()
-                                    },
-                                    shape = RoundedCornerShape(10.dp),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-                                ) {
-                                    Text(
-                                        text = if (isRu) "Отмена" else "Cancel",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                }
-                            }
-                        }
-
-                        // Test 2: Follower SOS Screen & Siren preview (5s countdown)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    if (testCaregiverSosCountdownSec == 0) {
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
-                                            Toast.makeText(
-                                                context,
-                                                if (isRu) "⚠️ Разрешение «Поверх других приложений» не дано — экран может не открыться!"
-                                                else "⚠️ 'Display over other apps' not granted — screen may not open!",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                        }
-                                        Toast.makeText(
-                                            context,
-                                            if (isRu) "Заблокируйте экран! SOS-сирена включится через 5 секунд..."
-                                            else "Lock your screen! SOS siren in 5 seconds...",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                        testCaregiverSosCountdownSec = 5
-                                        viewModel.startCaregiverSosTestCountdown(5)
-                                    }
-                                },
-                                enabled = testCaregiverSosCountdownSec == 0,
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (testCaregiverSosCountdownSec == 0) TestButtonAmber.copy(alpha = 0.7f)
-                                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.NotificationsActive,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = if (testCaregiverSosCountdownSec == 0) TestButtonAmber
-                                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (testCaregiverSosCountdownSec > 0) {
-                                        if (isRu) "🔴 SOS через ${testCaregiverSosCountdownSec}с..."
-                                        else "🔴 SOS in ${testCaregiverSosCountdownSec}s..."
-                                    } else {
-                                        if (isRu) "Экран SOS фоловера (5 сек)" else "Follower SOS screen (5s)"
-                                    },
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = if (testCaregiverSosCountdownSec == 0) TestButtonAmber
-                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                )
-                            }
-                            if (testCaregiverSosCountdownSec > 0) {
-                                OutlinedButton(
-                                    onClick = {
-                                        testCaregiverSosCountdownSec = 0
-                                        viewModel.cancelCaregiverSosTest()
-                                    },
-                                    shape = RoundedCornerShape(10.dp),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-                                ) {
-                                    Text(
-                                        text = if (isRu) "Отмена" else "Cancel",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                }
-                            }
-                        }
-
-                        // Test 3: Heads-Up Message Screen preview (5s countdown) — moved above SOS-SMS
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    if (testHeadsUpCountdownSec == 0) {
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
-                                            Toast.makeText(
-                                                context,
-                                                if (isRu) "⚠️ Без разрешения «Полноэкранные уведомления» сообщение может не появиться!"
-                                                else "⚠️ Without 'Full-screen notifications' permission the overlay may not show!",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                        }
-                                        Toast.makeText(
-                                            context,
-                                            if (isRu) "Заблокируйте экран! Важное SMS-сообщение появится через 5 секунд..."
-                                            else "Lock your screen! Heads-Up SMS-message in 5 seconds...",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                        testHeadsUpCountdownSec = 5
-                                        viewModel.startHeadsUpTestCountdown(5)
-                                    }
-                                },
-                                enabled = testHeadsUpCountdownSec == 0,
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (testHeadsUpCountdownSec == 0) TestButtonAmber.copy(alpha = 0.7f)
-                                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                                )
-                            ) {
-                                Text(
-                                    text = "💬",
-                                    fontSize = 16.sp
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (testHeadsUpCountdownSec > 0) {
-                                        if (isRu) "Сообщение через ${testHeadsUpCountdownSec}с..."
-                                        else "Message in ${testHeadsUpCountdownSec}s..."
-                                    } else {
-                                        if (isRu) "Экран важное SMS (5 сек)" else "Important SMS screen (5s)"
-                                    },
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = if (testHeadsUpCountdownSec == 0) TestButtonAmber
-                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                )
-                            }
-                            if (testHeadsUpCountdownSec > 0) {
-                                OutlinedButton(
-                                    onClick = {
-                                        testHeadsUpCountdownSec = 0
-                                        viewModel.cancelHeadsUpTest()
-                                    },
-                                    shape = RoundedCornerShape(10.dp),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-                                ) {
-                                    Text(
-                                        text = if (isRu) "Отмена" else "Cancel",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                }
-                            }
-                        }
-
-                        // Test 4: Caregiver SOS SMS (60 sec cooldown) — with confirmation dialog
-                        OutlinedButton(
-                            onClick = {
-                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-                                    smsPermissionsLauncher.launch(arrayOf(Manifest.permission.SEND_SMS))
-                                } else {
-                                    showSosSmsSendConfirmDialog = true
-                                }
-                            },
-                            enabled = testSosSmsCooldownSec == 0,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, TestButtonAmber.copy(alpha = 0.7f))
-                        ) {
-                            Text(text = "✉️", fontSize = 16.sp)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (testSosSmsCooldownSec > 0) {
-                                    if (isRu) "Отправить SOS-SMS (${testSosSmsCooldownSec}с)" else "Send Follower SOS SMS (${testSosSmsCooldownSec}s)"
-                                } else {
-                                    if (isRu) "Отправить SOS-SMS" else "Send Follower SOS SMS"
-                                },
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = if (testSosSmsCooldownSec == 0) TestButtonAmber else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                            )
-                        }
-
-                        // Confirmation dialog for SOS SMS sending
-                        if (showSosSmsSendConfirmDialog) {
-                            AlertDialog(
-                                onDismissRequest = { showSosSmsSendConfirmDialog = false },
-                                icon = { Text(text = "⚠️", fontSize = 28.sp) },
-                                title = {
-                                    Text(
-                                        text = if (isRu) "Отправить тестовое SOS-SMS?" else "Send test SOS SMS?",
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                },
-                                text = {
-                                    Text(
-                                        text = if (isRu) "На номера доверенных контактов будут отправлены реальные SMS-сообщения. Убедитесь, что контакты предупреждены о тесте."
-                                               else "Real SMS messages will be sent to trusted contact numbers. Make sure contacts are aware this is a test."
-                                    )
-                                },
-                                confirmButton = {
-                                    Button(
-                                        onClick = {
-                                            showSosSmsSendConfirmDialog = false
-                                            testSosSmsCooldownSec = 60
-                                            viewModel.sendCaregiverSosTestSms()
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
-                                    ) {
-                                        Text(if (isRu) "Отправить" else "Send", color = Color.White, fontWeight = FontWeight.Bold)
-                                    }
-                                },
-                                dismissButton = {
-                                    OutlinedButton(onClick = { showSosSmsSendConfirmDialog = false }) {
-                                        Text(if (isRu) "Отмена" else "Cancel")
-                                    }
-                                }
-                            )
-                        }
-
-                        Text(
-                            text = if (isRu) "💡 Если окно не появляется на заблокированном экране — дайте разрешения: Приложения → Спец. доступ → Полноэкранные уведомления и Всплывающие окна в фоне."
-                                   else "💡 If the screen doesn't appear on lockscreen — grant: Apps → Special Access → Full-screen notifications & Background pop-ups.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            modifier = Modifier.padding(horizontal = 4.dp)
-                        )
-
-                        // Test 4: BLE Bridge range test (5 sec)
-                        val bleRole = settings.bleBridgeSettings.role
-                        val bleRangeButtonText = when {
-                            bleRangeCooldownSec > 0 -> {
-                                if (isRu) "Тест дальности ($bleRangeCooldownSec с)..." else "Range testing (${bleRangeCooldownSec}s)..."
-                            }
-                            bleRole == BleBridgeRole.OBSERVER -> {
-                                if (isRu) "Тест дальности: приём" else "Range Test: Receive"
-                            }
-                            bleRole == BleBridgeRole.BROADCASTER -> {
-                                if (isRu) "Тест дальности: передача" else "Range Test: Broadcast"
-                            }
-                            else -> {
-                                if (isRu) "Тест дальности BLE-моста" else "BLE Bridge Range Test"
-                            }
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    val isBt = com.tirup.app.data.ble.BleBroadcaster.isBluetoothEnabled(context)
-                                    if (!isBt) {
-                                        Toast.makeText(context, if (isRu) "Включите Bluetooth на смартфоне" else "Enable Bluetooth first", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        if (bleRole == BleBridgeRole.OBSERVER) {
-                                            checkAndRequestBlePermissions(BleBridgeRole.OBSERVER)
-                                        } else {
-                                            checkAndRequestBlePermissions(BleBridgeRole.BROADCASTER)
-                                        }
-                                        bleRangeCooldownSec = 5
-                                        viewModel.startBleRangeTest(5)
-                                    }
-                                },
-                                enabled = bleRangeCooldownSec == 0,
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, TestButtonAmber.copy(alpha = 0.7f))
-                            ) {
-                                Text(text = "📡", fontSize = 16.sp)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = bleRangeButtonText,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (bleRangeCooldownSec == 0) TestButtonAmber else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                                )
-                            }
-
-                            IconButton(
-                                onClick = { showBleRangeHelpDialog = true },
-                                modifier = Modifier.size(40.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = if (isRu) "Информация о тесте дальности" else "Range test info",
-                                    tint = ActionBlue,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
-                    }
-                }
+            DeveloperTestingCard(
+                settings = settings,
+                isRu = isRu,
+                isDevTestsUnlocked = isDevTestsUnlocked,
+                smsPermissionsLauncher = smsPermissionsLauncher,
+                testCaregiverSosCountdownSec = testCaregiverSosCountdownSec,
+                onStartCaregiverSosTest = {
+                    testCaregiverSosCountdownSec = 5
+                    viewModel.startCaregiverSosTestCountdown(5)
+                },
+                onCancelCaregiverSosTest = {
+                    testCaregiverSosCountdownSec = 0
+                    viewModel.cancelCaregiverSosTest()
+                },
+                onStartPatientRescueTest = { viewModel.startPatientRescueTestCountdown(it) },
+                onCancelPatientRescueTest = { viewModel.cancelPatientRescueTest() },
+                onStartHeadsUpTest = { viewModel.startHeadsUpTestCountdown(it) },
+                onCancelHeadsUpTest = { viewModel.cancelHeadsUpTest() },
+                onSendCaregiverSosTestSms = { viewModel.sendCaregiverSosTestSms() },
+                onStartBleRangeTest = { viewModel.startBleRangeTest(it) },
+                onCheckAndRequestBlePermissions = { checkAndRequestBlePermissions(it) }
+            )
 
                 NightscoutSyncCard(
                     settings = settings,
@@ -1573,7 +876,6 @@ fun SettingsScreen(
                     }
                 }
             }
-        }
 
         // Section 5: Community Telegram Text Link
         item {
@@ -1695,272 +997,26 @@ fun SettingsScreen(
     }
 
     if (showRestoreOptionsModal) {
-        val backupSummary = state.backupSummary
-        AlertDialog(
-            onDismissRequest = { showRestoreOptionsModal = false },
-            title = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.FileUpload,
-                        contentDescription = null,
-                        tint = ActionBlue
-                    )
-                    Text(
-                        text = if (isRu) "Восстановление данных" else "Restore Data",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            text = {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.verticalScroll(rememberScrollState())
-                ) {
-                    if (backupSummary != null) {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = PrimaryEmerald.copy(alpha = 0.1f),
-                            border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.3f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    text = if (isRu) "⚡ Автоматическая копия найдена" else "⚡ Local Auto-Backup Available",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = PrimaryEmerald
-                                )
-                                val fmt = SimpleDateFormat("dd.MM.yyyy 'в' HH:mm", Locale.getDefault())
-                                val dateStr = if (backupSummary.exportedAt > 0L) fmt.format(Date(backupSummary.exportedAt)) else "—"
-                                Text(
-                                    text = if (isRu) "📅 Дата: $dateStr" else "📅 Date: $dateStr",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                                Text(
-                                    text = if (isRu) "🩸 Замеров: ${backupSummary.readingsCount} • 💉 Меток: ${backupSummary.treatmentsCount}"
-                                    else "🩸 Readings: ${backupSummary.readingsCount} • 💉 Treatments: ${backupSummary.treatmentsCount}",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Button(
-                                    onClick = {
-                                        showRestoreOptionsModal = false
-                                        viewModel.restoreLatestAutoBackup()
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        text = if (isRu) "Восстановить в 1 клик" else "Restore in 1 Click",
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 2.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
-                    }
-
-                    Text(
-                        text = if (isRu) "📁 Папка с копиями:\nDocuments/TIRUp/Backups/"
-                        else "📁 Backup directory:\nDocuments/TIRUp/Backups/",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = ActionBlue
-                    )
-
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = if (isRu) "Шпаргалка по выбору файла:" else "File picker guide:",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (isRu)
-                                    "• tirup_backup_*.zip или *.json — ПОЛНОЕ восстановление (замеры + метки + профиль и настройки).\n" +
-                                    "• tirup_readings.csv — только замеры сахара (настройки не заменяются).\n" +
-                                    "• tirup_treatments.csv — только метки инсулина и углеводов.\n" +
-                                    "• tirup_settings.json — только профиль и пороги тревог."
-                                else
-                                    "• tirup_backup_*.zip or *.json — FULL restore (readings + treatments + settings).\n" +
-                                    "• tirup_readings.csv — readings only.\n" +
-                                    "• tirup_treatments.csv — treatments only.\n" +
-                                    "• tirup_settings.json — settings only.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            showRestoreOptionsModal = false
-                            restoreBackupLauncher.launch(
-                                arrayOf("application/zip", "application/json", "text/csv", "text/comma-separated-values", "*/*")
-                            )
-                        },
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, ActionBlue),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FileUpload,
-                            contentDescription = null,
-                            tint = ActionBlue,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isRu) "Выбрать файл в папке..." else "Select file from folder...",
-                            color = ActionBlue,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showRestoreOptionsModal = false }) {
-                    Text(if (isRu) "Закрыть" else "Close")
-                }
+        RestoreOptionsModal(
+            backupSummary = state.backupSummary,
+            isRu = isRu,
+            onDismiss = { showRestoreOptionsModal = false },
+            onRestoreLatestAutoBackup = { viewModel.restoreLatestAutoBackup() },
+            onSelectBackupFile = {
+                restoreBackupLauncher.launch(
+                    arrayOf("application/zip", "application/json", "text/csv", "text/comma-separated-values", "*/*")
+                )
             }
         )
     }
 
-    val pendingRestore = state.pendingRestoreSummary
-    if (pendingRestore != null) {
-        val summary = pendingRestore
-        AlertDialog(
-            onDismissRequest = {
-                if (!state.isRestoreInProgress) {
-                    viewModel.dismissRestoreDialog()
-                }
-            },
-            title = {
-                Text(
-                    text = if (isRu) "Восстановление данных" else "Restore Data",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = if (isRu)
-                            "Обнаружена резервная копия TIRUp со следующими данными:"
-                        else
-                            "Found TIRUp backup with the following details:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            if (summary.patientName.isNotBlank()) {
-                                Text(
-                                    text = if (isRu) "👤 Профиль: ${summary.patientName} (${summary.diabetesType})"
-                                    else "👤 Profile: ${summary.patientName} (${summary.diabetesType})",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                            Text(
-                                text = if (isRu) "🩸 Замеров сахара: ${summary.readingsCount}"
-                                else "🩸 Glucose readings: ${summary.readingsCount}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Text(
-                                text = if (isRu) "💉 Записей терапии: ${summary.treatmentsCount}"
-                                else "💉 Treatments: ${summary.treatmentsCount}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            if (summary.hasSettings) {
-                                Text(
-                                    text = if (isRu) "⚙️ Настройки и пороги тревог включены"
-                                    else "⚙️ Settings & alerts included",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = PrimaryEmerald
-                                )
-                            }
-                            if (summary.exportedAt > 0L) {
-                                val fmt = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
-                                Text(
-                                    text = if (isRu) "📅 Дата бэкапа: ${fmt.format(Date(summary.exportedAt))}"
-                                    else "📅 Backup date: ${fmt.format(Date(summary.exportedAt))}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-
-                    Text(
-                        text = if (isRu)
-                            "⚠️ Существующие замеры и отметки будут объединены без дублирования. Настройки профиля и тревог будут обновлены из архива."
-                        else
-                            "⚠️ Existing readings and treatments will be merged without duplicates. Profile and alert settings will be restored.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = ActionBlue
-                    )
-
-                    if (state.isRestoreInProgress) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            Text(
-                                text = if (isRu) "Идёт восстановление..." else "Restoring...",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.confirmRestore() },
-                    enabled = !state.isRestoreInProgress,
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald)
-                ) {
-                    Text(if (isRu) "Восстановить" else "Restore")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { viewModel.dismissRestoreDialog() },
-                    enabled = !state.isRestoreInProgress
-                ) {
-                    Text(if (isRu) "Отмена" else "Cancel")
-                }
-            }
+    state.pendingRestoreSummary?.let { summary ->
+        PendingRestoreDialog(
+            pendingRestore = summary,
+            isRestoreInProgress = state.isRestoreInProgress,
+            isRu = isRu,
+            onConfirmRestore = { viewModel.confirmRestore() },
+            onDismiss = { viewModel.dismissRestoreDialog() }
         )
     }
 
@@ -2030,13 +1086,6 @@ fun SettingsScreen(
         )
     }
 
-    if (showBleRangeHelpDialog) {
-        BleRangeHelpDialog(
-            isRu = isRu,
-            onDismiss = { showBleRangeHelpDialog = false }
-        )
-    }
-
     if (showPredictiveHorizonDialog) {
         PredictiveHorizonDialog(
             currentMinutesAhead = settings.alertSettings.predictiveMinutesAhead,
@@ -2095,24 +1144,9 @@ fun SettingsScreen(
 
 
     if (state.showClearDialog) {
-        AlertDialog(
-            onDismissRequest = { viewModel.showClearConfirm(false) },
-            title = { Text(text = stringResource(R.string.clear_data), color = MaterialTheme.colorScheme.onSurface) },
-            text = { Text(text = stringResource(R.string.clear_data_confirm), color = MaterialTheme.colorScheme.onSurface) },
-            confirmButton = {
-                TextButton(
-                    onClick = { viewModel.clearAllData() }
-                ) {
-                    Text(text = stringResource(R.string.action_confirm), color = ColorVeryLow, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { viewModel.showClearConfirm(false) }
-                ) {
-                    Text(text = stringResource(R.string.action_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
+        ClearDataConfirmDialog(
+            onConfirm = { viewModel.clearAllData() },
+            onDismiss = { viewModel.showClearConfirm(false) }
         )
     }
 
