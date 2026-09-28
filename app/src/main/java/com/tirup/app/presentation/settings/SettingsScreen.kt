@@ -1432,6 +1432,73 @@ fun SettingsScreen(
                                 )
                             )
                         }
+
+                        if (alerts.isLowBatteryAlertEnabled) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = if (isRu) "Тест звуковых сигналов по порогам:" else "Test alert tones by threshold:",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                BatterySoundTestChip(
+                                    modifier = Modifier.weight(1f),
+                                    thresholdText = "<15%",
+                                    tierLabel = if (isRu) "Мягкий" else "Soft",
+                                    accentColor = Color(0xFFF59E0B),
+                                    isPlaying = (currentlyPlayingTag == "BATTERY_15"),
+                                    isRu = isRu,
+                                    onClick = {
+                                        handleSoundClick("BATTERY_15") {
+                                            com.tirup.app.data.alert.MedicalSoundPlayer.playSound(
+                                                com.tirup.app.data.alert.AlertTier.PREDICTIVE,
+                                                alerts.alertVolumePercent,
+                                                customTag = "BATTERY_15"
+                                            )
+                                        }
+                                    }
+                                )
+                                BatterySoundTestChip(
+                                    modifier = Modifier.weight(1f),
+                                    thresholdText = "<10%",
+                                    tierLabel = if (isRu) "Тройной" else "Main",
+                                    accentColor = Color(0xFFEA580C),
+                                    isPlaying = (currentlyPlayingTag == "BATTERY_10"),
+                                    isRu = isRu,
+                                    onClick = {
+                                        handleSoundClick("BATTERY_10") {
+                                            com.tirup.app.data.alert.MedicalSoundPlayer.playSound(
+                                                com.tirup.app.data.alert.AlertTier.MAIN,
+                                                alerts.alertVolumePercent,
+                                                customTag = "BATTERY_10"
+                                            )
+                                        }
+                                    }
+                                )
+                                BatterySoundTestChip(
+                                    modifier = Modifier.weight(1f),
+                                    thresholdText = "<5%",
+                                    tierLabel = if (isRu) "Тревога" else "Alarm",
+                                    accentColor = Color(0xFFEF4444),
+                                    isPlaying = (currentlyPlayingTag == "BATTERY_5"),
+                                    isRu = isRu,
+                                    onClick = {
+                                        handleSoundClick("BATTERY_5") {
+                                            com.tirup.app.data.alert.MedicalSoundPlayer.playSound(
+                                                com.tirup.app.data.alert.AlertTier.CRITICAL,
+                                                alerts.alertVolumePercent,
+                                                customTag = "BATTERY_5"
+                                            )
+                                        }
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -6032,6 +6099,57 @@ private fun AlertTierConfigRow(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun BatterySoundTestChip(
+    modifier: Modifier = Modifier,
+    thresholdText: String,
+    tierLabel: String,
+    accentColor: Color,
+    isPlaying: Boolean,
+    isRu: Boolean,
+    onClick: () -> Unit
+) {
+    val btnColor = if (isPlaying) MaterialTheme.colorScheme.error else accentColor
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = btnColor.copy(alpha = if (isPlaying) 0.16f else 0.08f),
+        border = BorderStroke(1.dp, btnColor.copy(alpha = if (isPlaying) 0.55f else 0.28f)),
+        modifier = modifier.clickable { onClick() }
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(vertical = 7.dp, horizontal = 4.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = btnColor,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    text = thresholdText,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = btnColor
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = if (isPlaying) (if (isRu) "Стоп" else "Stop") else tierLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isPlaying) btnColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 10.sp,
+                fontWeight = if (isPlaying) FontWeight.SemiBold else FontWeight.Normal
+            )
         }
     }
 }

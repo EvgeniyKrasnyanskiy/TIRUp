@@ -36,10 +36,10 @@ object MedicalSoundPlayer {
 
     private var currentAudioTrack: AudioTrack? = null
 
-    fun playSound(tier: AlertTier, volumePercent: Int = 80) {
+    fun playSound(tier: AlertTier, volumePercent: Int = 80, customTag: String? = null) {
         isPlayingActive = true
         _isPlaying.value = true
-        _currentlyPlayingTag.value = tier.name
+        _currentlyPlayingTag.value = customTag ?: tier.name
         audioScope.launch {
             try {
                 when (tier) {
