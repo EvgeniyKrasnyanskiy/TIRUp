@@ -10,6 +10,6 @@ data class NightscoutSettings(
         get() = serverUrl.isNotBlank() && (serverUrl.startsWith("http://", ignoreCase = true) || serverUrl.startsWith("https://", ignoreCase = true))
 
     fun getCleanBaseUrl(): String {
-        return serverUrl.trim().removeSuffix("/")
+        return serverUrl.trim().trimEnd('/')
     }
 }

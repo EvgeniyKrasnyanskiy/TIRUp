@@ -1,100 +1,86 @@
-# [Completed] План реализации: Ввод лечения (IoB, CoB, BG, заметки) и передача в xDrip+ через микро-бэкенд Nightscout
+# [Completed] План реализации: Сквозное удаление лечения с сервера Nightscout по UUID (v2.3.1)
 
 ## Описание задачи
-Реализация задачи 1 из [ROADMAP.md](file:///h:/Diabetes/TIRUp/.agent/docs/ROADMAP.md):
-- Создание отдельного блока настроек сервера Nightscout в скрытом меню разработчика (рядом с системными тестами).
-- Передача введённых данных (инсулин, углеводы, замер сахара глюкометром, заметка) на микро-бэкенд Nightscout (FastAPI-сервер из [`H:\Diabetes\xDripWidget`](file:///h:/Diabetes/xDripWidget)).
-- Связка с xDrip+: xDrip+ штатно синхронизирует лечение с этого сервера по REST API.
-- Верификация доставки: запись подтверждается и отображается на графике TIRUp после того, как поступила и зафиксировалась в xDrip+.
+Обеспечить удаление записей терапии (инсулин, углеводы, замеры, заметки) не только локально в TIRUp, но и на сервере Nightscout (FastAPI из `H:\Diabetes\xDripWidget`):
+1. Сохранять `uuid` каждой записи при отправке из TIRUp и при приёме из xDrip (`treatments.json`).
+2. В `NightscoutUploadManager` реализовать вызов `DELETE /api/v1/treatments/{uuid}?token={api_secret}` с авторизацией по SHA-1 хешу.
+3. При нажатии «Удалить» на графике сахара в `FocusScreen`:
+   - Если запись имеет `uuid` и настроен Nightscout, отправлять `DELETE` на сервер.
+   - Сервер выполняет `_mark_voided` (`is_voided = 1`, обнуляет дозы).
+   - Удалять запись из локальной базы данных TIRUp.
+   - Выводить Toast-уведомление пользователю.
+4. Итог: удалённые метки не «воскресают» в xDrip+ и TIRUp при последующих сеансах синхронизации. Совместимо по UUID с десктопным виджетом Windows.
 
 ---
 
 ## Архитектура решения
 
 ```
- ┌──────────────────────┐         HTTP POST /api/v1/treatments         ┌─────────────────────────────────┐
- │        TIRUp         │ ───────────────────────────────────────────> │  Микро-бэкенд Nightscout        │
- │  (FocusScreen input) │                                              │  (FastAPI из xDripWidget)       │
- └──────────────────────┘                                              └─────────────────────────────────┘
-            │                                                                           │
-            │ Локальный опрос (порт 17580)                                              │ Nightscout REST API Sync
-            │ http://127.0.0.1:17580/treatments.json                                    │ (Cloud upload/download)
-            ▼                                                                           ▼
- ┌──────────────────────┐                                              ┌─────────────────────────────────┐
- │ Подтверждение        │ ◄─────────────────────────────────────────── │              xDrip+             │
- │ в базе & на графике  │         Лечение скачано в базу xDrip         │  (рассчитывает системный IoB)   │
- └──────────────────────┘                                              └─────────────────────────────────┘
+  ┌────────────────────────────────────────────────────────┐
+  │                 TIRUp (FocusScreen)                    │
+  │     Пользователь нажимает "Удалить" на графике        │
+  └──────────────────────────┬─────────────────────────────┘
+                             │
+            ┌────────────────┴────────────────┐
+            ▼                                 ▼
+   Локальное удаление              HTTP DELETE /api/v1/treatments/{uuid}
+   (Room DB: treatments)                     │
+                                             ▼
+                               ┌─────────────────────────────┐
+                               │  Микро-бэкенд Nightscout    │
+                               │  _mark_voided(uuid)         │
+                               │  is_voided = 1, дозы = 0    │
+                               └─────────────┬───────────────┘
+                                             │
+                                             │ Следующая синхронизация xDrip
+                                             ▼
+                               ┌─────────────────────────────┐
+                               │           xDrip+            │
+                               │ Запись аннулирована и       │
+                               │ больше не восстанавливается │
+                               └─────────────────────────────┘
 ```
 
 ---
 
-## Декомпозиция на этапы разработки
+## Этапы разработки
 
-### Этап 1: Модель настроек Nightscout и хранилище
+### Этап 1: Модель данных и Room БД
 - **Файлы**:
-  - `app/src/main/java/com/tirup/app/domain/model/NightscoutSettings.kt` [NEW]
-  - `app/src/main/java/com/tirup/app/domain/model/UserSettings.kt` [MODIFY]
-  - `app/src/main/java/com/tirup/app/data/repository/SettingsRepositoryImpl.kt` [MODIFY]
-  - `app/src/main/java/com/tirup/app/data/backup/AutoBackupManager.kt` [MODIFY]
+  - `app/src/main/java/com/tirup/app/domain/model/Treatment.kt` [MODIFY]
+  - `app/src/main/java/com/tirup/app/data/local/entity/TreatmentEntity.kt` [MODIFY]
+  - `app/src/main/java/com/tirup/app/data/local/dao/TreatmentDao.kt` [MODIFY]
+  - `app/src/main/java/com/tirup/app/data/local/AppDatabase.kt` [MODIFY] (версия 7, миграция MIGRATION_6_7)
 - **Детали**:
-  - Создание класса `NightscoutSettings`:
-    - `isEnabled: Boolean = false`
-    - `serverUrl: String = ""` (например, `http://xx.xxx.228.105:8085`)
-    - `apiSecret: String = ""`
-    - `requireXdripConfirmation: Boolean = true` (отображать на графике только после подтверждения из xDrip+)
-  - Включение `nightscoutSettings` в `UserSettings`.
-  - Сериализация/десериализация в SharedPreferences и резервные копии JSON.
+  - Добавить поле `uuid: String? = null`.
+  - Добавить индекс по `uuid` в Room.
+  - В `TreatmentDao`: добавить методы `getById(id: Long)`, `getByUuid(uuid: String)`.
 
-### Этап 2: Блок управления сервером в скрытых настройках
+### Этап 2: Парсинг UUID в источнике данных и сетевой клиент
 - **Файлы**:
-  - `app/src/main/java/com/tirup/app/presentation/settings/SettingsScreen.kt` [MODIFY]
-  - `app/src/main/java/com/tirup/app/presentation/settings/SettingsViewModel.kt` [MODIFY]
-  - `app/src/main/java/com/tirup/app/presentation/settings/dialogs/NightscoutSettingsDialog.kt` [NEW]
-- **Детали**:
-  - В `SettingsScreen.kt` внутри `if (isDevTestsUnlocked)` (открывается 5 тапами по версии приложения):
-    - Добавление отдельной карточки `BentoCard`: **«🌐 Сервер синхронизации (Nightscout API)»**.
-    - Тумблер включения отправки.
-    - Текущий URL сервера и маскированный API Secret со статусом подключения.
-    - Кнопка вызова диалога редактирования адреса и ключа.
-    - Кнопка **«Проверить связь»** (вызывает `GET /api/v1/status` или `GET /health` с выводом версии `Micro-Nightscout` и задержки ответа в мс).
-    - Описание схемы работы (TIRUp -> Сервер -> xDrip+ -> График).
-
-### Этап 3: Менеджер отправки Treatment и проверки связи
-- **Файлы**:
-  - `app/src/main/java/com/tirup/app/data/network/NightscoutUploadManager.kt` [NEW]
-- **Детали**:
-  - Легковесный менеджер на базе `HttpURLConnection` (без сторонних библиотек):
-    - `checkConnection(url: String, secret: String): Result<String>` (`GET /api/v1/status.json` с заголовком `api-secret`).
-    - `uploadTreatment(settings: NightscoutSettings, treatment: Treatment, eventType: String, glucose: Double?): Result<String>` (`POST /api/v1/treatments` с JSON-структурой, совместимой с `xDripWidget\widget.py`).
-    - Автогенерация `uuid` и даты в формате ISO-8601 UTC.
-
-### Этап 4: Активация быстрого ввода на FocusScreen и логика подтверждения
-- **Файлы**:
-  - `app/src/main/java/com/tirup/app/presentation/focus/FocusScreen.kt` [MODIFY]
-  - `app/src/main/java/com/tirup/app/presentation/focus/FocusViewModel.kt` [MODIFY]
   - `app/src/main/java/com/tirup/app/data/receiver/DexdripBroadcastReceiver.kt` [MODIFY]
+  - `app/src/main/java/com/tirup/app/data/network/NightscoutUploadManager.kt` [MODIFY]
 - **Детали**:
-  - В `FocusScreen.kt`:
-    - Раскомментировать `QuickActionStrip` и отображать его только при `userSettings.nightscoutSettings.isEnabled`.
-    - Раскомментировать `TreatmentInputBottomSheet`.
-  - В `FocusViewModel.kt`:
-    - При добавлении лечения отправлять его в фоновом режиме через `NightscoutUploadManager`.
-    - Показывать всплывающее сообщение (Toast / Snackbar): «Отправлено на сервер • Ожидание подтверждения от xDrip+».
-    - Если `requireXdripConfirmation == false`, сразу сохранять в Room с пометкой `PENDING`.
-  - В `DexdripBroadcastReceiver.kt`:
-    - При фоновом опросе `127.0.0.1:17580/treatments.json` сопоставлять полученные записи с отправленными и обновлять их статус на `CONFIRMED`.
+  - В `parseTreatmentsJson`: считывать `uuid`, `_id`, `sysid`.
+  - В `saveTreatmentIfNew`: сохранять `uuid` и обновлять существующие записи, если появился UUID.
+  - В `NightscoutUploadManager`:
+    - Добавить `deleteTreatment(settings: NightscoutSettings, uuid: String): Result<Unit>`.
+
+### Этап 3: Репозиторий и ViewModel
+- **Файлы**:
+  - `app/src/main/java/com/tirup/app/domain/repository/GlucoseRepository.kt` [MODIFY]
+  - `app/src/main/java/com/tirup/app/data/repository/GlucoseRepositoryImpl.kt` [MODIFY]
+  - `app/src/main/java/com/tirup/app/presentation/focus/FocusViewModel.kt` [MODIFY]
+  - `app/build.gradle.kts` [MODIFY] (версия v2.3.1, versionCode 19)
+- **Детали**:
+  - `getTreatmentById(id: Long): Treatment?` в репозитории.
+  - В `deleteTreatment(id)`: извлекать запись, считывать `uuid`, вызывать `NightscoutUploadManager.deleteTreatment`, удалять из Room и показывать Toast.
+  - В `addTreatment`: сохранять возвращаемый `itemUuid` при локальной вставке.
 
 ---
 
 ## План верификации
-1. **Юнит-тесты**:
-   - Тест формирования JSON payload для Nightscout REST API (`NightscoutPayloadTest`).
-   - Тест проверки авторизации и URL хелперов.
-2. **Проверка подключения (ручная)**:
-   - Ввод параметров тестового сервера и нажатие «Проверить связь».
-3. **Сборка приложения**:
-   - `.\gradlew.bat testDebugUnitTest`
-   - `.\gradlew.bat assembleRelease`
-4. **Установка на телефон и проверка на живом устройстве**:
-   - `adb -s af27386b install -r app\build\outputs\apk\release\TIRUp-v2.2.4-release.apk`
-   - Проверка разблокировки меню по 5 тапам, ввода URL/ключа, отправки болюса/углеводов.
+1. Юнит-тесты: `.\gradlew.bat testDebugUnitTest`.
+2. Сборка релизного APK: `.\gradlew.bat assembleRelease`.
+3. Установка на устройство: `adb -s af27386b install -r app/build/outputs/apk/release/TIRUp-v2.3.1-release.apk`.
+4. Git commit и отчёт.

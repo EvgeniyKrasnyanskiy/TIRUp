@@ -1,4 +1,4 @@
-﻿package com.tirup.app.data.local.entity
+package com.tirup.app.data.local.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
@@ -9,7 +9,8 @@ import com.tirup.app.domain.model.Treatment
 @Entity(
     tableName = "treatments",
     indices = [
-        Index(value = ["timestamp"])
+        Index(value = ["timestamp"]),
+        Index(value = ["uuid"])
     ]
 )
 data class TreatmentEntity(
@@ -30,7 +31,10 @@ data class TreatmentEntity(
     val notes: String? = null,
 
     @ColumnInfo(name = "source")
-    val source: String = "XDRIP"
+    val source: String = "XDRIP",
+
+    @ColumnInfo(name = "uuid")
+    val uuid: String? = null
 ) {
     fun toDomain(): Treatment = Treatment(
         id = id,
@@ -38,7 +42,8 @@ data class TreatmentEntity(
         insulinUnits = insulinUnits,
         carbsGrams = carbsGrams,
         notes = notes,
-        source = source
+        source = source,
+        uuid = uuid
     )
 
     companion object {
@@ -48,7 +53,8 @@ data class TreatmentEntity(
             insulinUnits = domain.insulinUnits,
             carbsGrams = domain.carbsGrams,
             notes = domain.notes,
-            source = domain.source
+            source = domain.source,
+            uuid = domain.uuid
         )
     }
 }

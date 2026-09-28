@@ -771,11 +771,20 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             }
 
             if (duplicate != null) {
-                // If existing treatment didn't have notes but incoming does, enrich it
+                var updated = duplicate
+                var changed = false
                 if (duplicate.notes.isNullOrBlank() && !treatment.notes.isNullOrBlank()) {
-                    dao.insert(duplicate.copy(notes = treatment.notes))
+                    updated = updated.copy(notes = treatment.notes)
+                    changed = true
                 }
-                Log.d(TAG, "Skipped duplicate treatment within 5m window: insulin=${treatment.insulinUnits}, carbs=${treatment.carbsGrams}")
+                if (duplicate.uuid.isNullOrBlank() && !treatment.uuid.isNullOrBlank()) {
+                    updated = updated.copy(uuid = treatment.uuid)
+                    changed = true
+                }
+                if (changed) {
+                    dao.insert(updated)
+                }
+                Log.d(TAG, "Skipped duplicate treatment within window: insulin=${treatment.insulinUnits}, carbs=${treatment.carbsGrams}, uuid=${treatment.uuid}")
                 return
             }
 
@@ -823,8 +832,18 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
                     if (sameInsulin && sameCarbs && (sameNotes || (t1HasDose && t2HasDose))) {
                         toDelete.add(t2.id)
+                        var updatedT1 = t1
+                        var t1Changed = false
                         if (t1.notes.isNullOrBlank() && !t2.notes.isNullOrBlank()) {
-                            dao.insert(t1.copy(notes = t2.notes))
+                            updatedT1 = updatedT1.copy(notes = t2.notes)
+                            t1Changed = true
+                        }
+                        if (t1.uuid.isNullOrBlank() && !t2.uuid.isNullOrBlank()) {
+                            updatedT1 = updatedT1.copy(uuid = t2.uuid)
+                            t1Changed = true
+                        }
+                        if (t1Changed) {
+                            dao.insert(updatedT1)
                         }
                         deleted++
                     }
@@ -1092,6 +1111,8 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         }
                         else -> 0L
                     }
+                    val rawUuid = obj.optString("uuid").ifBlank { obj.optString("_id") }.ifBlank { obj.optString("sysid") }
+                    val uuid = rawUuid.takeIf { it.isNotBlank() }
                     val hasCarbs = carbs != null && carbs > 0.0
                     val hasInsulin = insulin != null && insulin > 0.0
                     val hasNotes = !notes.isNullOrBlank()
@@ -1102,7 +1123,8 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                                 insulinUnits = if (hasInsulin) insulin else null,
                                 carbsGrams = if (hasCarbs) carbs else null,
                                 notes = notes,
-                                source = "XDRIP"
+                                source = "XDRIP",
+                                uuid = uuid
                             )
                         )
                     }

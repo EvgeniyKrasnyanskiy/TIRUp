@@ -378,7 +378,29 @@ class FocusViewModel(
 
     fun deleteTreatment(treatmentId: Long) {
         viewModelScope.launch {
+            val userSettings = _uiState.value.userSettings
+            val ns = userSettings.nightscoutSettings
+            val isRu = userSettings.language.equals("RU", ignoreCase = true)
+
+            val treatment = glucoseRepository.getTreatmentById(treatmentId)
+            val uuid = treatment?.uuid
+
             glucoseRepository.deleteTreatmentById(treatmentId)
+
+            if (ns.isEnabled && ns.isValidUrl && !uuid.isNullOrBlank()) {
+                val deleteResult = com.tirup.app.data.network.NightscoutUploadManager.deleteTreatment(ns, uuid)
+                if (deleteResult.isSuccess) {
+                    val msg = if (isRu) "✓ Запись удалена с сервера Nightscout" else "✓ Treatment deleted from Nightscout server"
+                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                } else {
+                    val err = deleteResult.exceptionOrNull()?.message ?: ""
+                    val msg = if (isRu) "Удалено локально (ошибка сервера: $err)" else "Deleted locally (server error: $err)"
+                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                val msg = if (isRu) "Запись удалена" else "Treatment deleted"
+                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -400,6 +422,8 @@ class FocusViewModel(
 
             if (!hasInsulin && !hasCarbs && !hasNotes && !hasGlucose) return@launch
 
+            var uploadedUuid: String? = null
+
             // 1. Upload to Nightscout micro-backend if enabled
             if (ns.isEnabled && ns.isValidUrl) {
                 val uploadResult = com.tirup.app.data.network.NightscoutUploadManager.uploadTreatment(
@@ -413,6 +437,7 @@ class FocusViewModel(
                 )
 
                 if (uploadResult.isSuccess) {
+                    uploadedUuid = uploadResult.getOrNull()
                     val msg = if (ns.requireXdripConfirmation) {
                         if (isRu) "✓ Отправлено на сервер • Ожидание синхронизации с xDrip+"
                         else "✓ Sent to server • Waiting for xDrip+ sync"
@@ -445,7 +470,8 @@ class FocusViewModel(
                         insulinUnits = if (hasInsulin) insulinUnits else null,
                         carbsGrams = if (hasCarbs) carbsGrams else null,
                         notes = notes,
-                        source = "TIRUP"
+                        source = "TIRUP",
+                        uuid = uploadedUuid
                     )
                     glucoseRepository.insertTreatment(treatment)
                 }

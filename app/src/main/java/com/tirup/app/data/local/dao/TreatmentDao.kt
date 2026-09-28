@@ -49,8 +49,17 @@ interface TreatmentDao {
     @Query("SELECT COUNT(*) FROM treatments WHERE timestamp BETWEEN :minTime AND :maxTime AND ((:insulin IS NULL AND insulin_units IS NULL) OR ABS(insulin_units - :insulin) < 0.05) AND ((:carbs IS NULL AND carbs_grams IS NULL) OR ABS(carbs_grams - :carbs) < 0.5)")
     suspend fun countSimilar(minTime: Long, maxTime: Long, insulin: Double?, carbs: Double?): Int
 
+    @Query("SELECT * FROM treatments WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): TreatmentEntity?
+
+    @Query("SELECT * FROM treatments WHERE uuid = :uuid LIMIT 1")
+    suspend fun getByUuid(uuid: String): TreatmentEntity?
+
     @Query("DELETE FROM treatments WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM treatments WHERE uuid = :uuid")
+    suspend fun deleteByUuid(uuid: String)
 
     @Query("DELETE FROM treatments")
     suspend fun clearAll()

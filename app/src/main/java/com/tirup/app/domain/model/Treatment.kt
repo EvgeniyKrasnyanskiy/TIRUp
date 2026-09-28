@@ -6,7 +6,8 @@ data class Treatment(
     val insulinUnits: Double? = null,
     val carbsGrams: Double? = null,
     val notes: String? = null,
-    val source: String = "XDRIP"
+    val source: String = "XDRIP",
+    val uuid: String? = null
 ) {
     val hasInsulin: Boolean get() = insulinUnits != null && insulinUnits > 0.0
     val hasCarbs: Boolean get() = carbsGrams != null && carbsGrams > 0.0

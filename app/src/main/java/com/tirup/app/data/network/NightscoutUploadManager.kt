@@ -168,4 +168,54 @@ object NightscoutUploadManager {
             conn?.disconnect()
         }
     }
+
+    suspend fun deleteTreatment(
+        settings: NightscoutSettings,
+        uuid: String
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        if (!settings.isEnabled || !settings.isValidUrl) {
+            return@withContext Result.failure(IllegalStateException("Синхронизация с сервером выключена или URL не задан"))
+        }
+        val cleanUuid = uuid.trim()
+        if (cleanUuid.isBlank()) {
+            return@withContext Result.failure(IllegalArgumentException("UUID записи не может быть пустым"))
+        }
+
+        val cleanUrl = settings.getCleanBaseUrl()
+        val tokenParam = if (settings.apiSecret.isNotBlank()) "?token=${java.net.URLEncoder.encode(settings.apiSecret, "UTF-8")}" else ""
+        val targetUrl = "$cleanUrl/api/v1/treatments/$cleanUuid$tokenParam"
+
+        var conn: HttpURLConnection? = null
+        try {
+            val url = URL(targetUrl)
+            conn = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = TIMEOUT_MS
+                readTimeout = TIMEOUT_MS
+                requestMethod = "DELETE"
+                setRequestProperty("Accept", "application/json")
+                if (settings.apiSecret.isNotBlank()) {
+                    setRequestProperty("api-secret", sha1(settings.apiSecret))
+                }
+            }
+
+            val code = conn.responseCode
+            if (code in 200..299) {
+                Log.i(TAG, "Treatment successfully voided/deleted on server: uuid=$cleanUuid (HTTP $code)")
+                Result.success(Unit)
+            } else if (code == 401) {
+                Result.failure(IllegalStateException("Неверный API Secret (401)"))
+            } else {
+                val errText = try {
+                    conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                } catch (_: Exception) { "" }
+                Log.w(TAG, "Treatment delete failed with code $code: $errText")
+                Result.failure(IllegalStateException("Ошибка сервера: HTTP $code"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete treatment $cleanUuid from $targetUrl: ${e.message}", e)
+            Result.failure(e)
+        } finally {
+            conn?.disconnect()
+        }
+    }
 }

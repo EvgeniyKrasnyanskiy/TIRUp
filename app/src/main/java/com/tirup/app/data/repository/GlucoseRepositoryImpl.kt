@@ -236,6 +236,10 @@ class GlucoseRepositoryImpl(
         deletedCount
     }
 
+    override suspend fun getTreatmentById(id: Long): Treatment? = withContext(Dispatchers.IO) {
+        treatmentDao.getById(id)?.toDomain()
+    }
+
     override suspend fun deleteTreatmentById(id: Long) = withContext(Dispatchers.IO) {
         treatmentDao.deleteById(id)
     }

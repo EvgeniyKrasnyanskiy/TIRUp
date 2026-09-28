@@ -20,6 +20,7 @@ interface GlucoseRepository {
     suspend fun recalculateDailySummaries(startDate: Long, endDate: Long)
     suspend fun ensureDailySummariesUpToDate()
     suspend fun purgeDuplicateReadings(): Int
+    suspend fun getTreatmentById(id: Long): Treatment?
     suspend fun deleteTreatmentById(id: Long)
     suspend fun clearTreatments()
     suspend fun clearAllData()
