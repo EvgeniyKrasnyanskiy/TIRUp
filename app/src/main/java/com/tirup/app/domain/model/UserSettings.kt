@@ -186,7 +186,8 @@ data class UserSettings(
     val lastHba1cReminderTimestamp: Long = 0L,
     val lastYearEndDigestShownYear: Int = 0,
     val aodSettings: AodSettings = AodSettings(),
-    val lastImportantMessage: LastImportantMessage? = null
+    val lastImportantMessage: LastImportantMessage? = null,
+    val nightscoutSettings: NightscoutSettings = NightscoutSettings()
 ) {
     val latestHba1cRecord: LabHba1cRecord?
         get() = hba1cRecords.maxByOrNull { it.timestamp }

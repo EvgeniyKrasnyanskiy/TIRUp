@@ -16,6 +16,7 @@ import com.tirup.app.domain.model.BleBridgeRole
 import com.tirup.app.domain.model.BleBridgeSettings
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.LancetStatus
+import com.tirup.app.domain.model.NightscoutSettings
 import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.domain.model.PumpSetStatus
 import com.tirup.app.domain.model.SensorStatus
@@ -654,6 +655,16 @@ object AutoBackupManager {
         writer.name("transmitBattery").value(ble.transmitBattery)
         writer.name("useLongRange").value(ble.useLongRange)
         writer.name("showPacketBanner").value(ble.showPacketBanner)
+        writer.endObject()
+
+        // Nightscout Settings
+        val ns = settings.nightscoutSettings
+        writer.name("nightscoutSettings")
+        writer.beginObject()
+        writer.name("isEnabled").value(ns.isEnabled)
+        writer.name("serverUrl").value(ns.serverUrl)
+        writer.name("apiSecret").value(ns.apiSecret)
+        writer.name("requireXdripConfirmation").value(ns.requireXdripConfirmation)
         writer.endObject()
 
         // HbA1c Lab Records
@@ -1856,6 +1867,7 @@ object AutoBackupManager {
         var isFloatingBubbleAlwaysVisible = false
         var alertSettings = AlertSettings()
         var bleBridgeSettings = BleBridgeSettings()
+        var nightscoutSettings = NightscoutSettings()
 
         var isDeviceReminders = true
         var isSensorReminder = true
@@ -1978,6 +1990,29 @@ object AutoBackupManager {
                         transmitBattery = transmitBattery,
                         useLongRange = useLongRange,
                         showPacketBanner = showPacketBanner
+                    )
+                }
+                "nightscoutSettings" -> {
+                    var isEnabled = false
+                    var serverUrl = ""
+                    var apiSecret = ""
+                    var requireXdripConfirmation = true
+                    reader.beginObject()
+                    while (reader.hasNext()) {
+                        when (reader.nextName()) {
+                            "isEnabled" -> isEnabled = reader.nextBoolean()
+                            "serverUrl" -> serverUrl = reader.nextString()
+                            "apiSecret" -> apiSecret = reader.nextString()
+                            "requireXdripConfirmation" -> requireXdripConfirmation = reader.nextBoolean()
+                            else -> reader.skipValue()
+                        }
+                    }
+                    reader.endObject()
+                    nightscoutSettings = NightscoutSettings(
+                        isEnabled = isEnabled,
+                        serverUrl = serverUrl,
+                        apiSecret = apiSecret,
+                        requireXdripConfirmation = requireXdripConfirmation
                     )
                 }
                 "isDeviceRemindersEnabled" -> isDeviceReminders = reader.nextBoolean()
@@ -2126,7 +2161,8 @@ object AutoBackupManager {
             showPredictionOnChart = showPrediction,
             metricsOrder = metricsOrder,
             hiddenMetrics = hiddenMetrics,
-            hasSeenOnboarding = true
+            hasSeenOnboarding = true,
+            nightscoutSettings = nightscoutSettings
         )
     }
 

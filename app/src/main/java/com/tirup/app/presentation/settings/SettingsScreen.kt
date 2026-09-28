@@ -13,6 +13,10 @@ import com.tirup.app.presentation.settings.dialogs.PatientProfileSummaryCard
 import com.tirup.app.presentation.settings.dialogs.PredictiveHorizonDialog
 import com.tirup.app.presentation.settings.dialogs.PredictiveInfoDialog
 import com.tirup.app.presentation.settings.dialogs.YearEndDigestDialog
+import com.tirup.app.presentation.settings.dialogs.NightscoutSettingsDialog
+import com.tirup.app.data.network.NightscoutUploadManager
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.Edit
 
 
 
@@ -218,6 +222,7 @@ fun SettingsScreen(
     var showBlePinDialog by rememberSaveable { mutableStateOf(false) }
     var showRestoreOptionsModal by rememberSaveable { mutableStateOf(false) }
     var showBleRangeHelpDialog by rememberSaveable { mutableStateOf(false) }
+    var showNightscoutDialog by rememberSaveable { mutableStateOf(false) }
     val isDevTestsUnlocked by viewModel.isDevTestsUnlocked.collectAsState()
     var devTapCount by remember { mutableStateOf(0) }
     var lastDevTapTime by remember { mutableStateOf(0L) }
@@ -4474,6 +4479,233 @@ fun SettingsScreen(
                         }
                     }
                 }
+
+                // Section: Developer Mode - Nightscout Server Block
+                val nightscout = settings.nightscoutSettings
+                var isTestingNs by remember { mutableStateOf(false) }
+                var nsTestStatus by remember { mutableStateOf<String?>(null) }
+                var isNsTestSuccess by remember { mutableStateOf(false) }
+                val nsScope = rememberCoroutineScope()
+
+                BentoCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 2.dp, vertical = 2.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(text = "🌐", fontSize = 18.sp)
+                                Column {
+                                    Text(
+                                        text = if (isRu) "Сервер синхронизации" else "Nightscout Sync Server",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ActionBlue
+                                    )
+                                    Text(
+                                        text = if (isRu) "Nightscout REST API (микро-бэкенд)" else "Nightscout REST API (micro-backend)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Switch(
+                                checked = nightscout.isEnabled,
+                                onCheckedChange = { viewModel.setNightscoutEnabled(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = PrimaryEmerald
+                                )
+                            )
+                        }
+
+                        // Server URL & Status info
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (isRu) "Адрес сервера:" else "Server URL:",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = if (nightscout.serverUrl.isNotBlank()) nightscout.serverUrl else if (isRu) "Не задан" else "Not set",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (nightscout.serverUrl.isNotBlank()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "API Secret:",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = if (nightscout.apiSecret.isNotBlank()) "••••••••" else if (isRu) "Без пароля" else "None",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (isRu) "Подтверждение xDrip+:" else "xDrip+ confirmation:",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = if (nightscout.requireXdripConfirmation) (if (isRu) "Включено" else "Enabled") else (if (isRu) "Выключено" else "Disabled"),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (nightscout.requireXdripConfirmation) PrimaryEmerald else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        // Test status result if available
+                        if (nsTestStatus != null) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isNsTestSuccess) PrimaryEmerald.copy(alpha = 0.12f) else MaterialTheme.colorScheme.error.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, if (isNsTestSuccess) PrimaryEmerald.copy(alpha = 0.4f) else MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(text = if (isNsTestSuccess) "✓" else "⚠️", fontSize = 14.sp)
+                                    Text(
+                                        text = nsTestStatus!!,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (isNsTestSuccess) PrimaryEmerald else MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+
+                        // Action Buttons: Configure & Test
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                onClick = { showNightscoutDialog = true },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.7f))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = ActionBlue
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isRu) "Настройки" else "Configure",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = ActionBlue
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    if (nightscout.serverUrl.isBlank()) {
+                                        Toast.makeText(context, if (isRu) "Укажите URL сервера в настройках" else "Specify server URL", Toast.LENGTH_SHORT).show()
+                                        return@OutlinedButton
+                                    }
+                                    isTestingNs = true
+                                    nsTestStatus = null
+                                    nsScope.launch {
+                                        val res = NightscoutUploadManager.checkConnection(nightscout.serverUrl, nightscout.apiSecret)
+                                        isTestingNs = false
+                                        if (res.isSuccess) {
+                                            val d = res.getOrNull()!!
+                                            isNsTestSuccess = true
+                                            nsTestStatus = if (isRu) "Связь OK: ${d.name} v${d.version} (${d.latencyMs} мс)" else "Connected: ${d.name} v${d.version} (${d.latencyMs}ms)"
+                                        } else {
+                                            isNsTestSuccess = false
+                                            nsTestStatus = res.exceptionOrNull()?.message ?: "Error"
+                                        }
+                                    }
+                                },
+                                enabled = !isTestingNs && nightscout.serverUrl.isNotBlank(),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.7f))
+                            ) {
+                                if (isTestingNs) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp,
+                                        color = PrimaryEmerald
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isRu) "Связь..." else "Pinging...",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = PrimaryEmerald
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.CloudDone,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = PrimaryEmerald
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isRu) "Проверить" else "Ping",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = PrimaryEmerald
+                                    )
+                                }
+                            }
+                        }
+
+                        // Descriptive note
+                        Text(
+                            text = if (isRu)
+                                "💡 Передаёт введённое лечение (инсулин, углеводы, замеры, заметки) на ваш микро-бэкенд Nightscout (из xDripWidget). xDrip+ на телефоне скачивает их по REST API, после чего данные подтверждаются и отображаются на графике TIRUp."
+                            else
+                                "💡 Dispatches entered treatments to your Nightscout micro-backend (from xDripWidget). xDrip+ pulls them via REST API sync, confirming them in TIRUp.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
             }
 
         // Section: Collapse Advanced Settings Footer
@@ -5120,6 +5352,17 @@ fun SettingsScreen(
                 viewModel.updateBleBridgeSettings(ble.copy(familyPin = newPin))
             },
             onDismiss = { showBlePinDialog = false }
+        )
+    }
+
+    if (showNightscoutDialog) {
+        NightscoutSettingsDialog(
+            initialSettings = settings.nightscoutSettings,
+            isRu = isRu,
+            onDismiss = { showNightscoutDialog = false },
+            onSave = { updated ->
+                viewModel.updateNightscoutSettings(updated)
+            }
         )
     }
 

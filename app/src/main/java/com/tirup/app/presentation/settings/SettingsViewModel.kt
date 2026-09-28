@@ -486,6 +486,24 @@ class SettingsViewModel(
         }
     }
 
+    fun updateNightscoutSettings(settings: com.tirup.app.domain.model.NightscoutSettings) {
+        val current = _uiState.value.userSettings
+        viewModelScope.launch {
+            val updated = current.copy(nightscoutSettings = settings)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+        }
+    }
+
+    fun setNightscoutEnabled(enabled: Boolean) {
+        val current = _uiState.value.userSettings
+        viewModelScope.launch {
+            val updated = current.copy(nightscoutSettings = current.nightscoutSettings.copy(isEnabled = enabled))
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+        }
+    }
+
     fun startBleRangeTest(durationSec: Int = 5) {
         viewModelScope.launch {
             val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)

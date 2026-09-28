@@ -197,6 +197,10 @@ class SettingsRepositoryImpl(
             .putString(KEY_LAST_IMPORTANT_MSG_PHONE, settings.lastImportantMessage?.senderPhone ?: "")
             .putString(KEY_LAST_IMPORTANT_MSG_TEXT, settings.lastImportantMessage?.text ?: "")
             .putLong(KEY_LAST_IMPORTANT_MSG_TS, settings.lastImportantMessage?.timestamp ?: 0L)
+            .putBoolean(KEY_NIGHTSCOUT_IS_ENABLED, settings.nightscoutSettings.isEnabled)
+            .putString(KEY_NIGHTSCOUT_SERVER_URL, settings.nightscoutSettings.serverUrl)
+            .putString(KEY_NIGHTSCOUT_API_SECRET, settings.nightscoutSettings.apiSecret)
+            .putBoolean(KEY_NIGHTSCOUT_REQUIRE_XDRIP_CONFIRM, settings.nightscoutSettings.requireXdripConfirmation)
             .apply()
 
         try {
@@ -508,7 +512,13 @@ class SettingsRepositoryImpl(
                         timestamp = ts
                     )
                 } else null
-            }
+            },
+            nightscoutSettings = com.tirup.app.domain.model.NightscoutSettings(
+                isEnabled = prefs.getBoolean(KEY_NIGHTSCOUT_IS_ENABLED, false),
+                serverUrl = prefs.getString(KEY_NIGHTSCOUT_SERVER_URL, "") ?: "",
+                apiSecret = prefs.getString(KEY_NIGHTSCOUT_API_SECRET, "") ?: "",
+                requireXdripConfirmation = prefs.getBoolean(KEY_NIGHTSCOUT_REQUIRE_XDRIP_CONFIRM, true)
+            )
         )
     }
 
@@ -518,6 +528,11 @@ class SettingsRepositoryImpl(
         private const val KEY_LAST_IMPORTANT_MSG_PHONE = "key_last_important_msg_phone"
         private const val KEY_LAST_IMPORTANT_MSG_TEXT = "key_last_important_msg_text"
         private const val KEY_LAST_IMPORTANT_MSG_TS = "key_last_important_msg_ts"
+
+        private const val KEY_NIGHTSCOUT_IS_ENABLED = "key_nightscout_is_enabled"
+        private const val KEY_NIGHTSCOUT_SERVER_URL = "key_nightscout_server_url"
+        private const val KEY_NIGHTSCOUT_API_SECRET = "key_nightscout_api_secret"
+        private const val KEY_NIGHTSCOUT_REQUIRE_XDRIP_CONFIRM = "key_nightscout_require_xdrip_confirm"
 
         private const val KEY_LANG = "key_language"
         private const val KEY_UNIT = "key_unit"

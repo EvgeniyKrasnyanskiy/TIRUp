@@ -390,27 +390,73 @@ class FocusViewModel(
         timestamp: Long = System.currentTimeMillis()
     ) {
         viewModelScope.launch {
+            val userSettings = _uiState.value.userSettings
+            val ns = userSettings.nightscoutSettings
+            val isRu = userSettings.language.equals("RU", ignoreCase = true)
             val hasInsulin = insulinUnits != null && insulinUnits > 0.0
             val hasCarbs = carbsGrams != null && carbsGrams > 0.0
             val hasNotes = !notes.isNullOrBlank()
+            val hasGlucose = glucoseValue != null && glucoseValue > 0.0
 
-            if (hasInsulin || hasCarbs || hasNotes) {
-                val treatment = Treatment(
-                    timestamp = timestamp,
-                    insulinUnits = if (hasInsulin) insulinUnits else null,
-                    carbsGrams = if (hasCarbs) carbsGrams else null,
+            if (!hasInsulin && !hasCarbs && !hasNotes && !hasGlucose) return@launch
+
+            // 1. Upload to Nightscout micro-backend if enabled
+            if (ns.isEnabled && ns.isValidUrl) {
+                val uploadResult = com.tirup.app.data.network.NightscoutUploadManager.uploadTreatment(
+                    settings = ns,
+                    insulin = if (hasInsulin) insulinUnits else null,
+                    carbs = if (hasCarbs) carbsGrams else null,
+                    glucose = if (hasGlucose) glucoseValue else null,
+                    unit = userSettings.unit,
                     notes = notes,
-                    source = "TIRUP"
+                    timestamp = timestamp
                 )
-                glucoseRepository.insertTreatment(treatment)
+
+                if (uploadResult.isSuccess) {
+                    val msg = if (ns.requireXdripConfirmation) {
+                        if (isRu) "✓ Отправлено на сервер • Ожидание синхронизации с xDrip+"
+                        else "✓ Sent to server • Waiting for xDrip+ sync"
+                    } else {
+                        if (isRu) "✓ Отправлено на сервер" else "✓ Sent to server"
+                    }
+                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+
+                    // Trigger check of local xDrip after a short grace period
+                    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        kotlinx.coroutines.delay(10_000L)
+                        com.tirup.app.data.receiver.DexdripBroadcastReceiver.syncFromLocalXdrip(context)
+                    }
+                } else {
+                    val err = uploadResult.exceptionOrNull()?.message ?: "Unknown"
+                    android.widget.Toast.makeText(
+                        context,
+                        if (isRu) "⚠️ Ошибка отправки на сервер: $err" else "⚠️ Upload error: $err",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
             }
 
-            // Post to xDrip via broadcast
-            val glucoseMgdl = if (glucoseValue != null && glucoseValue > 0.0) {
-                if (_uiState.value.userSettings.unit == GlucoseUnit.MMOL_L) {
-                    glucoseValue * 18.0182
+            // 2. Local database insertion
+            // If requireXdripConfirmation is false OR Nightscout upload is disabled, insert locally
+            if (!ns.isEnabled || !ns.requireXdripConfirmation) {
+                if (hasInsulin || hasCarbs || hasNotes) {
+                    val treatment = Treatment(
+                        timestamp = timestamp,
+                        insulinUnits = if (hasInsulin) insulinUnits else null,
+                        carbsGrams = if (hasCarbs) carbsGrams else null,
+                        notes = notes,
+                        source = "TIRUP"
+                    )
+                    glucoseRepository.insertTreatment(treatment)
+                }
+            }
+
+            // 3. Post to xDrip via local broadcast as extra attempt
+            val glucoseMgdl = if (hasGlucose) {
+                if (userSettings.unit == GlucoseUnit.MMOL_L) {
+                    glucoseValue!! * 18.0182
                 } else {
-                    glucoseValue
+                    glucoseValue!!
                 }
             } else null
 
