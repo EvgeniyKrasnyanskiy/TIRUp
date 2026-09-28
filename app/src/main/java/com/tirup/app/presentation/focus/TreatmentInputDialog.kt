@@ -141,9 +141,9 @@ fun TreatmentInputBottomSheet(
 
     val quickNotes = remember(isRu) {
         if (isRu) {
-            listOf("Завтрак", "Обед", "Ужин", "Еда", "Канюля", "Ланцет", "Сенсор")
+            listOf("Завтрак", "Обед", "Ужин", "Канюля", "Ланцет", "Сенсор")
         } else {
-            listOf("Breakfast", "Lunch", "Dinner", "Food", "Cannula", "Lancet", "Sensor")
+            listOf("Breakfast", "Lunch", "Dinner", "Cannula", "Lancet", "Sensor")
         }
     }
 
