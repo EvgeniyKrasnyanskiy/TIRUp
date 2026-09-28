@@ -68,6 +68,17 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.rememberCoroutineScope
+import com.tirup.app.domain.model.XdripLanSettings
+import com.tirup.app.domain.model.XdripLanStatus
+import com.tirup.app.domain.model.LanConnectionState
+import com.tirup.app.data.network.XdripLanManager
+import com.tirup.app.data.network.XdripLanClient
+import kotlinx.coroutines.launch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -145,6 +156,10 @@ fun FocusScreen(
     val broadcastRemainingSec by BleBroadcaster.broadcastRemainingSec.collectAsState()
     val nextHeartbeatRemainingSec by BleBroadcaster.nextHeartbeatRemainingSec.collectAsState()
     val boostRemainingSec by BleObserverManager.boostRemainingSec.collectAsState()
+    val lanStatus by XdripLanManager.statusFlow.collectAsState()
+    val isLanDiscovering by XdripLanManager.isDiscoveringFlow.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
+    var showLanStatusDialog by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
     val userSettings = state.userSettings
@@ -296,6 +311,8 @@ fun FocusScreen(
             val isMasterBatteryStale = packetAgeMinutes >= 5
             val masterBattery = if (isObserver && heroBleSettings.lastMasterBattery in 0..100 && !isMasterBatteryStale) {
                 heroBleSettings.lastMasterBattery
+            } else if (userSettings.xdripLanSettings.isEnabled && lanStatus.masterBattery != null && lanStatus.masterBattery in 0..100) {
+                lanStatus.masterBattery
             } else null
 
             HeroGlucoseCard(
@@ -378,6 +395,9 @@ fun FocusScreen(
                 broadcastRemainingSec = broadcastRemainingSec,
                 nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
                 blePacketReceivedAt = blePacketReceivedAt,
+                xdripLanSettings = userSettings.xdripLanSettings,
+                lanStatus = lanStatus,
+                isLanDiscovering = isLanDiscovering,
                 dailyAlertsCount = dailyAlertLogs.size,
                 areAlertsMuted = run {
                     val a = userSettings.alertSettings
@@ -386,9 +406,19 @@ fun FocusScreen(
                     isPaused || !a.isAlertsMasterEnabled || (!a.isPredictiveEnabled && !a.isMainEnabled && !a.isSignalLossEnabled && !a.isLastChanceAlertEnabled)
                 },
                 onAlertHistoryClick = { showDailyAlertLogsDialog = true },
+                onLanClick = { showLanStatusDialog = true },
                 onBatteryClick = {
-                    val title = if (isRu) "Заряд батареи вещателя" else "Broadcaster Battery"
-                    val ageMins = if (heroBleSettings.lastPacketTimestamp > 0L) {
+                    val isFromLan = (masterBattery != null && (!isObserver || isMasterBatteryStale) && userSettings.xdripLanSettings.isEnabled)
+                    val title = if (isFromLan) {
+                        if (isRu) "Заряд батареи мастера (Wi-Fi)" else "Master Battery (Wi-Fi)"
+                    } else {
+                        if (isRu) "Заряд батареи вещателя (BLE)" else "Broadcaster Battery (BLE)"
+                    }
+                    val ageMins = if (isFromLan) {
+                        if (lanStatus.lastSuccessTimestamp > 0L) {
+                            (System.currentTimeMillis() - lanStatus.lastSuccessTimestamp) / 60000L
+                        } else null
+                    } else if (heroBleSettings.lastPacketTimestamp > 0L) {
                         (System.currentTimeMillis() - heroBleSettings.lastPacketTimestamp) / 60000L
                     } else null
                     val dataReceivedStr = if (ageMins != null) {
@@ -1209,6 +1239,33 @@ fun FocusScreen(
         )
     }
 
+    if (showLanStatusDialog) {
+        val xdripLan = userSettings.xdripLanSettings
+        LanStatusDialog(
+            xdripLan = xdripLan,
+            lanStatus = lanStatus,
+            isDiscovering = isLanDiscovering,
+            isRu = isRu,
+            onSearchClick = {
+                coroutineScope.launch {
+                    val res = XdripLanClient.discoverMaster(context, xdripLan.port, xdripLan.apiSecret)
+                    val discovered = res.getOrNull()
+                    if (discovered != null) {
+                        viewModel.updateXdripLanSettings(xdripLan.copy(masterHost = discovered))
+                        Toast.makeText(context, if (isRu) "Мастер найден: $discovered" else "Found master: $discovered", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, if (isRu) "Мастер не найден в подсети" else "Master not found in LAN", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onOpenSettings = {
+                showLanStatusDialog = false
+                onOpenSettings("wifi_lan")
+            },
+            onDismiss = { showLanStatusDialog = false }
+        )
+    }
+
     if (showBleStatusDialog) {
         val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         val isBtOn = bluetoothManager?.adapter?.isEnabled == true
@@ -1242,6 +1299,250 @@ fun FocusScreen(
             onDismiss = { showBleStatusDialog = false }
         )
     }
+}
+
+private data class LanBadgeStyle(
+    val bg: Color,
+    val borderColor: Color,
+    val iconColor: Color,
+    val statusText: String
+)
+
+@Composable
+private fun WifiLanBadge(
+    xdripLan: XdripLanSettings,
+    lanStatus: XdripLanStatus,
+    isDiscovering: Boolean,
+    isRu: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (!xdripLan.isEnabled) return
+
+    val style = when {
+        isDiscovering || lanStatus.state == LanConnectionState.CONNECTING -> LanBadgeStyle(
+            bg = ActionBlue.copy(alpha = 0.15f),
+            borderColor = ActionBlue.copy(alpha = 0.45f),
+            iconColor = ActionBlue,
+            statusText = if (isRu) "Поиск" else "Scan"
+        )
+        lanStatus.state == LanConnectionState.CONNECTED -> LanBadgeStyle(
+            bg = PrimaryEmerald.copy(alpha = 0.15f),
+            borderColor = PrimaryEmerald.copy(alpha = 0.45f),
+            iconColor = PrimaryEmerald,
+            statusText = "LAN"
+        )
+        lanStatus.state == LanConnectionState.ERROR -> LanBadgeStyle(
+            bg = ColorVeryLow.copy(alpha = 0.15f),
+            borderColor = ColorVeryLow.copy(alpha = 0.45f),
+            iconColor = ColorVeryLow,
+            statusText = if (isRu) "Сбой" else "Err"
+        )
+        else -> LanBadgeStyle(
+            bg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+            iconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            statusText = if (isRu) "Офлайн" else "Off"
+        )
+    }
+
+    Surface(
+        modifier = modifier
+            .height(24.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(8.dp),
+        color = style.bg,
+        border = BorderStroke(0.8.dp, style.borderColor)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Icon(
+                imageVector = if (lanStatus.state == LanConnectionState.DISCONNECTED) Icons.Default.WifiOff else Icons.Default.Wifi,
+                contentDescription = if (isRu) "Wi-Fi LAN" else "Wi-Fi LAN",
+                tint = style.iconColor,
+                modifier = Modifier.size(13.dp)
+            )
+            Text(
+                text = style.statusText,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp,
+                color = style.iconColor
+            )
+        }
+    }
+}
+
+@Composable
+private fun LanStatusDialog(
+    xdripLan: XdripLanSettings,
+    lanStatus: XdripLanStatus,
+    isDiscovering: Boolean,
+    isRu: Boolean,
+    onSearchClick: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val statusTitle = when (lanStatus.state) {
+        LanConnectionState.CONNECTED -> if (isRu) "Wi-Fi LAN: Подключен" else "Wi-Fi LAN: Connected"
+        LanConnectionState.CONNECTING -> if (isRu) "Wi-Fi LAN: Поиск мастера..." else "Wi-Fi LAN: Connecting..."
+        LanConnectionState.ERROR -> if (isRu) "Wi-Fi LAN: Ошибка связи" else "Wi-Fi LAN: Error"
+        LanConnectionState.DISCONNECTED -> if (isRu) "Wi-Fi LAN: Офлайн (нет Wi-Fi)" else "Wi-Fi LAN: Offline"
+        LanConnectionState.DISABLED -> if (isRu) "Wi-Fi LAN: Отключен" else "Wi-Fi LAN: Disabled"
+    }
+
+    val statusColor = when (lanStatus.state) {
+        LanConnectionState.CONNECTED -> PrimaryEmerald
+        LanConnectionState.CONNECTING -> ActionBlue
+        LanConnectionState.ERROR -> ColorVeryLow
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("📡", fontSize = 20.sp)
+                Text(
+                    text = statusTitle,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = statusColor
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (isRu) "IP мастера:" else "Master IP:",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = if (xdripLan.masterHost.isNotBlank()) "${xdripLan.cleanHost}:${xdripLan.port}" + (if (xdripLan.isAutoDiscovery) " (Авто)" else "") else if (isRu) "Автопоиск..." else "Auto-discovery...",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        if (lanStatus.masterBattery != null) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (isRu) "Батарея мастера:" else "Master battery:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "🔋 ${lanStatus.masterBattery}%",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PrimaryEmerald
+                                )
+                            }
+                        }
+
+                        if (lanStatus.lastSuccessTimestamp > 0L) {
+                            val diffMins = ((System.currentTimeMillis() - lanStatus.lastSuccessTimestamp) / 60000L).coerceAtLeast(0)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (isRu) "Последний замер:" else "Last reading:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = if (diffMins == 0L) (if (isRu) "Только что" else "Just now") else (if (isRu) "$diffMins мин. назад" else "$diffMins m ago"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        if (lanStatus.errorMessage != null && lanStatus.state == LanConnectionState.ERROR) {
+                            Text(
+                                text = "⚠️ ${lanStatus.errorMessage}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    text = if (isRu) {
+                        "Прямой приём сахара, тренда, IoB, CoB и заряда батареи от телефона мастера по Wi-Fi или точке доступа (порт 17580)."
+                    } else {
+                        "Direct BG, trend, IoB, CoB and master battery telemetry from master phone via LAN/Hotspot (port 17580)."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 16.sp
+                )
+            }
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = onSearchClick,
+                    enabled = !isDiscovering,
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    if (isDiscovering) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = PrimaryEmerald
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (isRu) "Поиск..." else "Scanning...")
+                    } else {
+                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (isRu) "Найти" else "Scan")
+                    }
+                }
+
+                Button(
+                    onClick = onOpenSettings,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
+                ) {
+                    Text(if (isRu) "Настройки" else "Settings")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(if (isRu) "Закрыть" else "Close")
+            }
+        }
+    )
 }
 
 @Composable
@@ -1901,6 +2202,9 @@ private fun HeroGlucoseCard(
     broadcastRemainingSec: Int = 0,
     nextHeartbeatRemainingSec: Int = 300,
     blePacketReceivedAt: Long = 0L,
+    xdripLanSettings: com.tirup.app.domain.model.XdripLanSettings? = null,
+    lanStatus: com.tirup.app.domain.model.XdripLanStatus? = null,
+    isLanDiscovering: Boolean = false,
     dailyAlertsCount: Int = 0,
     areAlertsMuted: Boolean = false,
     lastImportantMessage: LastImportantMessage? = null,
@@ -1908,6 +2212,7 @@ private fun HeroGlucoseCard(
     onDismissImportantMessage: () -> Unit = {},
     onAlertHistoryClick: () -> Unit = {},
     onBatteryClick: () -> Unit = {},
+    onLanClick: () -> Unit = {},
     onIobClick: () -> Unit = {},
     onCobClick: () -> Unit = {},
     onBleClick: () -> Unit = {},
@@ -2058,7 +2363,7 @@ private fun HeroGlucoseCard(
             val hasCob = (latestReading?.cob != null && latestReading.cob > 0.0)
             val hasBattery = masterBatteryPct != null && masterBatteryPct in 0..100 && !isMasterBatteryStale
 
-            // Header Row: [ Bell History ] --- [ Badges: Battery/IoB/CoB ] --- [ BLE Master pulse ]
+            // Header Row: Symmetrical status chips [ Bell + Wi-Fi LAN ] --- [ Battery/IoB/CoB ] --- [ BLE Bridge + AoD ]
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2066,27 +2371,43 @@ private fun HeroGlucoseCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left: Alert History Bell
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = if (dailyAlertsCount > 0) ColorHigh.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                    border = BorderStroke(0.8.dp, if (dailyAlertsCount > 0) ColorHigh.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
-                    modifier = Modifier.clickable { onAlertHistoryClick() }
+                // Left: Alert History Bell & Wi-Fi LAN Follower Badge
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (dailyAlertsCount > 0) ColorHigh.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                        border = BorderStroke(0.8.dp, if (dailyAlertsCount > 0) ColorHigh.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                        modifier = Modifier.clickable { onAlertHistoryClick() }
                     ) {
-                        Text(text = if (areAlertsMuted) "🔕" else "🔔", fontSize = if (areAlertsMuted) 14.5.sp else 12.sp)
-                        if (dailyAlertsCount > 0) {
-                            Text(
-                                text = "$dailyAlertsCount",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = ColorHigh
-                            )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Text(text = if (areAlertsMuted) "🔕" else "🔔", fontSize = if (areAlertsMuted) 13.sp else 11.5.sp)
+                            if (dailyAlertsCount > 0) {
+                                Text(
+                                    text = "$dailyAlertsCount",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    color = ColorHigh
+                                )
+                            }
                         }
+                    }
+
+                    if (xdripLanSettings != null && xdripLanSettings.isEnabled) {
+                        WifiLanBadge(
+                            xdripLan = xdripLanSettings,
+                            lanStatus = lanStatus ?: com.tirup.app.domain.model.XdripLanStatus(),
+                            isDiscovering = isLanDiscovering,
+                            isRu = isRu,
+                            onClick = onLanClick
+                        )
                     }
                 }
 
@@ -2109,16 +2430,17 @@ private fun HeroGlucoseCard(
                         ) {
                             Text(
                                 text = "🔋 $masterBatteryPct%",
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
                                 color = color
                             )
                         }
                     }
 
                     if (hasIob) {
-                        if (hasBattery) Spacer(modifier = Modifier.width(5.dp))
+                        if (hasBattery) Spacer(modifier = Modifier.width(4.dp))
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = ActionBlue.copy(alpha = 0.12f),
@@ -2127,16 +2449,17 @@ private fun HeroGlucoseCard(
                         ) {
                             Text(
                                 text = String.format(Locale.US, if (isRu) "💉 %.2f Ед" else "💉 %.2f U", latestReading!!.iob),
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
                                 color = ActionBlue
                             )
                         }
                     }
 
                     if (hasCob) {
-                        if (hasIob || hasBattery) Spacer(modifier = Modifier.width(5.dp))
+                        if (hasIob || hasBattery) Spacer(modifier = Modifier.width(4.dp))
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = PrimaryEmerald.copy(alpha = 0.12f),
@@ -2145,9 +2468,10 @@ private fun HeroGlucoseCard(
                         ) {
                             Text(
                                 text = String.format(Locale.US, if (isRu) "🍞 %.0f г" else "🍞 %.0f g", latestReading!!.cob),
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
                                 color = PrimaryEmerald
                             )
                         }
@@ -2172,7 +2496,7 @@ private fun HeroGlucoseCard(
                     }
                     Surface(
                         modifier = Modifier
-                            .size(width = 30.dp, height = 24.dp)
+                            .size(width = 28.dp, height = 24.dp)
                             .clickable { onAodClick() },
                         shape = RoundedCornerShape(8.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
@@ -2184,7 +2508,7 @@ private fun HeroGlucoseCard(
                         ) {
                             Text(
                                 text = "🌙",
-                                fontSize = 12.sp
+                                fontSize = 11.5.sp
                             )
                         }
                     }

@@ -659,4 +659,11 @@ class FocusViewModel(
             }
         }
     }
+
+    fun updateXdripLanSettings(lan: com.tirup.app.domain.model.XdripLanSettings) {
+        viewModelScope.launch {
+            val current = settingsRepository.getSettings().firstOrNull() ?: return@launch
+            settingsRepository.updateSettings(current.copy(xdripLanSettings = lan))
+        }
+    }
 }

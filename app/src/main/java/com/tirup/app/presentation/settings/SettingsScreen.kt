@@ -304,6 +304,11 @@ fun SettingsScreen(
             highlightBle = true
             delay(2800L)
             highlightBle = false
+        } else if (target == "wifi_lan" || target == "xdrip_lan") {
+            showAdvancedSettings = true
+            isLanCardExpanded = true
+            delay(150L)
+            listState.animateScrollToItem(5)
         } else if (target == "hba1c") {
             viewModel.toggleHba1cDialog(true)
         }
