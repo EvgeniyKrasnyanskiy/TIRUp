@@ -17,6 +17,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <!-- Storage Permissions for Local Offline Backup & Discovery -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" tools:ignore="ScopedStorage" />
@@ -149,6 +151,7 @@
                 <action android:name="com.tirup.app.ACTION_DISMISS_CRITICAL" />
                 <action android:name="com.tirup.app.ACTION_LAUNCH_DIANIGHT" />
                 <action android:name="com.tirup.app.ACTION_CHECK_SIGNAL_LOSS" />
+                <action android:name="com.tirup.app.ACTION_POLL_XDRIP_LAN" />
                 <action android:name="com.tirup.app.ACTION_SKIP_HBA1C_QUARTER" />
             </intent-filter>
         </receiver>

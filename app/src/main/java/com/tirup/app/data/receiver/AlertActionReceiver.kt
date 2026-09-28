@@ -92,6 +92,24 @@ class AlertActionReceiver : BroadcastReceiver() {
             ACTION_DISMISS_CAREGIVER_SOS -> {
                 com.tirup.app.data.alert.CaregiverSosAlarmManager.dismissSosAlarm(context)
             }
+            ACTION_POLL_XDRIP_LAN -> {
+                val pendingResult = goAsync()
+                scope.launch {
+                    val pm = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+                    val wakeLock = pm?.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "TIRUp:LanPollWakeLock")
+                    wakeLock?.acquire(8000L)
+                    try {
+                        com.tirup.app.data.network.XdripLanManager.pollNow()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed ACTION_POLL_XDRIP_LAN: ${e.message}", e)
+                    } finally {
+                        try {
+                            if (wakeLock?.isHeld == true) wakeLock.release()
+                        } catch (_: Exception) {}
+                        pendingResult.finish()
+                    }
+                }
+            }
         }
     }
 
@@ -102,5 +120,7 @@ class AlertActionReceiver : BroadcastReceiver() {
         const val ACTION_CHECK_SIGNAL_LOSS = "com.tirup.app.ACTION_CHECK_SIGNAL_LOSS"
         const val ACTION_SKIP_HBA1C_QUARTER = "com.tirup.app.ACTION_SKIP_HBA1C_QUARTER"
         const val ACTION_DISMISS_CAREGIVER_SOS = "com.tirup.app.ACTION_DISMISS_CAREGIVER_SOS"
+        const val ACTION_POLL_XDRIP_LAN = "com.tirup.app.ACTION_POLL_XDRIP_LAN"
+        const val REQUEST_CODE_POLL_LAN = 1005
     }
 }
