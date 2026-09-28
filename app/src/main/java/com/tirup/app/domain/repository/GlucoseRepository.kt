@@ -15,6 +15,14 @@ interface GlucoseRepository {
     fun getStreakDays(): Flow<Int>
     suspend fun insertReading(reading: GlucoseReading)
     suspend fun insertReadingsBatch(readings: List<GlucoseReading>)
+    suspend fun insertReadingFromSource(
+        reading: GlucoseReading,
+        priority: com.tirup.app.domain.model.DataSourcePriority = com.tirup.app.domain.model.DataSourcePriority.LOCAL_XDRIP
+    )
+    suspend fun insertReadingsBatchFromSource(
+        readings: List<GlucoseReading>,
+        priority: com.tirup.app.domain.model.DataSourcePriority = com.tirup.app.domain.model.DataSourcePriority.LOCAL_XDRIP
+    )
     suspend fun insertTreatment(treatment: Treatment): Long
     suspend fun insertTreatmentsBatch(treatments: List<Treatment>)
     suspend fun recalculateDailySummaries(startDate: Long, endDate: Long)

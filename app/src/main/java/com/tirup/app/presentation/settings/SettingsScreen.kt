@@ -14,9 +14,13 @@ import com.tirup.app.presentation.settings.dialogs.PredictiveHorizonDialog
 import com.tirup.app.presentation.settings.dialogs.PredictiveInfoDialog
 import com.tirup.app.presentation.settings.dialogs.YearEndDigestDialog
 import com.tirup.app.presentation.settings.dialogs.NightscoutSettingsDialog
+import com.tirup.app.presentation.settings.dialogs.XdripLanSettingsDialog
 import com.tirup.app.data.network.NightscoutUploadManager
+import com.tirup.app.data.network.XdripLanClient
+import com.tirup.app.data.network.XdripLanManager
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Wifi
 
 
 
@@ -223,6 +227,7 @@ fun SettingsScreen(
     var showRestoreOptionsModal by rememberSaveable { mutableStateOf(false) }
     var showBleRangeHelpDialog by rememberSaveable { mutableStateOf(false) }
     var showNightscoutDialog by rememberSaveable { mutableStateOf(false) }
+    var showXdripLanDialog by rememberSaveable { mutableStateOf(false) }
     val isDevTestsUnlocked by viewModel.isDevTestsUnlocked.collectAsState()
     var devTapCount by remember { mutableStateOf(0) }
     var lastDevTapTime by remember { mutableStateOf(0L) }
@@ -4706,6 +4711,251 @@ fun SettingsScreen(
                         )
                     }
                 }
+
+                // Section: Developer Mode - Wi-Fi LAN Follower (xDrip+) Block
+                val xdripLan = settings.xdripLanSettings
+                val lanStatus by XdripLanManager.statusFlow.collectAsState()
+                var isTestingLan by remember { mutableStateOf(false) }
+                var lanTestStatus by remember { mutableStateOf<String?>(null) }
+                var isLanTestSuccess by remember { mutableStateOf(false) }
+                val lanScope = rememberCoroutineScope()
+
+                BentoCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 2.dp, vertical = 2.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(text = "📡", fontSize = 18.sp)
+                                Column {
+                                    Text(
+                                        text = if (isRu) "Wi-Fi LAN Follower" else "Wi-Fi LAN Follower",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ActionBlue
+                                    )
+                                    Text(
+                                        text = if (isRu) "Прямой приём от мастера xDrip+ (порт 17580)" else "Direct xDrip+ master feed (port 17580)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Switch(
+                                checked = xdripLan.isEnabled,
+                                onCheckedChange = { viewModel.setXdripLanEnabled(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = PrimaryEmerald
+                                )
+                            )
+                        }
+
+                        // Host info & live status
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (isRu) "IP мастера:" else "Master IP:",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = if (xdripLan.masterHost.isNotBlank()) "${xdripLan.cleanHost}:${xdripLan.port}" else if (isRu) "Не задан" else "Not set",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (xdripLan.masterHost.isNotBlank()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (isRu) "Статус связи:" else "Connection status:",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    val statusColor = when (lanStatus.state) {
+                                        com.tirup.app.domain.model.LanConnectionState.CONNECTED -> PrimaryEmerald
+                                        com.tirup.app.domain.model.LanConnectionState.CONNECTING -> ActionBlue
+                                        com.tirup.app.domain.model.LanConnectionState.ERROR -> MaterialTheme.colorScheme.error
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                    val statusLabel = when (lanStatus.state) {
+                                        com.tirup.app.domain.model.LanConnectionState.CONNECTED -> if (isRu) "✓ Подключен" else "✓ Connected"
+                                        com.tirup.app.domain.model.LanConnectionState.CONNECTING -> if (isRu) "⏳ Поиск..." else "⏳ Connecting..."
+                                        com.tirup.app.domain.model.LanConnectionState.ERROR -> if (isRu) "⚠️ Ошибка связи" else "⚠️ Conn Error"
+                                        com.tirup.app.domain.model.LanConnectionState.DISCONNECTED -> if (isRu) "Офлайн (нет Wi-Fi)" else "Offline (No Wi-Fi)"
+                                        com.tirup.app.domain.model.LanConnectionState.DISABLED -> if (isRu) "Выключен" else "Disabled"
+                                    }
+                                    Text(
+                                        text = statusLabel,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = statusColor
+                                    )
+                                }
+
+                                if (lanStatus.masterBattery != null) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = if (isRu) "Батарея мастера:" else "Master Battery:",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = "🔋 ${lanStatus.masterBattery}%",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = PrimaryEmerald
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Test status result if available
+                        if (lanTestStatus != null) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isLanTestSuccess) PrimaryEmerald.copy(alpha = 0.12f) else MaterialTheme.colorScheme.error.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, if (isLanTestSuccess) PrimaryEmerald.copy(alpha = 0.4f) else MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(text = if (isLanTestSuccess) "✓" else "⚠️", fontSize = 14.sp)
+                                    Text(
+                                        text = lanTestStatus!!,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (isLanTestSuccess) PrimaryEmerald else MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+
+                        // Action Buttons: Configure & Ping
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                onClick = { showXdripLanDialog = true },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.7f))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = ActionBlue
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isRu) "Настройки" else "Configure",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = ActionBlue
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    if (xdripLan.masterHost.isBlank()) {
+                                        Toast.makeText(context, if (isRu) "Укажите IP мастера в настройках" else "Specify master IP", Toast.LENGTH_SHORT).show()
+                                        return@OutlinedButton
+                                    }
+                                    isTestingLan = true
+                                    lanTestStatus = null
+                                    lanScope.launch {
+                                        val res = XdripLanClient.testConnection(xdripLan)
+                                        isTestingLan = false
+                                        if (res.isSuccess) {
+                                            val d = res.getOrNull()!!
+                                            isLanTestSuccess = true
+                                            lanTestStatus = d.message
+                                        } else {
+                                            isLanTestSuccess = false
+                                            lanTestStatus = res.exceptionOrNull()?.message ?: "Error"
+                                        }
+                                    }
+                                },
+                                enabled = !isTestingLan && xdripLan.masterHost.isNotBlank(),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, PrimaryEmerald.copy(alpha = 0.7f))
+                            ) {
+                                if (isTestingLan) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp,
+                                        color = PrimaryEmerald
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isRu) "Связь..." else "Pinging...",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = PrimaryEmerald
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Wifi,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = PrimaryEmerald
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isRu) "Проверить" else "Ping",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = PrimaryEmerald
+                                    )
+                                }
+                            }
+                        }
+
+                        // Descriptive note
+                        Text(
+                            text = if (isRu)
+                                "💡 Прямой опрос телефона мастера по Wi-Fi или Hotspot на порт 17580. Получает сахар, тренд, IoB, CoB и заряд батареи мастера без интернета."
+                            else
+                                "💡 Direct Wi-Fi or Hotspot follower querying master on port 17580. Pulls BG, trend, IoB, CoB and master battery without internet.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
             }
 
         // Section: Collapse Advanced Settings Footer
@@ -5362,6 +5612,17 @@ fun SettingsScreen(
             onDismiss = { showNightscoutDialog = false },
             onSave = { updated ->
                 viewModel.updateNightscoutSettings(updated)
+            }
+        )
+    }
+
+    if (showXdripLanDialog) {
+        XdripLanSettingsDialog(
+            initialSettings = settings.xdripLanSettings,
+            isRu = isRu,
+            onDismiss = { showXdripLanDialog = false },
+            onSave = { updated ->
+                viewModel.updateXdripLanSettings(updated)
             }
         )
     }

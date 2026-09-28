@@ -504,6 +504,24 @@ class SettingsViewModel(
         }
     }
 
+    fun updateXdripLanSettings(settings: com.tirup.app.domain.model.XdripLanSettings) {
+        val current = _uiState.value.userSettings
+        viewModelScope.launch {
+            val updated = current.copy(xdripLanSettings = settings)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+        }
+    }
+
+    fun setXdripLanEnabled(enabled: Boolean) {
+        val current = _uiState.value.userSettings
+        viewModelScope.launch {
+            val updated = current.copy(xdripLanSettings = current.xdripLanSettings.copy(isEnabled = enabled))
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+        }
+    }
+
     fun startBleRangeTest(durationSec: Int = 5) {
         viewModelScope.launch {
             val isRu = _uiState.value.userSettings.language.equals("RU", ignoreCase = true)

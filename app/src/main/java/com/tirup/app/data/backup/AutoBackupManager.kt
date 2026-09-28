@@ -17,6 +17,7 @@ import com.tirup.app.domain.model.BleBridgeSettings
 import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.domain.model.LancetStatus
 import com.tirup.app.domain.model.NightscoutSettings
+import com.tirup.app.domain.model.XdripLanSettings
 import com.tirup.app.domain.model.PatientProfile
 import com.tirup.app.domain.model.PumpSetStatus
 import com.tirup.app.domain.model.SensorStatus
@@ -665,6 +666,17 @@ object AutoBackupManager {
         writer.name("serverUrl").value(ns.serverUrl)
         writer.name("apiSecret").value(ns.apiSecret)
         writer.name("requireXdripConfirmation").value(ns.requireXdripConfirmation)
+        writer.endObject()
+
+        // xDrip+ LAN Settings
+        val lan = settings.xdripLanSettings
+        writer.name("xdripLanSettings")
+        writer.beginObject()
+        writer.name("isEnabled").value(lan.isEnabled)
+        writer.name("masterHost").value(lan.masterHost)
+        writer.name("port").value(lan.port)
+        writer.name("apiSecret").value(lan.apiSecret)
+        writer.name("pollIntervalSeconds").value(lan.pollIntervalSeconds)
         writer.endObject()
 
         // HbA1c Lab Records
@@ -1868,6 +1880,7 @@ object AutoBackupManager {
         var alertSettings = AlertSettings()
         var bleBridgeSettings = BleBridgeSettings()
         var nightscoutSettings = NightscoutSettings()
+        var xdripLanSettings = XdripLanSettings()
 
         var isDeviceReminders = true
         var isSensorReminder = true
@@ -2013,6 +2026,32 @@ object AutoBackupManager {
                         serverUrl = serverUrl,
                         apiSecret = apiSecret,
                         requireXdripConfirmation = requireXdripConfirmation
+                    )
+                }
+                "xdripLanSettings" -> {
+                    var isEnabled = false
+                    var masterHost = ""
+                    var port = 17580
+                    var apiSecret = ""
+                    var pollIntervalSeconds = 60
+                    reader.beginObject()
+                    while (reader.hasNext()) {
+                        when (reader.nextName()) {
+                            "isEnabled" -> isEnabled = reader.nextBoolean()
+                            "masterHost" -> masterHost = reader.nextString()
+                            "port" -> port = reader.nextInt()
+                            "apiSecret" -> apiSecret = reader.nextString()
+                            "pollIntervalSeconds" -> pollIntervalSeconds = reader.nextInt()
+                            else -> reader.skipValue()
+                        }
+                    }
+                    reader.endObject()
+                    xdripLanSettings = XdripLanSettings(
+                        isEnabled = isEnabled,
+                        masterHost = masterHost,
+                        port = port,
+                        apiSecret = apiSecret,
+                        pollIntervalSeconds = pollIntervalSeconds
                     )
                 }
                 "isDeviceRemindersEnabled" -> isDeviceReminders = reader.nextBoolean()
@@ -2162,7 +2201,8 @@ object AutoBackupManager {
             metricsOrder = metricsOrder,
             hiddenMetrics = hiddenMetrics,
             hasSeenOnboarding = true,
-            nightscoutSettings = nightscoutSettings
+            nightscoutSettings = nightscoutSettings,
+            xdripLanSettings = xdripLanSettings
         )
     }
 

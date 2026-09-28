@@ -201,6 +201,11 @@ class SettingsRepositoryImpl(
             .putString(KEY_NIGHTSCOUT_SERVER_URL, settings.nightscoutSettings.serverUrl)
             .putString(KEY_NIGHTSCOUT_API_SECRET, settings.nightscoutSettings.apiSecret)
             .putBoolean(KEY_NIGHTSCOUT_REQUIRE_XDRIP_CONFIRM, settings.nightscoutSettings.requireXdripConfirmation)
+            .putBoolean(KEY_XDRIP_LAN_IS_ENABLED, settings.xdripLanSettings.isEnabled)
+            .putString(KEY_XDRIP_LAN_MASTER_HOST, settings.xdripLanSettings.masterHost)
+            .putInt(KEY_XDRIP_LAN_PORT, settings.xdripLanSettings.port)
+            .putString(KEY_XDRIP_LAN_API_SECRET, settings.xdripLanSettings.apiSecret)
+            .putInt(KEY_XDRIP_LAN_POLL_INTERVAL, settings.xdripLanSettings.pollIntervalSeconds)
             .apply()
 
         try {
@@ -518,6 +523,13 @@ class SettingsRepositoryImpl(
                 serverUrl = prefs.getString(KEY_NIGHTSCOUT_SERVER_URL, "") ?: "",
                 apiSecret = prefs.getString(KEY_NIGHTSCOUT_API_SECRET, "") ?: "",
                 requireXdripConfirmation = prefs.getBoolean(KEY_NIGHTSCOUT_REQUIRE_XDRIP_CONFIRM, true)
+            ),
+            xdripLanSettings = com.tirup.app.domain.model.XdripLanSettings(
+                isEnabled = prefs.getBoolean(KEY_XDRIP_LAN_IS_ENABLED, false),
+                masterHost = prefs.getString(KEY_XDRIP_LAN_MASTER_HOST, "") ?: "",
+                port = prefs.getInt(KEY_XDRIP_LAN_PORT, 17580),
+                apiSecret = prefs.getString(KEY_XDRIP_LAN_API_SECRET, "") ?: "",
+                pollIntervalSeconds = prefs.getInt(KEY_XDRIP_LAN_POLL_INTERVAL, 60)
             )
         )
     }
@@ -533,6 +545,12 @@ class SettingsRepositoryImpl(
         private const val KEY_NIGHTSCOUT_SERVER_URL = "key_nightscout_server_url"
         private const val KEY_NIGHTSCOUT_API_SECRET = "key_nightscout_api_secret"
         private const val KEY_NIGHTSCOUT_REQUIRE_XDRIP_CONFIRM = "key_nightscout_require_xdrip_confirm"
+
+        private const val KEY_XDRIP_LAN_IS_ENABLED = "key_xdrip_lan_is_enabled"
+        private const val KEY_XDRIP_LAN_MASTER_HOST = "key_xdrip_lan_master_host"
+        private const val KEY_XDRIP_LAN_PORT = "key_xdrip_lan_port"
+        private const val KEY_XDRIP_LAN_API_SECRET = "key_xdrip_lan_api_secret"
+        private const val KEY_XDRIP_LAN_POLL_INTERVAL = "key_xdrip_lan_poll_interval"
 
         private const val KEY_LANG = "key_language"
         private const val KEY_UNIT = "key_unit"

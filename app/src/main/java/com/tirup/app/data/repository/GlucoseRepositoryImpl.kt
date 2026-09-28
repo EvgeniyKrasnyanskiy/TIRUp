@@ -77,7 +77,18 @@ class GlucoseRepositoryImpl(
         }
     }
 
-    override suspend fun insertReading(reading: GlucoseReading) = withContext(Dispatchers.IO) {
+    override suspend fun insertReading(reading: GlucoseReading) {
+        insertReadingFromSource(reading, com.tirup.app.domain.model.DataSourcePriority.LOCAL_XDRIP)
+    }
+
+    override suspend fun insertReadingsBatch(readings: List<GlucoseReading>) {
+        insertReadingsBatchFromSource(readings, com.tirup.app.domain.model.DataSourcePriority.LOCAL_XDRIP)
+    }
+
+    override suspend fun insertReadingFromSource(
+        reading: GlucoseReading,
+        priority: com.tirup.app.domain.model.DataSourcePriority
+    ) = withContext(Dispatchers.IO) {
         val windowMs = 25_000L // 25s window: safe for 1-min CGM cadence, still absorbs duplicate echoes from xDrip broadcast
         val existing = readingDao.getReadingsBetweenSync(
             reading.timestamp - windowMs,
@@ -85,14 +96,16 @@ class GlucoseRepositoryImpl(
         )
         if (existing.isNotEmpty()) {
             val closest = existing.minByOrNull { kotlin.math.abs(it.timestamp - reading.timestamp) }!!
-            // If already exists within 25s, enrich or update it if incoming reading has new or updated info
-            val shouldUpdate = (reading.iob != null && reading.iob != closest.iob) ||
-                               (reading.cob != null && reading.cob != closest.cob) ||
-                               (!reading.trendArrow.isNullOrBlank() && closest.trendArrow.isNullOrBlank())
-            if (shouldUpdate) {
+            // Check if we should enrich or update based on priority and missing fields
+            val shouldEnrichIob = reading.iob != null && reading.iob != closest.iob
+            val shouldEnrichCob = reading.cob != null && reading.cob != closest.cob
+            val shouldEnrichArrow = !reading.trendArrow.isNullOrBlank() && closest.trendArrow.isNullOrBlank()
+            val shouldUpdateValue = priority.rank >= com.tirup.app.domain.model.DataSourcePriority.WIFI_LAN.rank && closest.valueMmol <= 0.0
+
+            if (shouldEnrichIob || shouldEnrichCob || shouldEnrichArrow || shouldUpdateValue) {
                 val merged = closest.copy(
-                    valueMmol = if (reading.valueMmol > 0.0) reading.valueMmol else closest.valueMmol,
-                    trendArrow = reading.trendArrow ?: closest.trendArrow,
+                    valueMmol = if (shouldUpdateValue && reading.valueMmol > 0.0) reading.valueMmol else closest.valueMmol,
+                    trendArrow = if (!reading.trendArrow.isNullOrBlank()) reading.trendArrow else closest.trendArrow,
                     iob = reading.iob ?: closest.iob,
                     cob = reading.cob ?: closest.cob
                 )
@@ -109,25 +122,41 @@ class GlucoseRepositoryImpl(
         recalculateDailySummaries(startOfDay, endOfDay)
     }
 
-    override suspend fun insertReadingsBatch(readings: List<GlucoseReading>) = withContext(Dispatchers.IO) {
+    override suspend fun insertReadingsBatchFromSource(
+        readings: List<GlucoseReading>,
+        priority: com.tirup.app.domain.model.DataSourcePriority
+    ) = withContext(Dispatchers.IO) {
         if (readings.isEmpty()) return@withContext
         val windowMs = 25_000L // 25s window prevents false deduplication of 1-minute CGM readings while eliminating duplicate echoes
-        val filtered = mutableListOf<GlucoseReading>()
+        val toInsert = mutableListOf<GlucoseReading>()
         
         for (r in readings) {
             val existing = readingDao.getReadingsBetweenSync(r.timestamp - windowMs, r.timestamp + windowMs)
-            val alreadyInBatch = filtered.any { kotlin.math.abs(it.timestamp - r.timestamp) < windowMs }
+            val alreadyInBatch = toInsert.any { kotlin.math.abs(it.timestamp - r.timestamp) < windowMs }
             if (existing.isEmpty() && !alreadyInBatch) {
-                filtered.add(r)
+                toInsert.add(r)
+            } else if (existing.isNotEmpty()) {
+                val closest = existing.minByOrNull { kotlin.math.abs(it.timestamp - r.timestamp) }!!
+                val shouldEnrichIob = r.iob != null && r.iob != closest.iob
+                val shouldEnrichCob = r.cob != null && r.cob != closest.cob
+                val shouldEnrichArrow = !r.trendArrow.isNullOrBlank() && closest.trendArrow.isNullOrBlank()
+                if (shouldEnrichIob || shouldEnrichCob || shouldEnrichArrow) {
+                    val merged = closest.copy(
+                        trendArrow = if (!r.trendArrow.isNullOrBlank()) r.trendArrow else closest.trendArrow,
+                        iob = r.iob ?: closest.iob,
+                        cob = r.cob ?: closest.cob
+                    )
+                    readingDao.insert(merged)
+                }
             }
         }
         
-        if (filtered.isNotEmpty()) {
-            val entities = filtered.map { GlucoseReadingEntity.fromDomain(it) }
+        if (toInsert.isNotEmpty()) {
+            val entities = toInsert.map { GlucoseReadingEntity.fromDomain(it) }
             readingDao.insertBatch(entities)
 
-            val minTs = filtered.minOf { it.timestamp }
-            val maxTs = filtered.maxOf { it.timestamp }
+            val minTs = toInsert.minOf { it.timestamp }
+            val maxTs = toInsert.maxOf { it.timestamp }
             recalculateDailySummaries(minTs, maxTs)
         }
     }
