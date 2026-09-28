@@ -13,6 +13,17 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
+import android.content.Context
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+
+data class SubnetInfo(
+    val prefix: String,
+    val gatewayIp: String?,
+    val localIp: String
+)
+
 data class XdripPebbleResult(
     val iob: Double? = null,
     val cob: Double? = null,
@@ -27,6 +38,125 @@ object XdripLanClient {
     private const val TAG = "XdripLanClient"
     private const val CONNECT_TIMEOUT_MS = 3500
     private const val READ_TIMEOUT_MS = 3500
+
+    fun getLocalSubnetInfo(context: Context): SubnetInfo? {
+        try {
+            val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+            val dhcp = wm?.dhcpInfo
+            if (dhcp != null && dhcp.ipAddress != 0) {
+                val ipInt = dhcp.ipAddress
+                val localIp = String.format(java.util.Locale.US, "%d.%d.%d.%d", ipInt and 0xff, ipInt shr 8 and 0xff, ipInt shr 16 and 0xff, ipInt shr 24 and 0xff)
+                val gwInt = dhcp.gateway
+                val gatewayIp = if (gwInt != 0) String.format(java.util.Locale.US, "%d.%d.%d.%d", gwInt and 0xff, gwInt shr 8 and 0xff, gwInt shr 16 and 0xff, gwInt shr 24 and 0xff) else null
+                val prefix = localIp.substringBeforeLast(".") + "."
+                return SubnetInfo(prefix, gatewayIp, localIp)
+            }
+        } catch (_: Exception) {}
+
+        try {
+            val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val ni = interfaces.nextElement()
+                if (!ni.isUp || ni.isLoopback) continue
+                val addrs = ni.inetAddresses
+                while (addrs.hasMoreElements()) {
+                    val addr = addrs.nextElement()
+                    if (!addr.isLoopbackAddress && addr is java.net.Inet4Address) {
+                        val host = addr.hostAddress ?: continue
+                        if (host.startsWith("192.168.") || host.startsWith("10.") || host.startsWith("172.")) {
+                            val prefix = host.substringBeforeLast(".") + "."
+                            return SubnetInfo(prefix, "${prefix}1", host)
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        return null
+    }
+
+    private fun probeSocket(host: String, port: Int, timeoutMs: Int = 800): Boolean {
+        return try {
+            java.net.Socket().use { s ->
+                s.connect(java.net.InetSocketAddress(host, port), timeoutMs)
+                true
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun verifyXdripEndpoint(host: String, port: Int, apiSecret: String): Boolean {
+        var conn: HttpURLConnection? = null
+        return try {
+            val settings = XdripLanSettings(isEnabled = true, masterHost = host, port = port, apiSecret = apiSecret)
+            val url = URL("${settings.baseUrl}/pebble")
+            conn = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 1200
+                readTimeout = 1200
+                requestMethod = "GET"
+                setRequestProperty("Accept", "application/json")
+                if (settings.hashedSecret != null) {
+                    setRequestProperty("api-secret", settings.hashedSecret!!)
+                }
+            }
+            val code = conn.responseCode
+            code in 200..299 || code == 401 || code == 403
+        } catch (_: Exception) {
+            false
+        } finally {
+            conn?.disconnect()
+        }
+    }
+
+    suspend fun discoverMaster(context: Context, port: Int = 17580, apiSecret: String = ""): Result<String> = withContext(Dispatchers.IO) {
+        val subnetInfo = getLocalSubnetInfo(context) ?: return@withContext Result.failure(
+            IllegalStateException("Устройство не подключено к сети Wi-Fi или Hotspot")
+        )
+
+        val foundChannel = kotlinx.coroutines.channels.Channel<String>(1)
+
+        // 1. First probe Gateway (master is almost always at Gateway in Hotspot mode e.g. 192.168.43.1)
+        val gw = subnetInfo.gatewayIp
+        if (!gw.isNullOrBlank() && gw != subnetInfo.localIp) {
+            if (probeSocket(gw, port, 600) && verifyXdripEndpoint(gw, port, apiSecret)) {
+                return@withContext Result.success(gw)
+            }
+        }
+
+        // 2. Parallel sweep of 1..254 with 2.5s overall timeout
+        val scanScope = kotlinx.coroutines.CoroutineScope(Dispatchers.IO + kotlinx.coroutines.SupervisorJob())
+        val jobs = mutableListOf<Job>()
+
+        for (i in 1..254) {
+            val candidateIp = "${subnetInfo.prefix}$i"
+            if (candidateIp == subnetInfo.localIp || candidateIp == gw) continue
+
+            val job = scanScope.launch {
+                if (probeSocket(candidateIp, port, 800)) {
+                    if (verifyXdripEndpoint(candidateIp, port, apiSecret)) {
+                        foundChannel.trySend(candidateIp)
+                    }
+                }
+            }
+            jobs.add(job)
+        }
+
+        var discoveredIp: String? = null
+        try {
+            withTimeoutOrNull(2500L) {
+                discoveredIp = foundChannel.receiveCatching().getOrNull()
+            }
+        } catch (_: Exception) {}
+
+        jobs.forEach { it.cancel() }
+
+        if (discoveredIp != null) {
+            Result.success(discoveredIp!!)
+        } else {
+            Result.failure(IllegalStateException("Мастер xDrip+ не найден в подсети ${subnetInfo.prefix}0/24 на порту $port"))
+        }
+    }
 
     private fun openConnection(endpointUrl: String, settings: XdripLanSettings): HttpURLConnection {
         val hasSecret = settings.apiSecret.isNotBlank()

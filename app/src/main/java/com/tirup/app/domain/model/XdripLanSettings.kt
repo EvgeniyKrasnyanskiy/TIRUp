@@ -4,6 +4,7 @@ import java.security.MessageDigest
 
 data class XdripLanSettings(
     val isEnabled: Boolean = false,
+    val isAutoDiscovery: Boolean = true,
     val masterHost: String = "",
     val port: Int = 17580,
     val apiSecret: String = "",
@@ -11,6 +12,9 @@ data class XdripLanSettings(
 ) {
     val isValidHost: Boolean
         get() = masterHost.isNotBlank() && port in 1..65535
+
+    val isConfigured: Boolean
+        get() = (isAutoDiscovery || isValidHost) && port in 1..65535
 
     val cleanHost: String
         get() {

@@ -202,6 +202,7 @@ class SettingsRepositoryImpl(
             .putString(KEY_NIGHTSCOUT_API_SECRET, settings.nightscoutSettings.apiSecret)
             .putBoolean(KEY_NIGHTSCOUT_REQUIRE_XDRIP_CONFIRM, settings.nightscoutSettings.requireXdripConfirmation)
             .putBoolean(KEY_XDRIP_LAN_IS_ENABLED, settings.xdripLanSettings.isEnabled)
+            .putBoolean(KEY_XDRIP_LAN_IS_AUTO_DISCOVERY, settings.xdripLanSettings.isAutoDiscovery)
             .putString(KEY_XDRIP_LAN_MASTER_HOST, settings.xdripLanSettings.masterHost)
             .putInt(KEY_XDRIP_LAN_PORT, settings.xdripLanSettings.port)
             .putString(KEY_XDRIP_LAN_API_SECRET, settings.xdripLanSettings.apiSecret)
@@ -526,6 +527,7 @@ class SettingsRepositoryImpl(
             ),
             xdripLanSettings = com.tirup.app.domain.model.XdripLanSettings(
                 isEnabled = prefs.getBoolean(KEY_XDRIP_LAN_IS_ENABLED, false),
+                isAutoDiscovery = prefs.getBoolean(KEY_XDRIP_LAN_IS_AUTO_DISCOVERY, true),
                 masterHost = prefs.getString(KEY_XDRIP_LAN_MASTER_HOST, "") ?: "",
                 port = prefs.getInt(KEY_XDRIP_LAN_PORT, 17580),
                 apiSecret = prefs.getString(KEY_XDRIP_LAN_API_SECRET, "") ?: "",
@@ -547,6 +549,7 @@ class SettingsRepositoryImpl(
         private const val KEY_NIGHTSCOUT_REQUIRE_XDRIP_CONFIRM = "key_nightscout_require_xdrip_confirm"
 
         private const val KEY_XDRIP_LAN_IS_ENABLED = "key_xdrip_lan_is_enabled"
+        private const val KEY_XDRIP_LAN_IS_AUTO_DISCOVERY = "key_xdrip_lan_is_auto_discovery"
         private const val KEY_XDRIP_LAN_MASTER_HOST = "key_xdrip_lan_master_host"
         private const val KEY_XDRIP_LAN_PORT = "key_xdrip_lan_port"
         private const val KEY_XDRIP_LAN_API_SECRET = "key_xdrip_lan_api_secret"

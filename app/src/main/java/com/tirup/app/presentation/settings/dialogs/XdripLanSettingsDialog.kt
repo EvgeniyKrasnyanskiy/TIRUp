@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Wifi
@@ -57,16 +59,19 @@ fun XdripLanSettingsDialog(
     onSave: (XdripLanSettings) -> Unit
 ) {
     var isEnabled by remember { mutableStateOf(initialSettings.isEnabled) }
+    var isAutoDiscovery by remember { mutableStateOf(initialSettings.isAutoDiscovery) }
     var masterHost by remember { mutableStateOf(initialSettings.masterHost) }
     var portStr by remember { mutableStateOf(initialSettings.port.toString()) }
     var apiSecret by remember { mutableStateOf(initialSettings.apiSecret) }
     var pollIntervalStr by remember { mutableStateOf(initialSettings.pollIntervalSeconds.toString()) }
     var isSecretVisible by remember { mutableStateOf(false) }
 
+    var isDiscovering by remember { mutableStateOf(false) }
     var isTestingConnection by remember { mutableStateOf(false) }
     var testResultText by remember { mutableStateOf<String?>(null) }
     var isTestSuccess by remember { mutableStateOf(false) }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
 
     AlertDialog(
@@ -95,7 +100,7 @@ fun XdripLanSettingsDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                         Text(
                             text = if (isRu) "Включить Wi-Fi приём" else "Enable Wi-Fi Follower",
                             style = MaterialTheme.typography.bodyMedium,
@@ -121,19 +126,106 @@ fun XdripLanSettingsDialog(
                     )
                 }
 
-                // Master IP Address
-                OutlinedTextField(
-                    value = masterHost,
-                    onValueChange = {
-                        masterHost = it
-                        testResultText = null
-                    },
-                    label = { Text(if (isRu) "IP-адрес мастера" else "Master IP Address") },
-                    placeholder = { Text("192.168.1.150 или 192.168.43.1") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // Auto-discovery toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                        Text(
+                            text = if (isRu) "Автопоиск мастера" else "Auto-discover master",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (isRu)
+                                "Автоматическое сканирование подсети и точки доступа Hotspot"
+                            else
+                                "Auto-scan local subnet and master Hotspot",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = isAutoDiscovery,
+                        onCheckedChange = { isAutoDiscovery = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = PrimaryEmerald
+                        )
+                    )
+                }
+
+                // Discover button if auto-discovery is on
+                if (isAutoDiscovery) {
+                    OutlinedButton(
+                        onClick = {
+                            isDiscovering = true
+                            testResultText = null
+                            scope.launch {
+                                val p = portStr.toIntOrNull() ?: 17580
+                                val res = XdripLanClient.discoverMaster(context, p, apiSecret.trim())
+                                isDiscovering = false
+                                if (res.isSuccess) {
+                                    val ip = res.getOrNull()!!
+                                    masterHost = ip
+                                    isTestSuccess = true
+                                    testResultText = if (isRu) "✓ Мастер найден: $ip" else "✓ Master found: $ip"
+                                } else {
+                                    isTestSuccess = false
+                                    val err = res.exceptionOrNull()?.message ?: "Не найден"
+                                    testResultText = "⚠️ $err"
+                                }
+                            }
+                        },
+                        enabled = !isDiscovering,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (isDiscovering) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = ActionBlue
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (isRu) "Сканирование подсети..." else "Scanning subnet...")
+                        } else {
+                            Text(
+                                text = if (masterHost.isBlank())
+                                    (if (isRu) "🔍 Найти мастера в подсети" else "🔍 Scan for Master")
+                                else
+                                    (if (isRu) "🔍 Найти снова (текущий: $masterHost)" else "🔍 Scan Again ($masterHost)"),
+                                color = ActionBlue,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+
+                // Master IP Address (editable or manual)
+                if (!isAutoDiscovery || masterHost.isNotBlank()) {
+                    OutlinedTextField(
+                        value = masterHost,
+                        onValueChange = {
+                            masterHost = it
+                            testResultText = null
+                        },
+                        label = {
+                            Text(if (isAutoDiscovery) {
+                                if (isRu) "IP мастера (найден автоматически)" else "Master IP (Discovered)"
+                            } else {
+                                if (isRu) "Статический IP мастера" else "Static Master IP"
+                            })
+                        },
+                        placeholder = { Text("192.168.1.150 или 192.168.43.1") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
                 // Port & Interval Row
                 Row(
@@ -271,6 +363,7 @@ fun XdripLanSettingsDialog(
                     onSave(
                         XdripLanSettings(
                             isEnabled = isEnabled,
+                            isAutoDiscovery = isAutoDiscovery,
                             masterHost = masterHost.trim(),
                             port = parsedPort,
                             apiSecret = apiSecret.trim(),

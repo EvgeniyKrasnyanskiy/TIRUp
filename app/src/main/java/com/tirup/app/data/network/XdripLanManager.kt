@@ -48,6 +48,9 @@ object XdripLanManager {
     private val _statusFlow = MutableStateFlow(XdripLanStatus())
     val statusFlow: StateFlow<XdripLanStatus> = _statusFlow.asStateFlow()
 
+    private val _isDiscoveringFlow = MutableStateFlow(false)
+    val isDiscoveringFlow: StateFlow<Boolean> = _isDiscoveringFlow.asStateFlow()
+
     fun syncWithSettings(
         context: Context,
         settingsRepository: SettingsRepository,
@@ -63,7 +66,7 @@ object XdripLanManager {
             settingsRepository.getSettings().collect { settings ->
                 mutex.withLock {
                     val lan = settings.xdripLanSettings
-                    if (lan.isEnabled && lan.isValidHost) {
+                    if (lan.isEnabled && lan.isConfigured) {
                         startPollingInternal(lan, settings)
                     } else {
                         stopPollingInternal()
@@ -136,14 +139,71 @@ object XdripLanManager {
     suspend fun pollNow() = withContext(Dispatchers.IO) {
         val settings = cachedSettingsRepo?.getSettings()?.firstOrNull() ?: return@withContext
         val lan = settings.xdripLanSettings
-        if (!lan.isEnabled || !lan.isValidHost) return@withContext
+        if (!lan.isEnabled || !lan.isConfigured) return@withContext
         executePollCycle(lan, settings)
+    }
+
+    suspend fun discoverMaster(): Result<String> = withContext(Dispatchers.IO) {
+        val ctx = appContext ?: return@withContext Result.failure(IllegalStateException("Контекст недоступен"))
+        val repo = cachedSettingsRepo ?: return@withContext Result.failure(IllegalStateException("Репозиторий недоступен"))
+        val settings = repo.getSettings().firstOrNull() ?: return@withContext Result.failure(IllegalStateException("Настройки недоступны"))
+        val lan = settings.xdripLanSettings
+
+        _isDiscoveringFlow.value = true
+        _statusFlow.value = _statusFlow.value.copy(
+            state = LanConnectionState.CONNECTING,
+            errorMessage = "Поиск мастера в подсети..."
+        )
+
+        try {
+            val res = XdripLanClient.discoverMaster(ctx, lan.port, lan.apiSecret)
+            if (res.isSuccess) {
+                val foundIp = res.getOrNull()!!
+                Log.i(TAG, "xDrip+ master discovered at $foundIp")
+                val updated = settings.copy(
+                    xdripLanSettings = lan.copy(masterHost = foundIp)
+                )
+                repo.updateSettings(updated)
+                _statusFlow.value = _statusFlow.value.copy(
+                    masterIp = foundIp,
+                    errorMessage = null
+                )
+                executePollCycle(updated.xdripLanSettings, updated)
+                Result.success(foundIp)
+            } else {
+                val err = res.exceptionOrNull()?.message ?: "Мастер не найден"
+                _statusFlow.value = _statusFlow.value.copy(
+                    state = LanConnectionState.ERROR,
+                    errorMessage = err
+                )
+                Result.failure(Exception(err))
+            }
+        } finally {
+            _isDiscoveringFlow.value = false
+        }
     }
 
     private suspend fun executePollCycle(settings: XdripLanSettings, userSettings: UserSettings) {
         val ctx = appContext ?: return
         val glucoseRepo = cachedGlucoseRepo ?: return
         val db = cachedDb ?: return
+
+        var activeLan = settings
+        if (activeLan.isAutoDiscovery && activeLan.masterHost.isBlank()) {
+            val disc = XdripLanClient.discoverMaster(ctx, activeLan.port, activeLan.apiSecret)
+            if (disc.isSuccess) {
+                val foundIp = disc.getOrNull()!!
+                activeLan = activeLan.copy(masterHost = foundIp)
+                cachedSettingsRepo?.updateSettings(userSettings.copy(xdripLanSettings = activeLan))
+                _statusFlow.value = _statusFlow.value.copy(masterIp = foundIp)
+            } else {
+                _statusFlow.value = _statusFlow.value.copy(
+                    state = LanConnectionState.ERROR,
+                    errorMessage = "Мастер не найден в подсети"
+                )
+                return
+            }
+        }
 
         // 1. Fetch Pebble (battery, iob, cob)
         val pebbleResult = XdripLanClient.fetchPebble(settings).getOrNull()
@@ -204,6 +264,20 @@ object XdripLanManager {
                 state = LanConnectionState.ERROR,
                 errorMessage = err
             )
+
+            // Auto-reconnect / rediscovery if host unreachable in auto-discovery mode
+            if (activeLan.isAutoDiscovery) {
+                try {
+                    val disc = XdripLanClient.discoverMaster(ctx, activeLan.port, activeLan.apiSecret)
+                    if (disc.isSuccess && disc.getOrNull() != activeLan.masterHost) {
+                        val newIp = disc.getOrNull()!!
+                        Log.i(TAG, "Master IP changed to $newIp, updating...")
+                        val updatedLan = activeLan.copy(masterHost = newIp)
+                        cachedSettingsRepo?.updateSettings(userSettings.copy(xdripLanSettings = updatedLan))
+                        _statusFlow.value = _statusFlow.value.copy(masterIp = newIp)
+                    }
+                } catch (_: Exception) {}
+            }
         }
 
         // 3. Periodic treatments fetch (every 3 cycles)

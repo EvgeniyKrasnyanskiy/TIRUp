@@ -673,6 +673,7 @@ object AutoBackupManager {
         writer.name("xdripLanSettings")
         writer.beginObject()
         writer.name("isEnabled").value(lan.isEnabled)
+        writer.name("isAutoDiscovery").value(lan.isAutoDiscovery)
         writer.name("masterHost").value(lan.masterHost)
         writer.name("port").value(lan.port)
         writer.name("apiSecret").value(lan.apiSecret)
@@ -2030,6 +2031,7 @@ object AutoBackupManager {
                 }
                 "xdripLanSettings" -> {
                     var isEnabled = false
+                    var isAutoDiscovery = true
                     var masterHost = ""
                     var port = 17580
                     var apiSecret = ""
@@ -2038,6 +2040,7 @@ object AutoBackupManager {
                     while (reader.hasNext()) {
                         when (reader.nextName()) {
                             "isEnabled" -> isEnabled = reader.nextBoolean()
+                            "isAutoDiscovery" -> isAutoDiscovery = reader.nextBoolean()
                             "masterHost" -> masterHost = reader.nextString()
                             "port" -> port = reader.nextInt()
                             "apiSecret" -> apiSecret = reader.nextString()
@@ -2048,6 +2051,7 @@ object AutoBackupManager {
                     reader.endObject()
                     xdripLanSettings = XdripLanSettings(
                         isEnabled = isEnabled,
+                        isAutoDiscovery = isAutoDiscovery,
                         masterHost = masterHost,
                         port = port,
                         apiSecret = apiSecret,
