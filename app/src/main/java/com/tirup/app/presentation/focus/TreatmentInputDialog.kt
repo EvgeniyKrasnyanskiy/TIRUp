@@ -1,5 +1,6 @@
 package com.tirup.app.presentation.focus
 
+import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -65,9 +66,53 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+object TreatmentPresetsManager {
+    private const val PREFS_NAME = "treatment_input_presets"
+    private const val KEY_INSULIN = "recent_insulin"
+    private const val KEY_CARBS = "recent_carbs"
+
+    private val DEFAULT_INSULIN = listOf(0.5, 1.0, 2.0, 3.0, 5.0)
+    private val DEFAULT_CARBS = listOf(10.0, 15.0, 20.0, 30.0, 50.0)
+
+    fun getRecentInsulin(context: Context): List<Double> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val raw = prefs.getString(KEY_INSULIN, null) ?: return DEFAULT_INSULIN
+        val parsed = raw.split(",").mapNotNull { it.trim().toDoubleOrNull() }.filter { it > 0.0 }.distinct().take(5)
+        return if (parsed.isNotEmpty()) parsed else DEFAULT_INSULIN
+    }
+
+    fun getRecentCarbs(context: Context): List<Double> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val raw = prefs.getString(KEY_CARBS, null) ?: return DEFAULT_CARBS
+        val parsed = raw.split(",").mapNotNull { it.trim().toDoubleOrNull() }.filter { it > 0.0 }.distinct().take(5)
+        return if (parsed.isNotEmpty()) parsed else DEFAULT_CARBS
+    }
+
+    fun recordInsulin(context: Context, dose: Double) {
+        if (dose <= 0.0) return
+        val current = getRecentInsulin(context).toMutableList()
+        current.remove(dose)
+        current.add(0, dose)
+        val updated = current.distinct().take(5)
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putString(KEY_INSULIN, updated.joinToString(","))
+            .apply()
+    }
+
+    fun recordCarbs(context: Context, carbs: Double) {
+        if (carbs <= 0.0) return
+        val current = getRecentCarbs(context).toMutableList()
+        current.remove(carbs)
+        current.add(0, carbs)
+        val updated = current.distinct().take(5)
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putString(KEY_CARBS, updated.joinToString(","))
+            .apply()
+    }
+}
+
 enum class TreatmentInputType {
     NOTE,
-    BLOOD_GLUCOSE,
     CARBS,
     INSULIN
 }
@@ -76,7 +121,7 @@ enum class TreatmentInputType {
 @Composable
 fun TreatmentInputBottomSheet(
     initialType: TreatmentInputType,
-    unit: GlucoseUnit,
+    @Suppress("UNUSED_PARAMETER") unit: GlucoseUnit,
     isRu: Boolean,
     onDismiss: () -> Unit,
     onSubmit: (insulin: Double?, carbs: Double?, bg: Double?, notes: String?, timestamp: Long) -> Unit
@@ -86,17 +131,19 @@ fun TreatmentInputBottomSheet(
 
     var insulinText by remember { mutableStateOf("") }
     var carbsText by remember { mutableStateOf("") }
-    var bgText by remember { mutableStateOf("") }
     var notesText by remember { mutableStateOf("") }
     var customTimestamp by remember { mutableStateOf<Long?>(null) }
+
+    val recentInsulin = remember(context) { TreatmentPresetsManager.getRecentInsulin(context) }
+    val recentCarbs = remember(context) { TreatmentPresetsManager.getRecentCarbs(context) }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val quickNotes = remember(isRu) {
         if (isRu) {
-            listOf("Завтрак", "Обед", "Ужин", "Перекус", "Спорт", "Гипо", "Замена сенсора", "Замена канюли")
+            listOf("Завтрак", "Обед", "Ужин", "Еда", "Канюля", "Ланцет", "Сенсор")
         } else {
-            listOf("Breakfast", "Lunch", "Dinner", "Snack", "Exercise", "Hypo", "Sensor Change", "Cannula Change")
+            listOf("Breakfast", "Lunch", "Dinner", "Food", "Cannula", "Lancet", "Sensor")
         }
     }
 
@@ -129,17 +176,10 @@ fun TreatmentInputBottomSheet(
                 ) {
                     TreatmentTabChip(
                         icon = "💬",
-                        label = if (isRu) "Заметка" else "Note",
+                        label = if (isRu) "Заметки" else "Notes",
                         isSelected = selectedType == TreatmentInputType.NOTE,
                         activeColor = Color(0xFF8B5CF6),
                         onClick = { selectedType = TreatmentInputType.NOTE }
-                    )
-                    TreatmentTabChip(
-                        icon = "🩸",
-                        label = if (isRu) "Глюк" else "Meter",
-                        isSelected = selectedType == TreatmentInputType.BLOOD_GLUCOSE,
-                        activeColor = ColorLow,
-                        onClick = { selectedType = TreatmentInputType.BLOOD_GLUCOSE }
                     )
                     TreatmentTabChip(
                         icon = "🍞",
@@ -197,24 +237,31 @@ fun TreatmentInputBottomSheet(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Quick increments
+                    // Adaptive recent insulin presets (5 options)
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        items(listOf(0.5, 1.0, 2.0, 3.0, 5.0)) { delta ->
+                        items(recentInsulin) { preset ->
+                            val textLabel = if (preset % 1.0 == 0.0) "${preset.toInt()}" else String.format(Locale.US, "%.1f", preset)
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 color = ActionBlue.copy(alpha = 0.12f),
                                 border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.35f)),
                                 modifier = Modifier.clickable {
-                                    val cur = insulinText.toDoubleOrNull() ?: 0.0
-                                    val next = cur + delta
-                                    insulinText = if (next == next.toInt().toDouble()) "${next.toInt()}" else String.format(Locale.US, "%.1f", next)
+                                    val cur = insulinText.toDoubleOrNull()
+                                    if (cur == null || cur == 0.0) {
+                                        insulinText = textLabel
+                                    } else if (cur == preset) {
+                                        val next = cur + preset
+                                        insulinText = if (next % 1.0 == 0.0) "${next.toInt()}" else String.format(Locale.US, "%.1f", next)
+                                    } else {
+                                        insulinText = textLabel
+                                    }
                                 }
                             ) {
                                 Text(
-                                    text = "+$delta",
+                                    text = "$textLabel " + (if (isRu) "Ед" else "U"),
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.Bold,
                                     color = ActionBlue,
@@ -281,24 +328,31 @@ fun TreatmentInputBottomSheet(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Quick carb increments
+                    // Adaptive recent carb presets (5 options)
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        items(listOf(5, 10, 15, 20, 30, 50)) { delta ->
+                        items(recentCarbs) { preset ->
+                            val textLabel = if (preset % 1.0 == 0.0) "${preset.toInt()}" else String.format(Locale.US, "%.1f", preset)
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 color = ColorHigh.copy(alpha = 0.12f),
                                 border = BorderStroke(1.dp, ColorHigh.copy(alpha = 0.35f)),
                                 modifier = Modifier.clickable {
-                                    val cur = carbsText.toDoubleOrNull() ?: 0.0
-                                    val next = (cur + delta).toInt()
-                                    carbsText = "$next"
+                                    val cur = carbsText.toDoubleOrNull()
+                                    if (cur == null || cur == 0.0) {
+                                        carbsText = textLabel
+                                    } else if (cur == preset) {
+                                        val next = cur + preset
+                                        carbsText = if (next % 1.0 == 0.0) "${next.toInt()}" else String.format(Locale.US, "%.1f", next)
+                                    } else {
+                                        carbsText = textLabel
+                                    }
                                 }
                             ) {
                                 Text(
-                                    text = "+$delta г",
+                                    text = "$textLabel " + (if (isRu) "г" else "g"),
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.Bold,
                                     color = ColorHigh,
@@ -319,46 +373,6 @@ fun TreatmentInputBottomSheet(
                     )
                 }
 
-                TreatmentInputType.BLOOD_GLUCOSE -> {
-                    val unitLabel = if (unit == GlucoseUnit.MMOL_L) {
-                        if (isRu) "ммоль/л" else "mmol/L"
-                    } else {
-                        if (isRu) "мг/дл" else "mg/dL"
-                    }
-
-                    Text(
-                        text = if (isRu) "🩸 Замер глюкометром (из пальца)" else "🩸 Finger Blood Glucose Check",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = bgText,
-                        onValueChange = { bgText = it.replace(',', '.') },
-                        label = { Text(if (isRu) "Сахар ($unitLabel)" else "Glucose ($unitLabel)") },
-                        placeholder = { Text(if (unit == GlucoseUnit.MMOL_L) "5.5" else "100") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = ColorLow,
-                            focusedLabelColor = ColorLow
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    OutlinedTextField(
-                        value = notesText,
-                        onValueChange = { notesText = it },
-                        label = { Text(if (isRu) "Примечание (глюкометр, калибровка)" else "Note (meter, calibration)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
                 TreatmentInputType.NOTE -> {
                     Text(
                         text = if (isRu) "💬 Заметка события" else "💬 Event Note",
@@ -373,6 +387,17 @@ fun TreatmentInputBottomSheet(
                         onValueChange = { notesText = it },
                         label = { Text(if (isRu) "Текст заметки" else "Note text") },
                         placeholder = { Text(if (isRu) "Например: смена датчика, пробежка..." else "e.g. sensor change, jogging...") },
+                        trailingIcon = if (notesText.isNotEmpty()) {
+                            {
+                                IconButton(onClick = { notesText = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = if (isRu) "Очистить" else "Clear",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        } else null,
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -405,6 +430,40 @@ fun TreatmentInputBottomSheet(
                                     color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                                 )
+                            }
+                        }
+                    }
+
+                    if (notesText.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
+                                modifier = Modifier.clickable { notesText = "" }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (isRu) "Очистить поле" else "Clear field",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
                             }
                         }
                     }
@@ -538,7 +597,6 @@ fun TreatmentInputBottomSheet(
             val canSubmit = when (selectedType) {
                 TreatmentInputType.INSULIN -> (insulinText.toDoubleOrNull() ?: 0.0) > 0.0 || notesText.isNotBlank()
                 TreatmentInputType.CARBS -> (carbsText.toDoubleOrNull() ?: 0.0) > 0.0 || (insulinText.toDoubleOrNull() ?: 0.0) > 0.0
-                TreatmentInputType.BLOOD_GLUCOSE -> (bgText.toDoubleOrNull() ?: 0.0) > 0.0
                 TreatmentInputType.NOTE -> notesText.isNotBlank()
             }
 
@@ -546,11 +604,13 @@ fun TreatmentInputBottomSheet(
                 onClick = {
                     val ins = insulinText.toDoubleOrNull()?.takeIf { it > 0.0 }
                     val carbs = carbsText.toDoubleOrNull()?.takeIf { it > 0.0 }
-                    val bg = bgText.toDoubleOrNull()?.takeIf { it > 0.0 }
                     val note = notesText.trim().takeIf { it.isNotBlank() }
                     val ts = customTimestamp ?: System.currentTimeMillis()
 
-                    onSubmit(ins, carbs, bg, note, ts)
+                    ins?.let { TreatmentPresetsManager.recordInsulin(context, it) }
+                    carbs?.let { TreatmentPresetsManager.recordCarbs(context, it) }
+
+                    onSubmit(ins, carbs, null, note, ts)
                     onDismiss()
                 },
                 enabled = canSubmit,
@@ -602,22 +662,13 @@ fun QuickActionStrip(
             // 1. Note (Left)
             QuickActionButton(
                 icon = "💬",
-                label = if (isRu) "Заметка" else "Note",
+                label = if (isRu) "Заметки" else "Notes",
                 tint = Color(0xFF8B5CF6),
                 modifier = Modifier.weight(1f),
                 onClick = { onOpenTreatment(TreatmentInputType.NOTE) }
             )
 
-            // 2. Finger Meter (BG)
-            QuickActionButton(
-                icon = "🩸",
-                label = if (isRu) "Глюк" else "Meter",
-                tint = ColorLow,
-                modifier = Modifier.weight(1f),
-                onClick = { onOpenTreatment(TreatmentInputType.BLOOD_GLUCOSE) }
-            )
-
-            // 3. Carbs
+            // 2. Carbs (Middle)
             QuickActionButton(
                 icon = "🍞",
                 label = if (isRu) "Углеводы" else "Carbs",
@@ -626,7 +677,7 @@ fun QuickActionStrip(
                 onClick = { onOpenTreatment(TreatmentInputType.CARBS) }
             )
 
-            // 4. Insulin (Far Right - closest to right thumb)
+            // 3. Insulin (Right)
             QuickActionButton(
                 icon = "💉",
                 label = if (isRu) "Инсулин" else "Insulin",

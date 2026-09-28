@@ -945,7 +945,7 @@ fun MainPagerScaffold(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth(0.92f)
-                        .fillMaxHeight(0.64f),
+                        .fillMaxHeight(0.68f),
                     shape = RoundedCornerShape(32.dp),
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
                     border = BorderStroke(2.dp, glucoseColor.copy(alpha = 0.7f)),
@@ -1204,14 +1204,14 @@ private fun QuickHudDeviceChip(
 
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        color = statusColor.copy(alpha = 0.10f),
-        border = BorderStroke(1.2.dp, statusColor.copy(alpha = 0.35f))
+        shape = RoundedCornerShape(20.dp),
+        color = statusColor.copy(alpha = 0.12f),
+        border = BorderStroke(1.5.dp, statusColor.copy(alpha = 0.4f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 8.dp),
+                .padding(horizontal = 6.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -1219,21 +1219,21 @@ private fun QuickHudDeviceChip(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                Text(text = icon, fontSize = 13.sp)
-                Spacer(modifier = Modifier.width(3.dp))
+                Text(text = icon, fontSize = 20.sp)
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = title,
-                    fontSize = 12.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     softWrap = false
                 )
             }
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = timeText,
-                fontSize = 16.sp,
+                fontSize = 34.sp,
                 fontWeight = FontWeight.Black,
                 color = if (installedAt <= 0L) MaterialTheme.colorScheme.onSurfaceVariant else statusColor,
                 maxLines = 1,
