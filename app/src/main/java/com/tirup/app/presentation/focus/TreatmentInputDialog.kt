@@ -232,6 +232,17 @@ fun TreatmentInputBottomSheet(
                             focusedBorderColor = ActionBlue,
                             focusedLabelColor = ActionBlue
                         ),
+                        trailingIcon = if (insulinText.isNotEmpty()) {
+                            {
+                                IconButton(onClick = { insulinText = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = if (isRu) "Очистить" else "Clear",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        } else null,
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -279,6 +290,17 @@ fun TreatmentInputBottomSheet(
                         onValueChange = { notesText = it },
                         label = { Text(if (isRu) "Примечание (необязательно)" else "Note (optional)") },
                         singleLine = true,
+                        trailingIcon = if (notesText.isNotEmpty()) {
+                            {
+                                IconButton(onClick = { notesText = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = if (isRu) "Очистить" else "Clear",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        } else null,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -307,6 +329,17 @@ fun TreatmentInputBottomSheet(
                                 focusedBorderColor = ColorHigh,
                                 focusedLabelColor = ColorHigh
                             ),
+                            trailingIcon = if (carbsText.isNotEmpty()) {
+                                {
+                                    IconButton(onClick = { carbsText = "" }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = if (isRu) "Очистить" else "Clear",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            } else null,
                             modifier = Modifier.weight(1f)
                         )
 
@@ -322,6 +355,17 @@ fun TreatmentInputBottomSheet(
                                 focusedBorderColor = ActionBlue,
                                 focusedLabelColor = ActionBlue
                             ),
+                            trailingIcon = if (insulinText.isNotEmpty()) {
+                                {
+                                    IconButton(onClick = { insulinText = "" }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = if (isRu) "Очистить" else "Clear",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            } else null,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -369,6 +413,17 @@ fun TreatmentInputBottomSheet(
                         onValueChange = { notesText = it },
                         label = { Text(if (isRu) "Блюдо / Заметка" else "Meal / Note") },
                         singleLine = true,
+                        trailingIcon = if (notesText.isNotEmpty()) {
+                            {
+                                IconButton(onClick = { notesText = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = if (isRu) "Очистить" else "Clear",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        } else null,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
