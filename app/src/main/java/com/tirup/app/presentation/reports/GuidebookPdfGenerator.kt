@@ -149,20 +149,20 @@ class GuidebookPdfGenerator(private val context: Context) {
                     Triple(
                         if (isRu) "Mean Glucose (Средний сахар)" else "Mean Glucose (Average)",
                         if (isRu) "Цель: ≤7.8 (здоровые 4.5–5.8)" else "Target: ≤7.8 (non-diab 4.5–5.8)",
-                        if (isRu) "Среднее всех измерений. У людей без диабета натощак: 3.9–5.5 ммоль/л, после еды ≤7.8. При диабете средний 8.5 ≈ eA1c 7.5%, а 10.0 ≈ eA1c 8.6%."
-                        else "Arithmetic mean of all readings. Fasting non-diabetic range is 3.9–5.5 mmol/L, postprandial ≤7.8. Mean 8.5 ≈ eA1c 7.5%, Mean 10.0 ≈ eA1c 8.6%."
+                        if (isRu) "Среднее всех измерений. У людей без диабета натощак: 3.9–5.5 ммоль/л, после еды ≤7.8. При диабете средний 8.5 ≈ eA1c 7.0%, а 10.0 ≈ eA1c 7.6%."
+                        else "Arithmetic mean of all readings. Fasting non-diabetic range is 3.9–5.5 mmol/L, postprandial ≤7.8. Mean 8.5 ≈ eA1c 7.0%, Mean 10.0 ≈ eA1c 7.6%."
                     ),
                     Triple(
                         if (isRu) "eA1c / GMI (Расчётный гликированный гемоглобин)" else "eA1c / GMI (Estimated HbA1c)",
                         if (isRu) "Цель: ≤7.0% (норма 4.0–5.6%)" else "Target: ≤7.0% (normal 4.0–5.6%)",
-                        if (isRu) "Проекция HbA1c по формуле GMI = 3.31 + 0.431 × Mean(ммоль/л) за 2–3 мес. Не искажается анемией. Для детей цель может быть <6.5%, для пожилых <7.5–8.0%."
-                        else "GMI formula (3.31 + 0.431 × MeanGlucose mmol/L) projection over 2-3 months. Free from anemia distortions. Pediatric/pregnancy target <6.5%, elderly target <7.5-8.0%."
+                        if (isRu) "Проекция HbA1c по формуле GMI = 3.31 + 0.431 × Mean (адаптация Bergenstal 2018 для ммоль/л) за 2–3 мес. Не искажается анемией. Для детей цель может быть <6.5%, для пожилых <7.5–8.0%."
+                        else "GMI formula (3.31 + 0.431 × MeanGlucose mmol/L, Bergenstal 2018 adaptation) projection over 2-3 months. Free from anemia distortions. Pediatric/pregnancy target <6.5%, elderly target <7.5-8.0%."
                     ),
                     Triple(
                         if (isRu) "Min / Max (Экстремумы сахара за период)" else "Min / Max (Observed Glycemic Range)",
                         if (isRu) "Коридор: 3.9–10.0 ммоль/л" else "Target Corridor: 3.9–10.0 mmol/L",
-                        if (isRu) "Фактический размах колебаний. У здоровых людей 96% времени суток сахар находится строго в коридоре 4.0–7.8 ммоль/л (натощак 3.3–5.5 ммоль/л)."
-                        else "Full observed span of values. Healthy individuals spend 96% of the day within 4.0–7.8 mmol/L (fasting 3.3–5.5 mmol/L)."
+                        if (isRu) "Фактический размах колебаний. У здоровых людей 96% времени суток сахар находится строго в коридоре 4.0–7.8 ммоль/л (натощак 3.9–5.5 ммоль/л)."
+                        else "Full observed span of values. Healthy individuals spend 96% of the day within 4.0–7.8 mmol/L (fasting 3.9–5.5 mmol/L)."
                     )
                 ),
                 cardHeight = 39f
@@ -232,15 +232,15 @@ class GuidebookPdfGenerator(private val context: Context) {
                 listOf(
                     Triple(
                         if (isRu) "Ночной профиль (Окно сна 00:00–06:00)" else "Nocturnal Glycemia (Sleep Window)",
-                        if (isRu) "Цель: SD ≤1.5 ммоль/л, TBR = 0%" else "Target: SD ≤27 mg/dL, TBR = 0%",
+                        if (isRu) "Цель: SD ≤1.5 ммоль/л, TBR = 0%" else "Target: SD ≤1.5 mmol/L (≤27 mg/dL), TBR = 0%",
                         if (isRu) "Ночь — самый физиологически стабильный период суток без влияния еды. Отражает адекватность дозы базального инсулина и защищает от ночных гипогликемий."
                         else "The most basal metabolic phase of 24h. Evaluates background basal insulin coverage and rules out dangerous nocturnal hypoglycemia."
                     ),
                     Triple(
                         if (isRu) "Паттерны: «Утренняя заря» и постпрандиальные пики" else "Patterns: Dawn Phenomenon & Meal Spikes",
                         if (isRu) "Ранняя детекция" else "Early Detection",
-                        if (isRu) "Феномен утренней зари — подъём сахара в 4–8 утра из-за выброса кортизола и гормона роста. Постпрандиальный пик — подъём через 60–90 мин после еды (>2.5 ммоль/л)."
-                        else "Dawn phenomenon denotes early morning glucose rise driven by cortisol. Postprandial spikes reflect carbohydrate-insulin mismatch."
+                        if (isRu) "Феномен утренней зари — подъём сахара в 4–8 утра из-за выброса кортизола и гормона роста. Постпрандиальный пик — подъём через 60–90 мин после еды (прирост >2.2 ммоль/л от базы)."
+                        else "Dawn phenomenon denotes early morning glucose rise driven by cortisol. Postprandial spikes reflect carbohydrate-insulin mismatch (rise >2.2 mmol/L / >40 mg/dL from baseline)."
                     )
                 ),
                 cardHeight = 39f
