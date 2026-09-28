@@ -223,27 +223,58 @@ class SmsQueryReceiver : BroadcastReceiver() {
 
         /**
          * Checks whether the incoming message body contains a recognized glucose query trigger word.
+         * Rejects casual phrases (e.g. "купи сахар в магазине") while supporting commands and questions.
          */
         fun isQueryTrigger(body: String): Boolean {
             val clean = body.trim().lowercase()
-            return clean == "?" ||
-                    clean == "сахар" ||
-                    clean == "sugar" ||
-                    clean == "bg" ||
-                    clean == "глюкоза" ||
-                    clean == "tir" ||
-                    clean.startsWith("?") ||
+            if (clean.isBlank()) return false
+
+            // 1. Single-character trigger or exact command
+            val exactCommands = setOf(
+                "?", "help", "info", "status", "статус", "инфо", "tir",
+                "сахар", "сахор", "sugar", "bg", "ск", "глюкоза", "глюкозу", "глюкозе"
+            )
+            if (exactCommands.contains(clean)) {
+                return true
+            }
+
+            // 2. Starts with query prefix or question mark
+            val startsWithCommand = clean.startsWith("?") ||
                     clean.startsWith("сахар") ||
                     clean.startsWith("сахор") ||
                     clean.startsWith("глюкоз") ||
-                    clean.startsWith("инфо") ||
-                    clean.startsWith("статус") ||
                     clean.startsWith("sugar") ||
                     clean.startsWith("bg") ||
+                    clean.startsWith("ск") ||
                     clean.startsWith("help") ||
-                    clean.contains("сахар") ||
-                    clean.contains("глюкоз") ||
-                    clean.contains("sugar")
+                    clean.startsWith("info") ||
+                    clean.startsWith("status") ||
+                    clean.startsWith("статус") ||
+                    clean.startsWith("инфо")
+
+            if (startsWithCommand) {
+                // Must be standalone word or followed by delimiter/space/?
+                val prefixRegex = Regex("""^(?:\?|сахар|сахор|глюкоз[а-яё]*|sugar|bg|ск|help|info|status|статус|инфо)(?:[\s?!,.:;].*|$)""", RegexOption.IGNORE_CASE)
+                if (prefixRegex.matches(clean)) {
+                    return true
+                }
+            }
+
+            // 3. Natural language query phrases for glucose (e.g. "какой сахар?", "сколько сахар", "how is sugar?", "скинь сахар")
+            val queryVerbs = listOf("какой", "сколько", "как", "уровень", "что с", "покажи", "проверь", "скинь", "дай", "how is", "what is", "check", "get")
+            val glucoseNouns = listOf("сахар", "сахор", "глюкоз", "sugar", "bg", "ск")
+            val hasQueryVerb = queryVerbs.any { clean.contains(it) }
+            val hasGlucoseNoun = glucoseNouns.any { clean.contains(it) }
+            if (hasQueryVerb && hasGlucoseNoun) {
+                return true
+            }
+
+            // 4. Direct short question about glucose (e.g. "норма?", "сахар?", "ск?")
+            if (clean.length <= 15 && clean.endsWith("?") && glucoseNouns.any { clean.contains(it) }) {
+                return true
+            }
+
+            return false
         }
         fun launchHeadsUpMessage(
             context: Context,

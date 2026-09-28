@@ -52,6 +52,8 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.roundToInt
 
 enum class AlertTier {
@@ -284,41 +286,31 @@ object GlucoseAlertManager {
     const val EXTRA_GOTO_YEAR_END = "com.tirup.app.GOTO_YEAR_END"
     const val EXTRA_YEAR = "com.tirup.app.EXTRA_YEAR"
 
-    // Timestamps for Smart Snooze / Anti-spam
-    @Volatile
-    private var lastHypoAlertTimestamp: Long = 0L
-
-    @Volatile
-    private var lastBatteryAlertThreshold: Int = 100
-
-    @Volatile
-    private var lastHyperAlertTimestamp: Long = 0L
-
-    @Volatile
-    private var lastPredictiveAlertTimestamp: Long = 0L
-
-    @Volatile
-    private var lastSignalLossAlertTimestamp: Long = 0L
-
-    @Volatile
-    private var signalLossAlertCount: Int = 0
+    // Timestamps for Smart Snooze / Anti-spam (Atomic for complete thread-safety)
+    private val lastHypoAlertTimestamp = AtomicLong(0L)
+    private val lastBatteryAlertThreshold = AtomicInteger(100)
+    private val lastHyperAlertTimestamp = AtomicLong(0L)
+    private val lastPredictiveAlertTimestamp = AtomicLong(0L)
+    private val lastSignalLossAlertTimestamp = AtomicLong(0L)
+    private val signalLossAlertCount = AtomicInteger(0)
 
     // Adaptive Snooze tracking
-    @Volatile
-    private var userAcknowledgedHypoTimestamp: Long = 0L
-
-    @Volatile
-    private var userAcknowledgedHyperTimestamp: Long = 0L
+    private val userAcknowledgedHypoTimestamp = AtomicLong(0L)
+    private val userAcknowledgedHyperTimestamp = AtomicLong(0L)
 
     @Volatile
     var isCriticalAlarmActive: Boolean = false
         private set
+
+    @Volatile
+    private var appContext: Context? = null
 
     private var flashJob: Job? = null
     private var emergencySmsJob: Job? = null
     private var rescueWakeLock: android.os.PowerManager.WakeLock? = null
 
     fun initChannels(context: Context) {
+        appContext = context.applicationContext
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
@@ -790,11 +782,16 @@ object GlucoseAlertManager {
      * Dismisses the screaming critical alarm immediately (stops siren, vibration, torch, cancels notification).
      * If [fromUser] is true, records user reaction for adaptive snooze.
      */
+    /**
+     * Dismisses the screaming critical alarm immediately (stops siren, vibration, torch, cancels notification).
+     * If [fromUser] is true, records user reaction for adaptive snooze.
+     */
+    @Synchronized
     fun dismissCriticalAlarm(context: Context, fromUser: Boolean) {
         if (!isCriticalAlarmActive && !fromUser) return
         Log.i(TAG, "dismissCriticalAlarm fromUser=$fromUser")
 
-        cancelEmergencySmsTimer()
+        cancelEmergencySmsTimer(context)
         isCriticalAlarmActive = false
         MedicalSoundPlayer.stopAll()
 
@@ -823,8 +820,8 @@ object GlucoseAlertManager {
 
         if (fromUser) {
             val now = System.currentTimeMillis()
-            userAcknowledgedHypoTimestamp = now
-            userAcknowledgedHyperTimestamp = now
+            userAcknowledgedHypoTimestamp.set(now)
+            userAcknowledgedHyperTimestamp.set(now)
             _activeAlertBanner.value = null
         }
     }
@@ -847,9 +844,27 @@ object GlucoseAlertManager {
     /**
      * Cancels any pending emergency SMS countdown when the user acknowledges or silences an alarm.
      */
-    fun cancelEmergencySmsTimer() {
+    fun cancelEmergencySmsTimer(context: Context? = null) {
+        val ctx = context?.applicationContext ?: appContext
+        if (ctx != null) {
+            val intent = Intent(ctx, AlertActionReceiver::class.java).apply {
+                action = AlertActionReceiver.ACTION_TRIGGER_EMERGENCY_SMS
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                ctx,
+                AlertActionReceiver.REQUEST_CODE_EMERGENCY_SMS,
+                intent,
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+            )
+            if (pendingIntent != null) {
+                val alarmManager = ctx.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+                alarmManager?.cancel(pendingIntent)
+                pendingIntent.cancel()
+                Log.i(TAG, "Emergency SMS AlarmManager timer cancelled")
+            }
+        }
         if (emergencySmsJob != null) {
-            Log.i(TAG, "Canceling emergency SMS countdown (user reacted or alarm silenced)")
+            Log.i(TAG, "Canceling emergency SMS coroutine countdown")
             emergencySmsJob?.cancel()
             emergencySmsJob = null
         }
@@ -857,7 +872,9 @@ object GlucoseAlertManager {
 
     /**
      * Schedules an emergency SMS to trusted contact if the critical hypo alarm remains unacknowledged for the set delay.
+     * Uses AlarmManager.setExactAndAllowWhileIdle for survivability across Doze and process kills.
      */
+    @Suppress("UNUSED_PARAMETER")
     private fun scheduleEmergencySmsIfEnabled(
         context: Context,
         glucoseValue: Double,
@@ -871,33 +888,42 @@ object GlucoseAlertManager {
             return
         }
 
-        // Keep existing timer running if already actively counting down for this unacknowledged alarm
-        if (emergencySmsJob?.isActive == true) {
-            return
-        }
+        val appContext = context.applicationContext
+        this.appContext = appContext
 
         val delayMinutes = alerts.emergencySmsDelayMinutes.coerceAtLeast(1)
         val delayMillis = delayMinutes * 60_000L
         val contactPhones = listOf(alerts.emergencyContactPhone, alerts.secondaryEmergencyContactPhone).filter { it.isNotBlank() }.joinToString()
         Log.i(TAG, "Starting Emergency SMS countdown: $delayMinutes min until alert is sent to $contactPhones")
 
-        val appContext = context.applicationContext
-        emergencySmsJob = CoroutineScope(Dispatchers.IO).launch {
-            delay(delayMillis)
-            if (isCriticalAlarmActive) {
-                Log.w(TAG, "Critical hypo alarm timed out after $delayMinutes min without reaction! Sending emergency SMS...")
-                EmergencySmsManager.sendEmergencyAlert(
-                    context = appContext,
-                    glucoseValue = glucoseValue,
-                    trendArrow = trendArrow,
-                    delayMinutes = delayMinutes,
-                    settings = alerts,
-                    patientProfile = patientProfile,
-                    isRu = isRu,
-                    unit = unit
-                )
+        val intent = Intent(appContext, AlertActionReceiver::class.java).apply {
+            action = AlertActionReceiver.ACTION_TRIGGER_EMERGENCY_SMS
+            putExtra(AlertActionReceiver.EXTRA_SCHEDULED_GLUCOSE, glucoseValue)
+            putExtra(AlertActionReceiver.EXTRA_SCHEDULED_TREND, trendArrow)
+            putExtra(AlertActionReceiver.EXTRA_DELAY_MINUTES, delayMinutes)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            appContext,
+            AlertActionReceiver.REQUEST_CODE_EMERGENCY_SMS,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val alarmManager = appContext.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+        val triggerAt = System.currentTimeMillis() + delayMillis
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager?.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
             } else {
-                Log.i(TAG, "Critical alarm is no longer active after delay. Emergency SMS aborted.")
+                alarmManager?.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+            }
+            Log.i(TAG, "Scheduled exact emergency SMS alarm for +$delayMinutes min via AlarmManager")
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not set exact alarm, falling back to set(): ${e.message}")
+            try {
+                alarmManager?.set(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+            } catch (e2: Exception) {
+                Log.e(TAG, "Failed scheduling emergency SMS alarm: ${e2.message}")
             }
         }
     }
@@ -1219,7 +1245,7 @@ object GlucoseAlertManager {
 
             // If phone is connected to charger or battery increased above 20%, reset hysteresis
             if (isCharging || batteryPct > 20) {
-                lastBatteryAlertThreshold = 100
+                lastBatteryAlertThreshold.set(100)
                 return
             }
 
@@ -1230,8 +1256,8 @@ object GlucoseAlertManager {
                 else -> 100
             }
 
-            if (targetThreshold < lastBatteryAlertThreshold) {
-                lastBatteryAlertThreshold = targetThreshold
+            if (targetThreshold < lastBatteryAlertThreshold.get()) {
+                lastBatteryAlertThreshold.set(targetThreshold)
 
                 val isRu = settings.language.equals("RU", ignoreCase = true)
                 val tier = when (targetThreshold) {
@@ -1286,6 +1312,11 @@ object GlucoseAlertManager {
      * Inspects recent readings against settings and triggers the appropriate alert tier.
      * Uses Smart Adaptive Snooze for Hypo and Hyper, and Exponential Backoff for Signal Loss.
      */
+    /**
+     * Inspects recent readings against settings and triggers the appropriate alert tier.
+     * Uses Smart Adaptive Snooze for Hypo and Hyper, and Exponential Backoff for Signal Loss.
+     */
+    @Synchronized
     fun checkAndAlert(
         context: Context,
         recentReadings: List<GlucoseReading>,
@@ -1305,17 +1336,27 @@ object GlucoseAlertManager {
         // If master is disabled (or on pause) and hypo protection is also inactive/paused, return early
         if (!isMasterActive && !isHypoProtectionActive) return
 
-        // Auto-dismiss if phone is actively used
-        if (isCriticalAlarmActive && isPhoneInActiveUse(context)) {
-            dismissCriticalAlarm(context, fromUser = true)
-        }
-
         initChannels(context)
 
         val targetRanges = settings.targetRanges
         val sorted = recentReadings.sortedBy { it.timestamp }
         val latest = sorted.last()
         val isRu = settings.language.equals("RU", ignoreCase = true)
+
+        // Safety Guard (Issue #1): Auto-dismiss if phone is actively used ONLY if NOT in severe hypo
+        if (isCriticalAlarmActive && isPhoneInActiveUse(context) && latest.valueMmol >= alerts.criticalLowThresholdMmol) {
+            dismissCriticalAlarm(context, fromUser = true)
+        }
+
+        val tirLow = targetRanges.tirLowMmol
+        val tirHigh = if (settings.targetMode.name == "TING") targetRanges.tingHighMmol else targetRanges.tirHighMmol
+
+        // ----------------------------------------------------
+        // TIER 3: CRITICAL HYPO (Highest priority - evaluates BEFORE signal loss)
+        // ----------------------------------------------------
+        if (evaluateCriticalHypo(context, latest, sorted, alerts, settings, isHypoProtectionActive, tirLow, now, isRu)) {
+            return
+        }
 
         // ----------------------------------------------------
         // TIER 4: SIGNAL LOSS CHECK (Day / Night Schedule)
@@ -1325,13 +1366,10 @@ object GlucoseAlertManager {
             return
         }
 
-        val tirLow = targetRanges.tirLowMmol
-        val tirHigh = if (settings.targetMode.name == "TING") targetRanges.tingHighMmol else targetRanges.tirHighMmol
-
         // Auto-dismiss stale out-of-range & predictive notifications when back in normal range
         val isInNormalRange = latest.valueMmol in tirLow..tirHigh
         if (isInNormalRange) {
-            cancelEmergencySmsTimer()
+            cancelEmergencySmsTimer(context)
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             nm?.cancel(NOTIFICATION_ID_MAIN)
             nm?.cancel(NOTIFICATION_ID_PREDICTIVE)
@@ -1339,7 +1377,8 @@ object GlucoseAlertManager {
         }
 
         // Auto-dismiss predictive notification if older than 30 minutes
-        if (lastPredictiveAlertTimestamp > 0L && (now - lastPredictiveAlertTimestamp) > 30 * 60000L) {
+        val lastPredictive = lastPredictiveAlertTimestamp.get()
+        if (lastPredictive > 0L && (now - lastPredictive) > 30 * 60000L) {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             nm?.cancel(NOTIFICATION_ID_PREDICTIVE)
             if (_activeAlertBanner.value?.tier == AlertTier.PREDICTIVE) {
@@ -1347,294 +1386,345 @@ object GlucoseAlertManager {
             }
         }
 
-        // ----------------------------------------------------
-        // TIER 3: CRITICAL / PROLONGED
-        // ----------------------------------------------------
-        // Hypo protection is always on unless temporarily paused (<2h) or permanently disabled with explicit consent
-        if (isHypoProtectionActive) {
-            // Extreme Low or Prolonged Low
-            val isExtremeLow = latest.valueMmol < alerts.criticalLowThresholdMmol
-            val isProlongedLow = checkProlongedOutOfRange(sorted, isLow = true, threshold = tirLow, minutes = alerts.criticalHypoMinutes)
-
-            if (isExtremeLow || isProlongedLow) {
-                val timeSinceAck = now - userAcknowledgedHypoTimestamp
-                val isUnderSnooze = userAcknowledgedHypoTimestamp > 0 && timeSinceAck < alerts.snoozeHypoMinutes * 60000L
-
-                // Safety override: if under snooze, break early only if plummeting (drop rate <= -0.3 mmol/L)
-                // or if critically low (< 2.8) AND continuing to drop / stagnant.
-                // If glucose is rising after carbs, respect the clinical snooze.
-                val delta = if (sorted.size >= 2) latest.valueMmol - sorted[sorted.size - 2].valueMmol else 0.0
-                val isDroppingDangerously = (delta <= -0.3) || (latest.valueMmol < 2.8 && delta <= 0.0)
-
-                val shouldTriggerHypo = if (isUnderSnooze) {
-                    isDroppingDangerously // break snooze early if plummeting!
-                } else if (userAcknowledgedHypoTimestamp > 0) {
-                    true // 15-min snooze expired!
-                } else {
-                    // No reaction from user yet: repeat every 5 minutes!
-                    now - lastHypoAlertTimestamp >= 5 * 60000L
-                }
-
-                if (shouldTriggerHypo) {
-                    lastHypoAlertTimestamp = now
-                    userAcknowledgedHypoTimestamp = 0L // reset so repeats in 5m if no reaction
-
-                    val title = if (isExtremeLow) {
-                        if (isRu) "🚨 ЭКСТРЕМАЛЬНО НИЗКИЙ САХАР!" else "🚨 EXTREMELY LOW GLUCOSE!"
-                    } else {
-                        if (isRu) "🚨 ЗАТЯЖНАЯ ГИПОГЛИКЕМИЯ (${alerts.criticalHypoMinutes}+ мин)!" else "🚨 PROLONGED HYPO (${alerts.criticalHypoMinutes}+ min)!"
-                    }
-                    val iobText = if (latest.iob != null && latest.iob > 0.0) {
-                        String.format(Locale.US, if (isRu) " (IoB: %.1f Ед)" else " (IoB: %.1f U)", latest.iob)
-                    } else ""
-                    val text = String.format(
-                        Locale.US,
-                        if (isRu) "Текущий сахар: %.1f ммоль/л%s. Срочно примите быстрые углеводы!"
-                        else "Current glucose: %.1f mmol/L%s. Take fast-acting carbs now!",
-                        latest.valueMmol,
-                        iobText
-                    )
-                    val toneType = if (isExtremeLow) MedicalSoundPlayer.CriticalToneType.EXTRA_HYPO else MedicalSoundPlayer.CriticalToneType.STANDARD
-                    sendNotification(
-                        context = context,
-                        channelId = CHANNEL_CRITICAL,
-                        notificationId = NOTIFICATION_ID_CRITICAL,
-                        title = title,
-                        text = text,
-                        tier = AlertTier.CRITICAL,
-                        vibrate = alerts.isCriticalVibrate,
-                        flash = alerts.isCriticalFlash,
-                        volumePercent = 100,
-                        glucoseDisplay = String.format(Locale.US, "%.1f", latest.valueMmol),
-                        trendArrow = latest.trendArrow ?: "→",
-                        primaryContactPhone = alerts.emergencyContactPhone,
-                        primaryContactName = alerts.emergencyContactName,
-                        criticalToneType = toneType
-                    )
-                    scheduleEmergencySmsIfEnabled(context, latest.valueMmol, latest.trendArrow ?: "→", alerts, settings.patientProfile, isRu, settings.unit)
-                    return
-                }
-            }
-        }
-
-        // If master alerts switch is disabled or currently on pause, skip remaining tiers (Hyper, Main, Predictive, Signal loss)
+        // If master alerts switch is disabled or currently on pause, skip remaining tiers
         if (!isMasterActive) return
 
-        if (alerts.isCriticalEnabled) {
-            // Extreme High or Prolonged High
-            val isExtremeHigh = latest.valueMmol > alerts.criticalHighThresholdMmol
-            val isProlongedHigh = checkProlongedOutOfRange(sorted, isLow = false, threshold = tirHigh, minutes = alerts.criticalHyperMinutes)
-
-            if (isExtremeHigh || isProlongedHigh) {
-                val timeSinceAck = now - userAcknowledgedHyperTimestamp
-                val isUnderInitialSnooze = userAcknowledgedHyperTimestamp > 0 && timeSinceAck < 30 * 60000L
-                val isBetween30And45 = userAcknowledgedHyperTimestamp > 0 && timeSinceAck in (30 * 60000L)..(45 * 60000L)
-
-                // Check trend & active bolus: is glucose falling or is there active bolus IoB >= threshold?
-                // For BG <= 13.9: IoB >= 0.2 U (pediatric & small dose safety)
-                // For BG > 13.9: IoB >= 0.5 U (significant corrective bolus required)
-                val requiredIob = if (isExtremeHigh) 0.5 else 0.2
-                val hasActiveBolus = latest.iob != null && latest.iob >= requiredIob
-                val isFalling = sorted.size >= 3 && (latest.valueMmol - sorted[sorted.size - 3].valueMmol) <= -0.5
-
-                val shouldTriggerHyper = when {
-                    isUnderInitialSnooze -> false // give insulin 30 min minimum
-                    (isBetween30And45 || (hasActiveBolus && timeSinceAck < 60 * 60000L)) && (isFalling || hasActiveBolus) -> false // active bolus working, extend snooze
-                    userAcknowledgedHyperTimestamp > 0 && timeSinceAck >= (if (hasActiveBolus) 60 * 60000L else 45 * 60000L) -> true // insulin expired or not falling!
-                    else -> now - lastHyperAlertTimestamp >= 15 * 60000L // no reaction yet: repeat every 15 min
-                }
-
-                if (shouldTriggerHyper) {
-                    lastHyperAlertTimestamp = now
-                    userAcknowledgedHyperTimestamp = 0L
-
-                    val title = if (isExtremeHigh) {
-                        if (isRu) "⚠️ ЭКСТРЕМАЛЬНО ВЫСОКИЙ САХАР!" else "⚠️ EXTREMELY HIGH GLUCOSE!"
-                    } else {
-                        if (isRu) "⚠️ ЗАТЯЖНАЯ ГИПЕРГЛИКЕМИЯ (${alerts.criticalHyperMinutes}+ мин)!" else "⚠️ PROLONGED HIGH (${alerts.criticalHyperMinutes}+ min)!"
-                    }
-                    val iobText = if (latest.iob != null && latest.iob > 0.0) {
-                        String.format(Locale.US, if (isRu) " (IoB: %.1f Ед)" else " (IoB: %.1f U)", latest.iob)
-                    } else ""
-                    val text = String.format(
-                        Locale.US,
-                        if (isRu) "Текущий сахар: %.1f ммоль/л%s. Проверьте помпу/подколку и кетоны."
-                        else "Current glucose: %.1f mmol/L%s. Check insulin delivery and ketones.",
-                        latest.valueMmol,
-                        iobText
-                    )
-                    val toneType = if (isExtremeHigh) MedicalSoundPlayer.CriticalToneType.EXTRA_HYPER else MedicalSoundPlayer.CriticalToneType.STANDARD
-                    sendNotification(
-                        context = context,
-                        channelId = CHANNEL_CRITICAL,
-                        notificationId = NOTIFICATION_ID_CRITICAL,
-                        title = title,
-                        text = text,
-                        tier = AlertTier.CRITICAL,
-                        vibrate = alerts.isCriticalVibrate,
-                        flash = alerts.isCriticalFlash,
-                        volumePercent = 100,
-                        glucoseDisplay = String.format(Locale.US, "%.1f", latest.valueMmol),
-                        trendArrow = "↑",
-                        primaryContactPhone = alerts.emergencyContactPhone,
-                        primaryContactName = alerts.emergencyContactName,
-                        criticalToneType = toneType
-                    )
-                    return
-                }
-            }
+        // ----------------------------------------------------
+        // TIER 3: CRITICAL HYPER
+        // ----------------------------------------------------
+        if (evaluateCriticalHyper(context, latest, sorted, alerts, tirHigh, now, isRu)) {
+            return
         }
 
         // ----------------------------------------------------
         // TIER 2: MAIN (CONFIRMED OUT OF RANGE)
         // ----------------------------------------------------
-        val mainLow = alerts.mainLowThresholdMmol
-        val mainHigh = alerts.mainHighThresholdMmol
-        if (alerts.isMainEnabled && sorted.size >= 2) {
-            val is5MinCadence = (sorted.last().timestamp - sorted[sorted.size - 2].timestamp >= 3 * 60_000L)
-            // Adaptive threshold: 3 points for 5-min sensors (~15 min), full count for 1-min
-            val adaptivePoints = if (is5MinCadence) minOf(alerts.mainConsecutivePoints, 3) else alerts.mainConsecutivePoints
-            val lastPoints = sorted.takeLast(adaptivePoints)
-
-            val isLowConfirmed = if (is5MinCadence) {
-                sorted.size >= adaptivePoints && lastPoints.all { it.valueMmol < mainLow }
-            } else {
-                // 1-minute cadence: require at least 15 minutes of readings below mainLow
-                val lowPoints = sorted.takeLastWhile { it.valueMmol < mainLow }
-                lowPoints.size >= 2 && (latest.timestamp - lowPoints.first().timestamp >= 15 * 60_000L)
-            }
-
-            val isHighConfirmed = if (is5MinCadence) {
-                sorted.size >= adaptivePoints && lastPoints.all { it.valueMmol > mainHigh }
-            } else {
-                // 1-minute cadence: require at least 15 minutes of readings above mainHigh
-                val highPoints = sorted.takeLastWhile { it.valueMmol > mainHigh }
-                highPoints.size >= 2 && (latest.timestamp - highPoints.first().timestamp >= 15 * 60_000L)
-            }
-
-            if (isLowConfirmed && now - lastHypoAlertTimestamp >= alerts.snoozeHypoMinutes * 60000L) {
-                lastHypoAlertTimestamp = now
-                val title = if (isRu) "🔻 Низкий сахар" else "🔻 Low Glucose"
-                val text = String.format(
-                    Locale.US,
-                    if (isRu) "Глюкоза: %.1f ммоль/л ниже порога %.1f."
-                    else "Glucose: %.1f mmol/L below threshold %.1f.",
-                    latest.valueMmol,
-                    mainLow
-                )
-                sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash, alerts.alertVolumePercent)
-                return
-            } else if (isHighConfirmed) {
-                val isExtremeHigh = latest.valueMmol > targetRanges.veryHighThresholdMmol
-                val requiredIob = if (isExtremeHigh) 0.5 else 0.2
-                val hasActiveBolus = latest.iob != null && latest.iob >= requiredIob
-                val hyperRepeatInterval = if (hasActiveBolus) 60 * 60000L else alerts.snoozeHyperMinutes * 60000L
-
-                // Safety: Check if glucose is falling while active bolus is present
-                val prev = if (sorted.size >= 2) sorted[sorted.size - 2] else null
-                val isFalling = (prev != null && latest.valueMmol < prev.valueMmol) ||
-                        latest.trendArrow in listOf("↘", "↓", "⇊")
-
-                if (hasActiveBolus && isFalling) {
-                    // Glucose is dropping and active insulin is working: suppress the audible alarm!
-                    Log.i(TAG, "Suppressed High Glucose alert: glucose is falling (${latest.valueMmol} mmol/L) with active IoB (${latest.iob} U)")
-                    _activeAlertBanner.value = ActiveAlertBanner(
-                        tier = AlertTier.MAIN,
-                        title = if (isRu) "🔺 Сахар высокий, но снижается"
-                                else "🔺 High but dropping",
-                        message = String.format(
-                            Locale.US,
-                            if (isRu) "Глюкоза %.1f %s. Активный болюс (%.1f Ед) снижает сахар. Сигнал без звука."
-                            else "Glucose %.1f %s. Active bolus (%.1f U) is lowering glucose. Alert muted.",
-                            latest.valueMmol,
-                            latest.trendArrow ?: "↘",
-                            latest.iob
-                        )
-                    )
-                    return
-                }
-
-                if (now - lastHyperAlertTimestamp >= hyperRepeatInterval) {
-                    lastHyperAlertTimestamp = now
-                    val title = if (isRu) "🔺 Высокий сахар" else "🔺 High Glucose"
-                    val text = String.format(
-                        Locale.US,
-                        if (isRu) "Глюкоза: %.1f ммоль/л выше порога %.1f."
-                        else "Glucose: %.1f mmol/L above threshold %.1f.",
-                        latest.valueMmol,
-                        mainHigh
-                    )
-                    sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash, alerts.alertVolumePercent)
-                    return
-                }
-            }
+        if (evaluateMainAlert(context, latest, sorted, alerts, targetRanges, now, isRu)) {
+            return
         }
 
         // ----------------------------------------------------
         // TIER 1: PREDICTIVE (15-MIN FORECAST)
         // ----------------------------------------------------
-        if (alerts.isPredictiveEnabled && sorted.size >= 5) {
-            val prediction = GlucoseTrendPredictor.predictTrend(
-                readings = sorted,
-                targetRanges = targetRanges,
-                minutesAhead = alerts.predictiveMinutesAhead,
-                useTingForHigh = settings.targetMode.name == "TING"
+        evaluatePredictiveAlert(context, latest, sorted, alerts, settings, targetRanges, now, isRu)
+    }
+
+    private fun evaluateCriticalHypo(
+        context: Context,
+        latest: GlucoseReading,
+        sorted: List<GlucoseReading>,
+        alerts: AlertSettings,
+        settings: UserSettings,
+        isHypoProtectionActive: Boolean,
+        tirLow: Double,
+        now: Long,
+        isRu: Boolean
+    ): Boolean {
+        if (!isHypoProtectionActive) return false
+
+        val isExtremeLow = latest.valueMmol < alerts.criticalLowThresholdMmol
+        val isProlongedLow = checkProlongedOutOfRange(sorted, isLow = true, threshold = tirLow, minutes = alerts.criticalHypoMinutes)
+
+        if (!isExtremeLow && !isProlongedLow) return false
+
+        val ackTimestamp = userAcknowledgedHypoTimestamp.get()
+        val timeSinceAck = now - ackTimestamp
+        val isUnderSnooze = ackTimestamp > 0 && timeSinceAck < alerts.snoozeHypoMinutes * 60000L
+
+        // Safety override: if under snooze, break early only if plummeting (drop rate <= -0.3 mmol/L)
+        // or if critically low (< 2.8) AND continuing to drop / stagnant.
+        // If glucose is rising after carbs, respect the clinical snooze.
+        val delta = if (sorted.size >= 2) latest.valueMmol - sorted[sorted.size - 2].valueMmol else 0.0
+        val isDroppingDangerously = (delta <= -0.3) || (latest.valueMmol < 2.8 && delta <= 0.0)
+
+        val shouldTriggerHypo = if (isUnderSnooze) {
+            isDroppingDangerously // break snooze early if plummeting!
+        } else if (ackTimestamp > 0) {
+            true // 15-min snooze expired!
+        } else {
+            // No reaction from user yet: repeat every 5 minutes!
+            now - lastHypoAlertTimestamp.get() >= 5 * 60000L
+        }
+
+        if (shouldTriggerHypo) {
+            lastHypoAlertTimestamp.set(now)
+            userAcknowledgedHypoTimestamp.set(0L) // reset so repeats in 5m if no reaction
+
+            val title = if (isExtremeLow) {
+                if (isRu) "🚨 ЭКСТРЕМАЛЬНО НИЗКИЙ САХАР!" else "🚨 EXTREMELY LOW GLUCOSE!"
+            } else {
+                if (isRu) "🚨 ЗАТЯЖНАЯ ГИПОГЛИКЕМИЯ (${alerts.criticalHypoMinutes}+ мин)!" else "🚨 PROLONGED HYPO (${alerts.criticalHypoMinutes}+ min)!"
+            }
+            val iobText = if (latest.iob != null && latest.iob > 0.0) {
+                String.format(Locale.US, if (isRu) " (IoB: %.1f Ед)" else " (IoB: %.1f U)", latest.iob)
+            } else ""
+            val text = String.format(
+                Locale.US,
+                if (isRu) "Текущий сахар: %.1f ммоль/л%s. Срочно примите быстрые углеводы!"
+                else "Current glucose: %.1f mmol/L%s. Take fast-acting carbs now!",
+                latest.valueMmol,
+                iobText
             )
+            val toneType = if (isExtremeLow) MedicalSoundPlayer.CriticalToneType.EXTRA_HYPO else MedicalSoundPlayer.CriticalToneType.STANDARD
+            sendNotification(
+                context = context,
+                channelId = CHANNEL_CRITICAL,
+                notificationId = NOTIFICATION_ID_CRITICAL,
+                title = title,
+                text = text,
+                tier = AlertTier.CRITICAL,
+                vibrate = alerts.isCriticalVibrate,
+                flash = alerts.isCriticalFlash,
+                volumePercent = 100,
+                glucoseDisplay = String.format(Locale.US, "%.1f", latest.valueMmol),
+                trendArrow = latest.trendArrow ?: "→",
+                primaryContactPhone = alerts.emergencyContactPhone,
+                primaryContactName = alerts.emergencyContactName,
+                criticalToneType = toneType
+            )
+            scheduleEmergencySmsIfEnabled(context, latest.valueMmol, latest.trendArrow ?: "→", alerts, settings.patientProfile, isRu, settings.unit)
+            return true
+        }
+        return false
+    }
 
-            val isPredictedLow = prediction.event == PredictedEvent.PREDICTED_LOW
-            val hasHighIobRisk = (latest.iob != null && latest.iob >= 1.0 && latest.valueMmol <= 6.5 &&
-                    prediction.rateOfChangeMmolPerMin < -0.01)
+    private fun evaluateCriticalHyper(
+        context: Context,
+        latest: GlucoseReading,
+        sorted: List<GlucoseReading>,
+        alerts: AlertSettings,
+        tirHigh: Double,
+        now: Long,
+        isRu: Boolean
+    ): Boolean {
+        if (!alerts.isCriticalEnabled) return false
 
-            if ((isPredictedLow || hasHighIobRisk) && now - lastPredictiveAlertTimestamp >= 20 * 60000L) {
-                lastPredictiveAlertTimestamp = now
-                val eventTime = now + (prediction.minutesUntilCrossing ?: 15) * 60000L
-                val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(eventTime))
-                val title = if (isRu) "Прогноз: ГИПО ~ в $timeStr" else "Predict: LOW ~ at $timeStr"
+        val isExtremeHigh = latest.valueMmol > alerts.criticalHighThresholdMmol
+        val isProlongedHigh = checkProlongedOutOfRange(sorted, isLow = false, threshold = tirHigh, minutes = alerts.criticalHyperMinutes)
 
-                // Derive trend arrow strictly from rate of change to prevent conflicting arrows
-                val arrow = when {
-                    prediction.rateOfChangeMmolPerMin <= -0.15 -> "⇊"
-                    prediction.rateOfChangeMmolPerMin <= -0.06 -> "↓"
-                    else -> "↘"
-                }
+        if (!isExtremeHigh && !isProlongedHigh) return false
 
-                val iobNotice = if (latest.iob != null && latest.iob > 0.0) {
-                    String.format(Locale.US, if (isRu) " (IoB: %.1f Ед)" else " (IoB: %.1f U)", latest.iob)
-                } else ""
+        val ackTimestamp = userAcknowledgedHyperTimestamp.get()
+        val timeSinceAck = now - ackTimestamp
+        val isUnderInitialSnooze = ackTimestamp > 0 && timeSinceAck < 30 * 60000L
+        val isBetween30And45 = ackTimestamp > 0 && timeSinceAck in (30 * 60000L)..(45 * 60000L)
 
+        // Check trend & active bolus: is glucose falling or is there active bolus IoB >= threshold?
+        val requiredIob = if (isExtremeHigh) 0.5 else 0.2
+        val hasActiveBolus = latest.iob != null && latest.iob >= requiredIob
+        val isFalling = sorted.size >= 3 && (latest.valueMmol - sorted[sorted.size - 3].valueMmol) <= -0.5
+
+        val shouldTriggerHyper = when {
+            isUnderInitialSnooze -> false // give insulin 30 min minimum
+            (isBetween30And45 || (hasActiveBolus && timeSinceAck < 60 * 60000L)) && (isFalling || hasActiveBolus) -> false // active bolus working, extend snooze
+            ackTimestamp > 0 && timeSinceAck >= (if (hasActiveBolus) 60 * 60000L else 45 * 60000L) -> true // insulin expired or not falling!
+            else -> now - lastHyperAlertTimestamp.get() >= 15 * 60000L // no reaction yet: repeat every 15 min
+        }
+
+        if (shouldTriggerHyper) {
+            lastHyperAlertTimestamp.set(now)
+            userAcknowledgedHyperTimestamp.set(0L)
+
+            val title = if (isExtremeHigh) {
+                if (isRu) "⚠️ ЭКСТРЕМАЛЬНО ВЫСОКИЙ САХАР!" else "⚠️ EXTREMELY HIGH GLUCOSE!"
+            } else {
+                if (isRu) "⚠️ ЗАТЯЖНАЯ ГИПЕРГЛИКЕМИЯ (${alerts.criticalHyperMinutes}+ мин)!" else "⚠️ PROLONGED HIGH (${alerts.criticalHyperMinutes}+ min)!"
+            }
+            val iobText = if (latest.iob != null && latest.iob > 0.0) {
+                String.format(Locale.US, if (isRu) " (IoB: %.1f Ед)" else " (IoB: %.1f U)", latest.iob)
+            } else ""
+            val text = String.format(
+                Locale.US,
+                if (isRu) "Текущий сахар: %.1f ммоль/л%s. Проверьте помпу/подколку и кетоны."
+                else "Current glucose: %.1f mmol/L%s. Check insulin delivery and ketones.",
+                latest.valueMmol,
+                iobText
+            )
+            val toneType = if (isExtremeHigh) MedicalSoundPlayer.CriticalToneType.EXTRA_HYPER else MedicalSoundPlayer.CriticalToneType.STANDARD
+            sendNotification(
+                context = context,
+                channelId = CHANNEL_CRITICAL,
+                notificationId = NOTIFICATION_ID_CRITICAL,
+                title = title,
+                text = text,
+                tier = AlertTier.CRITICAL,
+                vibrate = alerts.isCriticalVibrate,
+                flash = alerts.isCriticalFlash,
+                volumePercent = 100,
+                glucoseDisplay = String.format(Locale.US, "%.1f", latest.valueMmol),
+                trendArrow = "↑",
+                primaryContactPhone = alerts.emergencyContactPhone,
+                primaryContactName = alerts.emergencyContactName,
+                criticalToneType = toneType
+            )
+            return true
+        }
+        return false
+    }
+
+    private fun evaluateMainAlert(
+        context: Context,
+        latest: GlucoseReading,
+        sorted: List<GlucoseReading>,
+        alerts: AlertSettings,
+        targetRanges: com.tirup.app.domain.model.TargetRanges,
+        now: Long,
+        isRu: Boolean
+    ): Boolean {
+        val mainLow = alerts.mainLowThresholdMmol
+        val mainHigh = alerts.mainHighThresholdMmol
+        if (!alerts.isMainEnabled || sorted.size < 2) return false
+
+        val is5MinCadence = (sorted.last().timestamp - sorted[sorted.size - 2].timestamp >= 3 * 60_000L)
+        val adaptivePoints = if (is5MinCadence) minOf(alerts.mainConsecutivePoints, 3) else alerts.mainConsecutivePoints
+        val lastPoints = sorted.takeLast(adaptivePoints)
+
+        val isLowConfirmed = if (is5MinCadence) {
+            sorted.size >= adaptivePoints && lastPoints.all { it.valueMmol < mainLow }
+        } else {
+            val lowPoints = sorted.takeLastWhile { it.valueMmol < mainLow }
+            lowPoints.size >= 2 && (latest.timestamp - lowPoints.first().timestamp >= 15 * 60_000L)
+        }
+
+        val isHighConfirmed = if (is5MinCadence) {
+            sorted.size >= adaptivePoints && lastPoints.all { it.valueMmol > mainHigh }
+        } else {
+            val highPoints = sorted.takeLastWhile { it.valueMmol > mainHigh }
+            highPoints.size >= 2 && (latest.timestamp - highPoints.first().timestamp >= 15 * 60_000L)
+        }
+
+        if (isLowConfirmed && now - lastHypoAlertTimestamp.get() >= alerts.snoozeHypoMinutes * 60000L) {
+            lastHypoAlertTimestamp.set(now)
+            val title = if (isRu) "🔻 Низкий сахар" else "🔻 Low Glucose"
+            val text = String.format(
+                Locale.US,
+                if (isRu) "Глюкоза: %.1f ммоль/л ниже порога %.1f."
+                else "Glucose: %.1f mmol/L below threshold %.1f.",
+                latest.valueMmol,
+                mainLow
+            )
+            sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash, alerts.alertVolumePercent)
+            return true
+        } else if (isHighConfirmed) {
+            val isExtremeHigh = latest.valueMmol > targetRanges.veryHighThresholdMmol
+            val requiredIob = if (isExtremeHigh) 0.5 else 0.2
+            val hasActiveBolus = latest.iob != null && latest.iob >= requiredIob
+            val hyperRepeatInterval = if (hasActiveBolus) 60 * 60000L else alerts.snoozeHyperMinutes * 60000L
+
+            val prev = if (sorted.size >= 2) sorted[sorted.size - 2] else null
+            val isFalling = (prev != null && latest.valueMmol < prev.valueMmol) ||
+                    latest.trendArrow in listOf("↘", "↓", "⇊")
+
+            if (hasActiveBolus && isFalling) {
+                Log.i(TAG, "Suppressed High Glucose alert: glucose is falling (${latest.valueMmol} mmol/L) with active IoB (${latest.iob} U)")
+                _activeAlertBanner.value = ActiveAlertBanner(
+                    tier = AlertTier.MAIN,
+                    title = if (isRu) "🔺 Сахар высокий, но снижается"
+                            else "🔺 High but dropping",
+                    message = String.format(
+                        Locale.US,
+                        if (isRu) "Глюкоза %.1f %s. Активный болюс (%.1f Ед) снижает сахар. Сигнал без звука."
+                        else "Glucose %.1f %s. Active bolus (%.1f U) is lowering glucose. Alert muted.",
+                        latest.valueMmol,
+                        latest.trendArrow ?: "↘",
+                        latest.iob
+                    )
+                )
+                return true
+            }
+
+            if (now - lastHyperAlertTimestamp.get() >= hyperRepeatInterval) {
+                lastHyperAlertTimestamp.set(now)
+                val title = if (isRu) "🔺 Высокий сахар" else "🔺 High Glucose"
                 val text = String.format(
                     Locale.US,
-                    if (isRu) "Сахар %.1f ммоль/л %s%s падает со скоростью %.2f ммоль/л/мин."
-                    else "Glucose %.1f mmol/L %s%s dropping at %.2f mmol/L/min.",
+                    if (isRu) "Глюкоза: %.1f ммоль/л выше порога %.1f."
+                    else "Glucose: %.1f mmol/L above threshold %.1f.",
                     latest.valueMmol,
-                    arrow,
-                    iobNotice,
-                    kotlin.math.abs(prediction.rateOfChangeMmolPerMin)
+                    mainHigh
                 )
-                sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash, alerts.alertVolumePercent)
-            } else if (prediction.event == PredictedEvent.PREDICTED_HIGH && now - lastPredictiveAlertTimestamp >= 30 * 60000L) {
-                lastPredictiveAlertTimestamp = now
-                val eventTime = now + (prediction.minutesUntilCrossing ?: 15) * 60000L
-                val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(eventTime))
-                val title = if (isRu) "Прогноз: ГИПЕР ~ в $timeStr" else "Predict: HIGH ~ at $timeStr"
-
-                val arrow = when {
-                    prediction.rateOfChangeMmolPerMin >= 0.15 -> "⇈"
-                    prediction.rateOfChangeMmolPerMin >= 0.06 -> "↑"
-                    else -> "↗"
-                }
-
-                val text = String.format(
-                    Locale.US,
-                    if (isRu) "Сахар %.1f ммоль/л %s растёт со скоростью %.2f ммоль/л/мин."
-                    else "Glucose %.1f mmol/L %s rising at %.2f mmol/L/min.",
-                    latest.valueMmol,
-                    arrow,
-                    prediction.rateOfChangeMmolPerMin
-                )
-                sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash, alerts.alertVolumePercent)
+                sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash, alerts.alertVolumePercent)
+                return true
             }
         }
+        return false
+    }
+
+    private fun evaluatePredictiveAlert(
+        context: Context,
+        latest: GlucoseReading,
+        sorted: List<GlucoseReading>,
+        alerts: AlertSettings,
+        settings: UserSettings,
+        targetRanges: com.tirup.app.domain.model.TargetRanges,
+        now: Long,
+        isRu: Boolean
+    ): Boolean {
+        if (!alerts.isPredictiveEnabled || sorted.size < 5) return false
+
+        val prediction = GlucoseTrendPredictor.predictTrend(
+            readings = sorted,
+            targetRanges = targetRanges,
+            minutesAhead = alerts.predictiveMinutesAhead,
+            useTingForHigh = settings.targetMode.name == "TING"
+        )
+
+        val isPredictedLow = prediction.event == PredictedEvent.PREDICTED_LOW
+        val hasHighIobRisk = (latest.iob != null && latest.iob >= 1.0 && latest.valueMmol <= 6.5 &&
+                prediction.rateOfChangeMmolPerMin < -0.01)
+
+        val lastPredictive = lastPredictiveAlertTimestamp.get()
+        if ((isPredictedLow || hasHighIobRisk) && now - lastPredictive >= 20 * 60000L) {
+            lastPredictiveAlertTimestamp.set(now)
+            val eventTime = now + (prediction.minutesUntilCrossing ?: 15) * 60000L
+            val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(eventTime))
+            val title = if (isRu) "Прогноз: ГИПО ~ в $timeStr" else "Predict: LOW ~ at $timeStr"
+
+            val arrow = when {
+                prediction.rateOfChangeMmolPerMin <= -0.15 -> "⇊"
+                prediction.rateOfChangeMmolPerMin <= -0.06 -> "↓"
+                else -> "↘"
+            }
+
+            val iobNotice = if (latest.iob != null && latest.iob > 0.0) {
+                String.format(Locale.US, if (isRu) " (IoB: %.1f Ед)" else " (IoB: %.1f U)", latest.iob)
+            } else ""
+
+            val text = String.format(
+                Locale.US,
+                if (isRu) "Сахар %.1f ммоль/л %s%s падает со скоростью %.2f ммоль/л/мин."
+                else "Glucose %.1f mmol/L %s%s dropping at %.2f mmol/L/min.",
+                latest.valueMmol,
+                arrow,
+                iobNotice,
+                kotlin.math.abs(prediction.rateOfChangeMmolPerMin)
+            )
+            sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash, alerts.alertVolumePercent)
+            return true
+        } else if (prediction.event == PredictedEvent.PREDICTED_HIGH && now - lastPredictive >= 30 * 60000L) {
+            lastPredictiveAlertTimestamp.set(now)
+            val eventTime = now + (prediction.minutesUntilCrossing ?: 15) * 60000L
+            val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(eventTime))
+            val title = if (isRu) "Прогноз: ГИПЕР ~ в $timeStr" else "Predict: HIGH ~ at $timeStr"
+
+            val arrow = when {
+                prediction.rateOfChangeMmolPerMin >= 0.15 -> "⇈"
+                prediction.rateOfChangeMmolPerMin >= 0.06 -> "↑"
+                else -> "↗"
+            }
+
+            val text = String.format(
+                Locale.US,
+                if (isRu) "Сахар %.1f ммоль/л %s растёт со скоростью %.2f ммоль/л/мин."
+                else "Glucose %.1f mmol/L %s rising at %.2f mmol/L/min.",
+                latest.valueMmol,
+                arrow,
+                prediction.rateOfChangeMmolPerMin
+            )
+            sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash, alerts.alertVolumePercent)
+            return true
+        }
+        return false
     }
 
     private fun checkProlongedOutOfRange(
@@ -2476,15 +2566,16 @@ object GlucoseAlertManager {
             val isMasterActive = alerts.isAlertsMasterEnabled && now >= alerts.alertsMuteUntilTimestamp
             if (alerts.isSignalLossEnabled && isMasterActive) {
                 val isNight = isNightNow(settings)
-                val requiredIntervalMs = if (signalLossAlertCount == 0) {
+                val count = signalLossAlertCount.get()
+                val requiredIntervalMs = if (count == 0) {
                     0L
                 } else {
-                    getNextSignalLossIntervalMs(signalLossAlertCount, isNight)
+                    getNextSignalLossIntervalMs(count, isNight)
                 }
 
-                if (now - lastSignalLossAlertTimestamp >= requiredIntervalMs) {
-                    signalLossAlertCount++
-                    lastSignalLossAlertTimestamp = now
+                if (now - lastSignalLossAlertTimestamp.get() >= requiredIntervalMs) {
+                    signalLossAlertCount.incrementAndGet()
+                    lastSignalLossAlertTimestamp.set(now)
                     val elapsedMin = (elapsedSinceLatest / 60000L).toInt()
                     val isRu = settings.language.equals("RU", ignoreCase = true)
                     val title = if (isRu) "📡 Потеря связи с сенсором ($elapsedMin мин)" else "📡 Sensor Signal Lost ($elapsedMin min)"
@@ -2503,7 +2594,7 @@ object GlucoseAlertManager {
                 }
 
                 // Schedule next check based on day/night interval
-                val nextIntervalMs = getNextSignalLossIntervalMs(signalLossAlertCount, isNightNow(settings))
+                val nextIntervalMs = getNextSignalLossIntervalMs(signalLossAlertCount.get(), isNightNow(settings))
                 scheduleNextSignalLossCheck(context, now + nextIntervalMs)
             } else {
                 // Keep periodic check alive every minute to update elapsed minutes in lockscreen notification & widgets
@@ -2512,9 +2603,9 @@ object GlucoseAlertManager {
             return true
         } else {
             // Signal is active! Reset backoff count and dismiss notification
-            if (signalLossAlertCount > 0 || lastSignalLossAlertTimestamp > 0L) {
-                signalLossAlertCount = 0
-                lastSignalLossAlertTimestamp = 0L
+            if (signalLossAlertCount.get() > 0 || lastSignalLossAlertTimestamp.get() > 0L) {
+                signalLossAlertCount.set(0)
+                lastSignalLossAlertTimestamp.set(0L)
                 val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
                 nm?.cancel(NOTIFICATION_ID_SIGNAL_LOSS)
             }

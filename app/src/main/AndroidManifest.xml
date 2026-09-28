@@ -153,6 +153,9 @@
                 <action android:name="com.tirup.app.ACTION_CHECK_SIGNAL_LOSS" />
                 <action android:name="com.tirup.app.ACTION_POLL_XDRIP_LAN" />
                 <action android:name="com.tirup.app.ACTION_SKIP_HBA1C_QUARTER" />
+                <action android:name="com.tirup.app.ACTION_TRIGGER_EMERGENCY_SMS" />
+                <action android:name="com.tirup.app.ACTION_SMS_SENT" />
+                <action android:name="com.tirup.app.ACTION_SMS_DELIVERED" />
             </intent-filter>
         </receiver>
 

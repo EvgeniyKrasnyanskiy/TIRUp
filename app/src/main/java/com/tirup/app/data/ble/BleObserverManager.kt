@@ -20,6 +20,7 @@ import com.tirup.app.TirupApplication
 import com.tirup.app.data.alert.GlucoseAlertManager
 import com.tirup.app.domain.model.BleBridgeRole
 import com.tirup.app.domain.model.BleGlucosePacket
+import com.tirup.app.domain.model.DataSourcePriority
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.repository.GlucoseRepository
 import com.tirup.app.domain.repository.SettingsRepository
@@ -177,43 +178,14 @@ object BleObserverManager {
         context: Context,
         settingsRepository: SettingsRepository,
         glucoseRepository: GlucoseRepository
-    ) {
-        appContext = context.applicationContext
-        cachedSettingsRepo = settingsRepository
-        cachedGlucoseRepo = glucoseRepository
-
-        scope.launch {
-            val userSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
-            val ble = userSettings.bleBridgeSettings
-            if (ble.role != BleBridgeRole.OBSERVER) return@launch
-
-            boostJob?.cancel()
-            isBoostActive = true
-            _boostRemainingSec.value = 60
-
-            // Restart scanner in low latency mode
-            stopScanningInternal()
-            startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = true)
-
-            boostJob = launch {
-                while (_boostRemainingSec.value > 0) {
-                    delay(1000L)
-                    _boostRemainingSec.value = (_boostRemainingSec.value - 1).coerceAtLeast(0)
-                }
-                isBoostActive = false
-                // Revert to normal scan mode
-                stopScanningInternal()
-                startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = false)
-            }
-        }
-    }
+    ) = boostScanForDuration(context, settingsRepository, glucoseRepository, 60)
 
     /** Legacy alias for backwards compatibility */
     fun boostScanFor30Sec(
         context: Context,
         settingsRepository: SettingsRepository,
         glucoseRepository: GlucoseRepository
-    ) = boostScanFor60Sec(context, settingsRepository, glucoseRepository)
+    ) = boostScanForDuration(context, settingsRepository, glucoseRepository, 30)
 
     /**
      * Boosts scan for a custom duration (e.g. 10s range test).
@@ -232,24 +204,28 @@ object BleObserverManager {
             val userSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
             val ble = userSettings.bleBridgeSettings
 
-            boostJob?.cancel()
-            isBoostActive = true
-            _boostRemainingSec.value = durationSec
+            mutex.withLock {
+                boostJob?.cancel()
+                isBoostActive = true
+                _boostRemainingSec.value = durationSec
 
-            // Restart scanner in low latency mode
-            stopScanningInternal()
-            startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = true)
+                // Restart scanner in low latency mode
+                stopScanningInternalLocked()
+                startScanningInternalLocked(context, ble.familyPin, settingsRepository, glucoseRepository, boost = true)
 
-            boostJob = launch {
-                while (_boostRemainingSec.value > 0) {
-                    delay(1000L)
-                    _boostRemainingSec.value = (_boostRemainingSec.value - 1).coerceAtLeast(0)
-                }
-                isBoostActive = false
-                // Revert to normal scan mode if observer, else stop
-                stopScanningInternal()
-                if (ble.role == BleBridgeRole.OBSERVER) {
-                    startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = false)
+                boostJob = launch {
+                    while (_boostRemainingSec.value > 0) {
+                        delay(1000L)
+                        _boostRemainingSec.value = (_boostRemainingSec.value - 1).coerceAtLeast(0)
+                    }
+                    mutex.withLock {
+                        isBoostActive = false
+                        // Revert to normal scan mode if observer, else stop
+                        stopScanningInternalLocked()
+                        if (ble.role == BleBridgeRole.OBSERVER) {
+                            startScanningInternalLocked(context, ble.familyPin, settingsRepository, glucoseRepository, boost = false)
+                        }
+                    }
                 }
             }
         }
@@ -611,7 +587,7 @@ object BleObserverManager {
                 )
                 settingsRepository.updateSettings(currentSettings.copy(bleBridgeSettings = updatedBle))
 
-                // Insert into Room DB (ignoring conflicts if already present)
+                // Insert into Room DB with explicit BLE_BRIDGE priority for robust deduplication
                 val newReading = GlucoseReading(
                     timestamp = packet.timestamp,
                     valueMmol = packet.valueMmol,
@@ -619,7 +595,7 @@ object BleObserverManager {
                     iob = if (packet.iob > 0.0) packet.iob else null,
                     cob = if (packet.cob > 0.0) packet.cob else null
                 )
-                glucoseRepository.insertReading(newReading)
+                glucoseRepository.insertReadingFromSource(newReading, DataSourcePriority.BLE_BRIDGE)
 
                 // Update widgets, lockscreen notification and clinical evaluations
                 GlucoseAlertManager.refreshLockscreenNotificationAndWidgets(context, currentSettings, newReading)
@@ -641,7 +617,12 @@ object BleObserverManager {
 
     @android.annotation.SuppressLint("MissingPermission")
     private suspend fun stopScanningInternal() = mutex.withLock {
-        if (!isScanning) return@withLock
+        stopScanningInternalLocked()
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
+    private fun stopScanningInternalLocked() {
+        if (!isScanning) return
         try {
             activeCallback?.let { cb ->
                 scanner?.stopScan(cb)

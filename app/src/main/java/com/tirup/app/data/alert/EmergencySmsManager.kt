@@ -1,7 +1,9 @@
 package com.tirup.app.data.alert
 
 import android.Manifest
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
@@ -10,6 +12,7 @@ import android.telephony.SmsManager
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.tirup.app.TirupApplication
+import com.tirup.app.data.receiver.AlertActionReceiver
 import com.tirup.app.data.repository.SettingsRepositoryImpl
 import com.tirup.app.domain.alert.EmergencySmsBuilder
 import com.tirup.app.domain.model.AlertSettings
@@ -28,6 +31,9 @@ object EmergencySmsManager {
      * Anti-spam cooldown: minimum 30 minutes between automated emergency SMS.
      */
     const val COOLDOWN_MILLIS = 30 * 60 * 1000L
+
+    @Volatile
+    private var inMemoryLastSentTimestamp: Long = 0L
 
     /**
      * Dispatches an emergency SMS alert to the configured trusted contact if enabled and cooldown has passed.
@@ -63,8 +69,9 @@ object EmergencySmsManager {
         }
 
         val now = System.currentTimeMillis()
-        if (now - settings.lastEmergencySmsTimestamp < COOLDOWN_MILLIS) {
-            val remainingSec = (COOLDOWN_MILLIS - (now - settings.lastEmergencySmsTimestamp)) / 1000
+        val effectiveLastSent = maxOf(settings.lastEmergencySmsTimestamp, inMemoryLastSentTimestamp)
+        if (now - effectiveLastSent < COOLDOWN_MILLIS) {
+            val remainingSec = (COOLDOWN_MILLIS - (now - effectiveLastSent)) / 1000
             Log.w(TAG, "Emergency SMS cooldown active ($remainingSec seconds remaining). Skipping duplicate SMS.")
             return false
         }
@@ -98,6 +105,7 @@ object EmergencySmsManager {
         }
 
         if (atLeastOneSuccess) {
+            inMemoryLastSentTimestamp = now
             updateLastSentTimestamp(context, now)
         }
         return atLeastOneSuccess
@@ -179,11 +187,34 @@ object EmergencySmsManager {
             SmsManager.getDefault()
         }
 
+        val sentIntent = PendingIntent.getBroadcast(
+            context,
+            (phone.hashCode() and 0x7FFFFFFF),
+            Intent(AlertActionReceiver.ACTION_SMS_SENT)
+                .setPackage(context.packageName)
+                .putExtra("extra_phone", phone),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val deliveryIntent = PendingIntent.getBroadcast(
+            context,
+            (phone.hashCode() and 0x7FFFFFFF) + 1,
+            Intent(AlertActionReceiver.ACTION_SMS_DELIVERED)
+                .setPackage(context.packageName)
+                .putExtra("extra_phone", phone),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val parts = smsManager.divideMessage(message)
         if (parts.size > 1) {
-            smsManager.sendMultipartTextMessage(phone, null, parts, null, null)
+            val sentIntents = ArrayList<PendingIntent>(parts.size).apply {
+                for (i in 0 until parts.size) add(sentIntent)
+            }
+            val deliveryIntents = ArrayList<PendingIntent>(parts.size).apply {
+                for (i in 0 until parts.size) add(deliveryIntent)
+            }
+            smsManager.sendMultipartTextMessage(phone, null, parts, sentIntents, deliveryIntents)
         } else {
-            smsManager.sendTextMessage(phone, null, message, null, null)
+            smsManager.sendTextMessage(phone, null, message, sentIntent, deliveryIntent)
         }
     }
 
@@ -205,6 +236,37 @@ object EmergencySmsManager {
                 val loc = lm.getLastKnownLocation(provider) ?: continue
                 if (bestLocation == null || loc.accuracy < bestLocation.accuracy || loc.time > bestLocation.time) {
                     bestLocation = loc
+                }
+            }
+
+            // Fresh fix attempt if cached location is null or stale (> 15 minutes)
+            val isStale = bestLocation != null && (System.currentTimeMillis() - bestLocation.time > 15 * 60 * 1000L)
+            if ((bestLocation == null || isStale) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                try {
+                    val cancellationSignal = android.os.CancellationSignal()
+                    val latch = java.util.concurrent.CountDownLatch(1)
+                    var freshLoc: Location? = null
+                    val providerToUse = if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                        LocationManager.GPS_PROVIDER
+                    } else if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                        LocationManager.NETWORK_PROVIDER
+                    } else {
+                        LocationManager.PASSIVE_PROVIDER
+                    }
+                    lm.getCurrentLocation(
+                        providerToUse,
+                        cancellationSignal,
+                        java.util.concurrent.Executors.newSingleThreadExecutor()
+                    ) { loc ->
+                        freshLoc = loc
+                        latch.countDown()
+                    }
+                    latch.await(3500L, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    if (freshLoc != null) {
+                        bestLocation = freshLoc
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Fresh location fix attempt failed: ${e.message}")
                 }
             }
 

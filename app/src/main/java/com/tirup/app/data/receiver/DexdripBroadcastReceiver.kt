@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 
 class DexdripBroadcastReceiver : BroadcastReceiver() {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope get() = companionScope
 
     override fun onReceive(context: Context?, intent: Intent?) {
         if (context == null || intent == null) return
@@ -57,10 +57,8 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                                 val newCob = standaloneCob ?: latestEntity.cob
                                 if (newIob != latestEntity.iob || newCob != latestEntity.cob) {
                                     db.glucoseReadingDao().updateIobCob(latestEntity.id, newIob, newCob)
-                                    cachedIob = newIob
-                                    cachedIobTimestamp = System.currentTimeMillis()
-                                    cachedCob = newCob
-                                    cachedCobTimestamp = System.currentTimeMillis()
+                                    setCachedIob(newIob, System.currentTimeMillis())
+                                    setCachedCob(newCob, System.currentTimeMillis())
                                     com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context.applicationContext)
                                     Log.i(TAG, "Attached standalone IoB/CoB to reading ${latestEntity.timestamp}: iob=$newIob, cob=$newCob")
                                 }
@@ -141,14 +139,12 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         val curIob = iob
         if (curIob != null && curIob <= 0.05) {
             iob = null
-            cachedIob = null
-            cachedIobTimestamp = 0L
+            clearCachedIob()
         }
         val curCob = cob
         if (curCob != null && curCob <= 0.5) {
             cob = null
-            cachedCob = null
-            cachedCobTimestamp = 0L
+            clearCachedCob()
         }
 
         val pendingResult = goAsync()
@@ -161,13 +157,11 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         if (pebbleData != null) {
                             if (iob == null && pebbleData.first != null && pebbleData.first!! > 0.05) {
                                 iob = pebbleData.first
-                                cachedIob = iob
-                                cachedIobTimestamp = System.currentTimeMillis()
+                                setCachedIob(iob, System.currentTimeMillis())
                             }
                             if (cob == null && pebbleData.second != null && pebbleData.second!! > 0.5) {
                                 cob = pebbleData.second
-                                cachedCob = cob
-                                cachedCobTimestamp = System.currentTimeMillis()
+                                setCachedCob(cob, System.currentTimeMillis())
                             }
                         }
                     } catch (pe: Exception) {
@@ -183,8 +177,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         if (!recentTreatments.isNullOrEmpty()) {
                             val activeCob = calculateActiveCob(recentTreatments.map { it.toDomain() }, now)
                             cob = activeCob
-                            cachedCob = cob
-                            cachedCobTimestamp = now
+                            setCachedCob(cob, now)
                         }
                     } catch (_: Exception) {}
                 }
@@ -197,13 +190,11 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         if (lastInDb != null && (now - lastInDb.timestamp) <= IOB_COB_EXPIRY_MS) {
                             if (iob == null && lastInDb.iob != null && lastInDb.iob > 0.05) {
                                 iob = lastInDb.iob
-                                cachedIob = iob
-                                cachedIobTimestamp = lastInDb.timestamp
+                                setCachedIob(iob, lastInDb.timestamp)
                             }
                             if (cob == null && lastInDb.cob != null && lastInDb.cob >= 0.0) {
                                 cob = lastInDb.cob
-                                cachedCob = cob
-                                cachedCobTimestamp = lastInDb.timestamp
+                                setCachedCob(cob, lastInDb.timestamp)
                             }
                         }
                     } catch (_: Exception) {}
@@ -336,12 +327,10 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 val num = getDoubleFromBundle(extras, key)
                 if (num != null && num >= 0.0) {
                     if (num <= 0.05) {
-                        cachedIob = null
-                        cachedIobTimestamp = 0L
+                        clearCachedIob()
                         return null
                     }
-                    cachedIob = num
-                    cachedIobTimestamp = System.currentTimeMillis()
+                    setCachedIob(num, System.currentTimeMillis())
                     return num
                 }
             }
@@ -356,12 +345,10 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 if (parsed?.first != null && parsed.first!! >= 0.0) {
                     val num = parsed.first!!
                     if (num <= 0.05) {
-                        cachedIob = null
-                        cachedIobTimestamp = 0L
+                        clearCachedIob()
                         return null
                     }
-                    cachedIob = num
-                    cachedIobTimestamp = System.currentTimeMillis()
+                    setCachedIob(num, System.currentTimeMillis())
                     return num
                 }
             }
@@ -377,19 +364,18 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             val parsedIob = iobMatch?.groupValues?.get(1)?.replace(',', '.')?.toDoubleOrNull()
             if (parsedIob != null && parsedIob >= 0.0) {
                 if (parsedIob <= 0.05) {
-                    cachedIob = null
-                    cachedIobTimestamp = 0L
+                    clearCachedIob()
                     return null
                 }
-                cachedIob = parsedIob
-                cachedIobTimestamp = System.currentTimeMillis()
+                setCachedIob(parsedIob, System.currentTimeMillis())
                 return parsedIob
             }
         }
 
         // Cache fallback: return last valid IoB if within 30 minutes
-        if (cachedIob != null && (System.currentTimeMillis() - cachedIobTimestamp) <= IOB_COB_EXPIRY_MS) {
-            return cachedIob
+        val cached = getCachedIob()
+        if (cached != null) {
+            return cached
         }
 
         return null
@@ -420,24 +406,20 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                     val extracted = Regex("""\d+([.,]\d+)?""").find(obj)?.value?.replace(',', '.')?.toDoubleOrNull()
                     if (extracted != null && extracted >= 0.0) {
                         if (extracted <= 0.5) {
-                            cachedCob = null
-                            cachedCobTimestamp = 0L
+                            clearCachedCob()
                             return null
                         }
-                        cachedCob = extracted
-                        cachedCobTimestamp = System.currentTimeMillis()
+                        setCachedCob(extracted, System.currentTimeMillis())
                         return extracted
                     }
                 }
                 val num = getDoubleFromBundle(extras, key)
                 if (num != null && num >= 0.0) {
                     if (num <= 0.5) {
-                        cachedCob = null
-                        cachedCobTimestamp = 0L
+                        clearCachedCob()
                         return null
                     }
-                    cachedCob = num
-                    cachedCobTimestamp = System.currentTimeMillis()
+                    setCachedCob(num, System.currentTimeMillis())
                     return num
                 }
             }
@@ -452,12 +434,10 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 if (parsed?.second != null && parsed.second!! >= 0.0) {
                     val num = parsed.second!!
                     if (num <= 0.5) {
-                        cachedCob = null
-                        cachedCobTimestamp = 0L
+                        clearCachedCob()
                         return null
                     }
-                    cachedCob = num
-                    cachedCobTimestamp = System.currentTimeMillis()
+                    setCachedCob(num, System.currentTimeMillis())
                     return num
                 }
             }
@@ -473,19 +453,18 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             val parsedCob = cobMatch?.groupValues?.get(1)?.toDoubleOrNull()
             if (parsedCob != null && parsedCob >= 0.0) {
                 if (parsedCob <= 0.5) {
-                    cachedCob = null
-                    cachedCobTimestamp = 0L
+                    clearCachedCob()
                     return null
                 }
-                cachedCob = parsedCob
-                cachedCobTimestamp = System.currentTimeMillis()
+                setCachedCob(parsedCob, System.currentTimeMillis())
                 return parsedCob
             }
         }
 
         // Cache fallback: return last valid CoB if within 30 minutes
-        if (cachedCob != null && (System.currentTimeMillis() - cachedCobTimestamp) <= IOB_COB_EXPIRY_MS) {
-            return cachedCob
+        val cached = getCachedCob()
+        if (cached != null) {
+            return cached
         }
 
         return null
@@ -578,15 +557,44 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         @Volatile
         private var lastProcessedValue: Double = 0.0
 
-        @Volatile
-        private var cachedIob: Double? = null
-        @Volatile
-        private var cachedIobTimestamp: Long = 0L
+        data class TreatmentCache(
+            val iob: Double? = null,
+            val iobTimestamp: Long = 0L,
+            val cob: Double? = null,
+            val cobTimestamp: Long = 0L
+        )
 
-        @Volatile
-        private var cachedCob: Double? = null
-        @Volatile
-        private var cachedCobTimestamp: Long = 0L
+        private val treatmentCache = java.util.concurrent.atomic.AtomicReference(TreatmentCache())
+
+        fun setCachedIob(iob: Double?, timestamp: Long = System.currentTimeMillis()) {
+            treatmentCache.updateAndGet { it.copy(iob = iob, iobTimestamp = timestamp) }
+        }
+
+        fun clearCachedIob() {
+            treatmentCache.updateAndGet { it.copy(iob = null, iobTimestamp = 0L) }
+        }
+
+        fun setCachedCob(cob: Double?, timestamp: Long = System.currentTimeMillis()) {
+            treatmentCache.updateAndGet { it.copy(cob = cob, cobTimestamp = timestamp) }
+        }
+
+        fun clearCachedCob() {
+            treatmentCache.updateAndGet { it.copy(cob = null, cobTimestamp = 0L) }
+        }
+
+        fun getCachedIob(): Double? {
+            val cache = treatmentCache.get()
+            return if (cache.iob != null && (System.currentTimeMillis() - cache.iobTimestamp) <= IOB_COB_EXPIRY_MS) {
+                cache.iob
+            } else null
+        }
+
+        fun getCachedCob(): Double? {
+            val cache = treatmentCache.get()
+            return if (cache.cob != null && (System.currentTimeMillis() - cache.cobTimestamp) <= IOB_COB_EXPIRY_MS) {
+                cache.cob
+            } else null
+        }
 
         private val companionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -1234,12 +1242,10 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         if (newIob != latestEntity.iob || newCob != latestEntity.cob) {
                             db.glucoseReadingDao().updateIobCob(latestEntity.id, newIob, newCob)
                             if (newIob != null) {
-                                cachedIob = newIob
-                                cachedIobTimestamp = now
+                                setCachedIob(newIob, now)
                             }
                             if (newCob != null) {
-                                cachedCob = newCob
-                                cachedCobTimestamp = now
+                                setCachedCob(newCob, now)
                             }
                             com.tirup.app.presentation.widget.TirupWidgetUpdater.updateAllWidgets(context.applicationContext)
                             Log.i(TAG, "Synced IoB/CoB to reading ${latestEntity.id}: iob=$newIob, cob=$newCob")

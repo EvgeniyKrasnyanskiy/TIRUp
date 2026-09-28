@@ -19,13 +19,16 @@ object SosSmsParser {
 
     /**
      * Checks if the incoming message is a TIRUp emergency SOS alert.
+     * Requires both a hypoglycemia indicator and an alarm/critical indicator to prevent false sirens.
      */
     fun isSosMessage(body: String): Boolean {
         val trimmed = body.trim()
         val clean = trimmed.replace(Regex("^(\\[.*?\\]|\\(.*?\\))\\s*"), "")
         if (!trimmed.startsWith("SOS!", ignoreCase = true) && !clean.startsWith("SOS!", ignoreCase = true)) return false
         val lower = trimmed.lowercase()
-        return lower.contains("гипо") || lower.contains("hypo") || lower.contains("сирена") || lower.contains("alarm")
+        val hasHypo = lower.contains("гипо") || lower.contains("hypo")
+        val hasAlertOrCrit = lower.contains("сирена") || lower.contains("alarm") || lower.contains("критич") || lower.contains("critical")
+        return hasHypo && hasAlertOrCrit
     }
 
     /**
