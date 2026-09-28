@@ -492,8 +492,8 @@ fun TreatmentInputBottomSheet(
                                         set(Calendar.MINUTE, minute)
                                         set(Calendar.SECOND, 0)
                                         set(Calendar.MILLISECOND, 0)
-                                        // If selected time is > 1 min in the future, assume it was yesterday
-                                        if (timeInMillis > now.timeInMillis + 60_000L) {
+                                        // Midnight wrap-around: if selected time is far ahead in the future (> 6 hours), assume it was yesterday evening
+                                        if (timeInMillis - now.timeInMillis > 6 * 3600_000L) {
                                             add(Calendar.DAY_OF_YEAR, -1)
                                         }
                                     }
