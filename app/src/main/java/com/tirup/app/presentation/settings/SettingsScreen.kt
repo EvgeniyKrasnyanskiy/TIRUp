@@ -2451,10 +2451,9 @@ fun SettingsScreen(
                                         lanTestStatus = null
                                         lanScope.launch {
                                             if (xdripLan.isAutoDiscovery) {
-                                                val res = XdripLanClient.discoverMaster(context, xdripLan.port, xdripLan.apiSecret)
+                                                val res = XdripLanManager.discoverMaster()
                                                 val discovered = res.getOrNull()
                                                 if (discovered != null) {
-                                                    viewModel.updateXdripLanSettings(xdripLan.copy(masterHost = discovered))
                                                     isLanTestSuccess = true
                                                     lanTestStatus = if (isRu) "Мастер найден: $discovered" else "Found master: $discovered"
                                                 } else {

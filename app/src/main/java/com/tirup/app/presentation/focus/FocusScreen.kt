@@ -1241,20 +1241,28 @@ fun FocusScreen(
 
     if (showLanStatusDialog) {
         val xdripLan = userSettings.xdripLanSettings
+        var isManualDiscovering by remember { mutableStateOf(false) }
+        val isSearching = isLanDiscovering || isManualDiscovering
         LanStatusDialog(
             xdripLan = xdripLan,
             lanStatus = lanStatus,
-            isDiscovering = isLanDiscovering,
+            isDiscovering = isSearching,
             isRu = isRu,
             onSearchClick = {
+                if (isSearching) return@LanStatusDialog
+                isManualDiscovering = true
                 coroutineScope.launch {
-                    val res = XdripLanClient.discoverMaster(context, xdripLan.port, xdripLan.apiSecret)
-                    val discovered = res.getOrNull()
-                    if (discovered != null) {
-                        viewModel.updateXdripLanSettings(xdripLan.copy(masterHost = discovered))
-                        Toast.makeText(context, if (isRu) "Мастер найден: $discovered" else "Found master: $discovered", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, if (isRu) "Мастер не найден в подсети" else "Master not found in LAN", Toast.LENGTH_SHORT).show()
+                    try {
+                        val res = XdripLanManager.discoverMaster()
+                        val discovered = res.getOrNull()
+                        if (discovered != null) {
+                            Toast.makeText(context, if (isRu) "Мастер найден: $discovered" else "Found master: $discovered", Toast.LENGTH_SHORT).show()
+                        } else {
+                            val err = res.exceptionOrNull()?.message ?: (if (isRu) "Мастер не найден в подсети" else "Master not found in LAN")
+                            Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                        }
+                    } finally {
+                        isManualDiscovering = false
                     }
                 }
             },
@@ -1305,7 +1313,7 @@ private data class LanBadgeStyle(
     val bg: Color,
     val borderColor: Color,
     val iconColor: Color,
-    val statusText: String
+    val isBusy: Boolean = false
 )
 
 @Composable
@@ -1319,59 +1327,57 @@ private fun WifiLanBadge(
 ) {
     if (!xdripLan.isEnabled) return
 
+    val isBusy = isDiscovering || lanStatus.state == LanConnectionState.CONNECTING
     val style = when {
-        isDiscovering || lanStatus.state == LanConnectionState.CONNECTING -> LanBadgeStyle(
+        isBusy -> LanBadgeStyle(
             bg = ActionBlue.copy(alpha = 0.15f),
             borderColor = ActionBlue.copy(alpha = 0.45f),
             iconColor = ActionBlue,
-            statusText = if (isRu) "Поиск" else "Scan"
+            isBusy = true
         )
         lanStatus.state == LanConnectionState.CONNECTED -> LanBadgeStyle(
             bg = PrimaryEmerald.copy(alpha = 0.15f),
             borderColor = PrimaryEmerald.copy(alpha = 0.45f),
-            iconColor = PrimaryEmerald,
-            statusText = "LAN"
+            iconColor = PrimaryEmerald
         )
         lanStatus.state == LanConnectionState.ERROR -> LanBadgeStyle(
             bg = ColorVeryLow.copy(alpha = 0.15f),
             borderColor = ColorVeryLow.copy(alpha = 0.45f),
-            iconColor = ColorVeryLow,
-            statusText = if (isRu) "Сбой" else "Err"
+            iconColor = ColorVeryLow
         )
         else -> LanBadgeStyle(
             bg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
-            iconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            statusText = if (isRu) "Офлайн" else "Off"
+            iconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
         )
     }
 
     Surface(
         modifier = modifier
-            .height(24.dp)
+            .size(width = 28.dp, height = 24.dp)
             .clickable { onClick() },
         shape = RoundedCornerShape(8.dp),
         color = style.bg,
         border = BorderStroke(0.8.dp, style.borderColor)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = if (lanStatus.state == LanConnectionState.DISCONNECTED) Icons.Default.WifiOff else Icons.Default.Wifi,
-                contentDescription = if (isRu) "Wi-Fi LAN" else "Wi-Fi LAN",
-                tint = style.iconColor,
-                modifier = Modifier.size(13.dp)
-            )
-            Text(
-                text = style.statusText,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                fontSize = 10.sp,
-                color = style.iconColor
-            )
+            if (style.isBusy) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(12.dp),
+                    strokeWidth = 1.8.dp,
+                    color = style.iconColor
+                )
+            } else {
+                Icon(
+                    imageVector = if (lanStatus.state == LanConnectionState.CONNECTED) Icons.Default.Wifi else Icons.Default.WifiOff,
+                    contentDescription = if (isRu) "Wi-Fi LAN" else "Wi-Fi LAN",
+                    tint = style.iconColor,
+                    modifier = Modifier.size(13.dp)
+                )
+            }
         }
     }
 }
@@ -1509,7 +1515,11 @@ private fun LanStatusDialog(
         confirmButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
-                    onClick = onSearchClick,
+                    onClick = {
+                        if (!isDiscovering) {
+                            onSearchClick()
+                        }
+                    },
                     enabled = !isDiscovering,
                     shape = RoundedCornerShape(10.dp)
                 ) {
