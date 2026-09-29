@@ -1268,6 +1268,7 @@ fun FocusScreen(
                     }
                 }
             },
+            onToggleEnable = { viewModel.setXdripLanEnabled(!xdripLan.isEnabled) },
             onOpenSettings = {
                 showLanStatusDialog = false
                 onOpenSettings("wifi_lan")
@@ -1409,6 +1410,7 @@ private fun LanStatusDialog(
     isDiscovering: Boolean,
     isRu: Boolean,
     onSearchClick: () -> Unit,
+    onToggleEnable: () -> Unit,
     onOpenSettings: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -1568,8 +1570,24 @@ private fun LanStatusDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(if (isRu) "Закрыть" else "Close")
+            Button(
+                onClick = {
+                    onToggleEnable()
+                    onDismiss()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (xdripLan.isEnabled) MaterialTheme.colorScheme.error.copy(alpha = 0.85f) else ActionBlue
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = if (xdripLan.isEnabled) {
+                        if (isRu) "Отключить Wi-Fi" else "Disable Wi-Fi"
+                    } else {
+                        if (isRu) "Включить Wi-Fi" else "Enable Wi-Fi"
+                    },
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
     )
@@ -2409,7 +2427,7 @@ private fun HeroGlucoseCard(
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = if (dailyAlertsCount > 0) ColorHigh.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                        border = BorderStroke(0.8.dp, if (dailyAlertsCount > 0) ColorHigh.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                        border = BorderStroke(0.8.dp, if (dailyAlertsCount > 0) ColorHigh.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
                         modifier = Modifier.clickable { onAlertHistoryClick() }
                     ) {
                         Row(
