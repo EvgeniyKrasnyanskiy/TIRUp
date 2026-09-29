@@ -930,13 +930,6 @@ fun NightscoutSyncCard(
     val nightscout = settings.nightscoutSettings
     var isExpanded by rememberSaveable { mutableStateOf(false) }
     var isTestingNs by remember { mutableStateOf(false) }
-
-    // Auto-collapse settings when the card is disabled
-    LaunchedEffect(nightscout.isEnabled) {
-        if (!nightscout.isEnabled) {
-            isExpanded = false
-        }
-    }
     var nsTestStatus by remember { mutableStateOf<String?>(null) }
     var isNsTestSuccess by remember { mutableStateOf(false) }
     val nsScope = rememberCoroutineScope()

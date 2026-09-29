@@ -1378,7 +1378,7 @@ private fun WifiLanBadge(
             .clickable { onClick() },
         shape = RoundedCornerShape(8.dp),
         color = style.bg,
-        border = BorderStroke(0.8.dp, style.borderColor)
+        border = BorderStroke(1.2.dp, style.borderColor)
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),

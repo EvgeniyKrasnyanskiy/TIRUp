@@ -838,12 +838,16 @@ fun SettingsScreen(
                 onCheckAndRequestBlePermissions = { checkAndRequestBlePermissions(it) }
             )
 
+            // Nightscout sync: hidden until dev-unlocked OR already configured by user.
+            // Once disabled by user, it retreats back to the hidden (dev) section.
+            if (isDevTestsUnlocked || settings.nightscoutSettings.isEnabled) {
                 NightscoutSyncCard(
                     settings = settings,
                     isRu = isRu,
                     onUpdateNightscoutSettings = { viewModel.updateNightscoutSettings(it) },
                     onShowNightscoutDialog = { showNightscoutDialog = true }
                 )
+            }
 
 }
 
