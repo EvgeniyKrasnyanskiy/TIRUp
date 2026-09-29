@@ -109,6 +109,10 @@
     <string name="aod_flashlight_overlay_hint">💡 Фонарик (двойной тап для выключения)</string>
     <string name="aod_flashlight_ramping">💡 Разгорание: %d%% • Тап: Пауза</string>
     <string name="aod_flashlight_paused">⏸ Пауза: %d%% • Тап: Продолжить</string>
+    <string name="aod_flashlight_ramping_with_timer">💡 %1$d%% • %2$dс • Тап: Пауза</string>
+    <string name="aod_flashlight_paused_with_timer">⏸ %1$d%% • %2$dс • Тап: Продолжить</string>
+    <string name="aod_rear_torch">Тыльный фонарик</string>
+    <string name="aod_torch_brightness_hud">Индикатор: %d%%</string>
     <string name="aod_brightness_hud">Яркость: %d%%</string>
     <string name="aod_gesture_hint">Двойной тап: фонарик • Свайп: выход • Вверх/вниз: яркость</string>
     <string name="aod_no_data">Нет данных</string>

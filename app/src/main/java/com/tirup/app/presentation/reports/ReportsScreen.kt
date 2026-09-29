@@ -835,7 +835,7 @@ private fun HistoricalReportCard(
                                 Icon(
                                     imageVector = Icons.Default.DeleteOutline,
                                     contentDescription = "Clear",
-                                    tint = ColorHigh,
+                                    tint = ColorVeryLow,
                                     modifier = Modifier.size(24.dp)
                                 )
                             }

@@ -1005,6 +1005,38 @@ fun AlwaysOnDisplayCard(
                     )
                 }
 
+                // Launch on Screen Off (Night hours 22:00 - 06:00 when phone is idle/face up)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                        Text(
+                            text = if (isRu) "🔒 Запускать AoD при заблокированном экране" else "🔒 Launch AoD on locked screen",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (isRu) "(только ночные часы 22:00 – 06:00, когда телефон не используется и не в кармане)"
+                            else "(night hours 22:00 – 06:00, when device is idle and not in pocket)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = aod.launchOnScreenOff,
+                        onCheckedChange = { launchOnScreenOff ->
+                            onUpdateAodSettings(aod.copy(launchOnScreenOff = launchOnScreenOff))
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = ActionBlue
+                        )
+                    )
+                }
+
                 // Launch Test Button
                 Button(
                     onClick = {

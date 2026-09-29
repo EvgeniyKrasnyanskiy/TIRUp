@@ -16,10 +16,47 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+
 class AodActivity : ComponentActivity() {
+
+    private var sensorManager: SensorManager? = null
+    private var proximitySensor: Sensor? = null
+    private var proximityJob: Job? = null
+
+    private val proximityListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent?) {
+            if (event?.sensor?.type == Sensor.TYPE_PROXIMITY) {
+                val distance = event.values.firstOrNull() ?: return
+                val maxRange = proximitySensor?.maximumRange ?: 5f
+                val isNear = distance < maxRange.coerceAtMost(5f)
+                if (isNear) {
+                    if (proximityJob == null || proximityJob?.isActive == false) {
+                        proximityJob = lifecycleScope.launch {
+                            delay(1800L)
+                            finish()
+                        }
+                    }
+                } else {
+                    proximityJob?.cancel()
+                    proximityJob = null
+                }
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        sensorManager = getSystemService(SENSOR_SERVICE) as? SensorManager
+        proximitySensor = sensorManager?.getDefaultSensor(Sensor.TYPE_PROXIMITY)
 
         try {
             // Allow display over lock screen and wake up
@@ -78,6 +115,18 @@ class AodActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         hideSystemBars()
+        proximitySensor?.let { sensor ->
+            sensorManager?.registerListener(proximityListener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        proximityJob?.cancel()
+        proximityJob = null
+        try {
+            sensorManager?.unregisterListener(proximityListener)
+        } catch (_: Exception) {}
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

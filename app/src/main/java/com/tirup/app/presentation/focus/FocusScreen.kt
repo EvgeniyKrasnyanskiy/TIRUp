@@ -90,6 +90,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -1329,12 +1330,30 @@ private fun WifiLanBadge(
     if (!xdripLan.isEnabled) return
 
     val isBusy = isDiscovering || lanStatus.state == LanConnectionState.CONNECTING
+    var showSpinner by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isBusy) {
+        if (isBusy) {
+            showSpinner = true
+            delay(3800L) // 3.8s max spinner animation to prevent user anxiety
+            showSpinner = false
+        } else {
+            showSpinner = false
+        }
+    }
+
     val style = when {
-        isBusy -> LanBadgeStyle(
+        showSpinner -> LanBadgeStyle(
             bg = ActionBlue.copy(alpha = 0.15f),
             borderColor = ActionBlue.copy(alpha = 0.45f),
             iconColor = ActionBlue,
             isBusy = true
+        )
+        isBusy -> LanBadgeStyle(
+            bg = ActionBlue.copy(alpha = 0.15f),
+            borderColor = ActionBlue.copy(alpha = 0.45f),
+            iconColor = ActionBlue,
+            isBusy = false
         )
         lanStatus.state == LanConnectionState.CONNECTED -> LanBadgeStyle(
             bg = PrimaryEmerald.copy(alpha = 0.15f),
@@ -2494,7 +2513,7 @@ private fun HeroGlucoseCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    if (bleBridgeSettings != null) {
+                    if (bleBridgeSettings != null && bleBridgeSettings.isEnabled) {
                         BleBridgeBadge(
                             bleSettings = bleBridgeSettings,
                             isBleBroadcasting = isBleBroadcasting,

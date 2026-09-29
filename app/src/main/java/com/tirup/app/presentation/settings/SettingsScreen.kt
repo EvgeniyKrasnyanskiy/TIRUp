@@ -266,6 +266,7 @@ fun SettingsScreen(
 
     val listState = rememberLazyListState()
     var highlightBle by remember { mutableStateOf(false) }
+    var highlightLan by remember { mutableStateOf(false) }
 
 
     LaunchedEffect(target) {
@@ -282,6 +283,9 @@ fun SettingsScreen(
             isLanCardExpanded = true
             delay(150L)
             listState.animateScrollToItem(5)
+            highlightLan = true
+            delay(2800L)
+            highlightLan = false
         } else if (target == "hba1c") {
             viewModel.toggleHba1cDialog(true)
         }
@@ -704,6 +708,8 @@ fun SettingsScreen(
                                 isRu = isRu,
                                 isLanCardExpanded = isLanCardExpanded,
                                 onToggleExpanded = { isLanCardExpanded = !isLanCardExpanded },
+                                highlightLan = highlightLan,
+                                highlightBorderAlpha = highlightBorderAlpha,
                                 onUpdateLanSettings = { viewModel.updateXdripLanSettings(it) },
                                 onShowLanSettingsDialog = { showXdripLanDialog = true }
                             )

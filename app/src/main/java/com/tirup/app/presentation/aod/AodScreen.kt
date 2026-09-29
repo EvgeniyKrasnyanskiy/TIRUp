@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FlashlightOn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -63,7 +64,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.os.BatteryManager
+import android.os.Build
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
 import com.tirup.app.R
@@ -158,6 +162,53 @@ fun AodScreen(
     var isFlashlightPaused by rememberSaveable { mutableStateOf(false) }
     var flashlightProgress by rememberSaveable { mutableFloatStateOf(0f) }
 
+    // Rear camera hardware torch state
+    val cameraManager = remember(context) {
+        context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
+    }
+    val cameraId = remember(cameraManager) {
+        try {
+            cameraManager?.cameraIdList?.firstOrNull { id ->
+                val chars = cameraManager.getCameraCharacteristics(id)
+                chars.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+            } ?: cameraManager?.cameraIdList?.firstOrNull()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    var isRearTorchActive by rememberSaveable { mutableStateOf(false) }
+    var rearTorchBrightness by rememberSaveable { mutableFloatStateOf(0.30f) }
+    var isTorchBrightnessOverlayVisible by remember { mutableStateOf(false) }
+    var torchBrightnessOverlayTrigger by remember { mutableLongStateOf(0L) }
+
+    fun toggleRearTorch(enable: Boolean) {
+        try {
+            if (cameraId != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                cameraManager?.setTorchMode(cameraId, enable)
+                isRearTorchActive = enable
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                if (isRearTorchActive && cameraId != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    cameraManager?.setTorchMode(cameraId, false)
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    // Screen flashlight countdown (100 seconds auto-close, reset on any tap)
+    var flashlightCountdownSec by rememberSaveable { mutableIntStateOf(100) }
+    // Rear torch button visible for 3 seconds on tap during screen flashlight
+    var isRearTorchButtonVisible by remember { mutableStateOf(false) }
+    var rearTorchButtonCountdown by remember { mutableIntStateOf(3) }
+
     LaunchedEffect(isFlashlightActive, isFlashlightPaused) {
         if (isFlashlightActive && !isFlashlightPaused) {
             val stepDelay = 50L
@@ -166,6 +217,39 @@ fun AodScreen(
                 delay(stepDelay)
                 flashlightProgress = (flashlightProgress + stepIncrement).coerceAtMost(1.0f)
             }
+        }
+    }
+
+    LaunchedEffect(isFlashlightActive, isRearTorchActive) {
+        if (isFlashlightActive && !isRearTorchActive) {
+            flashlightCountdownSec = 100
+            while (isFlashlightActive && !isRearTorchActive && flashlightCountdownSec > 0) {
+                delay(1000L)
+                flashlightCountdownSec--
+            }
+            if (flashlightCountdownSec <= 0 && isFlashlightActive) {
+                isFlashlightActive = false
+                isFlashlightPaused = false
+                flashlightProgress = 0f
+                isRearTorchButtonVisible = false
+            }
+        }
+    }
+
+    LaunchedEffect(isRearTorchButtonVisible, rearTorchButtonCountdown) {
+        if (isRearTorchButtonVisible && rearTorchButtonCountdown > 0) {
+            delay(1000L)
+            rearTorchButtonCountdown--
+            if (rearTorchButtonCountdown <= 0) {
+                isRearTorchButtonVisible = false
+            }
+        }
+    }
+
+    LaunchedEffect(torchBrightnessOverlayTrigger) {
+        if (torchBrightnessOverlayTrigger > 0L) {
+            delay(1200L)
+            isTorchBrightnessOverlayVisible = false
         }
     }
 
@@ -218,13 +302,13 @@ fun AodScreen(
     }
 
     // Pulse timer countdown: screen sleeps after pulseDurationSeconds in PULSE_ON_UPDATE mode
-    LaunchedEffect(lastAwakeTriggerTimestamp, aod.displayMode, isFlashlightActive) {
-        if (aod.displayMode == AodDisplayMode.PULSE_ON_UPDATE && !isFlashlightActive) {
+    LaunchedEffect(lastAwakeTriggerTimestamp, aod.displayMode, isFlashlightActive, isRearTorchActive) {
+        if (aod.displayMode == AodDisplayMode.PULSE_ON_UPDATE && !isFlashlightActive && !isRearTorchActive) {
             val durationMs = aod.pulseDurationSeconds.coerceAtLeast(3) * 1000L
             delay(durationMs)
             isAwake = false
             onSetWindowBrightness(0.001f) // Ultra-dim sleeping window
-        } else if (aod.displayMode == AodDisplayMode.ALWAYS_ON && !isFlashlightActive) {
+        } else if (aod.displayMode == AodDisplayMode.ALWAYS_ON && !isFlashlightActive && !isRearTorchActive) {
             isAwake = true
             onSetWindowBrightness(currentBrightness)
         }
@@ -238,9 +322,11 @@ fun AodScreen(
         }
     }
 
-    // Sync window brightness with flashlight progression or AoD brightness
-    LaunchedEffect(flashlightProgress, isFlashlightActive, currentBrightness, isAwake, aod.displayMode) {
-        if (isFlashlightActive) {
+    // Sync window brightness with flashlight progression, rear torch, or AoD brightness
+    LaunchedEffect(flashlightProgress, isFlashlightActive, isRearTorchActive, rearTorchBrightness, currentBrightness, isAwake, aod.displayMode) {
+        if (isRearTorchActive) {
+            onSetWindowBrightness(rearTorchBrightness.coerceIn(0.01f, 1.0f))
+        } else if (isFlashlightActive) {
             val b = 0.05f + (0.95f * flashlightProgress)
             onSetWindowBrightness(b)
         } else {
@@ -256,12 +342,17 @@ fun AodScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            // Gesture detector: tap to wake / pause flashlight, double tap for flashlight
-            .pointerInput(aod.displayMode, isFlashlightActive) {
+            // Gesture detector: tap to wake / pause flashlight / toggle rear torch
+            .pointerInput(aod.displayMode, isFlashlightActive, isRearTorchActive) {
                 detectTapGestures(
                     onTap = {
-                        if (isFlashlightActive) {
-                            // Single tap during flashlight: pause or resume ramping!
+                        if (isRearTorchActive) {
+                            toggleRearTorch(false)
+                        } else if (isFlashlightActive) {
+                            // Single tap during flashlight: reset 100s timer & reveal rear torch button for 3s
+                            flashlightCountdownSec = 100
+                            isRearTorchButtonVisible = true
+                            rearTorchButtonCountdown = 3
                             isFlashlightPaused = !isFlashlightPaused
                         } else {
                             // Single tap wakes screen in PULSE_ON_UPDATE
@@ -271,20 +362,25 @@ fun AodScreen(
                         }
                     },
                     onDoubleTap = {
-                        if (!isFlashlightActive) {
+                        if (isRearTorchActive) {
+                            toggleRearTorch(false)
+                        } else if (!isFlashlightActive) {
                             isFlashlightActive = true
                             isFlashlightPaused = false
                             flashlightProgress = 0.05f
+                            flashlightCountdownSec = 100
+                            isRearTorchButtonVisible = false
                         } else {
                             isFlashlightActive = false
                             isFlashlightPaused = false
                             flashlightProgress = 0f
+                            isRearTorchButtonVisible = false
                         }
                     }
                 )
             }
             // Vertical drag for brightness, horizontal swipe for exit
-            .pointerInput(isFlashlightActive) {
+            .pointerInput(isFlashlightActive, isRearTorchActive) {
                 var totalDragX = 0f
                 var totalDragY = 0f
                 var isVerticalDrag = false
@@ -299,7 +395,11 @@ fun AodScreen(
                         totalDragX += dragAmount.x
                         totalDragY += dragAmount.y
 
-                        if (!isFlashlightActive) {
+                        if (isRearTorchActive) {
+                            rearTorchBrightness = (rearTorchBrightness - (dragAmount.y / 350f)).coerceIn(0.01f, 1.0f)
+                            isTorchBrightnessOverlayVisible = true
+                            torchBrightnessOverlayTrigger = System.currentTimeMillis()
+                        } else if (!isFlashlightActive) {
                             if (isVerticalDrag || (abs(totalDragY) > 8f && abs(totalDragY) > abs(totalDragX) * 1.1f)) {
                                 isVerticalDrag = true
                                 currentBrightness = (currentBrightness - (dragAmount.y / 450f)).coerceIn(0.005f, 1.0f)
@@ -310,7 +410,10 @@ fun AodScreen(
                         }
                     },
                     onDragEnd = {
-                        if (abs(totalDragX) > 80f && abs(totalDragX) > abs(totalDragY) * 1.5f) {
+                        if (isRearTorchActive) {
+                            torchBrightnessOverlayTrigger = System.currentTimeMillis()
+                        } else if (abs(totalDragX) > 80f && abs(totalDragX) > abs(totalDragY) * 1.5f) {
+                            if (isRearTorchActive) toggleRearTorch(false)
                             onExit()
                         } else if (isVerticalDrag) {
                             onSaveBrightness(currentBrightness)
@@ -318,7 +421,9 @@ fun AodScreen(
                         }
                     },
                     onDragCancel = {
-                        if (isVerticalDrag) {
+                        if (isRearTorchActive) {
+                            torchBrightnessOverlayTrigger = System.currentTimeMillis()
+                        } else if (isVerticalDrag) {
                             onSaveBrightness(currentBrightness)
                             brightnessOverlayTrigger = System.currentTimeMillis()
                         }
@@ -335,7 +440,7 @@ fun AodScreen(
         // -------------------------------------------------------------
         // 1. Flashlight Overlay: Smooth warm white ramp with interactive slider & pause
         // -------------------------------------------------------------
-        if (isFlashlightActive || flashlightProgress > 0.001f) {
+        if ((isFlashlightActive || flashlightProgress > 0.001f) && !isRearTorchActive) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -357,9 +462,9 @@ fun AodScreen(
                     ) {
                         Text(
                             text = if (isFlashlightPaused) {
-                                stringResource(R.string.aod_flashlight_paused, pct)
+                                stringResource(R.string.aod_flashlight_paused_with_timer, pct, flashlightCountdownSec)
                             } else {
-                                stringResource(R.string.aod_flashlight_ramping, pct)
+                                stringResource(R.string.aod_flashlight_ramping_with_timer, pct, flashlightCountdownSec)
                             },
                             color = overlayTextColor,
                             fontSize = 14.sp,
@@ -370,6 +475,7 @@ fun AodScreen(
                                 isFlashlightActive = false
                                 isFlashlightPaused = false
                                 flashlightProgress = 0f
+                                isRearTorchButtonVisible = false
                             }
                         ) {
                             Icon(
@@ -396,6 +502,136 @@ fun AodScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
+
+                // Rear Hardware Torch Quick-Switch Button (Visible for 3s after tap at fingerprint area)
+                AnimatedVisibility(
+                    visible = isRearTorchButtonVisible,
+                    enter = fadeIn(tween(150)),
+                    exit = fadeOut(tween(250)),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = if (isLandscape) 64.dp else 100.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xEE0F172A),
+                        border = BorderStroke(2.dp, Color(0xFFF59E0B)),
+                        shadowElevation = 8.dp,
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clickable {
+                                isFlashlightActive = false
+                                isFlashlightPaused = false
+                                flashlightProgress = 0f
+                                isRearTorchButtonVisible = false
+                                rearTorchBrightness = 0.30f
+                                toggleRearTorch(true)
+                            }
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FlashlightOn,
+                                    contentDescription = stringResource(R.string.aod_rear_torch),
+                                    tint = Color(0xFFF59E0B),
+                                    modifier = Modifier.size(30.dp)
+                                )
+                                Text(
+                                    text = "${rearTorchButtonCountdown}s",
+                                    color = Color(0xFFFCD34D),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // 1b. Rear Hardware Torch Active Mode (Black screen with illuminated icon at 30%, drag 1-100%)
+        // -------------------------------------------------------------
+        if (isRearTorchActive) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            ) {
+                // Torch brightness HUD
+                AnimatedVisibility(
+                    visible = isTorchBrightnessOverlayVisible,
+                    enter = fadeIn(tween(150)),
+                    exit = fadeOut(tween(300)),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = if (isLandscape) 36.dp else 68.dp)
+                ) {
+                    Surface(
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                        color = Color(0xEE1E293B),
+                        border = BorderStroke(1.dp, Color(0xFF475569)),
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(text = "🔦", fontSize = 18.sp)
+                            Text(
+                                text = stringResource(R.string.aod_torch_brightness_hud, (rearTorchBrightness * 100).roundToInt()),
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                // Rear torch illuminated icon in fingerprint scanner area (bottom center)
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = if (isLandscape) 20.dp else 72.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFF1E293B).copy(alpha = rearTorchBrightness.coerceIn(0.15f, 0.95f)),
+                        border = BorderStroke(2.dp, Color(0xFFF59E0B).copy(alpha = rearTorchBrightness.coerceIn(0.25f, 1.0f))),
+                        modifier = Modifier
+                            .size(76.dp)
+                            .clickable {
+                                toggleRearTorch(false)
+                            }
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FlashlightOn,
+                                contentDescription = stringResource(R.string.aod_rear_torch),
+                                tint = Color(0xFFF59E0B).copy(alpha = rearTorchBrightness.coerceIn(0.3f, 1.0f)),
+                                modifier = Modifier.size(38.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        text = "▲▼ 1–100%",
+                        color = Color(0xFF888888).copy(alpha = rearTorchBrightness.coerceIn(0.2f, 0.8f)),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         }
 
@@ -403,7 +639,7 @@ fun AodScreen(
         // 2. Brightness HUD overlay during vertical drag (Placed at TopCenter above glucose)
         // -------------------------------------------------------------
         AnimatedVisibility(
-            visible = isBrightnessOverlayVisible && !isFlashlightActive,
+            visible = isBrightnessOverlayVisible && !isFlashlightActive && !isRearTorchActive,
             enter = fadeIn(tween(150)),
             exit = fadeOut(tween(300)),
             modifier = Modifier
@@ -436,7 +672,7 @@ fun AodScreen(
         // 3. AOD Glucose Display Content (Visible when isAwake or ALWAYS_ON)
         // -------------------------------------------------------------
         AnimatedVisibility(
-            visible = (isAwake || aod.displayMode == AodDisplayMode.ALWAYS_ON) && !isFlashlightActive,
+            visible = (isAwake || aod.displayMode == AodDisplayMode.ALWAYS_ON) && !isFlashlightActive && !isRearTorchActive,
             enter = fadeIn(tween(400)),
             exit = fadeOut(tween(400)),
             modifier = Modifier.fillMaxSize()
@@ -490,7 +726,10 @@ fun AodScreen(
                     }
 
                     IconButton(
-                        onClick = onExit,
+                        onClick = {
+                            if (isRearTorchActive) toggleRearTorch(false)
+                            onExit()
+                        },
                         modifier = Modifier.size(if (isLandscape) 40.dp else 36.dp)
                     ) {
                         Icon(

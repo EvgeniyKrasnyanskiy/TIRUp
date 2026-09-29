@@ -108,6 +108,10 @@
     <string name="aod_flashlight_overlay_hint">💡 Flashlight (double-tap to turn off)</string>
     <string name="aod_flashlight_ramping">💡 Ramping: %d%% • Tap: Pause</string>
     <string name="aod_flashlight_paused">⏸ Paused: %d%% • Tap: Resume</string>
+    <string name="aod_flashlight_ramping_with_timer">💡 %1$d%% • %2$ds • Tap: Pause</string>
+    <string name="aod_flashlight_paused_with_timer">⏸ %1$d%% • %2$ds • Tap: Resume</string>
+    <string name="aod_rear_torch">Rear Torch</string>
+    <string name="aod_torch_brightness_hud">Torch Icon: %d%%</string>
     <string name="aod_brightness_hud">Brightness: %d%%</string>
     <string name="aod_gesture_hint">Double-tap: Flashlight • Swipe: Exit • Up/down: Brightness</string>
     <string name="aod_no_data">No data</string>

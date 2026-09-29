@@ -83,6 +83,9 @@ class FloatingBubbleService : Service() {
     private var isFirstModeApplication: Boolean = true
     private var miniCountdownJob: Job? = null
     private var countdownToast: Toast? = null
+    private var burnInJob: Job? = null
+    private var isUserInteracting: Boolean = false
+    private var lastSideSwitchTimestamp: Long = 0L
 
     @Suppress("DEPRECATION")
     private fun vibrateTick() {
@@ -139,6 +142,7 @@ class FloatingBubbleService : Service() {
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         createAndAttachBubble()
         observeData()
+        startBurnInProtection()
     }
 
     @SuppressLint("InflateParams", "ClickableViewAccessibility")
@@ -188,6 +192,7 @@ class FloatingBubbleService : Service() {
         view.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
+                    isUserInteracting = true
                     initialX = params.x
                     initialY = params.y
                     initialTouchX = event.rawX
@@ -318,6 +323,7 @@ class FloatingBubbleService : Service() {
                     } else {
                         snapToEdge(params)
                     }
+                    isUserInteracting = false
                     true
                 }
                 MotionEvent.ACTION_CANCEL -> {
@@ -325,6 +331,7 @@ class FloatingBubbleService : Service() {
                     cancelCountdownToast()
                     isCountdownActive = false
                     isDisableTriggered = false
+                    isUserInteracting = false
                     true
                 }
                 else -> false
@@ -362,6 +369,72 @@ class FloatingBubbleService : Service() {
             interpolator = DecelerateInterpolator()
             addUpdateListener { va ->
                 params.x = va.animatedValue as Int
+                bubbleView?.let { bv ->
+                    if (bv.isAttachedToWindow) {
+                        windowManager.updateViewLayout(bv, params)
+                    }
+                }
+            }
+        }
+        edgeAnimator = animator
+        animator.start()
+    }
+
+    private fun startBurnInProtection() {
+        burnInJob?.cancel()
+        burnInJob = serviceScope.launch {
+            lastSideSwitchTimestamp = System.currentTimeMillis()
+            while (true) {
+                delay(60_000L) // Shift every 1 minute
+                try {
+                    val bv = bubbleView ?: continue
+                    val params = windowLayoutParams ?: continue
+                    if (!bv.isAttachedToWindow || bv.visibility != View.VISIBLE || isUserInteracting) {
+                        continue
+                    }
+
+                    val now = System.currentTimeMillis()
+                    val screenWidth = resources.displayMetrics.widthPixels
+                    val screenHeight = resources.displayMetrics.heightPixels
+                    val bubbleWidth = params.width
+                    val edgeMargin = dpToPx(4)
+                    val minY = dpToPx(36)
+                    val maxY = screenHeight - bubbleWidth - dpToPx(56)
+
+                    // 15-minute Rule: Switch screen side every 15 minutes
+                    val shouldSwitchSide = now - lastSideSwitchTimestamp >= 15 * 60 * 1000L
+                    if (shouldSwitchSide) {
+                        lastSideSwitchTimestamp = now
+                        val isCurrentlyOnRight = (params.x + bubbleWidth / 2) > (screenWidth / 2)
+                        val targetX = if (isCurrentlyOnRight) edgeMargin else (screenWidth - bubbleWidth - edgeMargin)
+                        val targetY = (params.y + dpToPx((-20..20).random())).coerceIn(minY, maxY)
+                        animateBubblePosition(params, targetX, targetY)
+                    } else {
+                        // 1-minute Drift: Shift Y position by +-15..25 dp
+                        val randomOffsetDp = listOf(-24, -18, -14, 14, 18, 24).random()
+                        val targetY = (params.y + dpToPx(randomOffsetDp)).coerceIn(minY, maxY)
+                        animateBubblePosition(params, params.x, targetY)
+                    }
+                } catch (e: Exception) {
+                    Log.d(TAG, "Burn-in protection shift error: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private fun animateBubblePosition(params: WindowManager.LayoutParams, targetX: Int, targetY: Int) {
+        val startX = params.x
+        val startY = params.y
+        if (startX == targetX && startY == targetY) return
+
+        edgeAnimator?.cancel()
+        val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 500
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener { va ->
+                val fraction = va.animatedValue as Float
+                params.x = (startX + (targetX - startX) * fraction).toInt()
+                params.y = (startY + (targetY - startY) * fraction).toInt()
                 bubbleView?.let { bv ->
                     if (bv.isAttachedToWindow) {
                         windowManager.updateViewLayout(bv, params)
@@ -746,6 +819,8 @@ class FloatingBubbleService : Service() {
         super.onDestroy()
         miniCountdownJob?.cancel()
         cancelCountdownToast()
+        burnInJob?.cancel()
+        burnInJob = null
         serviceScope.cancel()
         snoozeJob?.cancel()
         edgeAnimator?.cancel()

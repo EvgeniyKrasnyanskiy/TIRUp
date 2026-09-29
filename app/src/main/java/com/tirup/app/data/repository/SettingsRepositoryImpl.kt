@@ -193,6 +193,7 @@ class SettingsRepositoryImpl(
             .putInt(KEY_AOD_AUTO_CHARGE_END_HOUR, settings.aodSettings.autoChargeEndHour)
             .putInt(KEY_AOD_AUTO_CHARGE_END_MIN, settings.aodSettings.autoChargeEndMinute)
             .putFloat(KEY_AOD_CUSTOM_BRIGHTNESS, settings.aodSettings.customBrightness)
+            .putBoolean(KEY_AOD_LAUNCH_ON_SCREEN_OFF, settings.aodSettings.launchOnScreenOff)
             .putString(KEY_LAST_IMPORTANT_MSG_SENDER, settings.lastImportantMessage?.senderName ?: "")
             .putString(KEY_LAST_IMPORTANT_MSG_PHONE, settings.lastImportantMessage?.senderPhone ?: "")
             .putString(KEY_LAST_IMPORTANT_MSG_TEXT, settings.lastImportantMessage?.text ?: "")
@@ -505,7 +506,8 @@ class SettingsRepositoryImpl(
                 autoChargeStartMinute = prefs.getInt(KEY_AOD_AUTO_CHARGE_START_MIN, 0),
                 autoChargeEndHour = prefs.getInt(KEY_AOD_AUTO_CHARGE_END_HOUR, 7),
                 autoChargeEndMinute = prefs.getInt(KEY_AOD_AUTO_CHARGE_END_MIN, 0),
-                customBrightness = prefs.getFloat(KEY_AOD_CUSTOM_BRIGHTNESS, 0.01f)
+                customBrightness = prefs.getFloat(KEY_AOD_CUSTOM_BRIGHTNESS, 0.01f),
+                launchOnScreenOff = prefs.getBoolean(KEY_AOD_LAUNCH_ON_SCREEN_OFF, false)
             ),
             lastImportantMessage = run {
                 val text = prefs.getString(KEY_LAST_IMPORTANT_MSG_TEXT, null)
@@ -673,5 +675,6 @@ class SettingsRepositoryImpl(
         private const val KEY_AOD_AUTO_CHARGE_START_MIN = "key_aod_auto_charge_start_min"
         private const val KEY_AOD_AUTO_CHARGE_END_HOUR = "key_aod_auto_charge_end_hour"
         private const val KEY_AOD_AUTO_CHARGE_END_MIN = "key_aod_auto_charge_end_min"
+        private const val KEY_AOD_LAUNCH_ON_SCREEN_OFF = "key_aod_launch_on_screen_off"
     }
 }
