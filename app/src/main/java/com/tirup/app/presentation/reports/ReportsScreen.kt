@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -621,16 +622,21 @@ private fun LiveReportCard(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onInfoClick,
-                        modifier = Modifier.size(32.dp)
+                    Surface(
+                        shape = CircleShape,
+                        color = ActionBlue.copy(alpha = 0.15f),
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clickable { onInfoClick() }
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Info",
-                            tint = ActionBlue,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Info",
+                                tint = ActionBlue,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                     if (state.isGeneratingLive) {
                         Spacer(modifier = Modifier.width(6.dp))

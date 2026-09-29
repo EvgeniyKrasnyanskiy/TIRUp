@@ -1367,8 +1367,8 @@ private fun WifiLanBadge(
         )
         else -> LanBadgeStyle(
             bg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
-            iconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
+            iconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
         )
     }
 

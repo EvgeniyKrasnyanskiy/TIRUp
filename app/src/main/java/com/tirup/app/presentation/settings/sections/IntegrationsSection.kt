@@ -216,6 +216,24 @@ fun BleBridgeCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    // Info button is placed to the LEFT of the switch
+                    Surface(
+                        shape = CircleShape,
+                        color = ActionBlue.copy(alpha = 0.15f),
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clickable { onShowBleHelpModal() }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "BLE Info",
+                                tint = ActionBlue,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
                     val switchTrackColor = if (ble.role == BleBridgeRole.OBSERVER) PrimaryEmerald else ActionBlue
                     Switch(
                         checked = isBridgeActive,
@@ -234,25 +252,7 @@ fun BleBridgeCard(
                             checkedThumbColor = Color.White,
                             checkedTrackColor = switchTrackColor
                         ),
-                        modifier = Modifier.scale(0.85f)
                     )
-
-                    Surface(
-                        shape = CircleShape,
-                        color = ActionBlue.copy(alpha = 0.15f),
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clickable { onShowBleHelpModal() }
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = "BLE Info",
-                                tint = ActionBlue,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
 
                     Icon(
                         imageVector = if (isBleCardExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
@@ -930,6 +930,13 @@ fun NightscoutSyncCard(
     val nightscout = settings.nightscoutSettings
     var isExpanded by rememberSaveable { mutableStateOf(false) }
     var isTestingNs by remember { mutableStateOf(false) }
+
+    // Auto-collapse settings when the card is disabled
+    LaunchedEffect(nightscout.isEnabled) {
+        if (!nightscout.isEnabled) {
+            isExpanded = false
+        }
+    }
     var nsTestStatus by remember { mutableStateOf<String?>(null) }
     var isNsTestSuccess by remember { mutableStateOf(false) }
     val nsScope = rememberCoroutineScope()
