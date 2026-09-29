@@ -182,10 +182,42 @@ fun AodScreen(
     var isTorchBrightnessOverlayVisible by remember { mutableStateOf(false) }
     var torchBrightnessOverlayTrigger by remember { mutableLongStateOf(0L) }
 
+    val maxTorchStrength = remember(cameraManager, cameraId) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && cameraId != null && cameraManager != null) {
+            try {
+                val chars = cameraManager.getCameraCharacteristics(cameraId)
+                chars.get(CameraCharacteristics.FLASH_INFO_STRENGTH_MAXIMUM_LEVEL) ?: 1
+            } catch (_: Exception) {
+                1
+            }
+        } else {
+            1
+        }
+    }
+
+    fun applyTorchBrightness(brightness: Float) {
+        try {
+            if (cameraId != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && maxTorchStrength > 1) {
+                    val level = (brightness * maxTorchStrength).roundToInt().coerceIn(1, maxTorchStrength)
+                    cameraManager?.turnOnTorchWithStrengthLevel(cameraId, level)
+                } else {
+                    cameraManager?.setTorchMode(cameraId, true)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     fun toggleRearTorch(enable: Boolean) {
         try {
             if (cameraId != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                cameraManager?.setTorchMode(cameraId, enable)
+                if (enable) {
+                    applyTorchBrightness(rearTorchBrightness)
+                } else {
+                    cameraManager?.setTorchMode(cameraId, false)
+                }
                 isRearTorchActive = enable
             }
         } catch (e: Exception) {
@@ -397,6 +429,7 @@ fun AodScreen(
 
                         if (isRearTorchActive) {
                             rearTorchBrightness = (rearTorchBrightness - (dragAmount.y / 350f)).coerceIn(0.01f, 1.0f)
+                            applyTorchBrightness(rearTorchBrightness)
                             isTorchBrightnessOverlayVisible = true
                             torchBrightnessOverlayTrigger = System.currentTimeMillis()
                         } else if (!isFlashlightActive) {

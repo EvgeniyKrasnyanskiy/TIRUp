@@ -6,7 +6,9 @@ import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,6 +19,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.AlertDialog
@@ -77,6 +81,7 @@ fun DeveloperTestingCard(
     var bleRangeCooldownSec by rememberSaveable { mutableIntStateOf(0) }
     var showSosSmsSendConfirmDialog by rememberSaveable { mutableStateOf(false) }
     var showBleRangeHelpDialog by rememberSaveable { mutableStateOf(false) }
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
 
     BentoCard(modifier = modifier.fillMaxWidth()) {
         Column(
@@ -84,26 +89,41 @@ fun DeveloperTestingCard(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "🛠️", fontSize = 18.sp)
-                Text(
-                    text = if (isRu) "Тестирование систем" else "System Testing",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = ActionBlue
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(text = "🛠️", fontSize = 18.sp)
+                    Text(
+                        text = if (isRu) "Тестирование систем" else "System Testing",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = ActionBlue
+                    )
+                }
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
+                    tint = ActionBlue
                 )
             }
 
-            Text(
-                text = if (isRu)
-                    "Инструменты проверки тревог и каналов связи:"
-                else
-                    "Alert and communication channel testing tools:",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            AnimatedVisibility(visible = isExpanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = if (isRu)
+                            "Инструменты проверки тревог и каналов связи:"
+                        else
+                            "Alert and communication channel testing tools:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
 
             // Test 1: Patient Rescue Screen (5 sec delay with Cancel)
             Row(
@@ -400,6 +420,8 @@ fun DeveloperTestingCard(
                         tint = ActionBlue,
                         modifier = Modifier.size(24.dp)
                     )
+                }
+            }
                 }
             }
         }

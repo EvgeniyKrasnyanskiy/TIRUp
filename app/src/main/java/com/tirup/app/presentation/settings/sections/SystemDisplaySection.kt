@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -150,162 +151,183 @@ fun DisplayPreferencesCard(
     onSetShowPredictionOnChart: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
+
     BentoCard(modifier = modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                text = stringResource(R.string.section_preferences),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            // Language Selector
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(imageVector = Icons.Default.Language, contentDescription = null, tint = ActionBlue, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = stringResource(R.string.pref_language), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LanguageChip(
-                        label = "Русский",
-                        isSelected = settings.language.equals("RU", ignoreCase = true),
-                        onClick = { onSetLanguage("RU") }
-                    )
-                    LanguageChip(
-                        label = "English",
-                        isSelected = settings.language.equals("EN", ignoreCase = true),
-                        onClick = { onSetLanguage("EN") }
-                    )
-                }
-            }
-
-            // Unit Selector
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(imageVector = Icons.Default.Tune, contentDescription = null, tint = Color(0xFF8B5CF6), modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = stringResource(R.string.pref_unit), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LanguageChip(
-                        label = "mmol/L",
-                        isSelected = settings.unit == GlucoseUnit.MMOL_L,
-                        onClick = { onSetUnit(GlucoseUnit.MMOL_L) }
-                    )
-                    LanguageChip(
-                        label = "mg/dL",
-                        isSelected = settings.unit == GlucoseUnit.MG_DL,
-                        onClick = { onSetUnit(GlucoseUnit.MG_DL) }
-                    )
-                }
-            }
-
-            // Theme Mode Selector
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(imageVector = Icons.Default.Brightness4, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = if (isRu) "Тема" else "Theme", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LanguageChip(
-                        label = if (isRu) "🌙 Тёмная" else "🌙 Dark",
-                        isSelected = settings.themeMode == ThemeMode.DARK,
-                        onClick = { onSetThemeMode(ThemeMode.DARK) }
-                    )
-                    LanguageChip(
-                        label = if (isRu) "☀️ Светлая" else "☀️ Light",
-                        isSelected = settings.themeMode != ThemeMode.DARK,
-                        onClick = { onSetThemeMode(ThemeMode.LIGHT) }
-                    )
-                }
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-
-            // Show Treatments On Chart Toggle
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 8.dp)
-                ) {
-                    Text("💉🍽️", fontSize = 16.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = if (isRu) "Метки болюсов и еды на графике" else "Insulin & Meal Marks on Chart",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-                Switch(
-                    checked = settings.showTreatmentsOnChart,
-                    onCheckedChange = { onSetShowTreatmentsOnChart(it) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = ActionBlue
-                    )
+                Text(
+                    text = stringResource(R.string.section_preferences),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
+                    tint = ActionBlue,
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 8.dp)
-                ) {
-                    Text("🔮", fontSize = 16.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = if (isRu) "Линия прогноза на графике (25 мин)" else "Trend Forecast on Chart (25m)",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface
+            AnimatedVisibility(visible = isExpanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Language Selector
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(imageVector = Icons.Default.Language, contentDescription = null, tint = ActionBlue, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = stringResource(R.string.pref_language), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            LanguageChip(
+                                label = "Русский",
+                                isSelected = settings.language.equals("RU", ignoreCase = true),
+                                onClick = { onSetLanguage("RU") }
+                            )
+                            LanguageChip(
+                                label = "English",
+                                isSelected = settings.language.equals("EN", ignoreCase = true),
+                                onClick = { onSetLanguage("EN") }
+                            )
+                        }
+                    }
+
+                    // Unit Selector
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(imageVector = Icons.Default.Tune, contentDescription = null, tint = Color(0xFF8B5CF6), modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = stringResource(R.string.pref_unit), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            LanguageChip(
+                                label = "mmol/L",
+                                isSelected = settings.unit == GlucoseUnit.MMOL_L,
+                                onClick = { onSetUnit(GlucoseUnit.MMOL_L) }
+                            )
+                            LanguageChip(
+                                label = "mg/dL",
+                                isSelected = settings.unit == GlucoseUnit.MG_DL,
+                                onClick = { onSetUnit(GlucoseUnit.MG_DL) }
+                            )
+                        }
+                    }
+
+                    // Theme Mode Selector
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(imageVector = Icons.Default.Brightness4, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = if (isRu) "Тема" else "Theme", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            LanguageChip(
+                                label = if (isRu) "🌙 Тёмная" else "🌙 Dark",
+                                isSelected = settings.themeMode == ThemeMode.DARK,
+                                onClick = { onSetThemeMode(ThemeMode.DARK) }
+                            )
+                            LanguageChip(
+                                label = if (isRu) "☀️ Светлая" else "☀️ Light",
+                                isSelected = settings.themeMode != ThemeMode.DARK,
+                                onClick = { onSetThemeMode(ThemeMode.LIGHT) }
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+
+                    // Show Treatments On Chart Toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp)
+                        ) {
+                            Text("💉🍽️", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = if (isRu) "Метки болюсов и еды на графике" else "Insulin & Meal Marks on Chart",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = settings.showTreatmentsOnChart,
+                            onCheckedChange = { onSetShowTreatmentsOnChart(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = ActionBlue
+                            )
                         )
-                        Text(
-                            text = if (isRu) "Фиолетовые точки и пунктир экстраполяции" else "Purple points & extrapolation trajectory",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp)
+                        ) {
+                            Text("🔮", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = if (isRu) "Линия прогноза на графике (25 мин)" else "Trend Forecast on Chart (25m)",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isRu) "Фиолетовые точки и пунктир экстраполяции" else "Purple points & extrapolation trajectory",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = settings.showPredictionOnChart,
+                            onCheckedChange = { onSetShowPredictionOnChart(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = ActionBlue
+                            )
                         )
                     }
                 }
-                Switch(
-                    checked = settings.showPredictionOnChart,
-                    onCheckedChange = { onSetShowPredictionOnChart(it) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = ActionBlue
-                    )
-                )
             }
         }
     }
@@ -319,10 +341,14 @@ fun WeeklyDigestCard(
     onTriggerImmediately: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
+
     BentoCard(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(horizontal = 2.dp, vertical = 2.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -339,39 +365,57 @@ fun WeeklyDigestCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = if (isRu) "Еженедельный клинический отчёт каждое воскресенье в 20:00 (динамика TIR/TING, вариабельность CV, гипо, сравнение с прошлой неделей)"
-                        else "Weekly clinical summary every Sunday at 8:00 PM (TIR/TING dynamics, CV, hypos, and week-over-week comparison)",
+                        text = if (isRu) "Еженедельный клинический отчёт каждое воскресенье в 20:00"
+                        else "Weekly clinical summary every Sunday at 8:00 PM",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(
+                        checked = settings.isWeeklyDigestEnabled,
+                        onCheckedChange = { isChecked ->
+                            onSetWeeklyDigestEnabled(isChecked)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = ActionBlue
+                        )
+                    )
+                    IconButton(onClick = { isExpanded = !isExpanded }) {
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
+                            tint = ActionBlue
+                        )
+                    }
+                }
+            }
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column(modifier = Modifier.padding(top = 8.dp)) {
+                    Text(
+                        text = if (isRu) "Анализ динамики TIR/TING, вариабельности CV, частоты гипогликемий и сравнение с прошлой неделей с доставкой в шторку уведомлений."
+                        else "Analysis of TIR/TING dynamics, CV, hypo frequency, and week-over-week comparison delivered to notifications shade.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 16.sp
                     )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Switch(
-                    checked = settings.isWeeklyDigestEnabled,
-                    onCheckedChange = { isChecked ->
-                        onSetWeeklyDigestEnabled(isChecked)
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = ActionBlue
-                    )
-                )
-            }
-
-            if (settings.isWeeklyDigestEnabled) {
-                Spacer(modifier = Modifier.height(10.dp))
-                OutlinedButton(
-                    onClick = onTriggerImmediately,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ActionBlue)
-                ) {
-                    Text(
-                        text = if (isRu) "Сформировать сейчас вручную" else "Generate digest now",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    if (settings.isWeeklyDigestEnabled) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = onTriggerImmediately,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ActionBlue)
+                        ) {
+                            Text(
+                                text = if (isRu) "Сформировать сейчас вручную" else "Generate digest now",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -389,11 +433,14 @@ fun DeviceRemindersCard(
     onSetHba1cReminderEnabled: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
+
     BentoCard(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded }
                     .padding(horizontal = 2.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -414,138 +461,149 @@ fun DeviceRemindersCard(
                         text = if (isRu) "Уведомления о замене сенсора CGM, инфузионного набора и ланцета"
                         else "Notifications for CGM sensor, infusion set, and lancet changes",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 16.sp
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Switch(
-                    checked = settings.isDeviceRemindersEnabled,
-                    onCheckedChange = { isChecked ->
-                        onSetDeviceRemindersEnabled(isChecked)
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = ActionBlue
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(
+                        checked = settings.isDeviceRemindersEnabled,
+                        onCheckedChange = { isChecked ->
+                            onSetDeviceRemindersEnabled(isChecked)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = ActionBlue
+                        )
                     )
-                )
-            }
-
-            if (settings.isDeviceRemindersEnabled) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    // Sensor checkbox
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clickable { onSetSensorReminderEnabled(!settings.isSensorReminderEnabled) }
-                    ) {
-                        Checkbox(
-                            checked = settings.isSensorReminderEnabled,
-                            onCheckedChange = { onSetSensorReminderEnabled(it) },
-                            colors = CheckboxDefaults.colors(checkedColor = ActionBlue),
-                            modifier = Modifier
-                                .scale(0.85f)
-                                .size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(
-                            text = if (isRu) "Сенсор" else "Sensor",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    // Infusion set checkbox
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clickable { onSetPumpReminderEnabled(!settings.isPumpReminderEnabled) }
-                    ) {
-                        Checkbox(
-                            checked = settings.isPumpReminderEnabled,
-                            onCheckedChange = { onSetPumpReminderEnabled(it) },
-                            colors = CheckboxDefaults.colors(checkedColor = ActionBlue),
-                            modifier = Modifier
-                                .scale(0.85f)
-                                .size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(
-                            text = if (isRu) "Инф. набор" else "Inf. set",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    // Lancet checkbox
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clickable { onSetLancetReminderEnabled(!settings.isLancetReminderEnabled) }
-                    ) {
-                        Checkbox(
-                            checked = settings.isLancetReminderEnabled,
-                            onCheckedChange = { onSetLancetReminderEnabled(it) },
-                            colors = CheckboxDefaults.colors(checkedColor = ActionBlue),
-                            modifier = Modifier
-                                .scale(0.85f)
-                                .size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(
-                            text = if (isRu) "Ланцет" else "Lancet",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface
+                    IconButton(onClick = { isExpanded = !isExpanded }) {
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
+                            tint = ActionBlue
                         )
                     }
                 }
             }
 
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
+            AnimatedVisibility(visible = isExpanded) {
+                Column(modifier = Modifier.padding(top = 8.dp)) {
+                    if (settings.isDeviceRemindersEnabled) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            // Sensor checkbox
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clickable { onSetSensorReminderEnabled(!settings.isSensorReminderEnabled) }
+                            ) {
+                                Checkbox(
+                                    checked = settings.isSensorReminderEnabled,
+                                    onCheckedChange = { onSetSensorReminderEnabled(it) },
+                                    colors = CheckboxDefaults.colors(checkedColor = ActionBlue),
+                                    modifier = Modifier
+                                        .scale(0.85f)
+                                        .size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = if (isRu) "Сенсор" else "Sensor",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
 
-            // HbA1c 90-day Checkup Reminder Switch
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 8.dp)
-                ) {
-                    Text(
-                        text = if (isRu) "Контроль HbA1c (раз в 90 дней)" else "HbA1c Checkup (every 90 days)",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = if (isRu) "Напоминание о сдаче крови на гликированный гемоглобин и сверка с 90-дневным GMI"
-                               else "Quarterly reminder to test lab HbA1c and correlate with 90-day sensor GMI",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 16.sp
-                    )
+                            // Infusion set checkbox
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clickable { onSetPumpReminderEnabled(!settings.isPumpReminderEnabled) }
+                            ) {
+                                Checkbox(
+                                    checked = settings.isPumpReminderEnabled,
+                                    onCheckedChange = { onSetPumpReminderEnabled(it) },
+                                    colors = CheckboxDefaults.colors(checkedColor = ActionBlue),
+                                    modifier = Modifier
+                                        .scale(0.85f)
+                                        .size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = if (isRu) "Инф. набор" else "Inf. set",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            // Lancet checkbox
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clickable { onSetLancetReminderEnabled(!settings.isLancetReminderEnabled) }
+                            ) {
+                                Checkbox(
+                                    checked = settings.isLancetReminderEnabled,
+                                    onCheckedChange = { onSetLancetReminderEnabled(it) },
+                                    colors = CheckboxDefaults.colors(checkedColor = ActionBlue),
+                                    modifier = Modifier
+                                        .scale(0.85f)
+                                        .size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = if (isRu) "Ланцет" else "Lancet",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+
+                    // HbA1c 90-day Checkup Reminder Switch
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp)
+                        ) {
+                            Text(
+                                text = if (isRu) "Контроль HbA1c (раз в 90 дней)" else "HbA1c Checkup (every 90 days)",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (isRu) "Напоминание о сдаче крови на гликированный гемоглобин и сверка с 90-дневным GMI"
+                                       else "Quarterly reminder to test lab HbA1c and correlate with 90-day sensor GMI",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 16.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Switch(
+                            checked = settings.isHba1cReminderEnabled,
+                            onCheckedChange = { isChecked ->
+                                onSetHba1cReminderEnabled(isChecked)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = ActionBlue
+                            )
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Switch(
-                    checked = settings.isHba1cReminderEnabled,
-                    onCheckedChange = { isChecked ->
-                        onSetHba1cReminderEnabled(isChecked)
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = ActionBlue
-                    )
-                )
             }
         }
     }
@@ -558,102 +616,123 @@ fun ClinicalStandardsCard(
     onUpdateNightHours: (nightStart: Int, nightEnd: Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
+
     BentoCard(modifier = modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                text = if (isRu) "Клинические стандарты (ATTD / ADA)" else "Clinical Standards (ATTD / ADA)",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            // Informational standard badge
-            val isMmol = settings.unit == GlucoseUnit.MMOL_L
-            val tirRangeStr = if (isMmol) (if (isRu) "3.9 — 10.0 ммоль/л" else "3.9 — 10.0 mmol/L") else "70 — 180 mg/dL"
-            val tingRangeStr = if (isMmol) (if (isRu) "3.9 — 7.8 ммоль/л" else "3.9 — 7.8 mmol/L") else "70 — 140 mg/dL"
-
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.fillMaxWidth()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                Text(
+                    text = if (isRu) "Клинические стандарты (ATTD / ADA)" else "Clinical Standards (ATTD / ADA)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
+                    tint = ActionBlue,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Informational standard badge
+                    val isMmol = settings.unit == GlucoseUnit.MMOL_L
+                    val tirRangeStr = if (isMmol) (if (isRu) "3.9 — 10.0 ммоль/л" else "3.9 — 10.0 mmol/L") else "70 — 180 mg/dL"
+                    val tingRangeStr = if (isMmol) (if (isRu) "3.9 — 7.8 ммоль/л" else "3.9 — 7.8 mmol/L") else "70 — 140 mg/dL"
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (isRu) "TIR (цель ≥70%):" else "TIR (target ≥70%):",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = tirRangeStr,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = PrimaryEmerald,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (isRu) "TING (цель ≥50%):" else "TING (target ≥50%):",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = tingRangeStr,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = ColorTight,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
-                            text = if (isRu) "TIR (цель ≥70%):" else "TIR (target ≥70%):",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = if (isRu) "Ночной профиль (окно сна)" else "Night Profile (Sleep Window)",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = tirRangeStr,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = PrimaryEmerald,
-                            fontWeight = FontWeight.SemiBold
+                            text = if (isRu) "Приблизительные часы сна (с шагом в 1 час)" else "Approximate sleep hours (1-hour step)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+
+                    // Night Profile Hours (Sleep window)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text(
-                            text = if (isRu) "TING (цель ≥50%):" else "TING (target ≥50%):",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        DropdownHourSelector(
+                            label = if (isRu) "Начало сна" else "Sleep Start",
+                            selectedHour = settings.nightStartHour,
+                            isRu = isRu,
+                            modifier = Modifier.weight(1f),
+                            onHourSelected = { newStart ->
+                                onUpdateNightHours(newStart, settings.nightEndHour)
+                            }
                         )
-                        Text(
-                            text = tingRangeStr,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = ColorTight,
-                            fontWeight = FontWeight.SemiBold
+
+                        DropdownHourSelector(
+                            label = if (isRu) "Конец сна" else "Sleep End",
+                            selectedHour = settings.nightEndHour,
+                            isRu = isRu,
+                            modifier = Modifier.weight(1f),
+                            onHourSelected = { newEnd ->
+                                onUpdateNightHours(settings.nightStartHour, newEnd)
+                            }
                         )
                     }
                 }
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = if (isRu) "Ночной профиль (окно сна)" else "Night Profile (Sleep Window)",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = if (isRu) "Приблизительные часы сна (с шагом в 1 час)" else "Approximate sleep hours (1-hour step)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // Night Profile Hours (Sleep window)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                DropdownHourSelector(
-                    label = if (isRu) "Начало сна" else "Sleep Start",
-                    selectedHour = settings.nightStartHour,
-                    isRu = isRu,
-                    modifier = Modifier.weight(1f),
-                    onHourSelected = { newStart ->
-                        onUpdateNightHours(newStart, settings.nightEndHour)
-                    }
-                )
-
-                DropdownHourSelector(
-                    label = if (isRu) "Конец сна" else "Sleep End",
-                    selectedHour = settings.nightEndHour,
-                    isRu = isRu,
-                    modifier = Modifier.weight(1f),
-                    onHourSelected = { newEnd ->
-                        onUpdateNightHours(settings.nightStartHour, newEnd)
-                    }
-                )
             }
         }
     }
@@ -711,11 +790,14 @@ fun FloatingGlucoseBubbleCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
 
     BentoCard(modifier = modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -728,73 +810,91 @@ fun FloatingGlucoseBubbleCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = if (isRu) "Появляется только вне нормы (<3.9 или >10.0). При гипо (<3.9) пульсирует волнами. Тап глушит звук и скрывает на 15 мин (гипо) / 45 мин (гипер, до 60 мин при IoB). Свободно перемещается"
-                        else "Shown only out of range (<3.9 or >10.0). Ripple pulse waves on hypo (<3.9). Tap silences and snoozes for 15m (hypo) / 45m (hyper, up to 60m with IoB). Draggable.",
+                        text = if (isRu) "Поверх всех приложений при выходе из нормы" else "Overlay on top of apps when out of range",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
-                Switch(
-                    checked = settings.isFloatingBubbleEnabled,
-                    onCheckedChange = { isChecked ->
-                        if (isChecked) {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
-                                val intent = Intent(
-                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                    Uri.parse("package:${context.packageName}")
-                                )
-                                context.startActivity(intent)
-                            } else {
-                                onToggleFloatingBubble(true)
-                            }
-                        } else {
-                            onToggleFloatingBubble(false)
-                        }
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = ActionBlue
-                    )
-                )
-            }
-
-            if (settings.isFloatingBubbleEnabled) {
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                    thickness = 0.5.dp
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (isRu) "Отображать постоянно" else "Always visible",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = if (isRu) "В норме (3.9–10.0) — мини-кружок (50%), тап открывает TIRUp, удержание 3 сек отключает. Вне нормы — тревожный режим (тап глушит/снузит, удержание открывает TIRUp)"
-                            else "In target (3.9–10.0) — mini-circle (50%), tap opens TIRUp, 3s hold turns off. Out of range — alarm mode (tap silences/snoozes, hold opens TIRUp)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(
-                        checked = settings.isFloatingBubbleAlwaysVisible,
+                        checked = settings.isFloatingBubbleEnabled,
                         onCheckedChange = { isChecked ->
-                            onToggleFloatingBubbleAlwaysVisible(isChecked)
+                            if (isChecked) {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
+                                    val intent = Intent(
+                                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                        Uri.parse("package:${context.packageName}")
+                                    )
+                                    context.startActivity(intent)
+                                } else {
+                                    onToggleFloatingBubble(true)
+                                }
+                            } else {
+                                onToggleFloatingBubble(false)
+                            }
                         },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
                             checkedTrackColor = ActionBlue
                         )
                     )
+                    IconButton(onClick = { isExpanded = !isExpanded }) {
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
+                            tint = ActionBlue
+                        )
+                    }
+                }
+            }
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = if (isRu) "Появляется только вне нормы (<3.9 или >10.0). При гипо (<3.9) пульсирует волнами. Тап глушит звук и скрывает на 15 мин (гипо) / 45 мин (гипер, до 60 мин при IoB). Свободно перемещается, дрейфует против выгорания экрана."
+                        else "Shown only out of range (<3.9 or >10.0). Ripple pulse waves on hypo (<3.9). Tap silences and snoozes for 15m (hypo) / 45m (hyper, up to 60m with IoB). Draggable with burn-in pixel shift.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    if (settings.isFloatingBubbleEnabled) {
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                            thickness = 0.5.dp
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isRu) "Отображать постоянно" else "Always visible",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (isRu) "В норме (3.9–10.0) — мини-кружок (50%), тап открывает TIRUp, удержание 3 сек отключает. Вне нормы — тревожный режим (тап глушит/снузит, удержание открывает TIRUp)"
+                                    else "In target (3.9–10.0) — mini-circle (50%), tap opens TIRUp, 3s hold turns off. Out of range — alarm mode (tap silences/snoozes, hold opens TIRUp)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Switch(
+                                checked = settings.isFloatingBubbleAlwaysVisible,
+                                onCheckedChange = { isChecked ->
+                                    onToggleFloatingBubbleAlwaysVisible(isChecked)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = ActionBlue
+                                )
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -842,7 +942,7 @@ fun AlwaysOnDisplayCard(
                                 if (isRu) "Выключен" else "Disabled"
                             },
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (aod.isEnabled) PrimaryEmerald else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (aod.isEnabled) ActionBlue else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -858,7 +958,7 @@ fun AlwaysOnDisplayCard(
                         },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
-                            checkedTrackColor = PrimaryEmerald
+                            checkedTrackColor = ActionBlue
                         )
                     )
                     IconButton(
@@ -868,7 +968,7 @@ fun AlwaysOnDisplayCard(
                         Icon(
                             imageVector = if (isAodExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                             contentDescription = if (isAodExpanded) "Свернуть" else "Развернуть",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = ActionBlue
                         )
                     }
                 }
@@ -921,10 +1021,10 @@ fun AlwaysOnDisplayCard(
                                 onUpdateAodSettings(aod.copy(displayMode = AodDisplayMode.PULSE_ON_UPDATE))
                             },
                         shape = RoundedCornerShape(10.dp),
-                        color = if (aod.displayMode == AodDisplayMode.PULSE_ON_UPDATE) PrimaryEmerald.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        color = if (aod.displayMode == AodDisplayMode.PULSE_ON_UPDATE) ActionBlue.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                         border = BorderStroke(
                             width = if (aod.displayMode == AodDisplayMode.PULSE_ON_UPDATE) 1.5.dp else 0.8.dp,
-                            color = if (aod.displayMode == AodDisplayMode.PULSE_ON_UPDATE) PrimaryEmerald else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                            color = if (aod.displayMode == AodDisplayMode.PULSE_ON_UPDATE) ActionBlue else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
                         )
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
@@ -932,7 +1032,7 @@ fun AlwaysOnDisplayCard(
                                 text = if (isRu) "⚡ Просыпаться" else "⚡ Pulse Wake",
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (aod.displayMode == AodDisplayMode.PULSE_ON_UPDATE) PrimaryEmerald else MaterialTheme.colorScheme.onSurface
+                                color = if (aod.displayMode == AodDisplayMode.PULSE_ON_UPDATE) ActionBlue else MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
@@ -1046,7 +1146,7 @@ fun AlwaysOnDisplayCard(
                         context.startActivity(aodIntent)
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald),
+                    colors = ButtonDefaults.buttonColors(containerColor = ActionBlue),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
@@ -1067,10 +1167,14 @@ fun WidgetPreviewCard(
     onUpdateWidgetBackgroundOpacity: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
+
     BentoCard(modifier = modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -1083,25 +1187,38 @@ fun WidgetPreviewCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = if (isRu) "Плавная регулировка прозрачности под ваши обои" else "Adjust transparency to match your home wallpaper",
+                        text = if (isRu) "Плавная регулировка прозрачности под ваши обои (${settings.widgetBackgroundOpacity}%)"
+                        else "Adjust transparency to match your home wallpaper (${settings.widgetBackgroundOpacity}%)",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                ) {
-                    Text(
-                        text = "${settings.widgetBackgroundOpacity}%",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                    ) {
+                        Text(
+                            text = "${settings.widgetBackgroundOpacity}%",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                    IconButton(onClick = { isExpanded = !isExpanded }) {
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
+                            tint = ActionBlue
+                        )
+                    }
                 }
             }
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
 
             // Live Interactive Preview Box on simulated wallpaper (5x1 Strip Widget)
             Box(
@@ -1304,6 +1421,8 @@ fun WidgetPreviewCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+                }
             }
         }
     }

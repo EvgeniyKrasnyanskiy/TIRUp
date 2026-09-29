@@ -55,7 +55,7 @@ class TrendsViewModel(
     private val _dismissedInsightIds = MutableStateFlow<Set<String>>(emptySet())
     val dismissedInsightIds: StateFlow<Set<String>> = _dismissedInsightIds.asStateFlow()
 
-    private val _selectedPeriod = MutableStateFlow(TrendPeriod.PERIOD_14D)
+    private val _selectedPeriod = MutableStateFlow(TrendPeriod.PERIOD_7D)
     val selectedPeriod: StateFlow<TrendPeriod> = _selectedPeriod.asStateFlow()
 
     private val _weeklyDigest = MutableStateFlow<WeeklyDigest?>(null)

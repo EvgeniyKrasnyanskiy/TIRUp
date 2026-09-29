@@ -1,67 +1,100 @@
-# План реализации: Улучшения UI, AoD, фонарика и плавающего пузырька
+# План реализации: Реорганизация Настроек, BLE-мост, Аппаратный фонарик, Сворачивание карточек и UI-полировка
 
-**Цель**: Реализовать 6 взаимосвязанных улучшений по запросу пользователя:
-1. Замена цвета корзины отчёта на красный (ReportsScreen).
-2. Скрытие значка BLE-моста при выключении и подсветка пункта Wi-Fi LAN в настройках (FocusScreen & SettingsScreen).
-3. Ограничение длительности вращения спиннера Wi-Fi LAN до 3.5–4 секунд (FocusScreen).
-4. Защита от выгорания AMOLED: дрейф плавающего пузырька по оси Y каждую минуту и смена стороны каждые 15 минут (FloatingBubbleService).
-5. Экранный фонарик с таймером автозакрытия на 100 с и тыльный LED-фонарик с управлением яркостью пиктограммы в центре экрана (AodScreen).
-6. Ночной запуск AoD при блокировке экрана (22:00–06:00) с проверкой датчика приближения (AodSettings, AodActivity, ScreenOffReceiver).
-
----
-
-## Этап 1. Быстрые UI-исправления (ReportsScreen, FocusScreen, SettingsScreen)
-- **1.1. Красная корзина отчета** (`ReportsScreen.kt`):
-  - Заменить `tint = ColorHigh` на `tint = ColorVeryLow` у иконки `Icons.Default.DeleteOutline`.
-- **1.2. Скрытие BLE-моста при отключении** (`FocusScreen.kt`):
-  - Проверять `if (bleBridgeSettings != null && bleBridgeSettings.isEnabled)` перед отрисовкой `BleBridgeBadge`.
-- **1.3. Тайм-аут анимации спиннера Wi-Fi LAN** (`FocusScreen.kt`):
-  - Добавить `LaunchedEffect` с ограничением показа `CircularProgressIndicator` не более 4 секунд с момента входа в состояние `isBusy`, с последующим отображением иконки `Wifi` со статусным цветом.
-- **1.4. Подсветка Wi-Fi LAN в Настройках** (`SettingsScreen.kt`):
-  - Добавить `highlightLan` и анимированную границу `highlightBorderAlpha` для `XdripLanFollowerCard`, активируемую при переходе с параметром `wifi_lan`.
+## 1. Порядок блоков в «Дополнительных настройках»
+- В `SettingsScreen.kt`:
+  1. `XdripLanFollowerCard` («Wi-Fi LAN Follower»)
+  2. `BleBridgeCard` («BLE-мост» — опущен под Wi-Fi LAN)
+  3. `EmergencySmsCard` («Экстренное SMS»)
+  4. `AlwaysOnDisplayCard` («Ночной экран (AoD)» — поднят сразу под Экстренное SMS)
+  5. `WeeklyDigestCard` («Воскресный дайджест»)
+  6. `DeviceRemindersCard` («Напоминание об устройствах»)
+  7. `ClinicalStandardsCard` («Клинические стандарты»)
+  8. `LockscreenNotificationCard` («Параметры отображения / Экран блокировки»)
+  9. `FloatingGlucoseBubbleCard` («Плавающий пузырёк с сахаром»)
+  10. `WidgetPreviewCard` («Прозрачность подложки виджетов»)
+  11. `AutoBackupCard` («Ежедневный автобэкап»)
+  12. `ClearDataCard` («Сброс данных»)
+  13. `DeveloperTestingCard` («Тестирование систем»)
+  14. `NightscoutSyncCard` («Сервер синхронизации»)
 
 ---
 
-## Этап 2. Дрейф плавающего кружка (Anti Burn-in / Pixel Shift)
-- **Файл**: `FloatingBubbleService.kt`
-- Запустить корутину периодического дрейфа:
-  - **Каждую минуту**: плавное смещение по оси Y на $\pm 15$–$25$ dp внутри безопасных границ экрана.
-  - **Каждые 15 минут** («правило 15»): плавная анимация перелета кружка на противоположный край экрана (левый $\leftrightarrow$ правый) с обновлением `pivot` и ориентации.
+## 2. Переработка карточки «BLE-мост»
+- В `IntegrationsSection.kt`:
+  - Переименовать заголовок: `Локальный BLE-мост` -> `BLE-мост` (EN: `BLE Bridge`).
+  - Добавить в шапку карточки стандартный `Switch`:
+    - При выключении: `onUpdateBleSettings(ble.copy(isEnabled = false))`.
+    - При включении: запрашивать пермишены и включать активную роль.
+    - Динамический цвет переключателя:
+      - `PrimaryEmerald` (зелёный), если активна роль «Приёмник».
+      - `ActionBlue` (синий), если активна роль «Вещатель».
+  - Заменить строку выбора ролей:
+    - Удалить плашку `✖️ Выкл` (так как включение/выключение перенесено на главный `Switch`).
+    - Сделать 2 широкие кнопки с текстовыми названиями: `Вещатель` (синий акцент `ActionBlue`) и `Приёмник` (зелёный акцент `PrimaryEmerald`).
 
 ---
 
-## Этап 3. Логика экранного и тыльного фонарика в AoD
-- **Файл**: `AodScreen.kt`
-- **3.1. Экранный фонарик**:
-  - Добавить 100-секундный таймер обратного отсчета (`100s...`).
-  - Любой тап по экрану сбрасывает таймер на 100.
-  - При 0 — экранный фонарик плавно гаснет.
-- **3.2. Тыльный LED-фонарик**:
-  - Кнопка тыльного фонарика (🔦) появляется по тапу при активном экранном фонарике в центре снизу (в зоне сканера отпечатков) на 3 секунды с мини-таймером.
-  - При нажатии на эту кнопку:
-    - Включается тыльная вспышка камеры (`CameraManager.setTorchMode(id, true)`).
-    - Фон экрана гаснет в чистый черный цвет (0% подсветки матрицы).
-    - Пиктограмма фонарика остаётся подсвеченной на 30% яркости без таймера закрытия.
-    - Вертикальный свайп по экрану регулирует яркость пиктограммы от 1% до 100%.
-    - Нажатие на пиктограмму выключает тыльный фонарик и возвращает AoD.
+## 3. Аппаратная регулировка силы тыльного LED-фонарика
+- В `AodScreen.kt`:
+  - Получить `maxTorchStrengthLevel` из `CameraCharacteristics.FLASH_INFO_STRENGTH_MAXIMUM_LEVEL` (для Android 13+, API 33 `TIRAMISU`).
+  - При свайпе пальца вверх/вниз:
+    - Если `maxTorchStrengthLevel > 1` и API >= 33: вызывать `cameraManager.turnOnTorchWithStrengthLevel(cameraId, level)`, где `level = (rearTorchBrightness * maxTorchStrengthLevel).roundToInt().coerceIn(1, maxTorchStrengthLevel)`.
+    - Иначе: использовать стандартный `setTorchMode(cameraId, true)`.
+  - При закрытии/отключении: `setTorchMode(cameraId, false)`.
 
 ---
 
-## Этап 4. Запуск AoD в ночные часы при блокировке экрана
-- **Файлы**: `AodSettings.kt`, `AodActivity.kt`, `SettingsScreen.kt`, `AodScreenOffReceiver.kt`
-- **4.1. Модель настроек**:
-  - Добавить поле `launchOnScreenOff: Boolean = false` в `AodSettings`.
-- **4.2. UI в настройках**:
-  - Добавить переключатель «Запускать AoD при заблокированном экране» с пояснением «(ночные часы 22:00 – 06:00, когда телефон не используется)».
-- **4.3. Приёмник события блокировки**:
-  - Создать `AodScreenOffReceiver`: слушает `Intent.ACTION_SCREEN_OFF`.
-  - Проверяет: включена ли опция, текущее время между 22:00 и 06:00.
-  - Проверяет датчик приближения (`Sensor.TYPE_PROXIMITY`): если телефон в кармане / закрыт — не будить.
-  - Запускает `AodActivity`.
+## 4. Унификация цветов стрелок разворота и переключателей AoD
+- **Стрелки разворота карточек**:
+  - Во всех карточках (`SettingsScreen.kt`, `IntegrationsSection.kt`, `SystemDisplaySection.kt`, `DataBackupSection.kt`, `DeveloperTestingSection.kt`) привести иконки `ExpandLess` / `ExpandMore` к единому фирменному синему стилю `tint = ActionBlue`.
+- **Элементы AoD**:
+  - В `AlwaysOnDisplayCard`: перекрасить переключатели, кнопки выбора режима (`Pulse Wake` / `Always On`) и статус из зелёного в фирменный синий цвет `ActionBlue`.
 
 ---
 
-## План верификации
-1. Сборка и юнит-тесты: `./gradlew testDebugUnitTest`.
-2. Проверка UI элементов (корзина, бэйджи, подсветка).
-3. Проверка анимаций дрейфа и фонарика.
+## 5. Сворачивание/разворачивание для 9 блоков настроек
+- Добавить `var isExpanded by rememberSaveable { mutableStateOf(false) }`, кликабельную строку заголовка со стрелкой `ExpandLess`/`ExpandMore` цвета `ActionBlue` и контент внутри `AnimatedVisibility(isExpanded)` для карточек:
+  1. `DisplayPreferencesCard` («Параметры отображения»)
+  2. `WeeklyDigestCard` («Воскресный дайджест»)
+  3. `DeviceRemindersCard` («Напоминание об устройствах»)
+  4. `ClinicalStandardsCard` («Клинические стандарты»)
+  5. `FloatingGlucoseBubbleCard` («Плавающий пузырёк с сахаром»)
+  6. `WidgetPreviewCard` («Прозрачность подложки виджетов»)
+  7. `AutoBackupCard` («Ежедневный автобэкап»)
+  8. `DeveloperTestingCard` («Тестирование систем»)
+  9. `NightscoutSyncCard` («Сервер синхронизации»)
+
+---
+
+## 6. Жёлтая рамка у пиктограммы «месяц» (🌙) в шапке
+- В `FocusScreen.kt` (`HeroGlucoseCard`):
+  - Задать кнопке `🌙` границу `BorderStroke(0.8.dp, ColorHigh.copy(alpha = 0.5f))` и фон `ColorHigh.copy(alpha = 0.12f)` симметрично кнопке уведомлений 🔔 на противоположном конце строки.
+
+---
+
+## 7. Жёлтый цвет плашки углеводов на главном экране
+- В `FocusScreen.kt` (`HeroGlucoseCard`):
+  - Заменить цвет плашки `🍞 XX г` с `PrimaryEmerald` на `ColorHigh` (жёлтый/янтарный).
+
+---
+
+## 8. Плашки инсулина и углеводов в Quick Glance HUD (окно по удержанию центральной кнопки)
+- В `MainActivity.kt` (`showQuickHud`):
+  - Плашка «Инсулин» (`💉`): фон `ActionBlue.copy(alpha = 0.15f)`, рамка `ActionBlue.copy(alpha = 0.5f)`, текст и цифры в синем акценте.
+  - Плашка «Углеводы» (`🥖`/`🍞`): фон `ColorHigh.copy(alpha = 0.15f)`, рамка `ColorHigh.copy(alpha = 0.5f)`, текст и цифры в жёлтом акценте.
+
+---
+
+## 9. Селекторы времени по умолчанию
+- В `ReportsViewModel.kt`:
+  - `_livePeriod` по умолчанию: `TrendPeriod.PERIOD_1D` («1д»).
+- В `TrendsViewModel.kt`:
+  - `_selectedPeriod` по умолчанию: `TrendPeriod.PERIOD_7D` («7д»).
+
+---
+
+## 10. Актуализация документации и стратегия версионирования
+- **README и Руководство**:
+  - Обновить `README.md`, `UserManualPdfGenerator.kt` и `GuidebookPdfGenerator.kt`: описать ночной дрейф кружка, ночной запуск AoD при блокировке, экранный фонарик 100с с тапом сброса, тыльный фонарик со ступенчатой силой вспышки, переключатель BLE-моста.
+- **Версионирование**:
+  - Установить `versionName = "1.0.0"`, при этом `versionCode = 21` (для гарантии корректного обновления без конфликта `INSTALL_FAILED_VERSION_DOWNGRADE`).

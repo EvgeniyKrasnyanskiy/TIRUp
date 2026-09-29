@@ -49,9 +49,9 @@ class UserManualPdfGenerator(private val context: Context) {
         val document = PdfDocument()
         try {
             val appVersion = try {
-                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "2.2.3"
+                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.0"
             } catch (_: Exception) {
-                "2.2.3"
+                "1.0.0"
             }
 
             // Typography Paints
@@ -472,8 +472,8 @@ class UserManualPdfGenerator(private val context: Context) {
                 )
                 flow.bullet(
                     if (isRu) "Семейный BLE-мост (Вещатель — Приёмник)" else "Family BLE Bridge",
-                    if (isRu) "Передача сахара ребёнка родителю по Bluetooth LE без Wi-Fi и SIM. Телефон ребёнка настраивается как «Вещатель» (импульс 15 с на замер, микропотребление <0.8% батареи/сутки), телефон родителя — как «Приёмник». Пакет шифруется 4-значным Family PIN."
-                    else "Stream patient glucose to parent over BLE without Wi-Fi or SIM. Broadcaster pulses 15s bursts (<0.8% battery/day), Observer receives. Secured with 4-digit PIN."
+                    if (isRu) "Передача сахара ребёнка родителю по Bluetooth LE без Wi-Fi и SIM. Блок оснащён общим тумблером питания (зелёный индикатор для приёмника, синий для вещателя) и кнопками выбора режима («Вещатель» / «Приёмник»). Телефон ребёнка настраивается как «Вещатель» (импульс 15 с на замер, микропотребление <0.8% батареи/сутки), телефон родителя — как «Приёмник». Пакет шифруется 4-значным Family PIN."
+                    else "Stream patient glucose to parent over BLE without Wi-Fi or SIM. Features a master header switch (green indicator for observer, blue for broadcaster) and dedicated mode buttons ('Broadcaster' / 'Observer'). Broadcaster pulses 15s bursts (<0.8% battery/day), Observer receives. Secured with 4-digit PIN."
                 )
                 flow.bullet(
                     if (isRu) "Режим Long Range (LE Coded PHY)" else "Long Range Mode (LE Coded PHY)",
@@ -730,8 +730,8 @@ class UserManualPdfGenerator(private val context: Context) {
                 )
                 flow.bullet(
                     if (isRu) "Виджеты рабочего стола, экран AoD и Пузырёк" else "Widgets, AoD Screen & Floating Bubble",
-                    if (isRu) "5 форматов виджетов рабочего стола (5х1, 4х2/3х2, 2х2, 1х2). Энергоэффективный Always-On Display (AoD) с защитой OLED от выгорания: ночные часы, гигантский сахар, стрелка тренда, индикатор батареи, жест яркости и фонарик с паузой. Плавающий «Пузырёк» виден поверх всех приложений."
-                    else "5 homescreen widget sizes (5x1, 4x2/3x2, 2x2, 1x2). Ultra-efficient Always-On Display (AoD) with OLED anti-burn-in jitter: bedside clock, giant glucose, battery status, brightness drag, and smooth flashlight with pause. Floating Bubble pulses over apps."
+                    if (isRu) "5 форматов виджетов рабочего стола (5х1, 4х2/3х2, 2х2, 1х2). Энергоэффективный Always-On Display (AoD) с автозапуском в часы сна при блокировке экрана и защитой OLED от выгорания: ночные часы, гигантский сахар, стрелка тренда, индикатор батареи, жест регулировки яркости (включая силу тыльной вспышки на Android 13+) и фонарик с паузой и таймером автоотключения (3 мин). Плавающий «Пузырёк» с защитой от выгорания (Pixel Shift 1 мин, смена стороны 15 мин по «правилу 15») и автоскрытием при норме сахара виден поверх всех приложений."
+                    else "5 homescreen widget sizes (5x1, 4x2/3x2, 2x2, 1x2). Ultra-efficient Always-On Display (AoD) with night sleep screen-off lockscreen autostart and OLED anti-burn-in jitter: bedside clock, giant glucose, battery status, vertical brightness/hardware torch strength drag, and flashlight with pause and auto-off timer (3 min). Floating Bubble features anti-burn-in pixel drift (1-min Y-shift, 15-min side toggle) and auto-hides on normal glucose."
                 )
                 flow.bullet(
                     if (isRu) "Сроки службы расходников и напоминания о замене" else "Supplies Tracking & Expiry Reminders",

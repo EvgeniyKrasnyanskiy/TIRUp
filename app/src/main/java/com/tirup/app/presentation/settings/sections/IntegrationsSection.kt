@@ -45,6 +45,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -58,6 +59,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -176,7 +178,7 @@ fun BleBridgeCard(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                text = if (isRu) "Локальный BLE-мост" else "Local BLE Bridge",
+                                text = if (isRu) "BLE-мост" else "BLE Bridge",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Bold
@@ -214,6 +216,27 @@ fun BleBridgeCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    val switchTrackColor = if (ble.role == BleBridgeRole.OBSERVER) PrimaryEmerald else ActionBlue
+                    Switch(
+                        checked = isBridgeActive,
+                        onCheckedChange = { isChecked ->
+                            if (!isChecked) {
+                                onUpdateBleSettings(ble.copy(isEnabled = false))
+                            } else {
+                                val targetRole = if (ble.role == BleBridgeRole.DISABLED) BleBridgeRole.BROADCASTER else ble.role
+                                val ok = checkAndRequestBlePermissions(targetRole)
+                                if (ok) {
+                                    onUpdateBleSettings(ble.copy(isEnabled = true, role = targetRole))
+                                }
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = switchTrackColor
+                        ),
+                        modifier = Modifier.scale(0.85f)
+                    )
+
                     Surface(
                         shape = CircleShape,
                         color = ActionBlue.copy(alpha = 0.15f),
@@ -267,46 +290,32 @@ fun BleBridgeCard(
                     }
 
                     val roles = listOf(
-                        Triple(BleBridgeRole.DISABLED, if (isRu) "✖️ Выкл" else "✖️ Off", "gray"),
-                        Triple(BleBridgeRole.BROADCASTER, if (isRu) "📡 Вещатель" else "📡 Broadcaster", "blue"),
-                        Triple(BleBridgeRole.OBSERVER, if (isRu) "📻 Приёмник" else "📻 Observer", "emerald")
+                        Pair(BleBridgeRole.BROADCASTER, if (isRu) "📡 Вещатель" else "📡 Broadcaster"),
+                        Pair(BleBridgeRole.OBSERVER, if (isRu) "📻 Приёмник" else "📻 Observer")
                     )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        roles.forEach { (role, label, colorType) ->
-                            val isSelected = if (role == BleBridgeRole.DISABLED) !isBridgeActive else (isBridgeActive && ble.role == role)
-                            val (bg, textColor, borderColor) = when (colorType) {
-                                "blue" -> if (isSelected) {
-                                    Triple(ActionBlue.copy(alpha = 0.2f), ActionBlue, ActionBlue)
-                                } else {
-                                    Triple(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                                }
-                                "emerald" -> if (isSelected) {
-                                    Triple(PrimaryEmerald.copy(alpha = 0.2f), PrimaryEmerald, PrimaryEmerald)
-                                } else {
-                                    Triple(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                                }
-                                else -> if (isSelected) {
-                                    Triple(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurface, MaterialTheme.colorScheme.outline)
-                                } else {
-                                    Triple(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                                }
+                        roles.forEach { (role, label) ->
+                            val isSelected = isBridgeActive && ble.role == role
+                            val isBroadcaster = role == BleBridgeRole.BROADCASTER
+                            val activeColor = if (isBroadcaster) ActionBlue else PrimaryEmerald
+
+                            val (bg, textColor, borderColor) = if (isSelected) {
+                                Triple(activeColor.copy(alpha = 0.18f), activeColor, activeColor)
+                            } else {
+                                Triple(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                             }
 
                             Surface(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clickable {
-                                        if (role == BleBridgeRole.DISABLED) {
-                                            onUpdateBleSettings(ble.copy(isEnabled = false, role = BleBridgeRole.DISABLED))
-                                        } else {
-                                            val ok = checkAndRequestBlePermissions(role)
-                                            if (ok) {
-                                                onUpdateBleSettings(ble.copy(isEnabled = true, role = role))
-                                            }
+                                        val ok = checkAndRequestBlePermissions(role)
+                                        if (ok) {
+                                            onUpdateBleSettings(ble.copy(isEnabled = true, role = role))
                                         }
                                     },
                                 shape = RoundedCornerShape(10.dp),
@@ -315,7 +324,7 @@ fun BleBridgeCard(
                             ) {
                                 Text(
                                     text = label,
-                                    modifier = Modifier.padding(vertical = 10.dp),
+                                    modifier = Modifier.padding(vertical = 11.dp),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                     color = textColor,
@@ -712,7 +721,7 @@ fun XdripLanFollowerCard(
                     Icon(
                         imageVector = if (isLanCardExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = if (isLanCardExpanded) "Collapse" else "Expand",
-                        tint = PrimaryEmerald,
+                        tint = ActionBlue,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -919,6 +928,7 @@ fun NightscoutSyncCard(
     modifier: Modifier = Modifier
 ) {
     val nightscout = settings.nightscoutSettings
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
     var isTestingNs by remember { mutableStateOf(false) }
     var nsTestStatus by remember { mutableStateOf<String?>(null) }
     var isNsTestSuccess by remember { mutableStateOf(false) }
@@ -930,7 +940,9 @@ fun NightscoutSyncCard(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -956,15 +968,27 @@ fun NightscoutSyncCard(
                         )
                     }
                 }
-                Switch(
-                    checked = nightscout.isEnabled,
-                    onCheckedChange = { onUpdateNightscoutSettings(nightscout.copy(isEnabled = it)) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = ActionBlue
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(
+                        checked = nightscout.isEnabled,
+                        onCheckedChange = { onUpdateNightscoutSettings(nightscout.copy(isEnabled = it)) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = ActionBlue
+                        )
                     )
-                )
+                    IconButton(onClick = { isExpanded = !isExpanded }) {
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
+                            tint = ActionBlue
+                        )
+                    }
+                }
             }
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
 
             Surface(
                 shape = RoundedCornerShape(10.dp),
@@ -1146,6 +1170,8 @@ fun NightscoutSyncCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                 lineHeight = 16.sp
             )
+                }
+            }
         }
     }
 }

@@ -46,7 +46,7 @@ data class HistoricalReportData(
 )
 
 data class ReportsUiState(
-    val livePeriod: TrendPeriod = TrendPeriod.PERIOD_14D,
+    val livePeriod: TrendPeriod = TrendPeriod.PERIOD_1D,
     val liveStatistics: GlucoseStatistics = GlucoseStatistics(),
     val liveReadings: List<GlucoseReading> = emptyList(),
     val historicalReport: HistoricalReportData = HistoricalReportData(),
@@ -77,7 +77,7 @@ class ReportsViewModel(
     private val database: AppDatabase
 ) : ViewModel() {
 
-    private val _livePeriod = MutableStateFlow(TrendPeriod.PERIOD_14D)
+    private val _livePeriod = MutableStateFlow(TrendPeriod.PERIOD_1D)
     val livePeriod: StateFlow<TrendPeriod> = _livePeriod.asStateFlow()
 
     private val _uiState = MutableStateFlow(ReportsUiState())

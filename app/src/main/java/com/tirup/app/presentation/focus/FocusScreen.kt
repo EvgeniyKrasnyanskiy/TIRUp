@@ -2492,8 +2492,8 @@ private fun HeroGlucoseCard(
                         if (hasIob || hasBattery) Spacer(modifier = Modifier.width(4.dp))
                         Surface(
                             shape = RoundedCornerShape(10.dp),
-                            color = PrimaryEmerald.copy(alpha = 0.12f),
-                            border = BorderStroke(0.8.dp, PrimaryEmerald.copy(alpha = 0.35f)),
+                            color = ColorHigh.copy(alpha = 0.12f),
+                            border = BorderStroke(0.8.dp, ColorHigh.copy(alpha = 0.35f)),
                             modifier = Modifier.clickable { onCobClick() }
                         ) {
                             Text(
@@ -2502,7 +2502,7 @@ private fun HeroGlucoseCard(
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp,
-                                color = PrimaryEmerald
+                                color = ColorHigh
                             )
                         }
                     }
@@ -2529,8 +2529,8 @@ private fun HeroGlucoseCard(
                             .size(width = 28.dp, height = 24.dp)
                             .clickable { onAodClick() },
                         shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-                        border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                        color = ColorHigh.copy(alpha = 0.12f),
+                        border = BorderStroke(0.8.dp, ColorHigh.copy(alpha = 0.5f))
                     ) {
                         Box(
                             modifier = Modifier.fillMaxSize(),

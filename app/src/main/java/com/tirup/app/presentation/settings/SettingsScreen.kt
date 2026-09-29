@@ -687,6 +687,17 @@ fun SettingsScreen(
                         Column(
                             verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
+                            XdripLanFollowerCard(
+                                settings = settings,
+                                isRu = isRu,
+                                isLanCardExpanded = isLanCardExpanded,
+                                onToggleExpanded = { isLanCardExpanded = !isLanCardExpanded },
+                                highlightLan = highlightLan,
+                                highlightBorderAlpha = highlightBorderAlpha,
+                                onUpdateLanSettings = { viewModel.updateXdripLanSettings(it) },
+                                onShowLanSettingsDialog = { showXdripLanDialog = true }
+                            )
+
                             BleBridgeCard(
                                 settings = settings,
                                 isRu = isRu,
@@ -703,92 +714,81 @@ fun SettingsScreen(
                                 onShowBlePinDialog = { showBlePinDialog = true }
                             )
 
-                            XdripLanFollowerCard(
+                            EmergencySmsCard(
                                 settings = settings,
                                 isRu = isRu,
-                                isLanCardExpanded = isLanCardExpanded,
-                                onToggleExpanded = { isLanCardExpanded = !isLanCardExpanded },
-                                highlightLan = highlightLan,
-                                highlightBorderAlpha = highlightBorderAlpha,
-                                onUpdateLanSettings = { viewModel.updateXdripLanSettings(it) },
-                                onShowLanSettingsDialog = { showXdripLanDialog = true }
+                                isSmsCardExpanded = isSmsCardExpanded,
+                                onToggleExpanded = { isSmsCardExpanded = !isSmsCardExpanded },
+                                hasSendSmsPermission = hasSendSmsPermission,
+                                hasReceiveSmsPermission = hasReceiveSmsPermission,
+                                hasOverlayPermission = hasOverlayPermission,
+                                smsPermissionsLauncher = smsPermissionsLauncher,
+                                overlayPermissionLauncher = overlayPermissionLauncher,
+                                locationPermissionLauncher = locationPermissionLauncher,
+                                testCaregiverSosCountdownSec = testCaregiverSosCountdownSec,
+                                onStartCaregiverSosTest = {
+                                    testCaregiverSosCountdownSec = 5
+                                    viewModel.startCaregiverSosTestCountdown(5)
+                                },
+                                onCancelCaregiverSosTest = {
+                                    testCaregiverSosCountdownSec = 0
+                                    viewModel.cancelCaregiverSosTest()
+                                },
+                                onSendTestEmergencySms = { viewModel.sendTestEmergencySms() },
+                                onUpdateAlertSettings = { viewModel.updateAlertSettings(it) }
                             )
 
-            EmergencySmsCard(
-                settings = settings,
-                isRu = isRu,
-                isSmsCardExpanded = isSmsCardExpanded,
-                onToggleExpanded = { isSmsCardExpanded = !isSmsCardExpanded },
-                hasSendSmsPermission = hasSendSmsPermission,
-                hasReceiveSmsPermission = hasReceiveSmsPermission,
-                hasOverlayPermission = hasOverlayPermission,
-                smsPermissionsLauncher = smsPermissionsLauncher,
-                overlayPermissionLauncher = overlayPermissionLauncher,
-                locationPermissionLauncher = locationPermissionLauncher,
-                testCaregiverSosCountdownSec = testCaregiverSosCountdownSec,
-                onStartCaregiverSosTest = {
-                    testCaregiverSosCountdownSec = 5
-                    viewModel.startCaregiverSosTestCountdown(5)
-                },
-                onCancelCaregiverSosTest = {
-                    testCaregiverSosCountdownSec = 0
-                    viewModel.cancelCaregiverSosTest()
-                },
-                onSendTestEmergencySms = { viewModel.sendTestEmergencySms() },
-                onUpdateAlertSettings = { viewModel.updateAlertSettings(it) }
-            )
+                            AlwaysOnDisplayCard(
+                                settings = settings,
+                                isRu = isRu,
+                                onUpdateAodSettings = { viewModel.updateAodSettings(it) }
+                            )
 
-            WeeklyDigestCard(
-                settings = settings,
-                isRu = isRu,
-                onSetWeeklyDigestEnabled = { viewModel.setWeeklyDigestEnabled(it) },
-                onTriggerImmediately = {
-                    com.tirup.app.data.worker.WeeklyDigestWorker.triggerImmediately(context)
-                    Toast.makeText(
-                        context,
-                        if (isRu) "Формируем отчёт дайджеста... Протяните шторку уведомлений"
-                        else "Generating weekly digest... Check notifications shade",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            )
+                            WeeklyDigestCard(
+                                settings = settings,
+                                isRu = isRu,
+                                onSetWeeklyDigestEnabled = { viewModel.setWeeklyDigestEnabled(it) },
+                                onTriggerImmediately = {
+                                    com.tirup.app.data.worker.WeeklyDigestWorker.triggerImmediately(context)
+                                    Toast.makeText(
+                                        context,
+                                        if (isRu) "Формируем отчёт дайджеста... Протяните шторку уведомлений"
+                                        else "Generating weekly digest... Check notifications shade",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            )
 
-            DeviceRemindersCard(
-                settings = settings,
-                isRu = isRu,
-                onSetDeviceRemindersEnabled = { viewModel.setDeviceRemindersEnabled(it) },
-                onSetSensorReminderEnabled = { viewModel.setSensorReminderEnabled(it) },
-                onSetPumpReminderEnabled = { viewModel.setPumpReminderEnabled(it) },
-                onSetLancetReminderEnabled = { viewModel.setLancetReminderEnabled(it) },
-                onSetHba1cReminderEnabled = { viewModel.setHba1cReminderEnabled(it) }
-            )
+                            DeviceRemindersCard(
+                                settings = settings,
+                                isRu = isRu,
+                                onSetDeviceRemindersEnabled = { viewModel.setDeviceRemindersEnabled(it) },
+                                onSetSensorReminderEnabled = { viewModel.setSensorReminderEnabled(it) },
+                                onSetPumpReminderEnabled = { viewModel.setPumpReminderEnabled(it) },
+                                onSetLancetReminderEnabled = { viewModel.setLancetReminderEnabled(it) },
+                                onSetHba1cReminderEnabled = { viewModel.setHba1cReminderEnabled(it) }
+                            )
 
-            ClinicalStandardsCard(
-                settings = settings,
-                isRu = isRu,
-                onUpdateNightHours = { start, end ->
-                    viewModel.autoUpdateNightHours(nightStart = start, nightEnd = end)
-                }
-            )
+                            ClinicalStandardsCard(
+                                settings = settings,
+                                isRu = isRu,
+                                onUpdateNightHours = { start, end ->
+                                    viewModel.autoUpdateNightHours(nightStart = start, nightEnd = end)
+                                }
+                            )
 
-            LockscreenNotificationCard(
-                settings = settings,
-                isRu = isRu,
-                onSetLockscreenNotificationEnabled = { viewModel.setLockscreenNotificationEnabled(it) }
-            )
+                            LockscreenNotificationCard(
+                                settings = settings,
+                                isRu = isRu,
+                                onSetLockscreenNotificationEnabled = { viewModel.setLockscreenNotificationEnabled(it) }
+                            )
 
-            FloatingGlucoseBubbleCard(
-                settings = settings,
-                isRu = isRu,
-                onToggleFloatingBubble = { viewModel.toggleFloatingBubble(it) },
-                onToggleFloatingBubbleAlwaysVisible = { viewModel.toggleFloatingBubbleAlwaysVisible(it) }
-            )
-
-            AlwaysOnDisplayCard(
-                settings = settings,
-                isRu = isRu,
-                onUpdateAodSettings = { viewModel.updateAodSettings(it) }
-            )
+                            FloatingGlucoseBubbleCard(
+                                settings = settings,
+                                isRu = isRu,
+                                onToggleFloatingBubble = { viewModel.toggleFloatingBubble(it) },
+                                onToggleFloatingBubbleAlwaysVisible = { viewModel.toggleFloatingBubbleAlwaysVisible(it) }
+                            )
 
             WidgetPreviewCard(
                 settings = settings,

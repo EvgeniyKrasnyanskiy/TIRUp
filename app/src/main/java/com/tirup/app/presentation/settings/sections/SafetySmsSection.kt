@@ -377,7 +377,7 @@ fun EmergencySmsCard(
                     Icon(
                         imageVector = if (isSmsCardExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = if (isSmsCardExpanded) "Collapse" else "Expand",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = ActionBlue,
                         modifier = Modifier.size(24.dp)
                     )
                 }

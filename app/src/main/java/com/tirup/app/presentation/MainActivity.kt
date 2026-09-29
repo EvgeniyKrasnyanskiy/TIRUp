@@ -104,6 +104,7 @@ import com.tirup.app.presentation.settings.SettingsScreen
 import com.tirup.app.presentation.settings.SettingsViewModel
 import com.tirup.app.presentation.settings.dialogs.Hba1cHistoryDialog
 import com.tirup.app.presentation.theme.ActionBlue
+import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.PrimaryEmerald
 import com.tirup.app.presentation.theme.TIRUpTheme
 import com.tirup.app.presentation.trends.TrendsScreen
@@ -1049,7 +1050,8 @@ fun MainPagerScaffold(
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(20.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                                color = ActionBlue.copy(alpha = 0.14f),
+                                border = BorderStroke(1.5.dp, ActionBlue.copy(alpha = 0.45f)),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Column(
@@ -1063,7 +1065,7 @@ fun MainPagerScaffold(
                                             text = if (isRu) "Инсулин" else "Insulin",
                                             fontSize = 18.sp,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            color = ActionBlue,
                                             maxLines = 1,
                                             softWrap = false
                                         )
@@ -1073,7 +1075,7 @@ fun MainPagerScaffold(
                                         text = iobStr,
                                         fontSize = 34.sp,
                                         fontWeight = FontWeight.Black,
-                                        color = MaterialTheme.colorScheme.onSurface,
+                                        color = ActionBlue,
                                         maxLines = 1,
                                         softWrap = false
                                     )
@@ -1082,7 +1084,8 @@ fun MainPagerScaffold(
 
                             Surface(
                                 shape = RoundedCornerShape(20.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                                color = ColorHigh.copy(alpha = 0.14f),
+                                border = BorderStroke(1.5.dp, ColorHigh.copy(alpha = 0.45f)),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Column(
@@ -1096,7 +1099,7 @@ fun MainPagerScaffold(
                                             text = if (isRu) "Углеводы" else "Carbs",
                                             fontSize = 18.sp,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            color = ColorHigh,
                                             maxLines = 1,
                                             softWrap = false
                                         )
@@ -1106,7 +1109,7 @@ fun MainPagerScaffold(
                                         text = cobStr,
                                         fontSize = 34.sp,
                                         fontWeight = FontWeight.Black,
-                                        color = MaterialTheme.colorScheme.onSurface,
+                                        color = ColorHigh,
                                         maxLines = 1,
                                         softWrap = false
                                     )
