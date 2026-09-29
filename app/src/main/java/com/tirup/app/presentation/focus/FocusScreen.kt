@@ -1532,41 +1532,51 @@ private fun LanStatusDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 16.sp
                 )
-            }
-        },
-        confirmButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = {
-                        if (!isDiscovering) {
-                            onSearchClick()
-                        }
-                    },
+
+                // Full-width "Find Master" button
+                Button(
+                    onClick = { if (!isDiscovering) onSearchClick() },
                     enabled = !isDiscovering,
-                    shape = RoundedCornerShape(10.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ActionBlue,
+                        contentColor = Color.White,
+                        disabledContainerColor = ActionBlue.copy(alpha = 0.35f),
+                        disabledContentColor = Color.White.copy(alpha = 0.6f)
+                    )
                 ) {
                     if (isDiscovering) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(14.dp),
                             strokeWidth = 2.dp,
-                            color = PrimaryEmerald
+                            color = Color.White
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (isRu) "Поиск..." else "Scanning...")
+                        Text(if (isRu) "Поиск..." else "Scanning...", fontWeight = FontWeight.Bold)
                     } else {
                         Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (isRu) "Найти" else "Scan")
+                        Text(if (isRu) "Найти мастера" else "Find Master", fontWeight = FontWeight.Bold)
                     }
                 }
 
-                Button(
+                // Settings link — plain blue text like BLE dialog
+                TextButton(
                     onClick = onOpenSettings,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
+                    modifier = Modifier.align(Alignment.End)
                 ) {
-                    Text(if (isRu) "Настройки" else "Settings")
+                    Text(
+                        text = if (isRu) "⚙️ Настройки Wi-Fi LAN..." else "⚙️ Wi-Fi LAN Settings...",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = ActionBlue
+                    )
                 }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = if (isRu) "Закрыть" else "Close", color = ActionBlue, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
