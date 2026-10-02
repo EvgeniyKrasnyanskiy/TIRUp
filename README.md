@@ -3,20 +3,397 @@
 <div align="center">
 
 ![Version](https://img.shields.io/badge/Version-1.0.0-brightgreen.svg)
-![Platform](https://img.shields.io/badge/Platform-Android-green.svg)
+![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-green.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-blue.svg)
 ![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%2F%20Material%203-blueviolet.svg)
 ![Architecture](https://img.shields.io/badge/Architecture-Clean%20%2F%20MVVM-orange.svg)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)
 
-**TIRUp** — современное автономное Android-приложение для непрерывного мониторинга гликемии (CGM), углублённого клинического анализа профиля глюкозы и автоматической генерации стандартизированных медицинских AGP-отчётов (Ambulatory Glucose Profile).
+**TIRUp** is an advanced, privacy-first, 100% offline open-source Android application for Continuous Glucose Monitoring (CGM) analytics, emergency safety alerts, and automated clinical AGP (Ambulatory Glucose Profile) medical reporting.
 
-[English](#english-summary) • [Возможности](#-ключевые-возможности) • [Настройка xDrip+](#-интеграция-с-xdrip) • [Метрики](#-клинические-метрики-и-алгоритмы) • [Сборка](#-сборка-проекта)
+[ 🇬🇧 English ](#tirup-time-in-range-up-) • [ 🇷🇺 Перейти к русской версии ](#russian-version)
+
+[ 🌟 Key Features ](#key-features) • [ 📸 Screenshots ](#ui-screenshots) • [ 📱 Data Sources ](#data-sources) • [ 📊 Clinical Metrics ](#clinical-metrics) • [ 🛠 Tech Stack ](#tech-stack) • [ 🏗 Building ](#building) • [ ⚠️ Medical Disclaimer ](#disclaimer)
 
 </div>
 
 ---
 
+<a name="ui-screenshots"></a>
+## 📸 UI Screenshots
+
+<div align="center">
+
+| Home & Real-Time Monitoring | Glycemic Trends & AGP | Clinical PDF Reports |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/01_home_screen.jpg" width="240" alt="Home Screen" /> | <img src="docs/screenshots/02_trends_agp.jpg" width="240" alt="Trends & AGP" /> | <img src="docs/screenshots/03_medical_reports.jpg" width="240" alt="Medical Reports" /> |
+| **Hero Glucose & Metrics Grid** | **Trends, Ranges & 24h AGP Curve** | **Standardized AGP PDF Export** |
+
+<br/>
+
+| Weekly Digest Analysis | TIR Streak & Activity Grid | Supplies & Devices Tracker |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/04_weekly_digest.jpg" width="240" alt="Weekly Digest" /> | <img src="docs/screenshots/05_tir_streak_grid.jpg" width="240" alt="TIR Streak" /> | <img src="docs/screenshots/06_supplies_tracker.jpg" width="240" alt="Supplies Tracker" /> |
+| **Week-over-Week Insights** | **Target Range Consistency** | **Sensors, Cannulas & Lancets** |
+
+<br/>
+
+| Laboratory HbA1c Journal | Master / Follower Roles | Advanced Hardware Settings |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/07_hba1c_journal.jpg" width="240" alt="HbA1c Journal" /> | <img src="docs/screenshots/08_settings_roles.jpg" width="240" alt="Roles & Preferences" /> | <img src="docs/screenshots/09_advanced_settings.jpg" width="240" alt="Advanced Settings" /> |
+| **Lab HbA1c vs 90d GMI** | **Caregiver Roles & Daily Target** | **LAN Follower, BLE Bridge & SOS** |
+
+<br/>
+
+| Patient Profile & Settings |
+| :---: |
+| <img src="docs/screenshots/10_patient_profile.jpg" width="240" alt="Patient Profile" /> |
+| **Clinical Profile & Daily Carb Target** |
+
+</div>
+
+---
+
+<a name="key-features"></a>
+## 🌟 Key Features
+
+### 1. Autonomous Real-Time Ingestion (100% Offline)
+- Direct interception of local broadcast intents from **xDrip+** (`com.eveningoutpost.dexdrip.BgEstimate`).
+- Reception of active insulin (**IoB**), active carbohydrates (**CoB**), and bolus/food history via the **Broadcast Service API**.
+- Operates 100% locally on your smartphone — **no internet connection, external cloud servers, or risks of medical telemetry leaks**.
+
+### 2. Direct xDrip+ Polling via Wi-Fi / Hotspot (LAN Follower, 100% Offline)
+- Direct local HTTP polling of the master device's xDrip+ web server (`http://<master_ip>:17580`) with `API Secret` authentication.
+- Polls `sgv.json` (glucose, trend arrow), `pebble` (active insulin IoB, active carbohydrates CoB, master device battery 🔋), and `treatments.json` (boluses, carbs, fingerstick calibrations, notes with persistent UUIDs).
+- Fully functional without an active internet connection (over home Wi-Fi or the master device's Hotspot).
+- **Subnet Auto-Discovery**: parallel background coroutine scan across addresses `192.168.x.1`–`254` and Hotspot gateway `192.168.43.1` completed in ~1.2 seconds. Battery protection: scanning is blocked (no-op) when Wi-Fi is disconnected.
+- **Unified Deduplication Matrix**: single ingestion point into Room DB with strict source priority (`LOCAL_XDRIP` [4] → `BLE_BRIDGE` [3] → `WIFI_LAN` [2] → `NIGHTSCOUT_CLOUD` [1]) and safe field enrichment (`iob`, `cob`, `trendArrow`).
+- **HeroGlucoseCard Status Chip Strip**: balanced row of chips `[Bell 🔔]` → `[Wi-Fi icon]` → `[Master Battery 🔋 %]` → `[IoB 💉]` → `[CoB 🍞]` → `[BLE Bridge 📡]` → `[AoD 🌙]`. Compact 28x24 dp dimensions without clutter, dynamic color shifts based on live status, and responsive layout across any screen width. Tapping the Wi-Fi chip opens a status dialog with a manual subnet scan trigger.
+
+### 3. Quick Treatments Entry & Nightscout API Cloud Sync
+- Convenient quick-entry sheet on the Home screen for logging bolus insulin doses 💉, carbohydrates 🍞, fingerstick calibrations 🩸, and notes 💬.
+- Background sync to the Nightscout REST API (`POST /api/v1/treatments`) with support for `api-secret` (SHA-1) or query token authorization.
+- **Persistent UUID Deletion (`DELETE /api/v1/treatments/{uuid}`)**: deleting a treatment record in TIRUp cancels it on the server and purges it from the Room DB, preventing phantom entries from reappearing during xDrip+ synchronization.
+- Hidden developer menu (5 taps on the version tag): live connection latency tester and xDrip+ port 17580 acknowledgment inspector.
+
+### 4. Dual Measurement Units
+- Instant, seamless toggle between **mmol/L** and **mg/dL** across all app screens, graphs, home screen widgets, and exported PDF clinical reports.
+
+### 5. Daily Target Compensator Math (TIR $\ge 70\%$ / TING $\ge 50\%$)
+- Calculates the exact time in hours and minutes required to spend in the target range until midnight (00:00:00 – 23:59:59) to hit the 70% TIR / 50% TING clinical goal.
+- Proactive **"Last Chance for TIR"** warning alert, sounding 1–2 hours before the mathematical point of no return.
+- Concise live status indicators: *"In range 2h 15m remaining"* or *"Target 100% achieved!"*.
+
+### 6. Treatments & Notes Graph Overlay
+- Automatic overlay of bolus insulin pins 💉 (*cyan pin `X.X U`*), meals 🍽️ (*amber pin `XX g`*), and xDrip notes 💬 (*purple badge `💬 text` with smart vertical stacking*) directly on the 24-hour Canvas graph.
+- Projected dashed guidelines to glucose points with synchronized pinch-to-zoom and pan gestures.
+- Interactive tooltip inspector on marker tap displaying exact timestamp, insulin dose, carb count, bread units (BU), and full note text with one-tap deletion.
+
+### 7. 25-Minute Trend Forecast Overlay
+- Violet prediction points and dashed extrapolation trajectory (`#A855F7`) extending 25 minutes forward from current reading (`+5m`, `+10m`, `+15m`, `+20m`, `+25m`).
+- Autonomous kinetic momentum algorithm with physiological damping based on recent velocity — **no mandatory entry of ISF or Carb Ratio required**.
+- Empowers preemptive hypo intervention with fast-acting carbohydrates 15–20 minutes before breaking clinical thresholds.
+- Interactive tap inspector on any forecast point showing estimated time and projected glucose level.
+
+### 8. Smart 4-Tier Safety Alarms & Battery Supervision
+- **Tier 1 (Predictive Trend Alert, 15 min)**: mathematical velocity regression calculating exact astronomical event time (*"at 16:42"*) with gentle, low-stress chime.
+- **Tier 2 (Confirmed Out-of-Range)**: triggers after 3–5 consecutive readings outside personal thresholds; distinct triple medical chime with 1.5s pause.
+- **Tier 3 (Dangerous & Critical Alarms)**:
+  - *Dangerous (Prolonged)*: glucose < 3.9 mmol/L for > 20 min or > 10.0 mmol/L for > 90 min — 12-second sustained medical warning.
+  - *Critical (Urgent)*: customizable thresholds (defaults: < 3.0 and > 13.9 mmol/L). Instant single-point trigger: powerful 50-second civil-defense GDH air-raid siren (520–980 Hz frequency sweep with saturation harmonics) for Crit. HYPO waking up the rescue screen over lockscreen with SOS countdown to followers; or a 16-second pulsating emergency tone (1760/2349 Hz) for Crit. HYPER. Unified modal for thresholds and siren configuration.
+- **Tier 4 (Sensor Signal Loss >20 min)**: gentle disconnect reminder with progressive day/night schedule (sleep window: repeated alarm cycle for reliable waking; daytime: courteous reminder intervals).
+- **Stepped Critical Battery Alarms (<15%, <10%, <5%)**: intelligent warning with hysteresis, anti-spam protection, and quick acknowledgment button ("OK") directly in the Android notification shade.
+- **Independent Alarm Volume Slider (20% – 100%)**: dedicated volume control in Settings with live "Test 🔔" playback button.
+- **Quick Snooze All**: temporarily silence all alarms from the Focus screen (`10m`, `30m`, default `1h`, `2h`, `4h`, `8h`) with automatic suppression of signal loss chimes.
+- **Bilingual Alert Log**: on-the-fly translation of logged alarm events, titles, and snooze states when toggling system language (EN/RU).
+- **Clinical Smart Snooze**:
+  - *Hypoglycemia*: 15-minute pause with coma prevention override (instant re-alarm if glucose falls below 2.8 mmol/L).
+  - *Hyperglycemia*: 30–45 minute pause for insulin absorption with re-alert if glucose fails to trend downward.
+
+### 9. Loved Ones Protection: Master / Follower Roles, Heads-Up Messages & Emergency SOS
+- **"👑 Master (Sensor)" and "👁️ Follower (Caregiver)" Roles**:
+  - Central role switcher at the very top of Settings directly beneath "My Profile".
+  - *Master:* reads sensor, evaluates local thresholds, initiates rescue timer, and dispatches SOS to caregivers during severe hypoglycemia.
+  - *Follower:* receives offline telemetry, silent remote queries, and triggers full-blast emergency sirens during night SOS alerts from the patient.
+  - *Role-specific Alarm Testing:* "Test" button for Master triggers the patient rescue screen (carbs recommendation, hypo recovery countdown timer, emergency speed dial); for Follower, triggers the loud emergency siren and patient info card showing 2.8 ⇊ with direct Google Maps link.
+- **Heads-Up Overlay for High-Priority SMS (Master ⇄ Follower)**:
+  - Incoming SMS from whitelisted caregivers wakes the display for 15 seconds over lockscreen (`ACQUIRE_CAUSES_WAKEUP`).
+  - High-visibility neon border styling with gentle pulsing and haptic vibration (no jarring siren).
+  - Large legible typography (22sp), green "OK" dismiss button, and quick "Reply" button.
+  - Quick-reply sheet strictly limited to $\le 70$ characters (single SMS segment) with one-tap preset responses (*"Drank juice 🧃"*, *"Took insulin 💉"*, *"All under control 👌"*).
+- **Silent Under-the-Hood Telemetry (Silent Query Reply)**:
+  - Caregiver query SMS (`sugar`, `?`, `bg`, `tir`, `сахар`) processed **100% silently in the background** — screen does not turn on and phone does not vibrate.
+  - Auto-replies with ultra-compact SMS ($\le 70$ chars): `TIRUp: [Name] 6.4 mmol (→) at 14:35 (+0.2). TIR: 82%. IoB: 1.2U`.
+  - Whitelist security (matches last 10 digits) and 60-second anti-spam cooldown.
+- **Emergency SOS SMS for Loss of Consciousness**:
+  - If a critical hypo siren (< 3.0 mmol/L) sounds unacknowledged for > 3–5 minutes, TIRUp queries GPS and dispatches emergency coordinates to trusted caregivers.
+  - Compact format: `SOS! [Name] - severe hypo: 2.6 mmol (↓)! Siren active 3m unacknowledged. Location: maps.google.com/?q=...`.
+  - Whitelist security and auto-recheck of SMS/Overlay permissions when returning from Android system settings.
+
+### 10. Floating Glucose Bubble (AMOLED Anti-Burn-In)
+- Compact circular floating widget (60x60dp) overlaying all apps.
+- **Smart Visibility**: displays **only when glucose is out of target** (< 3.9 or > 10.0 mmol/L) and automatically vanishes when back in range (always-on mode also available).
+- **AMOLED Pixel-Shift Protection**: subtle vertical drift every 60 seconds with edge alternation every 15 minutes (mirroring clinical "Rule of 15").
+- Hypoglycemia water-ripple pulsing animation.
+- Tap on bubble mutes siren, snoozes bubble for 5 minutes, and opens the app.
+
+### 11. Glance Desktop Widgets (5 Formats)
+- **5 formats for any launcher grid**:
+  - **5x1 (Information Strip)**: continuous AGP core visualization: `TIR`, `TBR` (hypo, goal < 4%), and `TAR` (hyper) in dedicated blocks, plus dynamic slots for active insulin (💉 IoB), master battery (🔋), streak (🔥), time (⏱), and daily statistics (`Avg` / `CV` / `TING` / `GMI`).
+  - **4x2 / 3x2**: comprehensive dashboard with 4-hour HD Canvas sparkline and segmented point coloring.
+  - **2x2**: ergonomic square focus widget.
+  - **1x2**: vertical glance stack.
+- **Instant Widget Localization**: language (EN/RU) and measurement units (mmol/L or mg/dL) update immediately on the launcher upon changing in Settings.
+- **Live Indicators**: active insulin (💉) and carbs (🍞) badges, target streak count (🔥 X d.).
+- **Adjustable Opacity (0%..100%)**: smooth background transparency slider with live wallpaper preview.
+
+### 12. Sunday Analytical Digest
+- Generates an interactive weekly analytical report every Sunday at 20:00.
+- Week-over-week comparative breakdown (TIR, TING, TBR, TAR, CV, SD, Mean Glucose, Hypo count) with dynamic delta indicators ($\pm\Delta\%$).
+- Automated clinical interpretations and tailored recommendations.
+- Push notification with direct deep-link and persistent history archive.
+
+### 13. 24-Hour Ambulatory Glucose Profile (AGP) & Pattern Detection
+- Hourly 24-hour profile with percentile bands: Median (50%), Interquartile Range (25–75%), and Outlier Range (10–90%).
+- Card toggle `[📊 Chart | 🔢 Metrics]` switching between the percentile curves and a 12-parameter clinical metrics grid (Mean, eA1c, SD, %CV, TIR, TING, TBR, TAR, GRI, GVI, PGS, Min/Max).
+- Hidden clinical pattern detector: automated recognition of nocturnal drops during sleep hours, dawn phenomenon, and postprandial glycemic spikes with dismiss capability (✕).
+
+### 14. Standardized Medical AGP PDF Reports & User Manual
+- **Clinical AGP Report for Endocrinologist**: official ATTD/ADA 1-page standard sheet for 7, 14, 30, or 90 days with patient demographics and automated clinical findings.
+- **CGM Parameter Reference Guide (A4)**: in-depth breakdown of 12 clinical metrics, formulas, and target reference intervals.
+- **Three-Page User Manual (PDF)**: illustrated printable guide covering data source pairing, widgets, alarms, smart snooze, emergency SMS, and family BLE bridge setup.
+
+### 15. Daily Sandbox Auto-Backup (Permissionless)
+- Exact `AlarmManager.RTC_WAKEUP` triggers daily at **23:59:59**, backing up Room database and preferences into the app's secure private sandbox.
+- Automated backup detection and seamless restoration upon reinstallation.
+
+### 16. Family BLE Bridge & Long Range (LE Coded PHY, 100% Offline)
+- Local direct transmission of glucose, trend arrow, active insulin (IoB), and battery level via **Bluetooth Low Energy (BLE)** every 60 seconds.
+- **Zero internet, zero mobile network, zero pairing required** at distances of 10–15 meters (Legacy 1M mode) and **up to 30–50 meters through 2–3 walls** in Long Range mode.
+- **Bluetooth 5.0 Long Range (LE Coded PHY)**:
+  - **Hardware Gatekeeper Opt-in**: Broadcaster toggle enabled only on supported chipsets (`isLeCodedPhySupported && isLeExtendedAdvertisingSupported`) with safety dialog and 30-second test ping pulse.
+  - **Universal Dual-PHY Receiver**: Observer scanner on Android 8.0+ listens concurrently to Legacy 1M and Coded PHY packets (`PHY_LE_ALL_SUPPORTED`) without manual switching.
+  - **Fail-Safe Fallback**: on controller error (`FEATURE_UNSUPPORTED`), both broadcaster and receiver seamlessly fall back to Legacy 1M without disruption.
+  - **UI Diagnostic Badges**: `📡 LR` badge on Home screen indicates active broadcast mode; silent receiver timeout (>6 min) suggests switching broadcaster back to Legacy.
+- **Ultra-Stable 24/7 Radio Protocol**:
+  - Adaptive broadcast pulse: 12 seconds for 1-minute sensors and 15 seconds for 5-minute sensors.
+  - **Doze-Resistant Keep-Alive (AlarmManager)**: 5-minute `RTC_WAKEUP` heartbeat maintaining system `WakeLock` via `goAsync()`, ensuring continuous operation on Android 8–16 during deep CPU sleep.
+  - **AOSP 30-Minute Scan Limit & Silence Watchdog**: proactive scanner reset every 20 minutes prevents opportunistic throttling; silence watcher resets receiver under mutex if packets cease for $\ge 6$ minutes.
+  - `BleObserverService` runs as an Android Foreground Service tied to persistent notification/AOD, preventing OS termination.
+- **Dual Operating Modes**:
+  - **Broadcaster**: transmits child's real-time CGM telemetry.
+  - **Observer**: continuously scans in the background, displays packet age badge (`RX`, `<1m`, `1m`...), and shows compact signal toasts (`🟢 BLE: 🩸7.8 →, 💉1.5, 🔋85%`).
+- Privacy protected by a 3-digit **Family PIN** (foreign BLE advertisements automatically dropped).
+
+### 17. Clinical Laboratory HbA1c Journal & Quarterly Tracking
+- Logs venous blood HbA1c lab results.
+- Direct alignment of venous HbA1c with **90-day sensor GMI** and matching period TIR.
+- **Quarterly Reminders (every 90 days)**:
+  - Anti-spam safeguard: maximum 2 notifications per cycle (spaced 14 days apart).
+  - **"Skip (+90d)"** button for well-managed users deferring quarterly testing.
+  - Logging a new lab result resets the 90-day timer automatically.
+- Generates official **1-page PDF medical summary** for endocrinologist comparing lab results against CGM calculations.
+
+### 18. Dec 31 Annual Digest & Zero-Lag Historical Archiving
+- **Zero-Lag Architecture**: automatically seals closed calendar years into partitioned `tirup_readings_YYYY.csv` archives. Keeps SQLite database lightning-fast even after 1–5+ years of continuous CGM history.
+- **New Year's Eve Digest on Dec 31 at 20:00**:
+  - Festive push notification with champagne icon 🥂.
+  - Celebration dialog summarizing the year's achievements (TIR, mean glucose, streak record, total readings).
+  - Exportable commemorative New Year vector PDF postcard for family memories.
+
+### 19. Full ZIP Backup Export
+- One-click export of complete Room database and preferences into a portable ZIP archive.
+- Saved directly to `Documents/TIRUp/Backups/` for effortless device migration or offline PC archiving.
+
+### 20. Multi-File Batch Historical Import (CSV / ZIP)
+- Concurrently select and import unlimited files and archives (xDrip+, Dexcom Clarity, TIRUp CSV/ZIP backups).
+- Memory-safe streaming parser with automatic detection of delimiters and date formats.
+- Background deduplication merging millions of records into Room database with live progress indicator and summary report.
+
+### 21. Supplies & Devices Lifecycle Tracker
+- **"Devices & Supplies"** sheet on Focus screen for tracking remaining lifespans:
+  - **CGM Sensor**: configurable 1–90 days (defaults: 10, 14, or 15 days).
+  - **Pump Infusion Set / Cannula**: configurable 2–7 days (default: 3 days).
+  - **Lancet**: configurable 1–7 days (default: 1 day).
+- **Real-Time Recalculation**: adjusting duration stepper (`+` / `-`) instantly recalculates expiration date, remaining time, and health bar without resetting device date.
+- **Smart Replacement Alerts**: timely warnings (2 days and 1 day prior) and expiration alerts with anti-spam suppression.
+- **Automatic Sync via xDrip+ Notes**:
+  - Recognizes keywords (`cannula`, `sensor`, `lancet`, `catheter`, `restart`, `extend`, `канюля`, `инфуз`, `катетер`, `сенсор`, `датчик`, `ланцет`, `рестарт`, `продлить`).
+  - Supports compound notes (e.g. `cannula -> lancet`) and duration modifiers (`extend sensor 7`, `restart cannula 3`, `lancet +7`): resets installation time and updates cycle duration.
+
+### 22. Energy-Efficient Always-On Display (AoD) & Bedside Night Clock
+- **Pure Black Canvas (`#000000`)**: complete hardware pixel shutoff on OLED/AMOLED panels.
+- **Anti-Burn-In Jitter**: subtle micro-shifting of interface elements every 60 seconds.
+- **Calibrated Zero-Descent Typography**: zero font descender padding, placing metrics tight against glucose numbers.
+- **Active Insulin Glance**: compact `💧 X.XX U` status chip on AoD when active bolus is present.
+- **Huge Landscape Numbers**: massive glucose numerals and adaptive trend arrows optimized for nightstand viewing.
+- **Touch Gestures & Bedside Torch**:
+  - **Vertical swipe**: smooth screen brightness adjustment and hardware flashlight strength control (on devices supporting Camera2 Torch Strength Level, Android 13+).
+  - **Double-tap**: warm night flashlight featuring a 5-second soft warmup to 100%, single-tap pause/lock, double-tap toggle off, manual brightness slider, and **automatic 3-minute countdown shutoff** to protect battery.
+  - **Horizontal swipe**: instant exit from AoD.
+- **Dual Modes**: `ALWAYS_ON` (constant display at minimal brightness) and `PULSE_ON_UPDATE` (display sleeps and wakes for 5 seconds upon new CGM reading).
+- **Auto-Launch Options**: optional launch when plugged into night charger, and **sleep-hour launch over lockscreen on power button press**.
+
+---
+
+<a name="data-sources"></a>
+## 📱 Data Source Integrations
+
+TIRUp supports all popular autonomous data sources within the Android diabetes ecosystem:
+
+### xDrip+ (Local Broadcast):
+1. In **xDrip+** ➔ **Settings** ➔ **Inter-app settings**.
+2. Enable **Broadcast locally** (`com.eveningoutpost.dexdrip.BgEstimate`) for real-time glucose stream.
+3. Enable **Broadcast Service API** for IoB, CoB, and treatment events.
+4. **Automatic supplies lifecycle tracking**: saving notes in xDrip+ (e.g., `cannula`, `extend sensor 7`, `restart cannula 3`, `lancet +7`) automatically synchronizes or extends supplies lifespans in TIRUp.
+
+### Direct xDrip+ Polling via Wi-Fi (LAN Follower):
+1. **On Master Device**: in **xDrip+** ➔ **Settings** ➔ **Inter-app settings**, ensure the local web server is enabled (port 17580).
+2. **On Follower Device**: in **TIRUp** ➔ **Settings** ➔ **"📡 Direct xDrip+ Polling (Wi-Fi LAN)"**:
+   - Toggle the integration switch on.
+   - Tap **"🔍 Search Master"** for automatic subnet discovery or enter the master device IP manually.
+   - Enter `API Secret` if configured in xDrip+.
+   - Works 100% offline within home Wi-Fi or the master phone's Hotspot without cellular internet.
+
+### GlucoDataHandler / Juggluco:
+- Enable local broadcast forwarding of compatible `com.eveningoutpost.dexdrip.BgEstimate` intents.
+
+### Android System Settings (Battery):
+- In Android system settings for TIRUp and your data source, set battery optimization to **"Unrestricted"**.
+- Lock TIRUp in the recent apps menu to guarantee uninterrupted background service execution.
+
+---
+
+<a name="clinical-metrics"></a>
+## 📊 Clinical Metrics & Algorithms
+
+All clinical algorithms in TIRUp adhere to the international consensus standards of **ATTD (Advanced Technologies & Treatments for Diabetes)** and the **ADA (American Diabetes Association)**:
+
+| Metric | Clinical Description | Target Range (mmol/L) | Target Range (mg/dL) | Consensus Color |
+| :--- | :--- | :--- | :--- | :--- |
+| **TBR Very Low**| Severe Hypoglycemia (Level 2) | $< 1.0\%$ (< 3.0 mmol/L) | $< 1.0\%$ (< 54 mg/dL) | 🔴 Critical Red (`#EF4444`) |
+| **TBR Low** | Moderate Hypoglycemia (Level 1) | $< 4.0\%$ (3.0 – 3.8 mmol/L) | $< 4.0\%$ (54 – 69 mg/dL) | 🟠 Amber Orange (`#F59E0B`) |
+| **TING** | Tight In-Range Target | $\ge 50\%$ (3.9 – 7.8 mmol/L) | $\ge 50\%$ (70 – 140 mg/dL) | 🟢 Bright Green (`#4ADE80`) |
+| **TIR** | Standard In-Range Target | $\ge 70\%$ (3.9 – 10.0 mmol/L) | $\ge 70\%$ (70 – 180 mg/dL) | 🟢 Emerald Green (`#10B981`) |
+| **TAR High** | Moderate Hyperglycemia (Level 1) | $< 25.0\%$ (10.1 – 13.9 mmol/L) | $< 25.0\%$ (181 – 250 mg/dL) | 🟠 Amber Orange (`#F59E0B`) |
+| **TAR Very High**| Severe Hyperglycemia (Level 2) | $< 5.0\%$ (> 13.9 mmol/L) | $< 5.0\%$ (> 250 mg/dL) | 🔴 Critical Red (`#EF4444`) |
+| **%CV** | Coefficient of Variation | $\le 36.0\%$ ($SD / Mean 	imes 100\%$) | $\le 36.0\%$ | ⚪ Neutral Grey |
+| **eA1c / GMI** | Estimated Glycated Hemoglobin | $\le 7.0\%$ (ADAG formula) | $\le 7.0\%$ | ⚪ Neutral Grey |
+| **GRI** | Glycemia Risk Index | $\le 40.0$ ($3.0 	imes VLow + 2.4 	imes Low + 0.8 	imes High + 1.6 	imes VHigh$) | $\le 40.0$ | ⚪ Neutral Grey |
+
+---
+
+<a name="tech-stack"></a>
+## 🛠 Technology Stack
+
+- **Language**: Kotlin 2.0.0
+- **UI Toolkit**: Jetpack Compose, Material 3 (Bento Grid layout)
+- **Home Screen Widgets**: Jetpack Glance + RemoteViews
+- **Architecture**: Clean Architecture + MVVM + Unidirectional Data Flow (UDF)
+- **Background Processing**: WorkManager, AlarmManager (RTC_WAKEUP), Foreground Services
+- **Asynchronous Flow**: Kotlin Coroutines, StateFlow, SharedFlow
+- **Persistence**: Room Database (SQLite) with automatic multi-version migrations (v1 ➔ v7)
+- **Networking**: HttpURLConnection, OkHttp, LAN Follower client, and Nightscout REST API
+- **Document Generation**: Android Native Canvas Graphics (high-resolution vector PDF)
+- **Audio Engine**: AudioTrack pure sine wave tone generator (zero external MP3 dependencies)
+- **SMS & Telephony**: SmsManager, Telephony SMS BroadcastReceiver
+- **Compatibility**: Android 8.0 (API Level 26) through Android 15 (Target SDK 35)
+
+---
+
+<a name="building"></a>
+## 🏗 Building the Project
+
+### Prerequisites:
+- JDK 17 (recommended: Eclipse Adoptium Temurin 17)
+- Android SDK 35 / Build Tools 35.0.0
+
+### Build Commands:
+```bash
+# Clone the repository
+git clone git@github.com:EvgeniyKrasnyanskiy/TIRUp.git
+cd TIRUp
+
+# Run unit test suite
+./gradlew testDebugUnitTest
+
+# Assemble Debug APK
+./gradlew assembleDebug
+
+# Install on connected device via ADB
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+---
+
+<a name="disclaimer"></a>
+## ⚠️ Medical Disclaimer
+
+**TIRUp** is developed solely for informational, personal self-management, and analytical purposes.
+- This software is **not a certified medical device** and does not provide clinical diagnoses.
+- Information provided by TIRUp is not a substitute for professional medical advice from an endocrinologist or physician.
+- Any modifications to insulin doses, medication regimens, or therapeutic procedures must be made exclusively under the supervision of a licensed healthcare provider.
+
+---
+
+<a name="russian-version"></a>
+# 🇷🇺 TIRUp (Time-In-Range Up) — На русском 🩸📈
+
+<div align="center">
+
+![Версия](https://img.shields.io/badge/Версия-1.0.0-brightgreen.svg)
+![Платформа](https://img.shields.io/badge/Платформа-Android%208.0%2B-green.svg)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-blue.svg)
+![Jetpack Compose](https://img.shields.io/badge/Интерфейс-Jetpack%20Compose%20%2F%20Material%203-blueviolet.svg)
+![Архитектура](https://img.shields.io/badge/Архитектура-Clean%20%2F%20MVVM-orange.svg)
+![Лицензия](https://img.shields.io/badge/Лицензия-MIT-lightgrey.svg)
+
+**TIRUp** — современное автономное Android-приложение для непрерывного мониторинга гликемии (CGM), углублённого клинического анализа профиля глюкозы и автоматической генерации стандартизированных медицинских AGP-отчётов (Ambulatory Glucose Profile).
+
+[ 🇬🇧 English Version ](#tirup-time-in-range-up-) • [ 🇷🇺 На русском ](#russian-version)
+
+[ 🌟 Ключевые возможности ](#ru-features) • [ 📸 Скриншоты ](#ru-screenshots) • [ 📱 Источники данных ](#ru-sources) • [ 📊 Метрики ](#ru-metrics) • [ 🛠 Стек ](#ru-tech-stack) • [ 🏗 Сборка ](#ru-building) • [ ⚠️ Дисклеймер ](#ru-disclaimer)
+
+</div>
+
+---
+
+<a name="ru-screenshots"></a>
+## 📸 Скриншоты интерфейса
+
+<div align="center">
+
+| Главный экран и мониторинг | Тренды гликемии и AGP | Клинические отчёты PDF |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/01_home_screen.jpg" width="240" alt="Главный экран" /> | <img src="docs/screenshots/02_trends_agp.jpg" width="240" alt="Тренды и AGP" /> | <img src="docs/screenshots/03_medical_reports.jpg" width="240" alt="Медицинские отчёты" /> |
+| **Hero-карточка и сетка метрик** | **Тренды, диапазоны и кривая AGP** | **Стандартизированный лист для врача** |
+
+<br/>
+
+| Воскресный дайджест | Стрик дней и активность | Трекер устройств и расходников |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/04_weekly_digest.jpg" width="240" alt="Недельный дайджест" /> | <img src="docs/screenshots/05_tir_streak_grid.jpg" width="240" alt="Стрик в норме" /> | <img src="docs/screenshots/06_supplies_tracker.jpg" width="240" alt="Устройства и расходники" /> |
+| **Динамика неделя-к-неделе** | **Сетка дисциплины в цели** | **Сенсоры, канюли и ланцеты** |
+
+<br/>
+
+| Журнал лабораторного HbA1c | Роли «Мастер / Фоловер» | Расширенные настройки |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/07_hba1c_journal.jpg" width="240" alt="Журнал HbA1c" /> | <img src="docs/screenshots/08_settings_roles.jpg" width="240" alt="Роли и настройки" /> | <img src="docs/screenshots/09_advanced_settings.jpg" width="240" alt="Аппаратные настройки" /> |
+| **Лабораторный HbA1c против GMI** | **Профиль подопечного и цель TIR** | **Wi-Fi LAN, BLE-мост и SOS SMS** |
+
+<br/>
+
+| Профиль пациента |
+| :---: |
+| <img src="docs/screenshots/10_patient_profile.jpg" width="240" alt="Профиль пациента" /> |
+| **Клинический профиль и суточная норма углеводов** |
+
+</div>
+
+---
+
+<a name="ru-features"></a>
 ## 🌟 Ключевые возможности
 
 ### 1. Автономный приём данных в реальном времени (100% Offline)
@@ -199,6 +576,7 @@
 
 ---
 
+<a name="ru-sources"></a>
 ## 📱 Интеграция с источниками данных
 
 TIRUp поддерживает все популярные автономные источники данных диа-экосистемы Android:
@@ -226,6 +604,7 @@ TIRUp поддерживает все популярные автономные 
 
 ---
 
+<a name="ru-metrics"></a>
 ## 📊 Клинические метрики и алгоритмы
 
 Все расчёты в TIRUp соответствуют международным рекомендациям **ATTD (Advanced Technologies & Treatments for Diabetes)** и **ADA (American Diabetes Association)**:
@@ -244,6 +623,7 @@ TIRUp поддерживает все популярные автономные 
 
 ---
 
+<a name="ru-tech-stack"></a>
 ## 🛠 Технологический стек
 
 - **Язык**: Kotlin 2.0.0
@@ -261,6 +641,7 @@ TIRUp поддерживает все популярные автономные 
 
 ---
 
+<a name="ru-building"></a>
 ## 🏗 Сборка проекта
 
 ### Требования:
@@ -285,6 +666,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ---
 
+<a name="ru-disclaimer"></a>
 ## ⚠️ Медицинский отказ от ответственности (Disclaimer)
 
 Приложение **TIRUp** создано исключительно для информационных целей, аналитики и личного самоконтроля. 
@@ -294,35 +676,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ---
 
-<a name="english-summary"></a>
-## 🌐 English Summary
-
-**TIRUp** is an advanced, privacy-first, 100% offline open-source Android application for Continuous Glucose Monitoring (CGM) analytics, emergency safety alerts, and automated clinical AGP reporting.
-
-### Core Features:
-- **Direct Offline Broadcast**: Intercepts readings locally via `com.eveningoutpost.dexdrip.BgEstimate` from xDrip+, GlucoDataHandler, and Juggluco without internet or third-party servers.
-- **Direct Wi-Fi LAN Follower (100% Offline, v2.4.0)**: Direct LAN follower polling xDrip+ local web server (`:17580`) via home Wi-Fi or master Hotspot with automated subnet discovery (`192.168.x.1..254`), multi-source deduplication matrix, and symmetrical compact status indicators.
-- **Treatments Quick Entry & Nightscout API (v2.3.0 & v2.3.1)**: Quick-action treatments input strip, REST API uploads (`POST /api/v1/treatments`), and persistent UUID deletion (`DELETE /api/v1/treatments/{uuid}`) preventing deleted entries from resurrecting during synchronization.
-- **Treatments Overlay**: Visualizes bolus insulin doses (💉) and meal carbs (🍽️) on the 24-hour Canvas sparkline with interactive inspect tooltips.
-- **Smart 4-Tier Alarms & Controls**: Tier 1 predictive trend alert (*"at 16:42"*), Tier 2 confirmed tone, Tier 3 dangerous & critical alarms (12s prolonged warning; instant 50s GDH air-raid siren for Crit. HYPO < 3.0 with screen wakeup & SOS, and 16s pulsed alert for Crit. HYPER > 13.9 in a unified settings dialog), Tier 4 signal loss alarm, independent alert volume slider (20%–100%) with test melody, configurable alert pause ('Snooze All' 10m..8h), and bilingual alert log.
-- **Multi-Stage Critical Battery Alarms**: Proactive alerts at <15%, <10%, and <5% battery thresholds with notification action acknowledgement.
-- **Standardized 6-Tier Clinical AGP/TIR Color Palette**: Distinct amber styling for moderate low (3.0–3.8 mmol/L) and critical red for severe low (<3.0 mmol/L) across all screens and widgets.
-- **Emergency Safety SMS & Offline Queries**:
-  - Automatically dispatches an ultra-compact single-segment SMS ($\le 67$ chars) with optional GPS coordinates to a trusted contact when severe hypo (< 3.0 mmol/L) sirens remain unacknowledged for 5 minutes.
-  - Whitelisted offline SMS query: trusted contacts can text `sugar`, `?`, `bg`, or `tir` to receive real-time glucose and TIR without internet access during network shutdowns.
-- **Floating Glucose Bubble (60x60dp)**: Automatically emerges only when glucose exits the target range (< 3.9 or > 10.0 mmol/L) with hypo water ripple wave effect and 5-min tap snooze.
-- **Glance Desktop Widgets (5 Formats)**: 5x1 horizontal strip displaying core AGP ranges (TIR, TBR < 4%, TAR) side by side plus dynamic IoB/Battery/Streak/Avg/CV slots, 4x2/3x2 Canvas chart dashboard, 2x2 focus square, and 1x2 vertical glance with opacity control (0%..100%) and instant locale/unit synchronization.
-- **Always-on Display 2.0**: Active insulin (💧 IoB) indicator, calibrated zero-padding typography, vertical swipe brightness adjustment, and 5s warmup night flashlight.
-- **Multi-File Batch Historical Import (CSV / ZIP)**: Seamless concurrent upload and deduplication of unlimited xDrip+ / Dexcom Clarity CSV and ZIP files without memory pressure.
-- **Sunday Compensation Digest**: Automated weekly review delivered every Sunday at 20:00 with week-over-week dynamic delta comparison ($\pm\Delta\%$) and clinical insights.
-- **Clinical AGP Reports**: Generates official Ambulatory Glucose Profile PDF sheets with 12 core clinical parameters (TIR, TING, TBR, TAR, CV, eA1c, GRI, GVI, PGS) matching ATTD/ADA standards.
-- **Family BLE Bridge & Long Range (100% Offline)**: Direct Bluetooth Low Energy broadcast (10–15m standard, up to 30–50m with optional Bluetooth 5.0 LE Coded PHY Long Range through walls) transmitting glucose, trend arrow, IoB, and battery every 60s without pairing or internet, with dual-PHY scanning and automatic fail-safe fallback, guarded by 3-digit Family PIN.
-- **Laboratory HbA1c Journal & Quarterly Tracking**: Tracks venous HbA1c lab tests with direct comparison against 90-day sensor GMI and TIR, quarterly reminder alerts (anti-spam 2-push limit, skip button), and 1-page clinical PDF export.
-- **Zero-Lag Annual History Archiving & Dec 31 Digest**: Automatically seals past calendar years into `tirup_readings_YYYY.csv` keeping the Room database lightweight across 1–5+ years; delivers a festive annual summary modal and PDF postcard on Dec 31 at 20:00.
-- **Full ZIP Backup Export**: One-click manual export of database and settings into `Documents/TIRUp/Backups/`.
-- **Permissionless Daily Auto-Backup**: Exact RTC AlarmManager backs up settings and database into the app sandbox daily at 23:59:59 without dangerous external storage permissions.
-- **Supplies & Device Lifecycle Tracker**: Dedicated modal on the Focus screen tracking CGM sensor, pump cannula, and lancet remaining lifespans with real-time recalculation upon stepper adjustments, proactive expiration alerts, and automatic xDrip+ cannula sync.
-- **Dual Units & Localization**: Seamless one-tap switching between `mmol/L` and `mg/dL`, full Russian and English localization.
+---
 
 ---
 
