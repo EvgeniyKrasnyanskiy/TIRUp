@@ -20,4 +20,6 @@ app/build/
 *.log
 ble_test_log.txt
 *.pdf
+.vscode/
+.agent/
 
