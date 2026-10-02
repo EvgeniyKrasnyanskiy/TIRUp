@@ -172,14 +172,31 @@ object CaregiverSosAlarmManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = if (data.isTest) "🚨 ТЕСТ SOS: ${data.patientName}" else "🚨 SOS! КРИТИЧЕСКАЯ ГИПО: ${data.patientName}"
-        val text = "${data.glucoseDisplay} (${data.trendArrow}) • Сирена ${data.delayMinutes}м без ответа"
+        val isRu = try {
+            val prefs = context.getSharedPreferences("tirup_user_settings", Context.MODE_PRIVATE)
+            val lang = prefs.getString("language", null)
+            if (lang != null) lang.equals("RU", ignoreCase = true)
+            else java.util.Locale.getDefault().language.lowercase() in listOf("ru", "be", "kk", "uk")
+        } catch (_: Exception) { true }
+
+        val title = if (data.isTest) {
+            if (isRu) "🚨 ТЕСТ SOS: ${data.patientName}" else "🚨 TEST SOS: ${data.patientName}"
+        } else {
+            if (isRu) "🚨 SOS! КРИТИЧЕСКАЯ ГИПО: ${data.patientName}" else "🚨 SOS! CRITICAL HYPO: ${data.patientName}"
+        }
+        val text = if (isRu) {
+            "${data.glucoseDisplay} (${data.trendArrow}) • Сирена ${data.delayMinutes}м без ответа"
+        } else {
+            "${data.glucoseDisplay} (${data.trendArrow}) • Siren ${data.delayMinutes}m unacknowledged"
+        }
+        val urgencyNote = if (isRu) "Срочно свяжитесь с пациентом!" else "Urgent: contact the patient immediately!"
+        val dismissLabel = if (isRu) "Отключить тревогу" else "Dismiss alarm"
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_CAREGIVER_SOS)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText("$text\n\nСрочно свяжитесь с пациентом!"))
+            .setStyle(NotificationCompat.BigTextStyle().bigText("$text\n\n$urgencyNote"))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -188,20 +205,21 @@ object CaregiverSosAlarmManager {
             .setAutoCancel(false)
             .setFullScreenIntent(fullScreenPending, true)
             .setContentIntent(fullScreenPending)
-            .addAction(0, "Отключить тревогу", dismissPending)
+            .addAction(0, dismissLabel, dismissPending)
 
         nm.notify(NOTIFICATION_ID_CAREGIVER_SOS, builder.build())
     }
 
-    fun initChannel(nm: NotificationManager) {
+    fun initChannel(nm: NotificationManager, isRu: Boolean = true) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID_CAREGIVER_SOS,
-                "Экстренный SOS фоловера (Caregiver Wakeup)",
+                if (isRu) "Экстренный SOS фоловера (Caregiver Wakeup)" else "Emergency Follower SOS (Caregiver Wakeup)",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 group = GlucoseAlertManager.GROUP_ALERTS
-                description = "Громкая сирена при получении SMS о критической гипогликемии у близкого"
+                description = if (isRu) "Громкая сирена при получении SMS о критической гипогликемии у близкого"
+                else "Loud siren upon receiving SMS of critical hypoglycemia from your loved one"
                 enableLights(true)
                 lightColor = Color.RED
                 enableVibration(true)

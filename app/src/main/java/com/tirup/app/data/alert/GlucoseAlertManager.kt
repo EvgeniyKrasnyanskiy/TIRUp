@@ -117,6 +117,9 @@ data class AlertLogEntry(
                     .replace("Predict: LOW ~ at", "Прогноз: ГИПО ~ в")
                     .replace("Predict: HIGH ~ at", "Прогноз: ГИПЕР ~ в")
                     .replace("📡 Sensor Signal Lost", "📡 Потеря связи с сенсором")
+                    .replace("🔋 Critical battery:", "🔋 Критический разряд:")
+                    .replace("🔋 Very low battery:", "🔋 Сильный разряд батареи:")
+                    .replace("🔋 Low battery:", "🔋 Низкий заряд батареи:")
                     .replace(" min", " мин")
                     .replace(" MIN", " МИН")
             } else {
@@ -136,6 +139,9 @@ data class AlertLogEntry(
                     .replace("Прогноз: ГИПО ~ в", "Predict: LOW ~ at")
                     .replace("Прогноз: ГИПЕР ~ в", "Predict: HIGH ~ at")
                     .replace("📡 Потеря связи с сенсором", "📡 Sensor Signal Lost")
+                    .replace("🔋 Критический разряд:", "🔋 Critical battery:")
+                    .replace("🔋 Сильный разряд батареи:", "🔋 Very low battery:")
+                    .replace("🔋 Низкий заряд батареи:", "🔋 Low battery:")
                     .replace(" мин", " min")
                     .replace(" МИН", " MIN")
             }
@@ -169,6 +175,8 @@ data class AlertLogEntry(
                     .replace("mmol/L", "ммоль/л")
                     .replace("No CGM readings for", "Нет данных от сенсора более")
                     .replace("Check Bluetooth and transmitter.", "Проверьте Bluetooth и трансмиттер.")
+                    .replace("Only ", "Осталось ")
+                    .replace(" remaining. Connect charger to keep glucose monitoring active.", "%. Подключите зарядное устройство, чтобы не прерывать мониторинг глюкозы.")
                     .replace(" min.", " мин.")
                     .replace(" min", " мин")
             } else {
@@ -196,6 +204,8 @@ data class AlertLogEntry(
                     .replace("ммоль/л", "mmol/L")
                     .replace("Нет данных от сенсора более", "No CGM readings for")
                     .replace("Проверьте Bluetooth и трансмиттер.", "Check Bluetooth and transmitter.")
+                    .replace("Осталось ", "Only ")
+                    .replace("%. Подключите зарядное устройство, чтобы не прерывать мониторинг глюкозы.", "% remaining. Connect charger to keep glucose monitoring active.")
                     .replace(" мин.", " min.")
                     .replace(" мин", " min")
             }
@@ -349,16 +359,17 @@ object GlucoseAlertManager {
         )
 
         // Initialize Caregiver / Follower SOS channel
-        CaregiverSosAlarmManager.initChannel(nm)
+        CaregiverSosAlarmManager.initChannel(nm, isRu)
 
         // Tier 1: Predictive (Soft) - sound handled purely by MedicalSoundPlayer, high importance for heads-up visibility
         val predictiveChannel = NotificationChannel(
             CHANNEL_PREDICTIVE,
-            "Предиктивные тревоги (за 15 мин)",
+            if (isRu) "Предиктивные тревоги (за 15 мин)" else "Predictive Alerts (15 min)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             group = GROUP_ALERTS
-            description = "Мягкие упреждающие сигналы о скором выходе за целевой диапазон"
+            description = if (isRu) "Мягкие упреждающие сигналы о скором выходе за целевой диапазон"
+            else "Early predictive alerts before leaving the target glucose range"
             setSound(null, null)
             enableVibration(false)
         }
@@ -366,11 +377,12 @@ object GlucoseAlertManager {
         // Tier 2: Main (Confirmed 5 points) - sound handled purely by MedicalSoundPlayer
         val mainChannel = NotificationChannel(
             CHANNEL_MAIN,
-            "Основные тревоги (5 точек)",
+            if (isRu) "Основные тревоги (5 точек)" else "Main Glucose Alerts (5 points)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             group = GROUP_ALERTS
-            description = "Уверенные сигналы при подтверждённом выходе сахара за целевой диапазон"
+            description = if (isRu) "Уверенные сигналы при подтверждённом выходе сахара за целевой диапазон"
+            else "Confirmed alerts when glucose exits the target range across consecutive points"
             setSound(null, null)
             enableVibration(false)
         }
@@ -378,11 +390,12 @@ object GlucoseAlertManager {
         // Tier 3: Critical (Prolonged or extreme) - sound handled purely by MedicalSoundPlayer on USAGE_ALARM
         val criticalChannel = NotificationChannel(
             CHANNEL_CRITICAL,
-            "Критические тревоги («кричащие»)",
+            if (isRu) "Критические тревоги («кричащие»)" else "Critical Alarms (Urgent)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             group = GROUP_ALERTS
-            description = "Громкие настойчивые тревоги при затяжной гипо/гипергликемии или экстремальных значениях"
+            description = if (isRu) "Громкие настойчивые тревоги при затяжной гипо/гипергликемии или экстремальных значениях"
+            else "Loud alarms for prolonged hypo/hyperglycemia or extreme glucose thresholds"
             setSound(null, null)
             enableVibration(false)
             setBypassDnd(true)
@@ -391,11 +404,12 @@ object GlucoseAlertManager {
         // Tier 4: Signal Loss (No readings >20 min) - Critical Alarm, bypass DND
         val signalLossChannel = NotificationChannel(
             CHANNEL_SIGNAL_LOSS,
-            "Потеря сигнала сенсора (>20 мин)",
+            if (isRu) "Потеря сигнала сенсора (>20 мин)" else "Sensor Signal Loss (>20 min)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             group = GROUP_ALERTS
-            description = "Оповещения при отсутствии свежих данных от трансмиттера/сенсора (пробуждение и настойчивые повторы)"
+            description = if (isRu) "Оповещения при отсутствии свежих данных от трансмиттера/сенсора (пробуждение и настойчивые повторы)"
+            else "Alerts when no CGM readings are received (screen wakeup and scheduled retries)"
             setSound(null, null)
             enableVibration(false)
             setBypassDnd(true)
@@ -404,11 +418,12 @@ object GlucoseAlertManager {
         // Tier 5: Daily Compensator (Last Chance TIR)
         val compensatorChannel = NotificationChannel(
             CHANNEL_COMPENSATOR,
-            "Компенсатор цели (Суточный TIR)",
+            if (isRu) "Компенсатор цели (Суточный TIR)" else "Target Compensator (Daily TIR)",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             group = GROUP_ALERTS
-            description = "Мотивирующие уведомления о критическом запасе времени для достижения суточного TIR"
+            description = if (isRu) "Мотивирующие уведомления о критическом запасе времени для достижения суточного TIR"
+            else "Motivational notifications when daily target time buffer is running low"
             setSound(null, null)
             enableVibration(false)
         }
@@ -416,11 +431,12 @@ object GlucoseAlertManager {
         // Lockscreen / Ongoing Glucose Status
         val lockscreenChannel = NotificationChannel(
             CHANNEL_LOCKSCREEN,
-            "Текущий сахар (экран блокировки / шторка)",
+            if (isRu) "Текущий сахар (экран блокировки / шторка)" else "Current Glucose (Lockscreen / Status)",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
             group = GROUP_STATUS
-            description = "Постоянный статус сахара, тренда и TIR на экране блокировки и в панели уведомлений"
+            description = if (isRu) "Постоянный статус сахара, тренда и TIR на экране блокировки и в панели уведомлений"
+            else "Persistent notification of glucose, trend arrow, and TIR in shade and lockscreen"
             setSound(null, null)
             enableVibration(false)
             lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
@@ -429,11 +445,12 @@ object GlucoseAlertManager {
         // Weekly Sunday Digest
         val weeklyDigestChannel = NotificationChannel(
             CHANNEL_WEEKLY_DIGEST,
-            "Воскресный дайджест",
+            if (isRu) "Воскресный дайджест" else "Weekly Sunday Digest",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             group = GROUP_STATUS
-            description = "Еженедельная аналитическая сводка прогресса TIR, вариабельности и стабильности"
+            description = if (isRu) "Еженедельная аналитическая сводка прогресса TIR, вариабельности и стабильности"
+            else "Weekly analytical summary of TIR progress, variability, and clinical insights"
             setSound(null, null)
             enableVibration(false)
         }
@@ -448,33 +465,36 @@ object GlucoseAlertManager {
 
         NotificationChannel(
             CHANNEL_DEVICE_REMINDER,
-            "Напоминания об устройствах",
+            if (isRu) "Напоминания об устройствах" else "Device & Supplies Reminders",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             group = GROUP_REMINDERS
-            description = "Напоминания о замене сенсора CGM и инфузионного набора"
+            description = if (isRu) "Напоминания о замене сенсора CGM и инфузионного набора"
+            else "Reminders for CGM sensor, infusion set, and lancet changes"
             enableLights(true)
             lightColor = Color.CYAN
         }.also { nm.createNotificationChannel(it) }
 
         NotificationChannel(
             CHANNEL_HBA1C_REMINDER,
-            "Напоминания об анализах (HbA1c)",
+            if (isRu) "Напоминания об анализах (HbA1c)" else "HbA1c Milestone Reminder",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             group = GROUP_REMINDERS
-            description = "Ежеквартальные напоминания о сдаче HbA1c и корреляция с GMI сенсора"
+            description = if (isRu) "Ежеквартальные напоминания о сдаче HbA1c и корреляция с GMI сенсора"
+            else "Quarterly reminders for venous HbA1c lab tests and sensor GMI correlation"
             enableLights(true)
             lightColor = Color.RED
         }.also { nm.createNotificationChannel(it) }
 
         NotificationChannel(
             CHANNEL_YEAR_END_DIGEST,
-            "Итоги года",
+            if (isRu) "Итоги года" else "Year-End Digest (Dec 31)",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             group = GROUP_REMINDERS
-            description = "Праздничный годовой отчёт и статистика компенсации диабета 31 декабря"
+            description = if (isRu) "Праздничный годовой отчёт и статистика компенсации диабета 31 декабря"
+            else "Annual summary and diabetes management milestones on December 31"
             enableLights(true)
             lightColor = Color.parseColor("#10B981")
         }.also { nm.createNotificationChannel(it) }
@@ -1116,7 +1136,7 @@ object GlucoseAlertManager {
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
-            .addAction(0, "ОК", dismissPendingIntent)
+            .addAction(0, if (isRu) "ОК" else "OK", dismissPendingIntent)
             .build()
 
         nm.notify(5000 + kotlin.math.abs(pattern.id.hashCode() % 100), notification)
@@ -1266,17 +1286,22 @@ object GlucoseAlertManager {
                     else -> AlertTier.PREDICTIVE
                 }
 
-                val title = when (targetThreshold) {
-                    5 -> if (isRu) "🔋 Критический разряд: $batteryPct%" else "🔋 Critical battery: $batteryPct%"
-                    10 -> if (isRu) "🔋 Сильный разряд батареи: $batteryPct%" else "🔋 Very low battery: $batteryPct%"
-                    else -> if (isRu) "🔋 Низкий заряд батареи: $batteryPct%" else "🔋 Low battery: $batteryPct%"
+                val titleRu = when (targetThreshold) {
+                    5 -> "🔋 Критический разряд: $batteryPct%"
+                    10 -> "🔋 Сильный разряд батареи: $batteryPct%"
+                    else -> "🔋 Низкий заряд батареи: $batteryPct%"
+                }
+                val titleEn = when (targetThreshold) {
+                    5 -> "🔋 Critical battery: $batteryPct%"
+                    10 -> "🔋 Very low battery: $batteryPct%"
+                    else -> "🔋 Low battery: $batteryPct%"
                 }
 
-                val body = if (isRu) {
-                    "Осталось $batteryPct%. Подключите зарядное устройство, чтобы не прерывать мониторинг глюкозы."
-                } else {
-                    "Only $batteryPct% remaining. Connect charger to keep glucose monitoring active."
-                }
+                val bodyRu = "Осталось $batteryPct%. Подключите зарядное устройство, чтобы не прерывать мониторинг глюкозы."
+                val bodyEn = "Only $batteryPct% remaining. Connect charger to keep glucose monitoring active."
+
+                val title = if (isRu) titleRu else titleEn
+                val body = if (isRu) bodyRu else bodyEn
 
                 val channelId = if (targetThreshold <= 5) CHANNEL_CRITICAL else CHANNEL_MAIN
                 val volume = alerts.alertVolumePercent
@@ -1300,7 +1325,10 @@ object GlucoseAlertManager {
                     tier = tier,
                     vibrate = vibrate,
                     flash = flash,
-                    volumePercent = volume
+                    volumePercent = volume,
+                    titleEn = titleEn,
+                    textEn = bodyEn,
+                    isRu = isRu
                 )
             }
         } catch (e: Exception) {
@@ -1783,7 +1811,10 @@ object GlucoseAlertManager {
         trendArrow: String = "⇊",
         primaryContactPhone: String = "",
         primaryContactName: String = "",
-        criticalToneType: MedicalSoundPlayer.CriticalToneType = MedicalSoundPlayer.CriticalToneType.STANDARD
+        criticalToneType: MedicalSoundPlayer.CriticalToneType = MedicalSoundPlayer.CriticalToneType.STANDARD,
+        titleEn: String = "",
+        textEn: String = "",
+        isRu: Boolean = true
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
@@ -1814,7 +1845,7 @@ object GlucoseAlertManager {
 
         val alertColor = Color.parseColor(alertHex)
 
-        // Add direct native "ОК" button to dismiss/silence notification right from shade
+        // Add direct native OK button to dismiss/silence notification right from shade
         val dismissIntent = Intent(context, AlertActionReceiver::class.java).apply {
             action = AlertActionReceiver.ACTION_DISMISS_CRITICAL
             putExtra("notification_id", notificationId)
@@ -1839,7 +1870,7 @@ object GlucoseAlertManager {
             .setSilent(true)
             .setSound(null)
             .setAutoCancel(true)
-            .addAction(0, "ОК", dismissPendingIntent)
+            .addAction(0, if (isRu) "ОК" else "OK", dismissPendingIntent)
 
         if (tier == AlertTier.PREDICTIVE) {
             // Unread predictive alert is only valid for 20 minutes
@@ -1938,7 +1969,7 @@ object GlucoseAlertManager {
         )
 
         val isTestAlert = title.contains("Тест", ignoreCase = true) || title.contains("Test", ignoreCase = true)
-        logAlert(tier = tier, title = title, text = text, isTest = isTestAlert)
+        logAlert(tier = tier, title = title, text = text, titleEn = titleEn, textEn = textEn, isTest = isTestAlert)
 
         try {
             nm.notify(notificationId, builder.build())
@@ -2368,10 +2399,17 @@ object GlucoseAlertManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val isRu = try {
+            val prefs = context.getSharedPreferences("tirup_user_settings", Context.MODE_PRIVATE)
+            val lang = prefs.getString("language", null)
+            if (lang != null) lang.equals("RU", ignoreCase = true)
+            else java.util.Locale.getDefault().language.lowercase() in listOf("ru", "be", "kk", "uk")
+        } catch (_: Exception) { true }
+
         val fallback = NotificationCompat.Builder(context, CHANNEL_LOCKSCREEN)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("TIRUp")
-            .setContentText("Мониторинг глюкозы")
+            .setContentText(if (isRu) "Мониторинг глюкозы" else "Glucose monitoring")
             .setOngoing(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(true)
