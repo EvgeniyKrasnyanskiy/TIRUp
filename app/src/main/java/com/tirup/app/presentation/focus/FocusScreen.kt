@@ -159,6 +159,7 @@ fun FocusScreen(
     val boostRemainingSec by BleObserverManager.boostRemainingSec.collectAsState()
     val lanStatus by XdripLanManager.statusFlow.collectAsState()
     val isLanDiscovering by XdripLanManager.isDiscoveringFlow.collectAsState()
+    val nightscoutStatus by com.tirup.app.data.network.NightscoutStatusManager.statusFlow.collectAsState()
     val coroutineScope = rememberCoroutineScope()
     var showLanStatusDialog by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
@@ -305,16 +306,13 @@ fun FocusScreen(
         // 1. Hero Card: Current Glucose
         item {
             val heroBleSettings = userSettings.bleBridgeSettings
-            val isObserver = heroBleSettings.role == com.tirup.app.domain.model.BleBridgeRole.OBSERVER
-            val packetAgeMinutes = if (heroBleSettings.lastPacketTimestamp > 0L) {
-                (System.currentTimeMillis() - heroBleSettings.lastPacketTimestamp) / 60_000L
-            } else 999L
-            val isMasterBatteryStale = packetAgeMinutes >= 5
-            val masterBattery = if (isObserver && heroBleSettings.lastMasterBattery in 0..100 && !isMasterBatteryStale) {
-                heroBleSettings.lastMasterBattery
-            } else if (userSettings.xdripLanSettings.isEnabled && lanStatus.masterBattery != null && lanStatus.masterBattery in 0..100) {
-                lanStatus.masterBattery
-            } else null
+            val resolvedMasterBattery = com.tirup.app.domain.model.MasterBatteryResolver.resolve(
+                userSettings = userSettings,
+                lanStatus = lanStatus,
+                nightscoutStatus = nightscoutStatus
+            )
+            val masterBattery = resolvedMasterBattery?.percent
+            val isMasterBatteryStale = resolvedMasterBattery?.isStale ?: true
 
             HeroGlucoseCard(
                 latestReading = state.latestReading,
@@ -409,18 +407,20 @@ fun FocusScreen(
                 onAlertHistoryClick = { showDailyAlertLogsDialog = true },
                 onLanClick = { showLanStatusDialog = true },
                 onBatteryClick = {
-                    val isFromLan = (masterBattery != null && (!isObserver || isMasterBatteryStale) && userSettings.xdripLanSettings.isEnabled)
-                    val title = if (isFromLan) {
-                        if (isRu) "Заряд батареи мастера (Wi-Fi)" else "Master Battery (Wi-Fi)"
-                    } else {
-                        if (isRu) "Заряд батареи вещателя (BLE)" else "Broadcaster Battery (BLE)"
+                    val resBat = resolvedMasterBattery
+                    val title = when (resBat?.source) {
+                        com.tirup.app.domain.model.MasterBatterySource.WIFI_LAN -> {
+                            if (isRu) "Заряд батареи мастера (Wi-Fi)" else "Master Battery (Wi-Fi)"
+                        }
+                        com.tirup.app.domain.model.MasterBatterySource.NIGHTSCOUT -> {
+                            if (isRu) "Заряд батареи мастера (Nightscout)" else "Master Battery (Nightscout)"
+                        }
+                        else -> {
+                            if (isRu) "Заряд батареи вещателя (BLE)" else "Broadcaster Battery (BLE)"
+                        }
                     }
-                    val ageMins = if (isFromLan) {
-                        if (lanStatus.lastSuccessTimestamp > 0L) {
-                            (System.currentTimeMillis() - lanStatus.lastSuccessTimestamp) / 60000L
-                        } else null
-                    } else if (heroBleSettings.lastPacketTimestamp > 0L) {
-                        (System.currentTimeMillis() - heroBleSettings.lastPacketTimestamp) / 60000L
+                    val ageMins = if (resBat != null && resBat.timestamp > 0L) {
+                        (System.currentTimeMillis() - resBat.timestamp) / 60000L
                     } else null
                     val dataReceivedStr = if (ageMins != null) {
                         when {

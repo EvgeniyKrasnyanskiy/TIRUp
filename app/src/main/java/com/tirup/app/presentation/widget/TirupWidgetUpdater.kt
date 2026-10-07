@@ -1136,15 +1136,15 @@ object TirupWidgetUpdater {
         }
 
         // 2. Master Battery (Priority 2): Only display if real, non-stale battery data is present
-        val ble = settings.bleBridgeSettings
-        val isObserver = ble.role == BleBridgeRole.OBSERVER
-        val battery = ble.lastMasterBattery
-        val packetAgeMinutes = if (ble.lastPacketTimestamp > 0L) {
-            (now - ble.lastPacketTimestamp) / 60_000L
-        } else 999L
-        val isBleStale = isStale || packetAgeMinutes > 7
-        val hasValidBattery = isObserver && (battery in 0..100) && !isBleStale
+        val resolvedBattery = com.tirup.app.domain.model.MasterBatteryResolver.resolve(
+            userSettings = settings,
+            lanStatus = com.tirup.app.data.network.XdripLanManager.statusFlow.value,
+            nightscoutStatus = com.tirup.app.data.network.NightscoutStatusManager.statusFlow.value,
+            now = now
+        )
+        val hasValidBattery = resolvedBattery != null && !resolvedBattery.isStale && !isStale
         if (!excludeTypes.contains("battery") && hasValidBattery) {
+            val battery = resolvedBattery!!.percent
             val batText = "🔋 $battery%"
             val batColor = when {
                 battery <= 15 -> 0xFFEF4444.toInt()

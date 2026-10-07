@@ -2239,15 +2239,14 @@ object GlucoseAlertManager {
             extrasList.add("<font color='$cobColor'><b>$cobFormatted</b></font>")
         }
 
-        val ble = settings.bleBridgeSettings
-        val isObserver = ble.role == com.tirup.app.domain.model.BleBridgeRole.OBSERVER
-        val packetAgeMinutes = if (ble.lastPacketTimestamp > 0L) {
-            (System.currentTimeMillis() - ble.lastPacketTimestamp) / 60_000L
-        } else 999L
-        val isStaleBattery = packetAgeMinutes >= 5
-        val hasMasterBattery = isObserver && (ble.lastMasterBattery in 0..100) && !isExpired && !isStaleBattery
+        val resolvedBattery = com.tirup.app.domain.model.MasterBatteryResolver.resolve(
+            userSettings = settings,
+            lanStatus = com.tirup.app.data.network.XdripLanManager.statusFlow.value,
+            nightscoutStatus = com.tirup.app.data.network.NightscoutStatusManager.statusFlow.value
+        )
+        val hasMasterBattery = resolvedBattery != null && !resolvedBattery.isStale && !isExpired
         if (hasMasterBattery) {
-            val bat = ble.lastMasterBattery
+            val bat = resolvedBattery!!.percent
             val batColor = when {
                 bat <= 15 -> "#EF4444"
                 bat <= 25 -> "#F59E0B"
@@ -2342,13 +2341,14 @@ object GlucoseAlertManager {
             }
 
             if (hasMasterBattery) {
+                val batPct = resolvedBattery!!.percent
                 setViewVisibility(R.id.notif_dot3, android.view.View.VISIBLE)
                 setViewVisibility(R.id.notif_battery, android.view.View.VISIBLE)
-                val batText = "🔋 ${ble.lastMasterBattery}%"
+                val batText = "🔋 $batPct%"
                 setTextViewText(R.id.notif_battery, batText)
                 val batColor = when {
-                    ble.lastMasterBattery <= 15 -> Color.parseColor("#EF4444")
-                    ble.lastMasterBattery <= 25 -> Color.parseColor("#F59E0B")
+                    batPct <= 15 -> Color.parseColor("#EF4444")
+                    batPct <= 25 -> Color.parseColor("#F59E0B")
                     else -> Color.parseColor("#10B981")
                 }
                 setTextColor(R.id.notif_battery, batColor)

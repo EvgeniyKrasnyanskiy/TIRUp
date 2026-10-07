@@ -49,6 +49,7 @@ class TirupApplication : Application() {
         com.tirup.app.data.worker.YearEndDigestWorker.schedule(this)
         com.tirup.app.data.ble.BleObserverManager.syncWithSettings(this, settingsRepository, glucoseRepository)
         com.tirup.app.data.network.XdripLanManager.syncWithSettings(this, settingsRepository, glucoseRepository, database)
+        com.tirup.app.data.network.NightscoutStatusManager.syncWithSettings(this, settingsRepository)
         com.tirup.app.presentation.aod.AodScreenOffManager.init(this)
 
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO).launch {

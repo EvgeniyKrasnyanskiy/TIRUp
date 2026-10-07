@@ -168,6 +168,7 @@ class AlertActionReceiver : BroadcastReceiver() {
                     wakeLock?.acquire(8000L)
                     try {
                         com.tirup.app.data.network.XdripLanManager.pollNow()
+                        com.tirup.app.data.network.NightscoutStatusManager.pollNow()
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed ACTION_POLL_XDRIP_LAN: ${e.message}", e)
                     } finally {

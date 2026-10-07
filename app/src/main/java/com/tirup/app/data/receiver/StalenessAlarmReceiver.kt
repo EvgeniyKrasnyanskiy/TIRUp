@@ -33,6 +33,9 @@ class StalenessAlarmReceiver : BroadcastReceiver() {
                 } else {
                     DexdripBroadcastReceiver.syncFromLocalXdrip(context, force = true)
                 }
+                if (settings.nightscoutSettings.isEnabled && settings.nightscoutSettings.isValidUrl) {
+                    com.tirup.app.data.network.NightscoutStatusManager.pollNow()
+                }
 
                 val latest = app.glucoseRepository.getLatestReading().firstOrNull() ?: return@launch
 
