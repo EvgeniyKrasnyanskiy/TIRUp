@@ -1055,6 +1055,25 @@ fun NightscoutSyncCard(
                             color = if (nightscout.requireXdripConfirmation) PrimaryEmerald else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isRu) "Получение сахаров:" else "Glucose download:",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = if (nightscout.downloadGlucose) (if (isRu) "Cloud Follower" else "Enabled") else (if (isRu) "Выключено" else "Disabled"),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (nightscout.downloadGlucose) PrimaryEmerald else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
@@ -1163,9 +1182,9 @@ fun NightscoutSyncCard(
 
             Text(
                 text = if (isRu)
-                    "💡 Передаёт введённое лечение (инсулин, углеводы, замеры, заметки) на ваш микро-бэкенд Nightscout (из xDripWidget). xDrip+ на телефоне скачивает их по REST API, после чего данные подтверждаются и отображаются на графике TIRUp."
+                    "💡 Позволяет использовать TIRUp как Cloud Follower: скачивает сахара, историю и батарейку мастера с сервера Nightscout при отсутствии BLE/Wi-Fi, а также передаёт введённые лечения (инсулин, углеводы, замеры)."
                 else
-                    "💡 Dispatches entered treatments to your Nightscout micro-backend (from xDripWidget). xDrip+ pulls them via REST API sync, confirming them in TIRUp.",
+                    "💡 Enables TIRUp as a Cloud Follower: pulls glucose, history, and master battery from Nightscout when BLE/Wi-Fi is unavailable, and dispatches entered treatments (insulin, carbs, BG checks).",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                 lineHeight = 16.sp

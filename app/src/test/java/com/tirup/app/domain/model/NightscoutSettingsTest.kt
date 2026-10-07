@@ -32,6 +32,7 @@ class NightscoutSettingsTest {
     fun testDefaultConfirmationEnabled() {
         val settings = NightscoutSettings()
         assertTrue(settings.requireXdripConfirmation)
+        assertTrue(settings.downloadGlucose)
         assertFalse(settings.isEnabled)
     }
 }

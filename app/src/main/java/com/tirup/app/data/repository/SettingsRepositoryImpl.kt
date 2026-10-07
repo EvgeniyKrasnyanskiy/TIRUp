@@ -202,6 +202,7 @@ class SettingsRepositoryImpl(
             .putString(KEY_NIGHTSCOUT_SERVER_URL, settings.nightscoutSettings.serverUrl)
             .putString(KEY_NIGHTSCOUT_API_SECRET, settings.nightscoutSettings.apiSecret)
             .putBoolean(KEY_NIGHTSCOUT_REQUIRE_XDRIP_CONFIRM, settings.nightscoutSettings.requireXdripConfirmation)
+            .putBoolean(KEY_NIGHTSCOUT_DOWNLOAD_GLUCOSE, settings.nightscoutSettings.downloadGlucose)
             .putBoolean(KEY_XDRIP_LAN_IS_ENABLED, settings.xdripLanSettings.isEnabled)
             .putBoolean(KEY_XDRIP_LAN_IS_AUTO_DISCOVERY, settings.xdripLanSettings.isAutoDiscovery)
             .putString(KEY_XDRIP_LAN_MASTER_HOST, settings.xdripLanSettings.masterHost)
@@ -525,7 +526,8 @@ class SettingsRepositoryImpl(
                 isEnabled = prefs.getBoolean(KEY_NIGHTSCOUT_IS_ENABLED, false),
                 serverUrl = prefs.getString(KEY_NIGHTSCOUT_SERVER_URL, "") ?: "",
                 apiSecret = prefs.getString(KEY_NIGHTSCOUT_API_SECRET, "") ?: "",
-                requireXdripConfirmation = prefs.getBoolean(KEY_NIGHTSCOUT_REQUIRE_XDRIP_CONFIRM, true)
+                requireXdripConfirmation = prefs.getBoolean(KEY_NIGHTSCOUT_REQUIRE_XDRIP_CONFIRM, true),
+                downloadGlucose = prefs.getBoolean(KEY_NIGHTSCOUT_DOWNLOAD_GLUCOSE, true)
             ),
             xdripLanSettings = com.tirup.app.domain.model.XdripLanSettings(
                 isEnabled = prefs.getBoolean(KEY_XDRIP_LAN_IS_ENABLED, false),
@@ -549,6 +551,7 @@ class SettingsRepositoryImpl(
         private const val KEY_NIGHTSCOUT_SERVER_URL = "key_nightscout_server_url"
         private const val KEY_NIGHTSCOUT_API_SECRET = "key_nightscout_api_secret"
         private const val KEY_NIGHTSCOUT_REQUIRE_XDRIP_CONFIRM = "key_nightscout_require_xdrip_confirm"
+        private const val KEY_NIGHTSCOUT_DOWNLOAD_GLUCOSE = "key_nightscout_download_glucose"
 
         private const val KEY_XDRIP_LAN_IS_ENABLED = "key_xdrip_lan_is_enabled"
         private const val KEY_XDRIP_LAN_IS_AUTO_DISCOVERY = "key_xdrip_lan_is_auto_discovery"

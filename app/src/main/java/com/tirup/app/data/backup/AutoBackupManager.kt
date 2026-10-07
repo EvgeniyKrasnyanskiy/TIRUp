@@ -666,6 +666,7 @@ object AutoBackupManager {
         writer.name("serverUrl").value(ns.serverUrl)
         writer.name("apiSecret").value(ns.apiSecret)
         writer.name("requireXdripConfirmation").value(ns.requireXdripConfirmation)
+        writer.name("downloadGlucose").value(ns.downloadGlucose)
         writer.endObject()
 
         // xDrip+ LAN Settings
@@ -2011,6 +2012,7 @@ object AutoBackupManager {
                     var serverUrl = ""
                     var apiSecret = ""
                     var requireXdripConfirmation = true
+                    var downloadGlucose = true
                     reader.beginObject()
                     while (reader.hasNext()) {
                         when (reader.nextName()) {
@@ -2018,6 +2020,7 @@ object AutoBackupManager {
                             "serverUrl" -> serverUrl = reader.nextString()
                             "apiSecret" -> apiSecret = reader.nextString()
                             "requireXdripConfirmation" -> requireXdripConfirmation = reader.nextBoolean()
+                            "downloadGlucose" -> downloadGlucose = reader.nextBoolean()
                             else -> reader.skipValue()
                         }
                     }
@@ -2026,7 +2029,8 @@ object AutoBackupManager {
                         isEnabled = isEnabled,
                         serverUrl = serverUrl,
                         apiSecret = apiSecret,
-                        requireXdripConfirmation = requireXdripConfirmation
+                        requireXdripConfirmation = requireXdripConfirmation,
+                        downloadGlucose = downloadGlucose
                     )
                 }
                 "xdripLanSettings" -> {

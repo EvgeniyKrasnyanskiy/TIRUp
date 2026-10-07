@@ -2,8 +2,12 @@ package com.tirup.app.data.network
 
 import android.content.Context
 import android.util.Log
+import com.tirup.app.data.alert.GlucoseAlertManager
+import com.tirup.app.domain.model.DataSourcePriority
+import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.NightscoutSettings
 import com.tirup.app.domain.model.NightscoutStatus
+import com.tirup.app.domain.repository.GlucoseRepository
 import com.tirup.app.domain.repository.SettingsRepository
 import com.tirup.app.presentation.widget.TirupWidgetUpdater
 import kotlinx.coroutines.CoroutineScope
@@ -39,6 +43,7 @@ object NightscoutStatusManager {
 
     private var appContext: Context? = null
     private var cachedSettingsRepo: SettingsRepository? = null
+    private var cachedGlucoseRepo: GlucoseRepository? = null
     private var pollJob: Job? = null
     private var lastPollTime = 0L
 
@@ -101,10 +106,14 @@ object NightscoutStatusManager {
 
     fun syncWithSettings(
         context: Context,
-        settingsRepository: SettingsRepository
+        settingsRepository: SettingsRepository,
+        glucoseRepository: GlucoseRepository? = null
     ) {
         appContext = context.applicationContext
         cachedSettingsRepo = settingsRepository
+        if (glucoseRepository != null) {
+            cachedGlucoseRepo = glucoseRepository
+        }
 
         scope.launch {
             settingsRepository.getSettings().collect { settings ->
@@ -126,7 +135,7 @@ object NightscoutStatusManager {
 
     private fun startPolling(settings: NightscoutSettings) {
         pollJob?.cancel()
-        Log.i(TAG, "Starting Nightscout telemetry polling for ${settings.serverUrl}")
+        Log.i(TAG, "Starting Nightscout telemetry & sync polling for ${settings.serverUrl}")
         pollJob = scope.launch {
             while (true) {
                 try {
@@ -146,7 +155,7 @@ object NightscoutStatusManager {
     private fun stopPolling() {
         pollJob?.cancel()
         pollJob = null
-        Log.i(TAG, "Stopped Nightscout telemetry polling")
+        Log.i(TAG, "Stopped Nightscout telemetry & sync polling")
     }
 
     suspend fun pollNow() = withContext(Dispatchers.IO) {
@@ -167,28 +176,45 @@ object NightscoutStatusManager {
         lastPollTime = System.currentTimeMillis()
         val cleanUrl = settings.getCleanBaseUrl()
 
-        // 1. Try /api/v1/devicestatus.json?count=1
+        // 1. Telemetry: Try /api/v1/devicestatus.json?count=1
         val dsResult = fetchDeviceStatus(cleanUrl, settings.apiSecret)
+        var batteryFound = false
         if (dsResult.isSuccess) {
             val status = dsResult.getOrNull()!!
             if (status.masterBattery != null) {
                 updateSuccess(status)
-                return@withContext
+                batteryFound = true
             }
         }
 
-        // 2. Fallback to /pebble
+        // 2. Fetch /pebble (for battery fallback and live IoB/CoB/Glucose)
+        var pebbleData: XdripPebbleResult? = null
         val pebbleResult = fetchPebbleStatus(cleanUrl, settings.apiSecret)
         if (pebbleResult.isSuccess) {
-            val status = pebbleResult.getOrNull()!!
-            updateSuccess(status)
-        } else {
+            val (status, pebble) = pebbleResult.getOrNull()!!
+            pebbleData = pebble
+            if (!batteryFound) {
+                updateSuccess(status)
+                batteryFound = true
+            }
+        }
+
+        if (!batteryFound && !dsResult.isSuccess && !pebbleResult.isSuccess) {
             val err = dsResult.exceptionOrNull()?.message ?: pebbleResult.exceptionOrNull()?.message
             _statusFlow.value = _statusFlow.value.copy(
                 isConnected = false,
                 errorMessage = err,
                 lastCheckTimestamp = System.currentTimeMillis()
             )
+        }
+
+        // 3. Process glucose readings (Cloud Follower) if enabled
+        if (settings.downloadGlucose) {
+            try {
+                fetchAndProcessGlucose(cleanUrl, settings, pebbleData)
+            } catch (e: Exception) {
+                Log.w(TAG, "Error processing Nightscout glucose readings: ${e.message}")
+            }
         }
     }
 
@@ -252,7 +278,7 @@ object NightscoutStatusManager {
         }
     }
 
-    private fun fetchPebbleStatus(cleanUrl: String, apiSecret: String): Result<NightscoutStatus> {
+    private fun fetchPebbleStatus(cleanUrl: String, apiSecret: String): Result<Pair<NightscoutStatus, XdripPebbleResult>> {
         var conn: HttpURLConnection? = null
         try {
             val url = URL("$cleanUrl/pebble")
@@ -270,16 +296,16 @@ object NightscoutStatusManager {
             if (code in 200..299) {
                 val body = conn.inputStream.bufferedReader().use { it.readText() }
                 val pebble = XdripLanClient.parsePebbleResponse(body)
-                if (pebble.battery != null) {
-                    return Result.success(
-                        NightscoutStatus(
-                            masterBattery = pebble.battery,
-                            lastBatteryTimestamp = pebble.timestamp ?: System.currentTimeMillis(),
-                            lastSuccessTimestamp = System.currentTimeMillis()
-                        )
+                val status = if (pebble.battery != null) {
+                    NightscoutStatus(
+                        masterBattery = pebble.battery,
+                        lastBatteryTimestamp = pebble.timestamp ?: System.currentTimeMillis(),
+                        lastSuccessTimestamp = System.currentTimeMillis()
                     )
+                } else {
+                    NightscoutStatus(lastSuccessTimestamp = System.currentTimeMillis())
                 }
-                return Result.success(NightscoutStatus(lastSuccessTimestamp = System.currentTimeMillis()))
+                return Result.success(Pair(status, pebble))
             } else {
                 return Result.failure(IllegalStateException("HTTP $code from pebble"))
             }
@@ -287,6 +313,152 @@ object NightscoutStatusManager {
             return Result.failure(e)
         } finally {
             conn?.disconnect()
+        }
+    }
+
+    private fun fetchEntries(cleanUrl: String, apiSecret: String, count: Int = 12): Result<List<GlucoseReading>> {
+        var conn: HttpURLConnection? = null
+        try {
+            // 1. Primary: /api/v1/entries/sgv.json?count=N
+            var targetUrl = "$cleanUrl/api/v1/entries/sgv.json?count=$count"
+            var connection = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
+                connectTimeout = TIMEOUT_MS
+                readTimeout = TIMEOUT_MS
+                requestMethod = "GET"
+                setRequestProperty("Accept", "application/json")
+                if (apiSecret.isNotBlank()) {
+                    setRequestProperty("api-secret", sha1(apiSecret))
+                }
+            }
+            conn = connection
+            var code = connection.responseCode
+
+            // 2. Fallback: /api/v1/entries.json?count=N
+            if (code == 404 || code == 400) {
+                conn.disconnect()
+                targetUrl = "$cleanUrl/api/v1/entries.json?count=$count"
+                connection = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = TIMEOUT_MS
+                    readTimeout = TIMEOUT_MS
+                    requestMethod = "GET"
+                    setRequestProperty("Accept", "application/json")
+                    if (apiSecret.isNotBlank()) {
+                        setRequestProperty("api-secret", sha1(apiSecret))
+                    }
+                }
+                conn = connection
+                code = connection.responseCode
+            }
+
+            // 3. Fallback: /sgv.json?count=N
+            if (code == 404 || code == 400) {
+                conn.disconnect()
+                targetUrl = "$cleanUrl/sgv.json?count=$count"
+                connection = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = TIMEOUT_MS
+                    readTimeout = TIMEOUT_MS
+                    requestMethod = "GET"
+                    setRequestProperty("Accept", "application/json")
+                    if (apiSecret.isNotBlank()) {
+                        setRequestProperty("api-secret", sha1(apiSecret))
+                    }
+                }
+                conn = connection
+                code = connection.responseCode
+            }
+
+            if (code in 200..299) {
+                val body = connection.inputStream.bufferedReader().use { it.readText() }
+                val readings = XdripLanClient.parseSgvJson(body)
+                return Result.success(readings)
+            } else {
+                return Result.failure(IllegalStateException("HTTP $code from entries endpoint"))
+            }
+        } catch (e: Exception) {
+            return Result.failure(e)
+        } finally {
+            conn?.disconnect()
+        }
+    }
+
+    private suspend fun fetchAndProcessGlucose(
+        cleanUrl: String,
+        settings: NightscoutSettings,
+        pebbleData: XdripPebbleResult?
+    ) {
+        val repo = cachedGlucoseRepo ?: return
+        val now = System.currentTimeMillis()
+        val latestInDb = repo.getLatestReading().firstOrNull()
+
+        // If we already have fresh data (< 2.5 min old from higher-priority source), skip remote batch fetch
+        val hasVeryFreshReading = latestInDb != null && (now - latestInDb.timestamp < 150_000L)
+
+        val readings = mutableListOf<GlucoseReading>()
+
+        if (!hasVeryFreshReading) {
+            // Determine count: if large gap (> 30 min), fetch 24 readings (~2 hours), otherwise 12 readings (~1 hour)
+            val gapMinutes = if (latestInDb != null) (now - latestInDb.timestamp) / 60_000L else 120L
+            val fetchCount = if (gapMinutes > 30L) 24 else 12
+
+            val entriesResult = fetchEntries(cleanUrl, settings.apiSecret, count = fetchCount)
+            if (entriesResult.isSuccess) {
+                val fetched = entriesResult.getOrNull() ?: emptyList()
+                readings.addAll(fetched)
+            }
+        }
+
+        // Fallback: If entries list was empty, but pebble has a fresh glucose reading (< 15 min), use pebble reading
+        if (readings.isEmpty() && pebbleData?.glucoseMmol != null && pebbleData.timestamp != null) {
+            val pebbleTs = pebbleData.timestamp
+            if (now - pebbleTs < 15 * 60_000L) {
+                readings.add(
+                    GlucoseReading(
+                        timestamp = pebbleTs,
+                        valueMmol = pebbleData.glucoseMmol,
+                        trendArrow = pebbleData.trendArrow,
+                        iob = pebbleData.iob,
+                        cob = pebbleData.cob
+                    )
+                )
+            }
+        }
+
+        if (readings.isNotEmpty()) {
+            val sorted = readings.sortedByDescending { it.timestamp }
+            val enriched = sorted.mapIndexed { index, r ->
+                if (index == 0 && (pebbleData?.iob != null || pebbleData?.cob != null)) {
+                    r.copy(
+                        iob = pebbleData.iob ?: r.iob,
+                        cob = pebbleData.cob ?: r.cob
+                    )
+                } else r
+            }
+
+            // Insert batch with NIGHTSCOUT_CLOUD priority (rank 1: will never overwrite BLE/LAN/local xDrip)
+            repo.insertReadingsBatchFromSource(enriched, DataSourcePriority.NIGHTSCOUT_CLOUD)
+
+            val latest = enriched.firstOrNull()
+            if (latest != null && (now - latest.timestamp < 15 * 60_000L)) {
+                appContext?.let { ctx ->
+                    val userSettings = cachedSettingsRepo?.getSettings()?.firstOrNull() ?: return@let
+                    GlucoseAlertManager.refreshLockscreenNotificationAndWidgets(ctx, userSettings, latest)
+                    val recent = repo.getRecentReadings(30).firstOrNull() ?: listOf(latest)
+                    GlucoseAlertManager.checkAndAlert(
+                        context = ctx,
+                        recentReadings = recent,
+                        settings = userSettings
+                    )
+                }
+            }
+        } else if (latestInDb != null && (pebbleData?.iob != null || pebbleData?.cob != null)) {
+            // Even if no new readings to insert, enrich latest DB reading if it is missing iob/cob
+            if ((latestInDb.iob == null && pebbleData.iob != null) || (latestInDb.cob == null && pebbleData.cob != null)) {
+                val enrichedLatest = latestInDb.copy(
+                    iob = pebbleData.iob ?: latestInDb.iob,
+                    cob = pebbleData.cob ?: latestInDb.cob
+                )
+                repo.insertReadingFromSource(enrichedLatest, DataSourcePriority.NIGHTSCOUT_CLOUD)
+            }
         }
     }
 }

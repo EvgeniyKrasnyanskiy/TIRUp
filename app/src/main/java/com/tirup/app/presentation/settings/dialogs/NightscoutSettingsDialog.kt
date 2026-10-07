@@ -61,6 +61,7 @@ fun NightscoutSettingsDialog(
     var serverUrl by remember { mutableStateOf(initialSettings.serverUrl) }
     var apiSecret by remember { mutableStateOf(initialSettings.apiSecret) }
     var requireXdripConfirmation by remember { mutableStateOf(initialSettings.requireXdripConfirmation) }
+    var downloadGlucose by remember { mutableStateOf(initialSettings.downloadGlucose) }
     var isSecretVisible by remember { mutableStateOf(false) }
 
     var isTestingConnection by remember { mutableStateOf(false) }
@@ -186,6 +187,38 @@ fun NightscoutSettingsDialog(
                     )
                 }
 
+                // Download Glucose (Cloud Follower) toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (isRu) "Получать сахара (Cloud Follower)" else "Download glucose (Cloud Follower)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (isRu)
+                                "Скачивать замеры и историю с сервера, если нет связи по BLE или Wi-Fi"
+                            else
+                                "Download readings and history from server if BLE or Wi-Fi is unavailable",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = downloadGlucose,
+                        onCheckedChange = { downloadGlucose = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = ActionBlue
+                        )
+                    )
+                }
+
                 // Test Connection Button & Status
                 OutlinedButton(
                     onClick = {
@@ -266,7 +299,8 @@ fun NightscoutSettingsDialog(
                             isEnabled = isEnabled,
                             serverUrl = serverUrl.trim().removeSuffix("/"),
                             apiSecret = apiSecret.trim(),
-                            requireXdripConfirmation = requireXdripConfirmation
+                            requireXdripConfirmation = requireXdripConfirmation,
+                            downloadGlucose = downloadGlucose
                         )
                     )
                     onDismiss()
