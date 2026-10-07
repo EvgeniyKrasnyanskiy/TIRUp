@@ -318,6 +318,7 @@ fun ReportsScreen(
             TrendPeriod.PERIOD_90D -> if (isRu) "90 дней" else "90 Days"
             TrendPeriod.PERIOD_YEAR -> if (isRu) "1 год" else "1 Year"
             TrendPeriod.PERIOD_ALL -> if (isRu) "Всё время" else "All Time"
+            TrendPeriod.PERIOD_CUSTOM -> if (isRu) "${state.customDays} дн." else "${state.customDays} Days"
         }
 
         AgpSheetPreviewModal(
@@ -431,25 +432,21 @@ fun ReportsScreen(
                 ) {
                     Text(
                         text = if (isRu) {
-                            "Почему показатели TIR, Mean и др. могут незначительно отличаться от цифр в xDrip+:\n\n" +
-                            "1️⃣ Скользящее окно vs Календарные сутки:\n" +
-                            "xDrip+ считает статистику за последние 24 скользящих часа от текущей секунды назад. TIRUp рассчитывает отчёт по фиксированным суткам (00:00–23:59) выбранного периода, что даёт строгие и воспроизводимые границы.\n\n" +
-                            "2️⃣ Количество точек и фильтрация дубликатов:\n" +
-                            "xDrip+ сохраняет все приходящие радиопакеты без проверки на повторы внутри минуты (включая повторные эхо-пакеты от сенсора и трансмиттера с разницей в несколько секунд — около 15–25 дубликатов в сутки). TIRUp применяет клиническое 25-секундное окно дедупликации: если сенсор присылает два пакета за пару секунд, TIRUp объединяет их, не создавая искусственных фантомных точек. Это делает расчёт взвешенного времени в диапазоне (TIR/TING) и среднего сахара (Mean) математически чище и точнее.\n\n" +
-                            "3️⃣ Математическое усреднение:\n" +
-                            "При переменном интервале точек (1 мин vs 5 мин) простое среднее арифметическое и средневзвешенное по времени могут расходиться на 0.1–0.3 ммоль/л.\n\n" +
-                            "4️⃣ Сглаживание шума:\n" +
-                            "xDrip+ на лету применяет фильтр Калмана (Kalman filter) к кривой, тогда как TIRUp считает аналитику по фактическим подтверждённым замерам сенсора."
+                            "Причины возможных небольших расхождений с xDrip+:\n\n" +
+                            "1️⃣ Дедупликация повторов:\n" +
+                            "xDrip+ сохраняет все радиопакеты (включая эхо-повторы с дельтой в пару секунд, +15–25 точек в сутки). TIRUp объединяет их 25-секундным окном фильтрации, отсекая фантомные замеры.\n\n" +
+                            "2️⃣ Границы выборки:\n" +
+                            "Для периода «1 день» TIRUp считает строго с 00:00 текущих суток, тогда как в xDrip+ статистика часто рассчитывается за скользящие 24 часа.\n\n" +
+                            "3️⃣ Округление единиц:\n" +
+                            "xDrip+ ведёт внутренние вычисления в целых мг/дл (70 мг/дл ≈ 3.885 ммоль/л), что на пограничных сахарах может давать разницу в 1–2 точки."
                         } else {
-                            "Why TIR, Mean and other metrics may slightly differ from xDrip+:\n\n" +
-                            "1️⃣ Rolling 24h Window vs Calendar Days:\n" +
-                            "xDrip+ computes statistics over a sliding 24-hour window from the current moment backward. TIRUp aligns reports to strict astronomical calendar days (00:00–23:59), ensuring reproducible clinical boundaries.\n\n" +
-                            "2️⃣ Reading Counts & Deduplication:\n" +
-                            "xDrip+ stores every incoming radio packet without sub-minute duplicate filtering (often accumulating 15–25 echo duplicate packets per day with 2–5s deltas). TIRUp applies a clinical 25-second deduplication window: if the sensor re-transmits a packet within seconds, TIRUp merges it without creating phantom points, ensuring clinically accurate time-weighted AUC and Mean.\n\n" +
-                            "3️⃣ Mathematical Averaging:\n" +
-                            "With variable sampling rates (1 min vs 5 min), simple arithmetic mean and time-weighted mean can deviate by 0.1–0.3 mmol/L.\n\n" +
-                            "4️⃣ Noise Filtering:\n" +
-                            "xDrip+ applies real-time Kalman filtering to displayed curves, while TIRUp calculates metrics strictly from verified sensor readings."
+                            "Why metrics may slightly differ from xDrip+:\n\n" +
+                            "1️⃣ Duplicate Filtering:\n" +
+                            "xDrip+ stores all radio packets including sub-minute echoes (+15–25 duplicates/day). TIRUp merges them via a 25-second clinical window, eliminating phantom points.\n\n" +
+                            "2️⃣ Time Window Boundaries:\n" +
+                            "For the 1-day period, TIRUp computes strictly from 00:00 today, whereas xDrip+ default view often uses a rolling 24-hour window.\n\n" +
+                            "3️⃣ Unit Conversion & Rounding:\n" +
+                            "xDrip+ computes internally in integer mg/dL (70 mg/dL ≈ 3.885 mmol/L), which can cause 1–2 point boundary differences."
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -611,7 +608,8 @@ private fun LiveReportCard(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        val displayDays = minOf(stats.daysCount, state.livePeriod.days)
+                        val effectiveDays = if (state.livePeriod == TrendPeriod.PERIOD_CUSTOM) state.customDays else state.livePeriod.days
+                        val displayDays = if (effectiveDays > 0) minOf(stats.daysCount, effectiveDays) else stats.daysCount
                         Text(
                             text = if (isRu) "${state.liveReadings.size} измерений • $displayDays дн. (нажмите для предпросмотра)"
                                    else "${state.liveReadings.size} readings • $displayDays days (tap to preview)",
@@ -652,7 +650,10 @@ private fun LiveReportCard(
             // Compact Period Selector for Live Report
             CompactPeriodSelector(
                 selectedPeriod = state.livePeriod,
-                onPeriodSelected = { viewModel.selectLivePeriod(it) }
+                customDays = state.customDays,
+                isRu = isRu,
+                onPeriodSelected = { viewModel.selectLivePeriod(it) },
+                onCustomDaysSelected = { days -> viewModel.selectLivePeriod(TrendPeriod.PERIOD_CUSTOM, days) }
             )
 
             // Range Bar

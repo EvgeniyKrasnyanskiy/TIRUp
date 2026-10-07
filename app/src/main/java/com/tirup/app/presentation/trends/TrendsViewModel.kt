@@ -58,6 +58,9 @@ class TrendsViewModel(
     private val _selectedPeriod = MutableStateFlow(TrendPeriod.PERIOD_7D)
     val selectedPeriod: StateFlow<TrendPeriod> = _selectedPeriod.asStateFlow()
 
+    private val _customDays = MutableStateFlow(14)
+    val customDays: StateFlow<Int> = _customDays.asStateFlow()
+
     private val _weeklyDigest = MutableStateFlow<WeeklyDigest?>(null)
     val weeklyDigest: StateFlow<WeeklyDigest?> = _weeklyDigest.asStateFlow()
 
@@ -226,13 +229,15 @@ class TrendsViewModel(
         viewModelScope.launch {
             combine(
                 _selectedPeriod,
+                _customDays,
                 glucoseRepository.getLatestReading()
-            ) { period, latestReading ->
-                Pair(period, latestReading)
-            }.flatMapLatest { (period, latestReading) ->
+            ) { period, customDays, latestReading ->
+                Triple(period, customDays, latestReading)
+            }.flatMapLatest { (period, customDays, latestReading) ->
                 val now = System.currentTimeMillis()
                 // Use latest reading timestamp or now as reference point
                 val referenceTime = latestReading?.timestamp ?: now
+                val effectiveDays = if (period == TrendPeriod.PERIOD_CUSTOM) customDays else period.days
 
                 val startTime = when {
                     period == TrendPeriod.PERIOD_1D -> {
@@ -245,11 +250,11 @@ class TrendsViewModel(
                         }
                         cal.timeInMillis
                     }
-                    period.days > 0 -> referenceTime - (period.days.toLong() * 86400000L)
+                    effectiveDays > 0 -> referenceTime - (effectiveDays.toLong() * 86400000L)
                     else -> 0L // All time
                 }
 
-                val endTime = if (period.days > 0) {
+                val endTime = if (effectiveDays > 0) {
                     referenceTime + 86400000L
                 } else {
                     Long.MAX_VALUE
@@ -257,12 +262,12 @@ class TrendsViewModel(
 
                 // Query at least 14 days for weekly digest comparison
                 val digestStartTime = referenceTime - (14L * 86400000L)
-                val queryStartTime = if (period.days > 0) minOf(startTime, digestStartTime) else 0L
+                val queryStartTime = if (effectiveDays > 0) minOf(startTime, digestStartTime) else 0L
 
                 glucoseRepository.getReadingsBetween(queryStartTime, endTime).combine(
                     settingsRepository.getSettings()
                 ) { allReadings, latestSettings ->
-                    val periodReadings = if (period.days > 0) {
+                    val periodReadings = if (effectiveDays > 0) {
                         allReadings.filter { it.timestamp in startTime..endTime }
                     } else {
                         allReadings
@@ -286,14 +291,14 @@ class TrendsViewModel(
                     val heatmap = AGPPercentilesCalculator.calculateHeatmap(
                         readings = periodReadings,
                         targetRanges = latestSettings.targetRanges,
-                        maxDays = if (period.days > 0) period.days.coerceAtMost(30) else 30
+                        maxDays = if (effectiveDays > 0) effectiveDays.coerceAtMost(30) else 30
                     )
 
                     val compensator = TargetCompensatorCalculator.calculateStrategicCompensator(
                         targetMode = TargetMode.TIR,
                         targetGoalPercent = latestSettings.targetRanges.tirGoalPercent.toDouble(),
                         readings = periodReadings,
-                        periodDays = period.days,
+                        periodDays = effectiveDays,
                         targetRanges = latestSettings.targetRanges,
                         language = latestSettings.language
                     )
@@ -308,6 +313,7 @@ class TrendsViewModel(
 
                     TrendsUiState(
                         selectedPeriod = period,
+                        customDays = customDays,
                         statistics = stats,
                         compensatorGoal = compensator,
                         percentileBins = agpBins,
@@ -323,7 +329,10 @@ class TrendsViewModel(
         }
     }
 
-    fun selectPeriod(period: TrendPeriod) {
+    fun selectPeriod(period: TrendPeriod, customDays: Int? = null) {
+        if (customDays != null && customDays > 0) {
+            _customDays.value = customDays
+        }
         _selectedPeriod.value = period
     }
 }

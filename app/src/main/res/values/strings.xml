@@ -40,6 +40,7 @@
     <string name="period_year">1 Year</string>
     <string name="period_all">All Time</string>
     <string name="period_more">...</string>
+    <string name="period_custom">Custom</string>
     <string name="agp_curve_title">Ambulatory Glucose Profile (AGP)</string>
     <string name="agp_median">50% Median</string>
     <string name="agp_interquartile">25–75% Interquartile</string>

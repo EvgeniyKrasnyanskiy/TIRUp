@@ -40,6 +40,7 @@
     <string name="period_year">1 год</string>
     <string name="period_all">Всё время</string>
     <string name="period_more">...</string>
+    <string name="period_custom">Свой период</string>
     <string name="agp_curve_title">Амбулаторный гликемический профиль (AGP)</string>
     <string name="agp_median">50% Медиана</string>
     <string name="agp_interquartile">25–75% Диапазон</string>

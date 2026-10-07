@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -32,6 +33,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -188,12 +192,16 @@ fun TrendsScreen(
                 ) {
                     CompactPeriodSelector(
                         selectedPeriod = selectedPeriod,
-                        onPeriodSelected = { viewModel.selectPeriod(it) }
+                        customDays = state.customDays,
+                        isRu = isRu,
+                        onPeriodSelected = { viewModel.selectPeriod(it) },
+                        onCustomDaysSelected = { days -> viewModel.selectPeriod(TrendPeriod.PERIOD_CUSTOM, days) }
                     )
                 }
 
                 // Incomplete Period Banner
-                if (state.actualDaysCount > 0 && selectedPeriod.days > 0 && state.actualDaysCount < selectedPeriod.days) {
+                val targetDays = if (selectedPeriod == TrendPeriod.PERIOD_CUSTOM) state.customDays else selectedPeriod.days
+                if (state.actualDaysCount > 0 && targetDays > 0 && state.actualDaysCount < targetDays) {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -214,8 +222,8 @@ fun TrendsScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (isRu) "Доступны данные за ${state.actualDaysCount} дн. (из ${selectedPeriod.days})"
-                                else "Data available for ${state.actualDaysCount} days (of ${selectedPeriod.days})",
+                                text = if (isRu) "Доступны данные за ${state.actualDaysCount} дн. (из $targetDays)"
+                                else "Data available for ${state.actualDaysCount} days (of $targetDays)",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = onSurfaceVariant,
                                 fontSize = 11.5.sp
@@ -829,9 +837,13 @@ private fun WeeklyDigestBanner(
 @Composable
 fun CompactPeriodSelector(
     selectedPeriod: TrendPeriod,
-    onPeriodSelected: (TrendPeriod) -> Unit
+    customDays: Int = 14,
+    isRu: Boolean = true,
+    onPeriodSelected: (TrendPeriod) -> Unit,
+    onCustomDaysSelected: (Int) -> Unit = {}
 ) {
     var expandedDropdown by remember { mutableStateOf(false) }
+    var showCustomDaysDialog by remember { mutableStateOf(false) }
 
     val primaryPeriods = listOf(
         TrendPeriod.PERIOD_1D,
@@ -876,10 +888,10 @@ fun CompactPeriodSelector(
             }
         }
 
-        // Dropdown Menu Button
-        Box(modifier = Modifier.weight(0.7f)) {
+        // Dropdown Menu Button (Gear / Custom / 1Y / All)
+        Box(modifier = Modifier.weight(1f)) {
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(10.dp),
                 color = if (isDropdownSelected) ActionBlue else MaterialTheme.colorScheme.surfaceVariant,
                 border = BorderStroke(
                     1.dp,
@@ -890,17 +902,60 @@ fun CompactPeriodSelector(
                     .clickable { expandedDropdown = true }
             ) {
                 Box(
-                    modifier = Modifier.padding(vertical = 9.dp),
+                    modifier = Modifier.padding(vertical = 7.dp, horizontal = 2.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = if (isDropdownSelected) stringResource(selectedPeriod.stringResId) else "•••",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isDropdownSelected) Color.White else MaterialTheme.colorScheme.onSurface,
-                            fontWeight = if (isDropdownSelected) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 11.5.sp
-                        )
+                    when {
+                        selectedPeriod == TrendPeriod.PERIOD_CUSTOM -> {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text(
+                                    text = "${customDays}д",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.5.sp,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                        selectedPeriod == TrendPeriod.PERIOD_YEAR -> {
+                            Text(
+                                text = stringResource(R.string.period_year),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.5.sp,
+                                maxLines = 1
+                            )
+                        }
+                        selectedPeriod == TrendPeriod.PERIOD_ALL -> {
+                            Text(
+                                text = stringResource(R.string.period_all),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.5.sp,
+                                maxLines = 1
+                            )
+                        }
+                        else -> {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Custom / More",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -909,6 +964,26 @@ fun CompactPeriodSelector(
                 expanded = expandedDropdown,
                 onDismissRequest = { expandedDropdown = false }
             ) {
+                DropdownMenuItem(
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = null,
+                            tint = ActionBlue,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = if (isRu) "Свой период ($customDays дн.)" else "Custom ($customDays d)",
+                            fontWeight = if (selectedPeriod == TrendPeriod.PERIOD_CUSTOM) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
+                    onClick = {
+                        expandedDropdown = false
+                        showCustomDaysDialog = true
+                    }
+                )
                 DropdownMenuItem(
                     text = { Text(text = stringResource(R.string.period_year)) },
                     onClick = {
@@ -925,6 +1000,99 @@ fun CompactPeriodSelector(
                 )
             }
         }
+    }
+
+    if (showCustomDaysDialog) {
+        var inputDaysText by remember { mutableStateOf(customDays.toString()) }
+        val quickChips = listOf(2, 3, 5, 20, 60)
+
+        AlertDialog(
+            onDismissRequest = { showCustomDaysDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = null,
+                        tint = ActionBlue,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isRu) "Свой период анализа" else "Custom Analysis Period",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = if (isRu) "Укажите количество дней (от 1 до 365):" else "Enter number of days (1 to 365):",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        quickChips.forEach { days ->
+                            val isSelected = inputDaysText == days.toString()
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) ActionBlue else MaterialTheme.colorScheme.surfaceVariant,
+                                border = BorderStroke(1.dp, if (isSelected) ActionBlue else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { inputDaysText = days.toString() }
+                            ) {
+                                Box(
+                                    modifier = Modifier.padding(vertical = 6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "${days}д",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = inputDaysText,
+                        onValueChange = { input ->
+                            val filtered = input.filter { it.isDigit() }.take(3)
+                            inputDaysText = filtered
+                        },
+                        label = { Text(if (isRu) "Количество дней" else "Number of days") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val parsed = inputDaysText.toIntOrNull()?.coerceIn(1, 365) ?: customDays
+                        onCustomDaysSelected(parsed)
+                        onPeriodSelected(TrendPeriod.PERIOD_CUSTOM)
+                        showCustomDaysDialog = false
+                    }
+                ) {
+                    Text(if (isRu) "Применить" else "Apply", color = ActionBlue, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCustomDaysDialog = false }) {
+                    Text(if (isRu) "Отмена" else "Cancel")
+                }
+            }
+        )
     }
 }
 

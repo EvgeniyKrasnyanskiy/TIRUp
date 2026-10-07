@@ -30,7 +30,8 @@ class AgpPdfGenerator(private val context: Context) {
         readings: List<GlucoseReading>,
         statistics: GlucoseStatistics,
         userSettings: UserSettings,
-        selectedPeriod: TrendPeriod = TrendPeriod.PERIOD_14D
+        selectedPeriod: TrendPeriod = TrendPeriod.PERIOD_14D,
+        customDays: Int = 14
     ): Result<File> = withContext(Dispatchers.IO) {
         val document = PdfDocument()
         val isRu = userSettings.language.equals("RU", ignoreCase = true)
@@ -83,6 +84,7 @@ class AgpPdfGenerator(private val context: Context) {
                 TrendPeriod.PERIOD_90D -> if (isRu) "90 дней" else "90 Days"
                 TrendPeriod.PERIOD_YEAR -> if (isRu) "1 год" else "1 Year"
                 TrendPeriod.PERIOD_ALL -> if (isRu) "Всё время" else "All Time"
+                TrendPeriod.PERIOD_CUSTOM -> if (isRu) "$customDays дн." else "$customDays Days"
             }
 
             // 1. Header Banner

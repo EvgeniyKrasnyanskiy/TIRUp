@@ -47,6 +47,7 @@ data class HistoricalReportData(
 
 data class ReportsUiState(
     val livePeriod: TrendPeriod = TrendPeriod.PERIOD_1D,
+    val customDays: Int = 14,
     val liveStatistics: GlucoseStatistics = GlucoseStatistics(),
     val liveReadings: List<GlucoseReading> = emptyList(),
     val historicalReport: HistoricalReportData = HistoricalReportData(),
@@ -80,6 +81,9 @@ class ReportsViewModel(
     private val _livePeriod = MutableStateFlow(TrendPeriod.PERIOD_1D)
     val livePeriod: StateFlow<TrendPeriod> = _livePeriod.asStateFlow()
 
+    private val _customDays = MutableStateFlow(14)
+    val customDays: StateFlow<Int> = _customDays.asStateFlow()
+
     private val _uiState = MutableStateFlow(ReportsUiState())
     val uiState: StateFlow<ReportsUiState> = _uiState.asStateFlow()
 
@@ -98,12 +102,14 @@ class ReportsViewModel(
         viewModelScope.launch {
             combine(
                 _livePeriod,
+                _customDays,
                 glucoseRepository.getLatestReading()
-            ) { period, latest ->
-                Pair(period, latest)
-            }.flatMapLatest { (period, latest) ->
+            ) { period, customDays, latest ->
+                Triple(period, customDays, latest)
+            }.flatMapLatest { (period, customDays, latest) ->
                 val now = System.currentTimeMillis()
                 val referenceTime = latest?.timestamp ?: now
+                val effectiveDays = if (period == TrendPeriod.PERIOD_CUSTOM) customDays else period.days
                 val startTime = when {
                     period == TrendPeriod.PERIOD_1D -> {
                         val cal = java.util.Calendar.getInstance().apply {
@@ -115,10 +121,10 @@ class ReportsViewModel(
                         }
                         cal.timeInMillis
                     }
-                    period.days > 0 -> referenceTime - (period.days.toLong() * 86400000L)
+                    effectiveDays > 0 -> referenceTime - (effectiveDays.toLong() * 86400000L)
                     else -> 0L
                 }
-                val endTime = if (period.days > 0) referenceTime + 86400000L else Long.MAX_VALUE
+                val endTime = if (effectiveDays > 0) referenceTime + 86400000L else Long.MAX_VALUE
 
                 glucoseRepository.getReadingsBetween(startTime, endTime).combine(
                     settingsRepository.getSettings()
@@ -136,6 +142,7 @@ class ReportsViewModel(
             }.collect { (readings, stats, latestSettings) ->
                 _uiState.value = _uiState.value.copy(
                     livePeriod = _livePeriod.value,
+                    customDays = _customDays.value,
                     liveReadings = readings,
                     liveStatistics = stats,
                     userSettings = latestSettings
@@ -183,7 +190,10 @@ class ReportsViewModel(
         }
     }
 
-    fun selectLivePeriod(period: TrendPeriod) {
+    fun selectLivePeriod(period: TrendPeriod, customDays: Int? = null) {
+        if (customDays != null && customDays > 0) {
+            _customDays.value = customDays
+        }
         _livePeriod.value = period
     }
 
@@ -300,7 +310,8 @@ class ReportsViewModel(
                 readings = currentState.liveReadings,
                 statistics = currentState.liveStatistics,
                 userSettings = currentState.userSettings,
-                selectedPeriod = _livePeriod.value
+                selectedPeriod = _livePeriod.value,
+                customDays = currentState.customDays
             )
 
             result.onSuccess { pdfFile ->
@@ -325,7 +336,8 @@ class ReportsViewModel(
                 readings = currentState.liveReadings,
                 statistics = currentState.liveStatistics,
                 userSettings = currentState.userSettings,
-                selectedPeriod = _livePeriod.value
+                selectedPeriod = _livePeriod.value,
+                customDays = currentState.customDays
             )
 
             result.onSuccess { pdfFile ->

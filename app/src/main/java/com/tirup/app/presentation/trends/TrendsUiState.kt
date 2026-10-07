@@ -13,11 +13,13 @@ enum class TrendPeriod(val days: Int, val stringResId: Int) {
     PERIOD_30D(30, com.tirup.app.R.string.period_30d),
     PERIOD_90D(90, com.tirup.app.R.string.period_90d),
     PERIOD_YEAR(365, com.tirup.app.R.string.period_year),
-    PERIOD_ALL(-1, com.tirup.app.R.string.period_all)
+    PERIOD_ALL(-1, com.tirup.app.R.string.period_all),
+    PERIOD_CUSTOM(0, com.tirup.app.R.string.period_custom)
 }
 
 data class TrendsUiState(
     val selectedPeriod: TrendPeriod = TrendPeriod.PERIOD_14D,
+    val customDays: Int = 14,
     val statistics: GlucoseStatistics = GlucoseStatistics(),
     val compensatorGoal: CompensatorGoal = CompensatorGoal(),
     val percentileBins: List<AGPPercentileBin> = emptyList(),
