@@ -12,6 +12,7 @@ import com.tirup.app.domain.model.Treatment
 import com.tirup.app.domain.repository.GlucoseRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -283,6 +284,15 @@ class GlucoseRepositoryImpl(
         treatmentDao.clearAll()
     }
 
+    override suspend fun getHistoricalBestStreak(): Int = withContext(Dispatchers.IO) {
+        val summaries = try {
+            summaryDao.getAllSummaries().first()
+        } catch (_: Exception) {
+            emptyList()
+        }
+        calculateMaxHistoricalStreak(summaries)
+    }
+
     companion object {
         fun calculateStreakDays(
             summaries: List<DailySummaryEntity>,
@@ -318,6 +328,42 @@ class GlucoseRepositoryImpl(
             val todayBonus = if (todaySummary != null && todaySummary.tir >= 70.0 && todaySummary.count >= 10) 1 else 0
 
             return completedStreak + todayBonus
+        }
+
+        fun calculateMaxHistoricalStreak(
+            summaries: List<DailySummaryEntity>
+        ): Int {
+            if (summaries.isEmpty()) return 0
+            val sorted = summaries
+                .filter { it.tir >= 70.0 && it.count >= 10 }
+                .sortedBy { it.dateTimestamp }
+
+            if (sorted.isEmpty()) return 0
+
+            var maxStreak = 1
+            var currentStreak = 1
+            val cal = Calendar.getInstance(TimeZone.getDefault())
+
+            for (i in 1 until sorted.size) {
+                val prevTs = sorted[i - 1].dateTimestamp
+                val currTs = sorted[i].dateTimestamp
+                cal.timeInMillis = prevTs
+                cal.add(Calendar.DAY_OF_YEAR, 1)
+                val expectedNextDay = cal.timeInMillis
+
+                val diff = kotlin.math.abs(currTs - expectedNextDay)
+                if (diff < 3600000L) { // consecutive day (allowing DST 1h diff)
+                    currentStreak++
+                    if (currentStreak > maxStreak) {
+                        maxStreak = currentStreak
+                    }
+                } else if (kotlin.math.abs(currTs - prevTs) < 3600000L) {
+                    // Same day duplicate - ignore
+                } else {
+                    currentStreak = 1
+                }
+            }
+            return maxStreak
         }
 
         fun getStartOfDay(timestamp: Long): Long {

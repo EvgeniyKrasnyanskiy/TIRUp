@@ -136,7 +136,7 @@ fun StreakMotivatorDialog(
                 // Title and Streak Counter
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
                         text = if (isRu) "Дни в целевом диапазоне!" else "Target Range Streak!",
@@ -146,28 +146,40 @@ fun StreakMotivatorDialog(
                         textAlign = TextAlign.Center
                     )
 
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFFFF7A00).copy(alpha = 0.15f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF7A00).copy(alpha = 0.4f))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = if (isRu) "🔥 $daysWord подряд в норме" else "🔥 $daysWord streak in target",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFFF7A00),
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
-                        )
-                    }
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFFF7A00).copy(alpha = 0.15f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF7A00).copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = if (isRu) "🔥 $daysWord подряд" else "🔥 $daysWord streak",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFF7A00),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            )
+                        }
 
-                    if (bestStreakDays > 0) {
-                        val bestWord = com.tirup.app.domain.util.PluralUtils.formatDays(bestStreakDays, isRu)
-                        Text(
-                            text = if (isRu) "Лучшая серия: $bestWord" else "Best streak: $bestWord",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
+                        if (bestStreakDays > 0) {
+                            val bestWord = com.tirup.app.domain.util.PluralUtils.formatDays(bestStreakDays, isRu)
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFFFFD700).copy(alpha = 0.12f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD700).copy(alpha = 0.35f))
+                            ) {
+                                Text(
+                                    text = if (isRu) "🏆 Рекорд: $bestWord" else "🏆 Best: $bestWord",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFF59E0B),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -221,7 +233,7 @@ fun StreakMotivatorDialog(
             onDismissRequest = { showFlameEasterEgg = false },
             title = {
                 Text(
-                    text = if (isRu) "Огонёк диабетика! " else "Diabetic Power Flame!",
+                    text = if (isRu) "Огонёк диабетика! 🔥" else "Diabetic Power Flame! 🔥",
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.fillMaxWidth()
@@ -234,11 +246,17 @@ fun StreakMotivatorDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("✨ 🌟 🎆 🏆 🎆 🌟 ✨", fontSize = 22.sp)
+                    val recordGreeting = if (bestStreakDays > 0) {
+                        val bestWord = com.tirup.app.domain.util.PluralUtils.formatDays(bestStreakDays, isRu)
+                        if (isRu) "\n\n🏆 Твой рекорд за всё время: $bestWord в целевом диапазоне!"
+                        else "\n\n🏆 Your all-time record: $bestWord in target range!"
+                    } else ""
+
                     Text(
-                        text = if (isRu)
+                        text = (if (isRu)
                             "Секретная искра разблокирована!\n\nКаждый час и день в целевом диапазоне бережёт твои сосуды, нервы и дарит отличную форму. Управлять диабетом — это ежедневный подвиг.\n\nПродолжай жечь и заряжать энергией! 🔥💪"
                         else
-                            "Secret spark unlocked!\n\nEvery hour and day in target range protects your blood vessels, nerves, and brings peak energy. Managing diabetes is an everyday triumph.\n\nKeep the fire burning! 🔥💪",
+                            "Secret spark unlocked!\n\nEvery hour and day in target range protects your blood vessels, nerves, and brings peak energy. Managing diabetes is an everyday triumph.\n\nKeep the fire burning! 🔥💪") + recordGreeting,
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurface
@@ -419,9 +437,10 @@ private fun GitHubTirContributionGrid(
                                                 else -> {
                                                     val solidColor = when {
                                                         cell.tir == null -> Color(0xFF263238)
-                                                        cell.tir < 70.0 -> Color(0xFFEF4444)
+                                                        cell.tir < 67.0 -> Color(0xFFEF4444)
+                                                        cell.tir < 70.0 -> Color(0xFFF59E0B)
                                                         cell.tir < 85.0 -> Color(0xFF10B981)
-                                                        else -> Color(0xFF059669)
+                                                        else -> Color(0xFF34D399)
                                                     }
                                                     Modifier
                                                         .background(solidColor)
@@ -440,7 +459,11 @@ private fun GitHubTirContributionGrid(
                                                 val tirVal = cell.tir?.toInt() ?: 0
                                                 val winLossStatus = when {
                                                     cell.isGuaranteedWin -> if (isRu) " (Цель выполнена! ✓)" else " (Target reached! ✓)"
-                                                    cell.isGuaranteedLoss -> if (isRu) " (Ниже цели)" else " (Below target)"
+                                                    cell.isGuaranteedLoss && (cell.tir ?: 0.0) < 67.0 -> if (isRu) " (Ниже цели)" else " (Below target)"
+                                                    cell.isGuaranteedLoss -> if (isRu) " (Почти у цели ⚠️)" else " (Near target ⚠️)"
+                                                    (cell.tir ?: 0.0) >= 85.0 -> if (isRu) " (В процессе, отлично ⭐)" else " (In progress, superb ⭐)"
+                                                    (cell.tir ?: 0.0) >= 70.0 -> if (isRu) " (В процессе, в норме ✓)" else " (In progress, in target ✓)"
+                                                    (cell.tir ?: 0.0) >= 67.0 -> if (isRu) " (В процессе, почти у цели ⚠️)" else " (In progress, near target ⚠️)"
                                                     else -> if (isRu) " (В процессе, цель ≥70%)" else " (In progress, target ≥70%)"
                                                 }
                                                 val dayPrefix = if (isRu) "Сегодня (${cell.dateLabel})" else "Today (${cell.dateLabel})"
@@ -451,6 +474,7 @@ private fun GitHubTirContributionGrid(
                                                     cell.tir == null -> ""
                                                     cell.tir >= 85.0 -> if (isRu) " (Отлично ⭐)" else " (Superb ⭐)"
                                                     cell.tir >= 70.0 -> if (isRu) " (В норме ✓)" else " (In target ✓)"
+                                                    cell.tir >= 67.0 -> if (isRu) " (Почти у цели ⚠️)" else " (Near target ⚠️)"
                                                     else -> if (isRu) " (Ниже цели)" else " (Below target)"
                                                 }
                                                 selectedDetail = "${cell.dateLabel}: TIR $tirText$statusText"
@@ -462,7 +486,9 @@ private fun GitHubTirContributionGrid(
                                     if (cell.isToday && cell.tir != null) {
                                         val fillFraction = (cell.tir / 100.0).toFloat().coerceIn(0f, 1f)
                                         val fillColor = when {
-                                            cell.isGuaranteedWin || cell.tir >= 70.0 -> Color(0xFF10B981)
+                                            cell.isGuaranteedWin || cell.tir >= 85.0 -> Color(0xFF34D399)
+                                            cell.tir >= 70.0 -> Color(0xFF10B981)
+                                            cell.tir >= 67.0 -> Color(0xFFF59E0B)
                                             else -> Color(0xFFEF4444)
                                         }
                                         Box(
@@ -503,15 +529,17 @@ private fun GitHubTirContributionGrid(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 9.sp
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(5.dp))
                 LegendCell(Color(0xFF263238)) // No data
                 Spacer(modifier = Modifier.width(3.dp))
-                LegendCell(Color(0xFFEF4444)) // <70%
+                LegendCell(Color(0xFFEF4444)) // <67%
+                Spacer(modifier = Modifier.width(3.dp))
+                LegendCell(Color(0xFFF59E0B)) // 67-69%
                 Spacer(modifier = Modifier.width(3.dp))
                 LegendCell(Color(0xFF10B981)) // 70-84%
                 Spacer(modifier = Modifier.width(3.dp))
-                LegendCell(Color(0xFF059669)) // >=85%
-                Spacer(modifier = Modifier.width(6.dp))
+                LegendCell(Color(0xFF34D399)) // >=85%
+                Spacer(modifier = Modifier.width(5.dp))
                 Text(
                     text = if (isRu) "Больше" else "More",
                     style = MaterialTheme.typography.labelSmall,

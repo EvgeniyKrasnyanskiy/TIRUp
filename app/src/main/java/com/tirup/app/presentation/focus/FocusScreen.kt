@@ -1200,6 +1200,7 @@ fun FocusScreen(
         StreakMotivatorDialog(
             streakDays = state.streakDays,
             isRu = isRu,
+            bestStreakDays = userSettings.bestStreakDays,
             dailySummaries = state.recentDailySummaries,
             todayTirPercent = state.statistics.tirPercent,
             onDismiss = {

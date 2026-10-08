@@ -32,6 +32,7 @@ interface GlucoseRepository {
     suspend fun deleteTreatmentById(id: Long)
     suspend fun clearTreatments()
     suspend fun clearAllData()
+    suspend fun getHistoricalBestStreak(): Int
 }
 
 interface SettingsRepository {

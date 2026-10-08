@@ -57,10 +57,18 @@ class TirupApplication : Application() {
             com.tirup.app.data.backup.AutoBackupManager.maybeTriggerAutoBackup(this@TirupApplication, database, settingsRepository)
             try {
                 val settings = settingsRepository.getSettings().first()
-                if (!settings.isWeeklyDigestEnabled) {
-                    settingsRepository.updateSettings(settings.copy(isWeeklyDigestEnabled = true))
+                val historicalBest = glucoseRepository.getHistoricalBestStreak()
+                var updatedSettings = settings
+                if (historicalBest > updatedSettings.bestStreakDays) {
+                    updatedSettings = updatedSettings.copy(bestStreakDays = historicalBest)
                 }
-                if (settings.isFloatingBubbleEnabled && android.provider.Settings.canDrawOverlays(this@TirupApplication)) {
+                if (!updatedSettings.isWeeklyDigestEnabled) {
+                    updatedSettings = updatedSettings.copy(isWeeklyDigestEnabled = true)
+                }
+                if (updatedSettings != settings) {
+                    settingsRepository.updateSettings(updatedSettings)
+                }
+                if (updatedSettings.isFloatingBubbleEnabled && android.provider.Settings.canDrawOverlays(this@TirupApplication)) {
                     com.tirup.app.presentation.overlay.FloatingBubbleService.start(this@TirupApplication)
                 }
             } catch (e: Exception) {
