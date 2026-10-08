@@ -1,23 +1,53 @@
 package com.tirup.app.data.ble
 
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.tirup.app.TirupApplication
 import com.tirup.app.data.alert.GlucoseAlertManager
 
 class BleObserverService : Service() {
 
     private var wakeLock: PowerManager.WakeLock? = null
+    private var isScreenReceiverRegistered = false
+
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_SCREEN_ON) {
+                val ctx = context ?: return
+                BleObserverManager.onScreenTurnedOn(ctx)
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         BleObserverManager.isServiceRunning = true
         Log.i(TAG, "BleObserverService created")
+
+        if (!isScreenReceiverRegistered) {
+            try {
+                val filter = IntentFilter(Intent.ACTION_SCREEN_ON)
+                ContextCompat.registerReceiver(
+                    this,
+                    screenReceiver,
+                    filter,
+                    ContextCompat.RECEIVER_NOT_EXPORTED
+                )
+                isScreenReceiverRegistered = true
+                Log.d(TAG, "ScreenReceiver registered for ACTION_SCREEN_ON")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to register screenReceiver: ${e.message}")
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -45,7 +75,7 @@ class BleObserverService : Service() {
                 startForeground(GlucoseAlertManager.NOTIFICATION_ID_LOCKSCREEN, notif)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "startForeground error: ")
+            Log.w(TAG, "startForeground error: ${e.message}")
         }
 
         val pm = getSystemService(POWER_SERVICE) as? PowerManager
@@ -58,7 +88,7 @@ class BleObserverService : Service() {
                 wakeLock?.acquire(24 * 60 * 60 * 1000L)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to acquire observer WakeLock: ")
+            Log.w(TAG, "Failed to acquire observer WakeLock: ${e.message}")
         }
 
         BleObserverManager.startScanningFromService(applicationContext, settingsRepo, glucoseRepo)
@@ -72,6 +102,14 @@ class BleObserverService : Service() {
         BleObserverManager.isServiceRunning = false
         BleScanKeepAliveReceiver.cancelKeepAlive(applicationContext)
         Log.i(TAG, "BleObserverService onDestroy")
+
+        if (isScreenReceiverRegistered) {
+            try {
+                unregisterReceiver(screenReceiver)
+            } catch (_: Exception) {}
+            isScreenReceiverRegistered = false
+        }
+
         try {
             if (wakeLock?.isHeld == true) {
                 wakeLock?.release()

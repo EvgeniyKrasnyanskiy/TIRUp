@@ -128,7 +128,7 @@ object BleObserverManager {
                         Log.w(TAG, "Failed to start BleObserverService: ${e.message}")
                     }
                 }
-                startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = isBoostActive)
+                startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = isBoostActive, useLongRange = ble.useLongRange)
             } else {
                 if (isServiceRunning) {
                     try {
@@ -160,7 +160,7 @@ object BleObserverManager {
             if (ble.isEnabled && ble.role == BleBridgeRole.OBSERVER) {
                 // Ensure any previous dead or stale scan registration is cleared before starting fresh
                 stopScanningInternal()
-                startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = isBoostActive)
+                startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = isBoostActive, useLongRange = ble.useLongRange)
             } else {
                 try {
                     context.stopService(Intent(context, BleObserverService::class.java))
@@ -211,7 +211,7 @@ object BleObserverManager {
 
                 // Restart scanner in low latency mode
                 stopScanningInternalLocked()
-                startScanningInternalLocked(context, ble.familyPin, settingsRepository, glucoseRepository, boost = true)
+                startScanningInternalLocked(context, ble.familyPin, settingsRepository, glucoseRepository, boost = true, useLongRange = ble.useLongRange)
 
                 boostJob = launch {
                     while (_boostRemainingSec.value > 0) {
@@ -223,7 +223,7 @@ object BleObserverManager {
                         // Revert to normal scan mode if observer, else stop
                         stopScanningInternalLocked()
                         if (ble.role == BleBridgeRole.OBSERVER) {
-                            startScanningInternalLocked(context, ble.familyPin, settingsRepository, glucoseRepository, boost = false)
+                            startScanningInternalLocked(context, ble.familyPin, settingsRepository, glucoseRepository, boost = false, useLongRange = ble.useLongRange)
                         }
                     }
                 }
@@ -271,6 +271,25 @@ object BleObserverManager {
     fun onKeepAliveTick() {
         scope.launch {
             onKeepAliveTickSuspend()
+        }
+    }
+
+    /**
+     * Invoked when user turns on the screen (ACTION_SCREEN_ON).
+     * If device was sleeping and no packets arrived for >= 75 seconds, activates a 60-second
+     * low-latency scan boost to immediately clear any dormant Bluetooth controller state and
+     * capture the next transmitter burst without delay.
+     */
+    fun onScreenTurnedOn(context: Context) {
+        if (!isServiceRunning && !isScanning) return
+        val now = System.currentTimeMillis()
+        val silenceMs = if (lastPacketReceivedSystemMs > 0L) now - lastPacketReceivedSystemMs else 0L
+        Log.d(TAG, "Screen turned on. Silence: ${silenceMs / 1000}s")
+        if (silenceMs >= 75_000L) {
+            val settingsRepo = cachedSettingsRepo ?: (context.applicationContext as? TirupApplication)?.settingsRepository ?: return
+            val glucoseRepo = cachedGlucoseRepo ?: (context.applicationContext as? TirupApplication)?.glucoseRepository ?: return
+            Log.i(TAG, "Screen unlocked after ${silenceMs / 1000}s silence. Activating 60s boost scan to catch next transmission immediately.")
+            boostScanFor60Sec(context, settingsRepo, glucoseRepo)
         }
     }
 
@@ -361,7 +380,7 @@ object BleObserverManager {
                                 scanner = null
                                 isScanning = false
                                 delay(800L)
-                                startScanningInternalLocked(context, ble.familyPin, settingsRepo, glucoseRepo, boost = false)
+                                startScanningInternalLocked(context, ble.familyPin, settingsRepo, glucoseRepo, boost = false, useLongRange = ble.useLongRange)
                             }
                         }
                     } finally {
@@ -375,7 +394,7 @@ object BleObserverManager {
             }
 
             // 4. Start completely fresh scan with a NEW ScanCallback instance
-            startScanningInternalLocked(context, ble.familyPin, settingsRepo, glucoseRepo, boost = isBoostActive || boost)
+            startScanningInternalLocked(context, ble.familyPin, settingsRepo, glucoseRepo, boost = isBoostActive || boost, useLongRange = ble.useLongRange)
         } finally {
             try {
                 if (restartWakeLock?.isHeld == true) {
@@ -390,9 +409,10 @@ object BleObserverManager {
         familyPin: String,
         settingsRepository: SettingsRepository,
         glucoseRepository: GlucoseRepository,
-        boost: Boolean
+        boost: Boolean,
+        useLongRange: Boolean = false
     ) = mutex.withLock {
-        startScanningInternalLocked(context, familyPin, settingsRepository, glucoseRepository, boost)
+        startScanningInternalLocked(context, familyPin, settingsRepository, glucoseRepository, boost, useLongRange)
     }
 
     private fun startScanningInternalLocked(
@@ -400,7 +420,8 @@ object BleObserverManager {
         familyPin: String,
         settingsRepository: SettingsRepository,
         glucoseRepository: GlucoseRepository,
-        boost: Boolean
+        boost: Boolean,
+        useLongRange: Boolean = false
     ) {
         if (isScanning) return
 
@@ -434,9 +455,10 @@ object BleObserverManager {
             )
             .build()
 
-        val canAttemptExtended = !extendedScanDisabledByFallback && adapter.isLeExtendedAdvertisingSupported
+        val canAttemptExtended = useLongRange && !extendedScanDisabledByFallback && adapter.isLeExtendedAdvertisingSupported
+        val scanMode = if (boost || isServiceRunning) ScanSettings.SCAN_MODE_LOW_LATENCY else ScanSettings.SCAN_MODE_BALANCED
         val scanSettings = ScanSettings.Builder()
-            .setScanMode(if (boost) ScanSettings.SCAN_MODE_LOW_LATENCY else ScanSettings.SCAN_MODE_BALANCED)
+            .setScanMode(scanMode)
             .setReportDelay(0L)
             .apply {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -447,6 +469,8 @@ object BleObserverManager {
                 if (canAttemptExtended) {
                     setLegacy(false)
                     setPhy(ScanSettings.PHY_LE_ALL_SUPPORTED)
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    setLegacy(true)
                 }
             }
             .build()
