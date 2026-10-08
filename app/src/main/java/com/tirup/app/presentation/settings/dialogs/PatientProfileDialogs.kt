@@ -196,8 +196,8 @@ fun PatientProfileEditDialog(
 ) {
     var localProfile by remember(profile) { mutableStateOf(profile) }
 
-    val hM = localProfile.heightCm.toDoubleOrNull()?.let { it / 100.0 }
-    val wKg = localProfile.weightKg.toDoubleOrNull()
+    val hM = localProfile.heightCm.replace(',', '.').toDoubleOrNull()?.let { it / 100.0 }
+    val wKg = localProfile.weightKg.replace(',', '.').toDoubleOrNull()
     val bmi = if (hM != null && wKg != null && hM > 0.5) wKg / (hM * hM) else null
 
     var showBmiGuide by remember { mutableStateOf(false) }
@@ -327,7 +327,7 @@ fun PatientProfileEditDialog(
                         OutlinedTextField(
                             value = localProfile.heightCm,
                             onValueChange = { newHeight ->
-                                localProfile = localProfile.copy(heightCm = newHeight)
+                                localProfile = localProfile.copy(heightCm = newHeight.replace(',', '.'))
                             },
                             label = { Text(if (isRu) "Рост (см)" else "Height (cm)") },
                             modifier = Modifier.weight(1f),
@@ -336,7 +336,7 @@ fun PatientProfileEditDialog(
                         OutlinedTextField(
                             value = localProfile.weightKg,
                             onValueChange = { newWeight ->
-                                localProfile = localProfile.copy(weightKg = newWeight)
+                                localProfile = localProfile.copy(weightKg = newWeight.replace(',', '.'))
                             },
                             label = { Text(if (isRu) "Вес (кг)" else "Weight (kg)") },
                             modifier = Modifier.weight(1f),

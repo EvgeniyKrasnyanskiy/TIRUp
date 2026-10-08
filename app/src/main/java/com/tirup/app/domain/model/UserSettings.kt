@@ -124,8 +124,8 @@ data class PatientProfile(
 
     val calculatedBmi: Double?
         get() {
-            val hM = heightCm.toDoubleOrNull()?.let { it / 100.0 }
-            val wKg = weightKg.toDoubleOrNull()
+            val hM = heightCm.replace(',', '.').toDoubleOrNull()?.let { it / 100.0 }
+            val wKg = weightKg.replace(',', '.').toDoubleOrNull()
             return if (hM != null && wKg != null && hM > 0.5) wKg / (hM * hM) else null
         }
 }
