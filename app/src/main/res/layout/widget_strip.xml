@@ -265,6 +265,7 @@
         android:id="@+id/widget_chart_image"
         android:layout_width="0dp"
         android:layout_height="0dp"
+        android:contentDescription="@null"
         android:visibility="gone" />
 
     <!-- Dummy views for compatibility -->

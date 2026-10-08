@@ -31,32 +31,34 @@ const val HexColorTarget = "#10B981"
 const val HexColorHigh = "#F59E0B"
 const val HexColorVeryHigh = "#EF4444"
 
-// Range Colors (consistent across themes)
+// Range Colors (consistent across themes, with light-theme accessible variants)
 val ColorVeryLow = Color(0xFFEF4444)      // Urgent Red < 3.0
 val ColorLow = Color(0xFFF59E0B)          // Warning Amber 3.0 - 3.8
-val ColorTight = Color(0xFF4ADE80)        // Pale Green (as in AGP report sheet) 3.9 - 7.8
+val ColorTight = Color(0xFF4ADE80)        // Bright Pale Green (Dark Theme) 3.9 - 7.8
+val ColorTightLight = Color(0xFF15803D)   // High-contrast Deep Emerald Green for Light Theme (WCAG AA > 4.5:1)
 val ColorTargetSoft = Color(0xFF4ADE80)   // Pale Green 3.9 - 7.8
 val ColorTarget = Color(0xFF10B981)       // Saturated Green / Emerald 7.9 - 10.0
+val ColorTargetLight = Color(0xFF047857)  // High-contrast Deep Emerald for Light Theme
 val ColorHigh = Color(0xFFF59E0B)         // Warning Amber 10.1 - 13.9
 val ColorVeryHigh = Color(0xFFEF4444)     // Urgent Red >= 14.0
 
 /**
  * Returns unified Compose Color for given glucose value in mmol/L strictly conforming to the 6-band clinical AGP/TIR standard:
  * < 3.0: ColorVeryLow (#EF4444)
- * 3.0..3.8: ColorLow (#F59E0B)
- * 3.9..7.8: ColorTight (#4ADE80)
- * 7.9..10.0: ColorTarget (#10B981)
- * 10.1..13.9: ColorHigh (#F59E0B)
+ * 3.0..3.8: ColorLow (#F59E0B / #B45309 in light)
+ * 3.9..7.8: ColorTight (#4ADE80 in dark / #15803D in light)
+ * 7.9..10.0: ColorTarget (#10B981 in dark / #047857 in light)
+ * 10.1..13.9: ColorHigh (#F59E0B / #B45309 in light)
  * >= 14.0: ColorVeryHigh (#EF4444)
  */
-fun getGlucoseColor(valueMmol: Double, ranges: TargetRanges = TargetRanges()): Color {
-    if (valueMmol <= 0.0) return Color(0xFF94A3B8)
+fun getGlucoseColor(valueMmol: Double, ranges: TargetRanges = TargetRanges(), isDark: Boolean = true): Color {
+    if (valueMmol <= 0.0) return if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
     return when (ranges.categorize(valueMmol)) {
         GlucoseRangeCategory.VERY_LOW -> ColorVeryLow
-        GlucoseRangeCategory.LOW -> ColorLow
-        GlucoseRangeCategory.TIGHT -> ColorTight
-        GlucoseRangeCategory.TARGET -> ColorTarget
-        GlucoseRangeCategory.HIGH -> ColorHigh
+        GlucoseRangeCategory.LOW -> if (isDark) ColorLow else Color(0xFFB45309)
+        GlucoseRangeCategory.TIGHT -> if (isDark) ColorTight else ColorTightLight
+        GlucoseRangeCategory.TARGET -> if (isDark) ColorTarget else ColorTargetLight
+        GlucoseRangeCategory.HIGH -> if (isDark) ColorHigh else Color(0xFFB45309)
         GlucoseRangeCategory.VERY_HIGH -> ColorVeryHigh
     }
 }
