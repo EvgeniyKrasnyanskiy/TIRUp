@@ -18,7 +18,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -44,7 +46,9 @@ object NightscoutStatusManager {
     private var appContext: Context? = null
     private var cachedSettingsRepo: SettingsRepository? = null
     private var cachedGlucoseRepo: GlucoseRepository? = null
+    private var syncJob: Job? = null
     private var pollJob: Job? = null
+    private var activeNsSettings: NightscoutSettings? = null
     private var lastPollTime = 0L
 
     private val _statusFlow = MutableStateFlow(NightscoutStatus())
@@ -115,21 +119,27 @@ object NightscoutStatusManager {
             cachedGlucoseRepo = glucoseRepository
         }
 
-        scope.launch {
-            settingsRepository.getSettings().collect { settings ->
-                mutex.withLock {
-                    val ns = settings.nightscoutSettings
-                    if (ns.isEnabled && ns.isValidUrl) {
-                        _statusFlow.value = _statusFlow.value.copy(isEnabled = true)
-                        if (pollJob?.isActive != true) {
-                            startPolling(ns)
+        syncJob?.cancel()
+        syncJob = scope.launch {
+            settingsRepository.getSettings()
+                .map { it.nightscoutSettings }
+                .distinctUntilChanged()
+                .collect { ns ->
+                    mutex.withLock {
+                        if (ns.isEnabled && ns.isValidUrl) {
+                            _statusFlow.value = _statusFlow.value.copy(isEnabled = true)
+                            if (activeNsSettings != ns || pollJob?.isActive != true) {
+                                stopPolling()
+                                activeNsSettings = ns
+                                startPolling(ns)
+                            }
+                        } else {
+                            activeNsSettings = null
+                            stopPolling()
+                            _statusFlow.value = NightscoutStatus(isEnabled = false)
                         }
-                    } else {
-                        stopPolling()
-                        _statusFlow.value = NightscoutStatus(isEnabled = false)
                     }
                 }
-            }
         }
     }
 
@@ -155,6 +165,7 @@ object NightscoutStatusManager {
     private fun stopPolling() {
         pollJob?.cancel()
         pollJob = null
+        activeNsSettings = null
         Log.i(TAG, "Stopped Nightscout telemetry & sync polling")
     }
 

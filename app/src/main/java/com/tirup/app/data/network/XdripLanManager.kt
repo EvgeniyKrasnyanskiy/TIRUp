@@ -30,7 +30,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -48,7 +50,9 @@ object XdripLanManager {
     private var cachedGlucoseRepo: GlucoseRepository? = null
     private var cachedDb: AppDatabase? = null
 
+    private var syncJob: Job? = null
     private var pollJob: Job? = null
+    private var activeLanSettings: XdripLanSettings? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var treatmentsPollCounter = 0
     private var lastPollExecutionTime = 0L
@@ -71,20 +75,27 @@ object XdripLanManager {
         cachedGlucoseRepo = glucoseRepository
         cachedDb = database
 
-        scope.launch {
-            settingsRepository.getSettings().collect { settings ->
-                mutex.withLock {
-                    val lan = settings.xdripLanSettings
-                    if (lan.isEnabled && lan.isConfigured) {
-                        if (pollJob?.isActive == true) {
+        syncJob?.cancel()
+        syncJob = scope.launch {
+            settingsRepository.getSettings()
+                .map { it.xdripLanSettings }
+                .distinctUntilChanged()
+                .collect { lan ->
+                    mutex.withLock {
+                        if (lan.isEnabled && lan.isConfigured) {
+                            if (activeLanSettings != lan || pollJob?.isActive != true) {
+                                if (pollJob?.isActive == true) {
+                                    stopPollingInternal()
+                                }
+                                activeLanSettings = lan
+                                startPollingInternal(lan)
+                            }
+                        } else {
+                            activeLanSettings = null
                             stopPollingInternal()
                         }
-                        startPollingInternal(lan, settings)
-                    } else {
-                        stopPollingInternal()
                     }
                 }
-            }
         }
     }
 
@@ -256,7 +267,7 @@ object XdripLanManager {
         }
     }
 
-    private fun startPollingInternal(settings: XdripLanSettings, userSettings: UserSettings) {
+    private fun startPollingInternal(settings: XdripLanSettings) {
         val ctx = appContext ?: return
         registerNetworkCallback(ctx)
 
@@ -286,6 +297,7 @@ object XdripLanManager {
                         continue
                     }
 
+                    val userSettings = cachedSettingsRepo?.getSettings()?.firstOrNull() ?: UserSettings()
                     executePollCycle(settings, userSettings)
                 } catch (e: Exception) {
                     Log.w(TAG, "Error in LAN polling loop: ${e.message}")
@@ -307,6 +319,7 @@ object XdripLanManager {
     private fun stopPollingInternal() {
         pollJob?.cancel()
         pollJob = null
+        activeLanSettings = null
         val ctx = appContext
         if (ctx != null) {
             cancelPollAlarm(ctx)
