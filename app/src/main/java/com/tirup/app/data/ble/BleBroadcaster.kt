@@ -237,13 +237,11 @@ object BleBroadcaster {
                         mutex.withLock {
                             stopAdvertisingInternal(cancelHeartbeat = false)
                             Log.d(TAG, "BLE broadcast pulse burst completed ($burstDurationMs ms)")
-                            // Reset 5-minute countdown immediately after burst completion
-                            scheduleHeartbeat(300_000L)
                         }
                     }
 
-                    // Reset 5-minute target timestamp right away (so UI shows 5:00 while broadcasting)
-                    scheduleHeartbeat(300_000L + burstDurationMs)
+                    // Reset 5-minute countdown right away starting cleanly at 5:00 (300 seconds)
+                    scheduleHeartbeat(300_000L)
 
                 } catch (e: SecurityException) {
                     Log.w(TAG, "SecurityException starting BLE advertising: ${e.message}")
