@@ -284,6 +284,7 @@ object BleObserverManager {
         }
     }
 
+    @android.annotation.SuppressLint("MissingPermission")
     private suspend fun restartScanInternal(reason: String, boost: Boolean = false) = mutex.withLock {
         val now = System.currentTimeMillis()
         val elapsedSinceLastRestart = now - lastRestartTimestampMs
@@ -309,7 +310,11 @@ object BleObserverManager {
 
             // 1. Stop current scan and discard old callback object
             try {
-                activeCallback?.let { cb -> scanner?.stopScan(cb) }
+                if (hasScanPermission(context)) {
+                    activeCallback?.let { cb -> scanner?.stopScan(cb) }
+                }
+            } catch (e: SecurityException) {
+                Log.w(TAG, "SecurityException stopping scan during restart: ${e.message}")
             } catch (e: Exception) {
                 Log.w(TAG, "Error stopping scan during restart: ${e.message}")
             }
@@ -347,7 +352,10 @@ object BleObserverManager {
                             if (isScanning && !isBoostActive) {
                                 Log.i(TAG, "Reverting scan mode from boost (LOW_LATENCY) to BALANCED")
                                 try {
-                                    activeCallback?.let { cb -> scanner?.stopScan(cb) }
+                                    if (hasScanPermission(context)) {
+                                        activeCallback?.let { cb -> scanner?.stopScan(cb) }
+                                    }
+                                } catch (_: SecurityException) {
                                 } catch (_: Exception) {}
                                 activeCallback = null
                                 scanner = null

@@ -2076,7 +2076,7 @@ private fun BleStatusDialog(
 
             val batStr = if (bleSettings.lastMasterBattery in 0..100) "${bleSettings.lastMasterBattery}%" else if (isRu) "нет данных" else "no data"
 
-            val isObserverLongRangeActive = BleObserverManager.isLongRangeScanActive.value
+            val isObserverLongRangeActive by BleObserverManager.isLongRangeScanActive.collectAsState()
             val scanModeStr = if (isObserverLongRangeActive) {
                 if (isRu) "\n• Сканер: Dual (1M + Long Range)" else "\n• Scanner: Dual (1M + Long Range)"
             } else {
