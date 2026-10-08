@@ -188,6 +188,15 @@ class HeadsUpMessageActivity : ComponentActivity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        try {
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+            }
+        } catch (_: Exception) {}
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         try {

@@ -70,13 +70,14 @@ sealed interface ReportEvent {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReportsViewModel(
-    @android.annotation.SuppressLint("StaticFieldLeak")
-    private val context: Context,
+    context: Context,
     private val glucoseRepository: GlucoseRepository,
     private val settingsRepository: SettingsRepository,
     private val streamingImporter: StreamingGlucoseImporter,
     private val database: AppDatabase
 ) : ViewModel() {
+
+    private val appContext: Context = context.applicationContext
 
     private val _livePeriod = MutableStateFlow(TrendPeriod.PERIOD_1D)
     val livePeriod: StateFlow<TrendPeriod> = _livePeriod.asStateFlow()
@@ -90,8 +91,8 @@ class ReportsViewModel(
     private val _events = MutableSharedFlow<ReportEvent>()
     val events: SharedFlow<ReportEvent> = _events.asSharedFlow()
 
-    private val pdfGenerator = AgpPdfGenerator(context)
-    private val guidebookPdfGenerator = GuidebookPdfGenerator(context)
+    private val pdfGenerator = AgpPdfGenerator(appContext)
+    private val guidebookPdfGenerator = GuidebookPdfGenerator(appContext)
 
     init {
         observeLiveReport()
@@ -425,8 +426,8 @@ class ReportsViewModel(
 
     private suspend fun dispatchShareIntent(pdfFile: File, subject: String, chooserTitle: String) {
         val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
+            appContext,
+            "${appContext.packageName}.fileprovider",
             pdfFile
         )
         val intent = Intent(Intent.ACTION_SEND).apply {
@@ -453,9 +454,9 @@ class ReportsViewModel(
                     put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
                 }
 
-                val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                val uri = appContext.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
                 if (uri != null) {
-                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                    appContext.contentResolver.openOutputStream(uri)?.use { out ->
                         FileInputStream(pdfFile).use { input ->
                             input.copyTo(out)
                         }
