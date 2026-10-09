@@ -5,7 +5,9 @@
 
 ---
 
-## [Unreleased] - В разработке (планируется к следующему релизу)
+## [Unreleased]
+
+## [1.0.1] - 2026-10-09
 
 ### 🚀 Добавлено (Added)
 - **Nightscout Cloud Follower**:
