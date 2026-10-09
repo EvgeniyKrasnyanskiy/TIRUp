@@ -121,7 +121,6 @@ class TrendsViewModel(
         val now = System.currentTimeMillis()
         val editor = sp.edit()
         var changed = false
-        val expired = mutableSetOf<String>()
 
         patterns.forEach { pattern ->
             if (pattern.id.isNotBlank() && pattern.id != "collecting_data") {
@@ -130,27 +129,19 @@ class TrendsViewModel(
                 if (firstSeen == 0L) {
                     editor.putLong(key, now)
                     changed = true
-                } else {
-                    val ttl = if (pattern.severity == PatternSeverity.ALERT) 48L * 3600_000L else 24L * 3600_000L
-                    if (now - firstSeen > ttl) {
-                        expired.add(pattern.id)
-                    }
                 }
             }
         }
         if (changed) {
             editor.apply()
         }
-        _expiredPatternIds.value = expired
+        _expiredPatternIds.value = emptySet()
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun isPatternExpired(id: String, severity: PatternSeverity): Boolean {
-        if (id == "collecting_data") return false
-        val sp = prefs ?: return false
-        val firstSeen = sp.getLong("$PREFIX_FIRST_SEEN$id", 0L)
-        if (firstSeen == 0L) return false
-        val ttl = if (severity == PatternSeverity.ALERT) 48L * 3600_000L else 24L * 3600_000L
-        return (System.currentTimeMillis() - firstSeen) > ttl
+        // Analytical patterns should remain visible in trends report for the selected interval
+        return false
     }
 
     fun restorePattern(id: String) {

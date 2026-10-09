@@ -200,8 +200,9 @@ fun TrendsScreen(
                 }
 
                 // Incomplete Period Banner
-                val targetDays = if (selectedPeriod == TrendPeriod.PERIOD_CUSTOM) state.customDays else selectedPeriod.days
-                if (state.actualDaysCount > 0 && targetDays > 0 && state.actualDaysCount < targetDays) {
+                val isPeriodSynced = !state.isLoading && state.selectedPeriod == selectedPeriod
+                val targetDays = if (state.selectedPeriod == TrendPeriod.PERIOD_CUSTOM) state.customDays else state.selectedPeriod.days
+                if (isPeriodSynced && state.actualDaysCount > 0 && targetDays > 0 && state.actualDaysCount < targetDays) {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -257,8 +258,9 @@ fun TrendsScreen(
 
 
         // 1. Detected Clinical Patterns (Placed at the very top under Period Selector)
+        val isMultiDayPeriod = selectedPeriod != TrendPeriod.PERIOD_1D
         val hasSufficientData = state.statistics.daysCount >= 3 || state.statistics.totalCount >= 100
-        if (hasSufficientData && (visiblePatterns.isNotEmpty() || archivedPatterns.isNotEmpty())) {
+        if (isMultiDayPeriod && (hasSufficientData || visiblePatterns.isNotEmpty() || archivedPatterns.isNotEmpty())) {
             item {
                 BentoCard(
                     modifier = Modifier.fillMaxWidth(),
@@ -333,18 +335,55 @@ fun TrendsScreen(
                                                     lineHeight = 16.sp
                                                 )
                                             }
-                                            IconButton(
-                                                onClick = { viewModel.dismissPattern(pattern.id) },
-                                                modifier = Modifier.size(28.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Close,
-                                                    contentDescription = "Dismiss",
-                                                    tint = onSurfaceVariant.copy(alpha = 0.5f),
-                                                    modifier = Modifier.size(16.dp)
-                                                )
+                                            if (pattern.id != "collecting_data") {
+                                                IconButton(
+                                                    onClick = { viewModel.dismissPattern(pattern.id) },
+                                                    modifier = Modifier.size(28.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Close,
+                                                        contentDescription = "Dismiss",
+                                                        tint = onSurfaceVariant.copy(alpha = 0.5f),
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
                                             }
                                         }
+                                    }
+                                }
+                            }
+                        } else if (hasSufficientData) {
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "🛡️",
+                                        fontSize = 20.sp,
+                                        modifier = Modifier.padding(end = 10.dp)
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = if (isRu) "Патологических паттернов не выявлено" else "No Pathological Patterns Detected",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = PrimaryEmerald
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = if (isRu) "За выбранный период выраженных ночных гипогликемий, зари и резких постпрандиальных скачков не обнаружено. Гликемический профиль стабилен."
+                                            else "No repeating nocturnal drops, dawn phenomenon, or postprandial spikes detected for this period. Profile is stable.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = onSurfaceVariant,
+                                            lineHeight = 16.sp
+                                        )
                                     }
                                 }
                             }
