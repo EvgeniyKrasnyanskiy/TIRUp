@@ -60,6 +60,7 @@ class FocusViewModel(
     private var lastNotifiedReadingTimestamp = -1L
     private var lastNotifiedUnit: com.tirup.app.domain.model.GlucoseUnit? = null
     private var lastNotifiedLockscreenEnabled: Boolean? = null
+    private var lastSubmittedTreatmentTimestamp = 0L
 
     init {
         observeData()
@@ -430,8 +431,16 @@ class FocusViewModel(
                 }
             } else null
 
-            var uploadedUuid: String? = null
+            val treatmentUuid = java.util.UUID.randomUUID().toString()
+            var uploadedUuid: String? = treatmentUuid
             var sourceName = "TIRUP"
+
+            // Гарантируем разнос таймштампов минимум на 2000 мс во избежание дедупликации в xDrip+
+            var effectiveTimestamp = timestamp
+            if (kotlin.math.abs(effectiveTimestamp - lastSubmittedTreatmentTimestamp) < 2000L) {
+                effectiveTimestamp = lastSubmittedTreatmentTimestamp + 2000L
+            }
+            lastSubmittedTreatmentTimestamp = effectiveTimestamp
 
             // 1. ПРИОРИТЕТ 1: Отправка интента в локальный xDrip+ (info.nightscout.client.NEW_TREATMENT)
             val isXdripDispatched = com.tirup.app.data.receiver.DexdripBroadcastReceiver.postTreatmentToXdrip(
@@ -440,7 +449,8 @@ class FocusViewModel(
                 carbs = if (hasCarbs) carbsGrams else null,
                 glucose = glucoseMgdl,
                 notes = notes,
-                timestamp = timestamp
+                timestamp = effectiveTimestamp,
+                uuid = treatmentUuid
             )
 
             if (isXdripDispatched) {
@@ -458,11 +468,11 @@ class FocusViewModel(
                     glucose = if (hasGlucose) glucoseValue else null,
                     unit = userSettings.unit,
                     notes = notes,
-                    timestamp = timestamp
+                    timestamp = effectiveTimestamp
                 )
 
                 if (uploadResult.isSuccess) {
-                    uploadedUuid = uploadResult.getOrNull()
+                    uploadedUuid = uploadResult.getOrNull() ?: treatmentUuid
                     if (!isXdripDispatched) {
                         val msg = if (isRu) "✓ Отправлено в резерв Nightscout"
                         else "✓ Sent to backup Nightscout"
@@ -485,7 +495,7 @@ class FocusViewModel(
             // 3. Сохранение в локальную БД TIRUp и обработка таймеров расходников
             if (hasInsulin || hasCarbs || hasNotes) {
                 val treatment = Treatment(
-                    timestamp = timestamp,
+                    timestamp = effectiveTimestamp,
                     insulinUnits = if (hasInsulin) insulinUnits else null,
                     carbsGrams = if (hasCarbs) carbsGrams else null,
                     notes = notes,

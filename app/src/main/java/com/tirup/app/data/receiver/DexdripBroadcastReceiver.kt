@@ -1301,7 +1301,8 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             carbs: Double? = null,
             glucose: Double? = null,
             notes: String? = null,
-            timestamp: Long = System.currentTimeMillis()
+            timestamp: Long = System.currentTimeMillis(),
+            uuid: String? = null
         ): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val eventType = when {
                 insulin != null && insulin > 0.0 && carbs != null && carbs > 0.0 -> "Meal Bolus"
@@ -1319,7 +1320,11 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                     false
                 }
 
+                val stableUuid = uuid ?: java.util.UUID.randomUUID().toString()
+
                 val treatmentObj = org.json.JSONObject().apply {
+                    put("_id", stableUuid)
+                    put("uuid", stableUuid)
                     put("mills", timestamp)
                     put("date", timestamp)
                     put("timestamp", timestamp)
@@ -1335,14 +1340,17 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                     if (!notes.isNullOrBlank()) put("notes", notes)
                 }
                 val treatmentJson = treatmentObj.toString()
-                val treatmentsArrayJson = org.json.JSONArray().put(treatmentObj).toString()
 
-                // 1. Broadcast standard Nightscout Client intent to xDrip's NSClientReceiver
+                // Broadcast standard Nightscout Client intent to xDrip's NSClientReceiver.
+                // NOTE: We pass ONLY "treatment" extra (single JSON string).
+                // Do NOT pass "treatments" (array extra), because xDrip's NSClientReceiver
+                // processes both "treatment" and "treatments" sequentially without an else branch,
+                // resulting in double processing, lock contention, and duplicate rejection.
                 val clientIntent = Intent("info.nightscout.client.NEW_TREATMENT").apply {
                     setPackage("com.eveningoutpost.dexdrip")
                     putExtra("treatment", treatmentJson)
-                    putExtra("treatments", treatmentsArrayJson)
-                    // Legacy primitive extras for compatibility with third-party broadcast receivers
+                    putExtra("_id", stableUuid)
+                    putExtra("uuid", stableUuid)
                     putExtra("timestamp", timestamp)
                     putExtra("created_at", timestamp)
                     putExtra("eventType", eventType)
@@ -1353,25 +1361,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 }
                 context.sendBroadcast(clientIntent)
 
-                // 2. Broadcast NSEmulator intent for older xDrip versions
-                val nsIntent = Intent("com.eveningoutpost.dexdrip.NSEmulator.TREATMENT").apply {
-                    setPackage("com.eveningoutpost.dexdrip")
-                    putExtra("treatment", treatmentJson)
-                    putExtra("treatments", treatmentsArrayJson)
-                    putExtra("timestamp", timestamp)
-                    putExtra("created_at", timestamp)
-                    putExtra("eventType", eventType)
-                    if (insulin != null && insulin > 0.0) {
-                        putExtra("insulin", insulin)
-                        putExtra("bolus", insulin)
-                    }
-                    if (carbs != null && carbs > 0.0) putExtra("carbs", carbs)
-                    if (glucose != null && glucose > 0.0) putExtra("glucose", glucose)
-                    if (!notes.isNullOrBlank()) putExtra("notes", notes)
-                }
-                context.sendBroadcast(nsIntent)
-
-                Log.i(TAG, "Dispatched treatment to xDrip+: isInstalled=$isXdripInstalled, insulin=$insulin, carbs=$carbs, notes=$notes")
+                Log.i(TAG, "Dispatched treatment to xDrip+: uuid=$stableUuid, isInstalled=$isXdripInstalled, insulin=$insulin, carbs=$carbs, notes=$notes")
                 isXdripInstalled
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to broadcast treatment to xDrip: ${e.message}", e)

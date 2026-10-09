@@ -570,8 +570,11 @@ fun TreatmentInputBottomSheet(
                                     val newCal = Calendar.getInstance().apply {
                                         set(Calendar.HOUR_OF_DAY, hourOfDay)
                                         set(Calendar.MINUTE, minute)
-                                        set(Calendar.SECOND, 0)
-                                        set(Calendar.MILLISECOND, 0)
+                                        // Preserve current second/millisecond offsets so multiple treatments logged
+                                        // within the same minute do not collide on the exact same millisecond.
+                                        val nowCal = Calendar.getInstance()
+                                        set(Calendar.SECOND, nowCal.get(Calendar.SECOND))
+                                        set(Calendar.MILLISECOND, nowCal.get(Calendar.MILLISECOND))
                                         // Midnight wrap-around: if selected time is far ahead in the future (> 6 hours), assume it was yesterday evening
                                         if (timeInMillis - now.timeInMillis > 6 * 3600_000L) {
                                             add(Calendar.DAY_OF_YEAR, -1)
