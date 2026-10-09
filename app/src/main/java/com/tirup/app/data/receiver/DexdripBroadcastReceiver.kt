@@ -1311,82 +1311,38 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 else -> "Note"
             }
 
-            // 1. Try local xDrip web server (port 17580) via HTTP POST
-            var httpSuccess = false
             try {
-                val payload = org.json.JSONObject().apply {
-                    put("eventType", eventType)
-                    put("insulin", insulin ?: 0.0)
-                    put("carbs", carbs ?: 0.0)
-                    put("notes", notes ?: "")
-                    put("created_at", com.tirup.app.data.network.NightscoutUploadManager.formatIso8601(timestamp))
+                val isXdripInstalled = try {
+                    context.packageManager.getPackageInfo("com.eveningoutpost.dexdrip", 0)
+                    true
+                } catch (_: Exception) {
+                    false
+                }
+
+                val treatmentObj = org.json.JSONObject().apply {
+                    put("mills", timestamp)
                     put("date", timestamp)
+                    put("timestamp", timestamp)
+                    put("created_at", com.tirup.app.data.network.NightscoutUploadManager.formatIso8601(timestamp))
+                    put("eventType", eventType)
                     put("enteredBy", "TIRUp")
+                    if (insulin != null && insulin > 0.0) put("insulin", insulin)
+                    if (carbs != null && carbs > 0.0) put("carbs", carbs)
                     if (glucose != null && glucose > 0.0) {
                         put("glucose", glucose)
                         put("glucoseType", "Finger")
                     }
-                }.toString()
-
-                val endpoints = listOf("api/v1/treatments", "treatments.json")
-                for (endpoint in endpoints) {
-                    var conn: java.net.HttpURLConnection? = null
-                    try {
-                        val url = java.net.URL("http://127.0.0.1:17580/$endpoint")
-                        conn = (url.openConnection() as java.net.HttpURLConnection).apply {
-                            connectTimeout = 1500
-                            readTimeout = 1500
-                            requestMethod = "POST"
-                            doOutput = true
-                            setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                            setRequestProperty("Accept", "application/json")
-                        }
-                        java.io.OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { writer ->
-                            writer.write(payload)
-                            writer.flush()
-                        }
-                        val code = conn.responseCode
-                        if (code in 200..299) {
-                            Log.i(TAG, "Successfully posted treatment to local xDrip server ($endpoint, code=$code)")
-                            httpSuccess = true
-                            break
-                        }
-                    } catch (_: Exception) {
-                        // Endpoint failed, try next
-                    } finally {
-                        conn?.disconnect()
-                    }
+                    if (!notes.isNullOrBlank()) put("notes", notes)
                 }
-            } catch (e: Exception) {
-                Log.w(TAG, "Local xDrip HTTP treatment post exception: ${e.message}")
-            }
+                val treatmentJson = treatmentObj.toString()
+                val treatmentsArrayJson = org.json.JSONArray().put(treatmentObj).toString()
 
-            // 2. Broadcast Android intents to ensure xDrip catches it via intent receivers
-            try {
-                val nsIntent = Intent("com.eveningoutpost.dexdrip.NSEmulator.TREATMENT").apply {
-                    setPackage("com.eveningoutpost.dexdrip")
-                    putExtra("timestamp", timestamp)
-                    putExtra("created_at", timestamp)
-                    putExtra("eventType", eventType)
-                    if (insulin != null && insulin > 0.0) {
-                        putExtra("insulin", insulin)
-                        putExtra("bolus", insulin)
-                    }
-                    if (carbs != null && carbs > 0.0) {
-                        putExtra("carbs", carbs)
-                    }
-                    if (glucose != null && glucose > 0.0) {
-                        putExtra("glucose", glucose)
-                        putExtra("glucoseType", "Finger")
-                    }
-                    if (!notes.isNullOrBlank()) {
-                        putExtra("notes", notes)
-                    }
-                }
-                context.sendBroadcast(nsIntent)
-
+                // 1. Broadcast standard Nightscout Client intent to xDrip's NSClientReceiver
                 val clientIntent = Intent("info.nightscout.client.NEW_TREATMENT").apply {
                     setPackage("com.eveningoutpost.dexdrip")
+                    putExtra("treatment", treatmentJson)
+                    putExtra("treatments", treatmentsArrayJson)
+                    // Legacy primitive extras for compatibility with third-party broadcast receivers
                     putExtra("timestamp", timestamp)
                     putExtra("created_at", timestamp)
                     putExtra("eventType", eventType)
@@ -1397,12 +1353,30 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 }
                 context.sendBroadcast(clientIntent)
 
-                Log.i(TAG, "Dispatched treatment to xDrip+: httpSuccess=$httpSuccess, insulin=$insulin, carbs=$carbs, notes=$notes")
+                // 2. Broadcast NSEmulator intent for older xDrip versions
+                val nsIntent = Intent("com.eveningoutpost.dexdrip.NSEmulator.TREATMENT").apply {
+                    setPackage("com.eveningoutpost.dexdrip")
+                    putExtra("treatment", treatmentJson)
+                    putExtra("treatments", treatmentsArrayJson)
+                    putExtra("timestamp", timestamp)
+                    putExtra("created_at", timestamp)
+                    putExtra("eventType", eventType)
+                    if (insulin != null && insulin > 0.0) {
+                        putExtra("insulin", insulin)
+                        putExtra("bolus", insulin)
+                    }
+                    if (carbs != null && carbs > 0.0) putExtra("carbs", carbs)
+                    if (glucose != null && glucose > 0.0) putExtra("glucose", glucose)
+                    if (!notes.isNullOrBlank()) putExtra("notes", notes)
+                }
+                context.sendBroadcast(nsIntent)
+
+                Log.i(TAG, "Dispatched treatment to xDrip+: isInstalled=$isXdripInstalled, insulin=$insulin, carbs=$carbs, notes=$notes")
+                isXdripInstalled
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to broadcast treatment to xDrip: ${e.message}", e)
+                false
             }
-
-            httpSuccess
         }
 
         suspend fun persistAndDistributeReading(

@@ -433,8 +433,8 @@ class FocusViewModel(
             var uploadedUuid: String? = null
             var sourceName = "TIRUP"
 
-            // 1. ПРИОРИТЕТ 1: Отправка в локальный xDrip+ (HTTP REST на порту 17580 + Интенты)
-            val isLocalSuccess = com.tirup.app.data.receiver.DexdripBroadcastReceiver.postTreatmentToXdrip(
+            // 1. ПРИОРИТЕТ 1: Отправка интента в локальный xDrip+ (info.nightscout.client.NEW_TREATMENT)
+            val isXdripDispatched = com.tirup.app.data.receiver.DexdripBroadcastReceiver.postTreatmentToXdrip(
                 context = context,
                 insulin = if (hasInsulin) insulinUnits else null,
                 carbs = if (hasCarbs) carbsGrams else null,
@@ -443,39 +443,43 @@ class FocusViewModel(
                 timestamp = timestamp
             )
 
-            if (isLocalSuccess) {
+            if (isXdripDispatched) {
                 sourceName = "LOCAL_XDRIP"
-                val msg = if (isRu) "✓ Записано в локальный xDrip+" else "✓ Saved to local xDrip+"
+                val msg = if (isRu) "✓ Передано в xDrip+" else "✓ Dispatched to xDrip+"
                 android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
-            } else {
-                // 2. ПРИОРИТЕТ 2: Резерв последней очереди — Nightscout Cloud
-                if (ns.isEnabled && ns.isValidUrl) {
-                    val uploadResult = com.tirup.app.data.network.NightscoutUploadManager.uploadTreatment(
-                        settings = ns,
-                        insulin = if (hasInsulin) insulinUnits else null,
-                        carbs = if (hasCarbs) carbsGrams else null,
-                        glucose = if (hasGlucose) glucoseValue else null,
-                        unit = userSettings.unit,
-                        notes = notes,
-                        timestamp = timestamp
-                    )
+            }
 
-                    if (uploadResult.isSuccess) {
-                        uploadedUuid = uploadResult.getOrNull()
-                        val msg = if (isRu) "✓ Отправлено в резерв Nightscout (локальный xDrip+ офлайн)"
-                        else "✓ Sent to backup Nightscout (local xDrip+ offline)"
+            // 2. ПРИОРИТЕТ 2: Резерв / синхронизация с Nightscout Cloud
+            if (ns.isEnabled && ns.isValidUrl) {
+                val uploadResult = com.tirup.app.data.network.NightscoutUploadManager.uploadTreatment(
+                    settings = ns,
+                    insulin = if (hasInsulin) insulinUnits else null,
+                    carbs = if (hasCarbs) carbsGrams else null,
+                    glucose = if (hasGlucose) glucoseValue else null,
+                    unit = userSettings.unit,
+                    notes = notes,
+                    timestamp = timestamp
+                )
+
+                if (uploadResult.isSuccess) {
+                    uploadedUuid = uploadResult.getOrNull()
+                    if (!isXdripDispatched) {
+                        val msg = if (isRu) "✓ Отправлено в резерв Nightscout"
+                        else "✓ Sent to backup Nightscout"
                         android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
-                    } else {
-                        val err = uploadResult.exceptionOrNull()?.message ?: "Unknown"
-                        val msg = if (isRu) "⚠️ Не удалось доставить ни в xDrip+, ни в резерв Nightscout: $err"
-                        else "⚠️ Failed to deliver to xDrip+ and Nightscout: $err"
-                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
                     }
                 } else {
-                    val msg = if (isRu) "⚠️ Записано в TIRUp (локальный сервер xDrip+ офлайн)"
-                    else "⚠️ Saved to TIRUp (local xDrip+ server offline)"
-                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                    if (!isXdripDispatched) {
+                        val err = uploadResult.exceptionOrNull()?.message ?: "Unknown"
+                        val msg = if (isRu) "⚠️ Не удалось доставить в резерв Nightscout: $err"
+                        else "⚠️ Failed to deliver to backup Nightscout: $err"
+                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                    }
                 }
+            } else if (!isXdripDispatched) {
+                val msg = if (isRu) "✓ Сохранено в TIRUp (xDrip+ не найден)"
+                else "✓ Saved in TIRUp (xDrip+ not found)"
+                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
             }
 
             // 3. Сохранение в локальную БД TIRUp и обработка таймеров расходников
