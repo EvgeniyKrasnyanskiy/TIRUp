@@ -68,6 +68,7 @@ object BleObserverManager {
     private var scanner: BluetoothLeScanner? = null
     private var activeCallback: ScanCallback? = null
     private var isScanning = false
+    @Volatile
     private var isBoostActive = false
     private var boostJob: Job? = null
     private var ecoMonitorJob: Job? = null
@@ -249,16 +250,30 @@ object BleObserverManager {
                         _boostRemainingSec.value = (_boostRemainingSec.value - 1).coerceAtLeast(0)
                     }
                     mutex.withLock {
-                        isBoostActive = false
-                        // Revert to normal scan mode if observer, else stop
-                        stopScanningInternalLocked()
-                        if (ble.role == BleBridgeRole.OBSERVER) {
-                            startScanningInternalLocked(context, ble.familyPin, settingsRepository, glucoseRepository, boost = false, useLongRange = ble.useLongRange)
+                        if (isBoostActive) {
+                            isBoostActive = false
+                            // Revert to normal scan mode if observer, else stop
+                            stopScanningInternalLocked()
+                            if (ble.role == BleBridgeRole.OBSERVER) {
+                                startScanningInternalLocked(context, ble.familyPin, settingsRepository, glucoseRepository, boost = false, useLongRange = ble.useLongRange)
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    /**
+     * Immediately cancels active boost search upon master packet arrival or manual cancel.
+     */
+    fun cancelBoost() {
+        if (!isBoostActive && _boostRemainingSec.value <= 0) return
+        Log.i(TAG, "Cancelling active boost search immediately (packet arrived or reset)")
+        boostJob?.cancel()
+        boostJob = null
+        isBoostActive = false
+        _boostRemainingSec.value = 0
     }
 
     /**
@@ -736,6 +751,9 @@ object BleObserverManager {
         lastPacketReceivedSystemMs = now
 
         recordChannelPacket(now, packet.timestamp, rssi)
+
+        // Cancel active boost search immediately on master packet arrival
+        cancelBoost()
 
         // Self-Healing: if we were in ECO power-saving mode, instantly restore LOW_LATENCY
         if (_isEcoModeFlow.value) {

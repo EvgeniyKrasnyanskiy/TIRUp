@@ -36,6 +36,7 @@ import com.tirup.app.data.ble.BleObserverManager
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -1894,25 +1895,16 @@ private fun BleBridgeBadge(
                 }
             }
         } else if (boostRemainingSec > 0) {
-            // Active Radar Search Animation (60s countdown)
-            val transition = rememberInfiniteTransition(label = "BleRadarSearch")
-            val ring1Progress by transition.animateFloat(
+            // Active Contour Droplet Search Animation (60s countdown)
+            val transition = rememberInfiniteTransition(label = "BleContourDropletSearch")
+            val dropletProgress by transition.animateFloat(
                 initialValue = 0f,
                 targetValue = 1f,
                 animationSpec = infiniteRepeatable(
                     animation = tween(durationMillis = 1300, easing = LinearEasing),
                     repeatMode = RepeatMode.Restart
                 ),
-                label = "ring1"
-            )
-            val ring2Progress by transition.animateFloat(
-                initialValue = 0f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 1300, delayMillis = 650, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart
-                ),
-                label = "ring2"
+                label = "dropletProgress"
             )
 
             Surface(
@@ -1920,33 +1912,82 @@ private fun BleBridgeBadge(
                     .size(width = 68.dp, height = 24.dp)
                     .clickable { onClick() },
                 shape = RoundedCornerShape(10.dp),
-                color = PrimaryEmerald.copy(alpha = 0.14f),
-                border = BorderStroke(0.9.dp, PrimaryEmerald.copy(alpha = 0.6f))
+                color = PrimaryEmerald.copy(alpha = 0.08f)
             ) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(2.dp),
+                    modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        val center = Offset(13.dp.toPx(), size.height / 2f)
-                        val maxRadius = size.height * 1.15f
-                        val rings = listOf(ring1Progress, ring2Progress)
-                        for (prog in rings) {
-                            if (prog > 0.05f) {
-                                val r = prog * maxRadius
-                                val alpha = (1f - prog).coerceIn(0f, 1f) * 0.8f
-                                val strokeW = (2.0f * (1f - prog * 0.4f)).dp.toPx()
+                        val strokeWidth = 1.2.dp.toPx()
+                        val pad = strokeWidth / 2f
+                        val w = size.width - strokeWidth
+                        val h = size.height - strokeWidth
+                        val r = 9.dp.toPx()
+
+                        // Base track border
+                        drawRoundRect(
+                            color = PrimaryEmerald.copy(alpha = 0.22f),
+                            topLeft = Offset(pad, pad),
+                            size = Size(w, h),
+                            cornerRadius = CornerRadius(r, r),
+                            style = Stroke(width = strokeWidth)
+                        )
+
+                        val androidPath = android.graphics.Path().apply {
+                            addRoundRect(
+                                pad, pad, pad + w, pad + h,
+                                r, r,
+                                android.graphics.Path.Direction.CW
+                            )
+                        }
+                        val pm = android.graphics.PathMeasure(androidPath, true)
+                        val totalLength = pm.length
+
+                        if (totalLength > 0f) {
+                            val headDist = dropletProgress * totalLength
+                            val numSegments = 14
+                            val trailLength = totalLength * 0.28f
+                            val pos = FloatArray(2)
+
+                            // Comet tail beads
+                            for (i in numSegments downTo 1) {
+                                val frac = i.toFloat() / numSegments
+                                var d = headDist - (frac * trailLength)
+                                if (d < 0f) d += totalLength
+                                if (pm.getPosTan(d, pos, null)) {
+                                    val alpha = (1f - frac) * 0.85f
+                                    val radiusPx = (0.8f + (1f - frac) * 1.4f).dp.toPx()
+                                    drawCircle(
+                                        color = PrimaryEmerald.copy(alpha = alpha),
+                                        radius = radiusPx,
+                                        center = Offset(pos[0], pos[1])
+                                    )
+                                }
+                            }
+
+                            // Glowing droplet head
+                            if (pm.getPosTan(headDist, pos, null)) {
+                                val headCenter = Offset(pos[0], pos[1])
                                 drawCircle(
-                                    color = PrimaryEmerald.copy(alpha = alpha),
-                                    radius = r,
-                                    center = center,
-                                    style = Stroke(width = strokeW)
+                                    color = PrimaryEmerald.copy(alpha = 0.35f),
+                                    radius = 3.6.dp.toPx(),
+                                    center = headCenter
+                                )
+                                drawCircle(
+                                    color = PrimaryEmerald,
+                                    radius = 2.4.dp.toPx(),
+                                    center = headCenter
+                                )
+                                drawCircle(
+                                    color = Color.White,
+                                    radius = 1.2.dp.toPx(),
+                                    center = headCenter
                                 )
                             }
                         }
                     }
+
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
@@ -2170,8 +2211,8 @@ private fun BleStatusDialog(
             }
 
             val powerModeStr = if (channelMetrics.isEcoMode) {
-                if (isRu) "\n• Режим питания: 🔋 Энергосберегающий (ECO, тишина > 5.5 мин)"
-                else "\n• Power mode: 🔋 Eco power-saving (silence > 5.5 min)"
+                if (isRu) "\n• Режим питания: 🔋 Энергосберегающий (ECO, тишина > 1 часа)"
+                else "\n• Power mode: 🔋 Eco power-saving (silence > 1 hour)"
             } else {
                 if (isRu) "\n• Режим питания: ⚡ Быстрый (LOW_LATENCY)"
                 else "\n• Power mode: ⚡ Fast (LOW_LATENCY)"
