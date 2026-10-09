@@ -2096,8 +2096,9 @@ private fun BleStatusDialog(
             }
 
             val channelDeliveryStr = if (channelMetrics.receivedCountLastHour > 0) {
-                if (isRu) "\n• Доставка (1 ч): ${channelMetrics.pdrPercent}% (${channelMetrics.receivedCountLastHour}/12 замер., ср. ${channelMetrics.avgRssi} dBm)"
-                else "\n• Delivery (1h): ${channelMetrics.pdrPercent}% (${channelMetrics.receivedCountLastHour}/12 readings, avg ${channelMetrics.avgRssi} dBm)"
+                val totalExpected = if (channelMetrics.expectedCountLastHour > 0) channelMetrics.expectedCountLastHour else channelMetrics.receivedCountLastHour
+                if (isRu) "\n• Доставка (1 ч): ${channelMetrics.pdrPercent}% (${channelMetrics.receivedCountLastHour}/$totalExpected замер., ср. ${channelMetrics.avgRssi} dBm)"
+                else "\n• Delivery (1h): ${channelMetrics.pdrPercent}% (${channelMetrics.receivedCountLastHour}/$totalExpected readings, avg ${channelMetrics.avgRssi} dBm)"
             } else ""
 
             val isSilenceAlert = !isObserverLongRangeActive && (contactAgeSecs != null && contactAgeSecs >= 360L)

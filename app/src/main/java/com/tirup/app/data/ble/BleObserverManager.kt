@@ -40,11 +40,13 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.math.roundToInt
 
 data class BleRadioChannelMetrics(
     val pdrPercent: Int = 100,
     val avgRssi: Int = 0,
     val receivedCountLastHour: Int = 0,
+    val expectedCountLastHour: Int = 60,
     val isEcoMode: Boolean = false
 )
 
@@ -101,7 +103,17 @@ object BleObserverManager {
     private val _channelMetricsFlow = MutableStateFlow(BleRadioChannelMetrics())
     val channelMetricsFlow: StateFlow<BleRadioChannelMetrics> = _channelMetricsFlow.asStateFlow()
 
-    private val packetHistory1h = java.util.Collections.synchronizedList(mutableListOf<Pair<Long, Int>>())
+    data class ChannelPacketRecord(
+        val arrivalMs: Long,
+        val readingTimestampMs: Long,
+        val rssi: Int
+    )
+
+    private val packetRecords1h = java.util.Collections.synchronizedList(mutableListOf<ChannelPacketRecord>())
+
+    @Volatile
+    var detectedCadenceIntervalMs: Long = 60_000L // default: 1-minute cadence (60 readings/hr)
+        private set
 
     private val _packetReceivedEvent = MutableSharedFlow<Pair<BleGlucosePacket, Int>>(extraBufferCapacity = 5)
     val packetReceivedEvent: SharedFlow<Pair<BleGlucosePacket, Int>> = _packetReceivedEvent.asSharedFlow()
@@ -584,25 +596,116 @@ object BleObserverManager {
                     _channelMetricsFlow.value = _channelMetricsFlow.value.copy(isEcoMode = true)
                     restartScanInternal("eco_mode_silence", boost = false)
                 }
+                // Recalculate metrics periodically so PDR degrades naturally during signal loss
+                _channelMetricsFlow.value = calculateMetrics(now)
             }
         }
     }
 
-    private fun recordChannelPacket(now: Long, rssi: Int) {
-        synchronized(packetHistory1h) {
-            packetHistory1h.add(Pair(now, rssi))
+    fun calculateMetrics(now: Long = System.currentTimeMillis()): BleRadioChannelMetrics {
+        synchronized(packetRecords1h) {
             val cutoff = now - 3600_000L
-            packetHistory1h.removeAll { it.first < cutoff }
-            val uniqueSlots = packetHistory1h.map { it.first / 300_000L }.distinct().size
-            val pdr = (uniqueSlots.toDouble() / 12.0 * 100.0).toInt().coerceIn(0, 100)
-            val avg = if (packetHistory1h.isNotEmpty()) packetHistory1h.map { it.second }.average().toInt() else rssi
-            _channelMetricsFlow.value = BleRadioChannelMetrics(
+            packetRecords1h.removeAll { it.arrivalMs < cutoff }
+
+            if (packetRecords1h.isEmpty()) {
+                val expected = calculateExpectedCount(now, detectedCadenceIntervalMs, 0)
+                return BleRadioChannelMetrics(
+                    pdrPercent = 100,
+                    avgRssi = 0,
+                    receivedCountLastHour = 0,
+                    expectedCountLastHour = expected,
+                    isEcoMode = _isEcoModeFlow.value
+                )
+            }
+
+            // Extract unique valid sensor reading timestamps
+            val validReadingTimestamps = packetRecords1h
+                .filter { it.readingTimestampMs > 0L }
+                .map { it.readingTimestampMs }
+                .distinct()
+                .sorted()
+
+            // If we have at least 2 distinct readings, determine cadence dynamically
+            if (validReadingTimestamps.size >= 2) {
+                val deltas = mutableListOf<Long>()
+                for (i in 1 until validReadingTimestamps.size) {
+                    val dt = validReadingTimestamps[i] - validReadingTimestamps[i - 1]
+                    if (dt in 30_000L..600_000L) {
+                        deltas.add(dt)
+                    }
+                }
+                if (deltas.isNotEmpty()) {
+                    val minDelta = deltas.minOrNull() ?: 60_000L
+                    val medianDelta = deltas.sorted()[deltas.size / 2]
+                    detectedCadenceIntervalMs = when {
+                        minDelta <= 90_000L || medianDelta <= 120_000L -> 60_000L // 1-minute sensor (Libre 2/3, Dexcom G7, Juggluco)
+                        medianDelta in 120_001L..210_000L -> 180_000L             // 2-3 minute sensor
+                        else -> 300_000L                                          // 5-minute sensor (Dexcom G6)
+                    }
+                }
+            }
+
+            val receivedCount = if (validReadingTimestamps.isNotEmpty()) {
+                validReadingTimestamps.size
+            } else {
+                // For test pings or packets without unique timestamps, count 1-minute arrival buckets
+                packetRecords1h.map { it.arrivalMs / 60_000L }.distinct().size
+            }
+
+            val expectedCount = calculateExpectedCount(now, detectedCadenceIntervalMs, receivedCount)
+            val pdr = if (expectedCount > 0) {
+                ((receivedCount.toDouble() / expectedCount.toDouble()) * 100.0).roundToInt().coerceIn(0, 100)
+            } else 100
+
+            val avgRssi = packetRecords1h.map { it.rssi }.average().toInt()
+
+            return BleRadioChannelMetrics(
                 pdrPercent = pdr,
-                avgRssi = avg,
-                receivedCountLastHour = uniqueSlots,
+                avgRssi = avgRssi,
+                receivedCountLastHour = receivedCount,
+                expectedCountLastHour = expectedCount,
                 isEcoMode = _isEcoModeFlow.value
             )
         }
+    }
+
+    private fun calculateExpectedCount(now: Long, intervalMs: Long, receivedCount: Int): Int {
+        val safeInterval = intervalMs.coerceAtLeast(30_000L)
+        val maxPerHour = (3600_000L / safeInterval).toInt().coerceAtLeast(1)
+
+        val activeDurationMs = if (scanStartTimestampMs > 0L) {
+            (now - scanStartTimestampMs).coerceIn(0L, 3600_000L)
+        } else {
+            3600_000L
+        }
+
+        val expectedInSpan = (activeDurationMs / safeInterval).toInt().coerceAtLeast(1)
+        val clampedExpected = expectedInSpan.coerceAtMost(maxPerHour)
+
+        return maxOf(clampedExpected, receivedCount)
+    }
+
+    private fun recordChannelPacket(now: Long, readingTimestampMs: Long, rssi: Int) {
+        synchronized(packetRecords1h) {
+            packetRecords1h.add(ChannelPacketRecord(arrivalMs = now, readingTimestampMs = readingTimestampMs, rssi = rssi))
+        }
+        _channelMetricsFlow.value = calculateMetrics(now)
+    }
+
+    internal fun addPacketRecordForTest(arrivalMs: Long, readingTimestampMs: Long, rssi: Int) {
+        synchronized(packetRecords1h) {
+            packetRecords1h.add(ChannelPacketRecord(arrivalMs = arrivalMs, readingTimestampMs = readingTimestampMs, rssi = rssi))
+        }
+        _channelMetricsFlow.value = calculateMetrics(arrivalMs)
+    }
+
+    internal fun clearRecordsForTest(startTimestampMs: Long = 0L, cadenceMs: Long = 60_000L) {
+        synchronized(packetRecords1h) {
+            packetRecords1h.clear()
+        }
+        scanStartTimestampMs = startTimestampMs
+        detectedCadenceIntervalMs = cadenceMs
+        _channelMetricsFlow.value = calculateMetrics(if (startTimestampMs > 0L) startTimestampMs else System.currentTimeMillis())
     }
 
     private fun handleScanResult(
@@ -624,7 +727,7 @@ object BleObserverManager {
         val now = System.currentTimeMillis()
         lastPacketReceivedSystemMs = now
 
-        recordChannelPacket(now, rssi)
+        recordChannelPacket(now, packet.timestamp, rssi)
 
         // Self-Healing: if we were in ECO power-saving mode, instantly restore LOW_LATENCY
         if (_isEcoModeFlow.value) {
@@ -705,6 +808,14 @@ object BleObserverManager {
                 GlucoseAlertManager.refreshLockscreenNotificationAndWidgets(context, currentSettings, newReading)
 
                 val recent = glucoseRepository.getRecentReadings(30).firstOrNull() ?: listOf(newReading)
+                if (recent.size >= 2) {
+                    val dt = Math.abs(recent[0].timestamp - recent[1].timestamp)
+                    if (dt in 30_000L..150_000L) {
+                        detectedCadenceIntervalMs = 60_000L
+                    } else if (dt > 150_000L && dt <= 360_000L) {
+                        detectedCadenceIntervalMs = 300_000L
+                    }
+                }
 
                 GlucoseAlertManager.checkAndAlert(
                     context = context,
@@ -737,6 +848,8 @@ object BleObserverManager {
         ecoMonitorJob = null
         _isEcoModeFlow.value = false
         _channelMetricsFlow.value = _channelMetricsFlow.value.copy(isEcoMode = false)
+        packetRecords1h.clear()
+        scanStartTimestampMs = 0L
         activeCallback = null
         scanner = null
         isScanning = false
