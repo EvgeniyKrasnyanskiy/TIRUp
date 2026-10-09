@@ -29,6 +29,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -40,9 +41,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+data class BleRadioChannelMetrics(
+    val pdrPercent: Int = 100,
+    val avgRssi: Int = 0,
+    val receivedCountLastHour: Int = 0,
+    val isEcoMode: Boolean = false
+)
+
 object BleObserverManager {
 
     private const val TAG = "BleObserverManager"
+    const val ECO_SILENCE_TIMEOUT_MS = 330_000L // 5.5 minutes (> 5 min transmitter interval)
     private const val MIN_RESTART_COOLDOWN_MS = 60_000L // anti-spam cooldown (protects against max 5 starts / 30s AOSP limit)
     private const val SILENCE_TIMEOUT_MS = 6 * 60 * 1000L // 6 minutes without packet triggers reactive restart
     private const val PROACTIVE_RESET_INTERVAL_MS = 27 * 60 * 1000L // 27 minutes continuous scan triggers proactive AOSP 30-min limit reset
@@ -59,6 +68,7 @@ object BleObserverManager {
     private var isScanning = false
     private var isBoostActive = false
     private var boostJob: Job? = null
+    private var ecoMonitorJob: Job? = null
 
     @Volatile
     private var lastRestartTimestampMs: Long = 0L
@@ -84,6 +94,14 @@ object BleObserverManager {
 
     private val _boostRemainingSec = MutableStateFlow(0)
     val boostRemainingSec: StateFlow<Int> = _boostRemainingSec.asStateFlow()
+
+    private val _isEcoModeFlow = MutableStateFlow(false)
+    val isEcoModeFlow: StateFlow<Boolean> = _isEcoModeFlow.asStateFlow()
+
+    private val _channelMetricsFlow = MutableStateFlow(BleRadioChannelMetrics())
+    val channelMetricsFlow: StateFlow<BleRadioChannelMetrics> = _channelMetricsFlow.asStateFlow()
+
+    private val packetHistory1h = java.util.Collections.synchronizedList(mutableListOf<Pair<Long, Int>>())
 
     private val _packetReceivedEvent = MutableSharedFlow<Pair<BleGlucosePacket, Int>>(extraBufferCapacity = 5)
     val packetReceivedEvent: SharedFlow<Pair<BleGlucosePacket, Int>> = _packetReceivedEvent.asSharedFlow()
@@ -307,7 +325,8 @@ object BleObserverManager {
     private suspend fun restartScanInternal(reason: String, boost: Boolean = false) = mutex.withLock {
         val now = System.currentTimeMillis()
         val elapsedSinceLastRestart = now - lastRestartTimestampMs
-        if (lastRestartTimestampMs > 0L && elapsedSinceLastRestart < MIN_RESTART_COOLDOWN_MS) {
+        val isUrgent = boost || reason.startsWith("self_healing") || reason.startsWith("eco_mode")
+        if (!isUrgent && lastRestartTimestampMs > 0L && elapsedSinceLastRestart < MIN_RESTART_COOLDOWN_MS) {
             Log.d(TAG, "Restart suppressed by cooldown ($reason, elapsed=${elapsedSinceLastRestart}ms < ${MIN_RESTART_COOLDOWN_MS}ms)")
             return@withLock
         }
@@ -456,7 +475,12 @@ object BleObserverManager {
             .build()
 
         val canAttemptExtended = useLongRange && !extendedScanDisabledByFallback && adapter.isLeExtendedAdvertisingSupported
-        val scanMode = if (boost || isServiceRunning) ScanSettings.SCAN_MODE_LOW_LATENCY else ScanSettings.SCAN_MODE_BALANCED
+        val scanMode = when {
+            boost -> ScanSettings.SCAN_MODE_LOW_LATENCY
+            _isEcoModeFlow.value -> ScanSettings.SCAN_MODE_LOW_POWER
+            isServiceRunning -> ScanSettings.SCAN_MODE_LOW_LATENCY
+            else -> ScanSettings.SCAN_MODE_BALANCED
+        }
         val scanSettings = ScanSettings.Builder()
             .setScanMode(scanMode)
             .setReportDelay(0L)
@@ -535,13 +559,49 @@ object BleObserverManager {
             if (lastPacketReceivedSystemMs == 0L) {
                 lastPacketReceivedSystemMs = now
             }
-            Log.i(TAG, "BLE Observer started scanning successfully (boost=$boost)")
+            startEcoMonitorLocked()
+            Log.i(TAG, "BLE Observer started scanning successfully (mode=$scanMode, boost=$boost, eco=${_isEcoModeFlow.value})")
         } catch (e: SecurityException) {
             Log.w(TAG, "SecurityException starting scan: ${e.message}")
             _isScanningFlow.value = false
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start scan: ${e.message}")
             _isScanningFlow.value = false
+        }
+    }
+
+    private fun startEcoMonitorLocked() {
+        ecoMonitorJob?.cancel()
+        ecoMonitorJob = scope.launch {
+            while (isActive) {
+                delay(30_000L) // check every 30s
+                if (!isScanning) continue
+                val now = System.currentTimeMillis()
+                val silenceMs = if (lastPacketReceivedSystemMs > 0L) now - lastPacketReceivedSystemMs else (now - scanStartTimestampMs)
+                if (silenceMs >= ECO_SILENCE_TIMEOUT_MS && !_isEcoModeFlow.value && !isBoostActive) {
+                    Log.i(TAG, "Silence of ${silenceMs / 1000}s detected (> 5.5 min). Switching to ECO power-saving mode (SCAN_MODE_LOW_POWER).")
+                    _isEcoModeFlow.value = true
+                    _channelMetricsFlow.value = _channelMetricsFlow.value.copy(isEcoMode = true)
+                    restartScanInternal("eco_mode_silence", boost = false)
+                }
+            }
+        }
+    }
+
+    private fun recordChannelPacket(now: Long, rssi: Int) {
+        synchronized(packetHistory1h) {
+            packetHistory1h.add(Pair(now, rssi))
+            val cutoff = now - 3600_000L
+            packetHistory1h.removeAll { it.first < cutoff }
+            val uniqueSlots = packetHistory1h.map { it.first / 300_000L }.distinct().size
+            val pdr = (uniqueSlots.toDouble() / 12.0 * 100.0).toInt().coerceIn(0, 100)
+            val avg = if (packetHistory1h.isNotEmpty()) packetHistory1h.map { it.second }.average().toInt() else rssi
+            _channelMetricsFlow.value = BleRadioChannelMetrics(
+                pdrPercent = pdr,
+                avgRssi = avg,
+                receivedCountLastHour = uniqueSlots,
+                isEcoMode = _isEcoModeFlow.value
+            )
         }
     }
 
@@ -563,6 +623,18 @@ object BleObserverManager {
         val rssi = result.rssi
         val now = System.currentTimeMillis()
         lastPacketReceivedSystemMs = now
+
+        recordChannelPacket(now, rssi)
+
+        // Self-Healing: if we were in ECO power-saving mode, instantly restore LOW_LATENCY
+        if (_isEcoModeFlow.value) {
+            Log.i(TAG, "Self-Healing: Master packet detected while in ECO mode! Instantly restoring LOW_LATENCY.")
+            _isEcoModeFlow.value = false
+            _channelMetricsFlow.value = _channelMetricsFlow.value.copy(isEcoMode = false)
+            scope.launch {
+                restartScanInternal("self_healing_master_detected", boost = true)
+            }
+        }
 
         // Check if this is a repeat packet from the same burst or a fallback heartbeat with the same reading timestamp
         if (packet.timestamp == 0L || packet.valueMmol <= 0.1) {
@@ -661,6 +733,10 @@ object BleObserverManager {
             }
         } catch (_: SecurityException) {
         } catch (_: Exception) {}
+        ecoMonitorJob?.cancel()
+        ecoMonitorJob = null
+        _isEcoModeFlow.value = false
+        _channelMetricsFlow.value = _channelMetricsFlow.value.copy(isEcoMode = false)
         activeCallback = null
         scanner = null
         isScanning = false

@@ -1893,6 +1893,7 @@ private fun BleBridgeBadge(
             }
         } else {
             // Observer Idle: Bluetooth icon + age of last radio contact / glucose reading
+            val isEcoMode by BleObserverManager.isEcoModeFlow.collectAsState()
             val readingTs = bleSettings.lastPacketTimestamp
             val contactTs = bleSettings.lastRadioContactMs
             val nowMs = System.currentTimeMillis()
@@ -1901,13 +1902,14 @@ private fun BleBridgeBadge(
             val displayAgeMin = if (readingAgeMin >= 0) readingAgeMin else contactAgeMin
             val isStale = displayAgeMin >= 5 || (contactAgeMin >= 5 && contactAgeMin != -1)
             val badgeText = when {
+                isEcoMode -> "ECO"
                 displayAgeMin < 0 -> "RX"
                 displayAgeMin < 1 -> "<1м"
                 displayAgeMin < 60 -> "${displayAgeMin}м"
                 else -> "${displayAgeMin / 60}ч"
             }
-            val containerColor = if (isStale) Color(0xFF94A3B8) else ActionBlue
-            val textColor = if (isStale) Color(0xFF94A3B8) else ActionBlue
+            val containerColor = if (isEcoMode) PrimaryEmerald else if (isStale) Color(0xFF94A3B8) else ActionBlue
+            val textColor = if (isEcoMode) PrimaryEmerald else if (isStale) Color(0xFF94A3B8) else ActionBlue
 
             Surface(
                 modifier = modifier
@@ -1927,7 +1929,7 @@ private fun BleBridgeBadge(
                     Icon(
                         imageVector = Icons.Default.Bluetooth,
                         contentDescription = "Bluetooth Receiver",
-                        tint = ActionBlue.copy(alpha = if (isStale) 0.6f else 0.9f),
+                        tint = containerColor.copy(alpha = if (isStale && !isEcoMode) 0.6f else 0.9f),
                         modifier = Modifier.size(13.dp)
                     )
                     Spacer(modifier = Modifier.width(3.dp))
@@ -2077,11 +2079,26 @@ private fun BleStatusDialog(
             val batStr = if (bleSettings.lastMasterBattery in 0..100) "${bleSettings.lastMasterBattery}%" else if (isRu) "нет данных" else "no data"
 
             val isObserverLongRangeActive by BleObserverManager.isLongRangeScanActive.collectAsState()
+            val channelMetrics by BleObserverManager.channelMetricsFlow.collectAsState()
+
             val scanModeStr = if (isObserverLongRangeActive) {
                 if (isRu) "\n• Сканер: Dual (1M + Long Range)" else "\n• Scanner: Dual (1M + Long Range)"
             } else {
                 if (isRu) "\n• Сканер: Standard (1M Legacy)" else "\n• Scanner: Standard (1M Legacy)"
             }
+
+            val powerModeStr = if (channelMetrics.isEcoMode) {
+                if (isRu) "\n• Режим питания: 🔋 Энергосберегающий (ECO, тишина > 5.5 мин)"
+                else "\n• Power mode: 🔋 Eco power-saving (silence > 5.5 min)"
+            } else {
+                if (isRu) "\n• Режим питания: ⚡ Быстрый (LOW_LATENCY)"
+                else "\n• Power mode: ⚡ Fast (LOW_LATENCY)"
+            }
+
+            val channelDeliveryStr = if (channelMetrics.receivedCountLastHour > 0) {
+                if (isRu) "\n• Доставка (1 ч): ${channelMetrics.pdrPercent}% (${channelMetrics.receivedCountLastHour}/12 замер., ср. ${channelMetrics.avgRssi} dBm)"
+                else "\n• Delivery (1h): ${channelMetrics.pdrPercent}% (${channelMetrics.receivedCountLastHour}/12 readings, avg ${channelMetrics.avgRssi} dBm)"
+            } else ""
 
             val isSilenceAlert = !isObserverLongRangeActive && (contactAgeSecs != null && contactAgeSecs >= 360L)
             val silenceWarning = if (isSilenceAlert) {
@@ -2094,14 +2111,18 @@ private fun BleStatusDialog(
                 "• Последний замер: $readingAgeStr\n" +
                 "• Радиосигнал: $contactAgeStr\n" +
                 "• Батарея вещателя: $batStr\n" +
-                "• Качество сигнала: $signalQuality" +
+                "• Сигнал (RSSI): $signalQuality" +
+                channelDeliveryStr +
+                powerModeStr +
                 scanModeStr + silenceWarning
             } else {
                 "Receiver is active listening for packets.\n\n" +
                 "• Last reading: $readingAgeStr\n" +
                 "• Radio signal: $contactAgeStr\n" +
                 "• Broadcaster battery: $batStr\n" +
-                "• Signal quality: $signalQuality" +
+                "• Signal (RSSI): $signalQuality" +
+                channelDeliveryStr +
+                powerModeStr +
                 scanModeStr + silenceWarning
             }
         }
