@@ -1238,7 +1238,7 @@ fun FocusScreen(
                         }
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = PrimaryEmerald,
+                        containerColor = ActionBlue,
                         contentColor = Color.White
                     ),
                     shape = RoundedCornerShape(10.dp)
@@ -2385,16 +2385,15 @@ private fun BleStatusDialog(
                         }
                     } else {
                         val isSearching = boostRemainingSec > 0
-                        val searchButtonColor = if (isSearching) PrimaryEmerald else ActionBlue
                         Button(
                             onClick = onBoostScanClick,
                             enabled = !isSearching,
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = searchButtonColor,
+                                containerColor = PrimaryEmerald,
                                 contentColor = Color.White,
-                                disabledContainerColor = if (isSearching) PrimaryEmerald.copy(alpha = 0.75f) else ActionBlue.copy(alpha = 0.35f),
-                                disabledContentColor = Color.White
+                                disabledContainerColor = PrimaryEmerald.copy(alpha = 0.35f),
+                                disabledContentColor = Color.White.copy(alpha = 0.6f)
                             ),
                             shape = RoundedCornerShape(10.dp)
                         ) {
