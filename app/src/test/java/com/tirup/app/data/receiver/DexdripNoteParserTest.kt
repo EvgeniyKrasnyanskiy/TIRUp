@@ -148,5 +148,21 @@ class DexdripNoteParserTest {
         org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isLancetNote(compoundTriple))
         org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isSensorNote(compoundTriple))
     }
+
+    @Test
+    fun testIsXdripSensorStartNote() {
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isXdripSensorStartNote("Started by xDrip"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isXdripSensorStartNote("started by xdrip"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isXdripSensorStartNote("Started by xDrip+"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isXdripSensorStartNote("Sensor Started by xDrip"))
+        org.junit.Assert.assertTrue(DexdripBroadcastReceiver.isXdripSensorStartNote("Started by xDrip (Dexcom G6)"))
+
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isXdripSensorStartNote("сенсор"))
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isXdripSensorStartNote("ланцет"))
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isXdripSensorStartNote("канюля"))
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isXdripSensorStartNote("Started by pump"))
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isXdripSensorStartNote(null))
+        org.junit.Assert.assertFalse(DexdripBroadcastReceiver.isXdripSensorStartNote(""))
+    }
 }
 

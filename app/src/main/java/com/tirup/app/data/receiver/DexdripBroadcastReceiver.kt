@@ -874,6 +874,13 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 var updatedSettings = currentSettings
                 var hasChanges = false
 
+                // 0. Check for xDrip restart proposal ("Started by xDrip")
+                for (t in treatments) {
+                    if (isXdripSensorStartNote(t.notes)) {
+                        com.tirup.app.data.alert.SensorRestartManager.handleXdripRestartDetected(context, t.timestamp, currentSettings)
+                    }
+                }
+
                 // 1. Cannula
                 val cannulaTreatment = treatments
                     .filter { isCannulaNote(it.notes) }
@@ -1075,6 +1082,12 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             return (hasSensorWord && (hasActionWord || hasDays)) ||
                     n.contains("сенсор") || n.contains("sensor") || n.contains("датчик") ||
                     n in listOf("сенсор", "sensor", "датчик", "новый сенсор", "sensor start", "sensor change", "замена сенсора", "смена сенсора")
+        }
+
+        fun isXdripSensorStartNote(note: String?): Boolean {
+            val n = note?.lowercase()?.trim() ?: return false
+            if (n.isBlank()) return false
+            return n.contains("started by xdrip") || (n.contains("started by") && n.contains("xdrip"))
         }
 
         fun parseTreatmentsJson(jsonStr: String): List<Treatment> {

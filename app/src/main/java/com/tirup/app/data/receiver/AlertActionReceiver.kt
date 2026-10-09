@@ -35,6 +35,31 @@ class AlertActionReceiver : BroadcastReceiver() {
                 GlucoseAlertManager.dismissCriticalAlarm(context, fromUser = true)
                 GlucoseAlertManager.clearActiveAlertBanner()
             }
+            ACTION_CONFIRM_SENSOR_RESTART -> {
+                val ts = intent.getLongExtra("timestamp", 0L)
+                val days = intent.getIntExtra("duration_days", 14)
+                if (ts > 0L) {
+                    val pendingResult = goAsync()
+                    scope.launch {
+                        try {
+                            val proposal = com.tirup.app.data.alert.SensorRestartProposal(timestamp = ts, durationDays = days)
+                            com.tirup.app.data.alert.SensorRestartManager.confirmRestart(context, proposal)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed confirmRestart: ${e.message}", e)
+                        } finally {
+                            pendingResult.finish()
+                        }
+                    }
+                }
+            }
+            ACTION_DISMISS_SENSOR_RESTART -> {
+                val ts = intent.getLongExtra("timestamp", 0L)
+                val days = intent.getIntExtra("duration_days", 14)
+                com.tirup.app.data.alert.SensorRestartManager.dismissRestart(
+                    context,
+                    if (ts > 0L) com.tirup.app.data.alert.SensorRestartProposal(timestamp = ts, durationDays = days) else null
+                )
+            }
             ACTION_CHECK_SIGNAL_LOSS -> {
                 val pendingResult = goAsync()
                 scope.launch {
@@ -186,6 +211,8 @@ class AlertActionReceiver : BroadcastReceiver() {
         private const val TAG = "AlertActionReceiver"
         private val receiverScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         const val ACTION_DISMISS_CRITICAL = "com.tirup.app.ACTION_DISMISS_CRITICAL"
+        const val ACTION_CONFIRM_SENSOR_RESTART = "com.tirup.app.ACTION_CONFIRM_SENSOR_RESTART"
+        const val ACTION_DISMISS_SENSOR_RESTART = "com.tirup.app.ACTION_DISMISS_SENSOR_RESTART"
         const val ACTION_LAUNCH_DIANIGHT = "com.tirup.app.ACTION_LAUNCH_DIANIGHT"
         const val ACTION_CHECK_SIGNAL_LOSS = "com.tirup.app.ACTION_CHECK_SIGNAL_LOSS"
         const val ACTION_SKIP_HBA1C_QUARTER = "com.tirup.app.ACTION_SKIP_HBA1C_QUARTER"

@@ -36,6 +36,7 @@ import com.tirup.app.data.ble.BleObserverManager
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -1194,6 +1195,65 @@ fun FocusScreen(
             onInstallNow = {
                 lancetExpiredDismissed = true
                 showDeviceModal = true
+            }
+        )
+    }
+
+    // xDrip+ Sensor Restart Proposal Dialog ("Started by xDrip")
+    val sensorRestartProposal by com.tirup.app.data.alert.SensorRestartManager.proposalFlow.collectAsState()
+    if (sensorRestartProposal != null) {
+        val proposal = sensorRestartProposal!!
+        val days = proposal.durationDays
+        AlertDialog(
+            onDismissRequest = {
+                com.tirup.app.data.alert.SensorRestartManager.dismissRestart(context, proposal)
+            },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("📡", fontSize = 20.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isRu) "Перезапуск сенсора в xDrip+" else "xDrip+ Sensor Restart",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            },
+            text = {
+                Text(
+                    text = if (isRu) {
+                        "Обнаружен перезапуск сенсора в xDrip+.\n\nОбновить таймер сенсора на ${days}д?"
+                    } else {
+                        "Sensor restart detected in xDrip+.\n\nUpdate sensor timer to ${days}d?"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            com.tirup.app.data.alert.SensorRestartManager.confirmRestart(context, proposal)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PrimaryEmerald,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(if (isRu) "Да, обновить" else "Yes, update", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        com.tirup.app.data.alert.SensorRestartManager.dismissRestart(context, proposal)
+                    }
+                ) {
+                    Text(if (isRu) "Нет" else "No")
+                }
             }
         )
     }
