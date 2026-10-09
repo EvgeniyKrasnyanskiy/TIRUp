@@ -36,12 +36,19 @@ object SensorRestartManager {
     private val _proposalFlow = MutableStateFlow<SensorRestartProposal?>(null)
     val proposalFlow: StateFlow<SensorRestartProposal?> = _proposalFlow.asStateFlow()
 
+    @Volatile
+    private var cachedLastHandledTimestamp: Long? = null
+
     fun getLastHandledTimestamp(context: Context): Long {
+        cachedLastHandledTimestamp?.let { return it }
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getLong(KEY_LAST_HANDLED_TIMESTAMP, 0L)
+        val ts = prefs.getLong(KEY_LAST_HANDLED_TIMESTAMP, 0L)
+        cachedLastHandledTimestamp = ts
+        return ts
     }
 
     private fun setLastHandledTimestamp(context: Context, timestamp: Long) {
+        cachedLastHandledTimestamp = timestamp
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putLong(KEY_LAST_HANDLED_TIMESTAMP, timestamp).apply()
     }

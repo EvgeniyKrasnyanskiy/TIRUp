@@ -391,15 +391,18 @@ class FocusViewModel(
             if (ns.isEnabled && ns.isValidUrl && !uuid.isNullOrBlank()) {
                 val deleteResult = com.tirup.app.data.network.NightscoutUploadManager.deleteTreatment(ns, uuid)
                 if (deleteResult.isSuccess) {
-                    val msg = if (isRu) "✓ Запись удалена с сервера Nightscout" else "✓ Treatment deleted from Nightscout server"
+                    val msg = if (isRu) "✓ Запись удалена из TIRUp и Nightscout (в xDrip+ при необходимости удалите вручную)"
+                    else "✓ Deleted from TIRUp and Nightscout (delete manually in xDrip+ if needed)"
                     android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
                 } else {
                     val err = deleteResult.exceptionOrNull()?.message ?: ""
-                    val msg = if (isRu) "Удалено локально (ошибка сервера: $err)" else "Deleted locally (server error: $err)"
+                    val msg = if (isRu) "Удалено из TIRUp (ошибка сервера: $err; в xDrip+ удалите вручную)"
+                    else "Deleted from TIRUp (server error: $err; delete manually in xDrip+)"
                     android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
                 }
             } else {
-                val msg = if (isRu) "Запись удалена" else "Treatment deleted"
+                val msg = if (isRu) "Запись удалена из TIRUp (в xDrip+ при необходимости удалите вручную)"
+                else "Treatment deleted from TIRUp (delete manually in xDrip+ if needed)"
                 android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
             }
         }
