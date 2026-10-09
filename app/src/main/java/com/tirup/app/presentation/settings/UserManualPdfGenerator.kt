@@ -49,9 +49,9 @@ class UserManualPdfGenerator(private val context: Context) {
         val document = PdfDocument()
         try {
             val appVersion = try {
-                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.0"
+                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.1"
             } catch (_: Exception) {
-                "1.0.0"
+                "1.0.1"
             }
 
             // Typography Paints
@@ -481,6 +481,21 @@ class UserManualPdfGenerator(private val context: Context) {
                     else "On Bluetooth 5.0+, Coded PHY (S=8) boosts link budget by 8-10 dBm, extending range 2-4x (up to 30-50m through walls). Observer operates in dual-mode automatically."
                 )
                 flow.bullet(
+                    if (isRu) "Wi-Fi LAN Follower (локальный веб-сервер xDrip+)" else "Wi-Fi LAN Follower (Local xDrip+ Server)",
+                    if (isRu) "Прямой опрос веб-сервера xDrip+ мастера (порт 17580) по домашнему Wi-Fi или через мобильную точку доступа (Hotspot) без интернета. Получает замеры сахара, IoB, CoB и заряд батареи мастера с параллельным автопоиском IP в подсети за ~1.2 с."
+                    else "Direct local polling of master's xDrip+ server (port 17580) over Wi-Fi or Hotspot without internet. Captures glucose, IoB, CoB and master battery with ~1.2s parallel subnet discovery."
+                )
+                flow.bullet(
+                    if (isRu) "Nightscout Cloud Follower и заряд мастера" else "Nightscout Cloud Follower & Master Battery",
+                    if (isRu) "Фоновое скачивание замеров сахара, IoB, CoB и заряда батареи мастера через REST API Nightscout (/api/v1/entries, /pebble, /devicestatus). Единый резолвер приоритета источников батареи (BLE -> Wi-Fi LAN -> Nightscout) и дедупликация 25 с."
+                    else "Background ingestion of glucose, IoB, CoB and master battery via Nightscout REST API (/api/v1/entries, /pebble, /devicestatus). Unified source priority (BLE -> Wi-Fi LAN -> Nightscout) with 25s deduplication."
+                )
+                flow.bullet(
+                    if (isRu) "Метрики радиоканала и Адаптивный эко-режим (1 час)" else "Radio Metrics & Adaptive Eco Mode (1h)",
+                    if (isRu) "Приёмник BLE рассчитывает скользящий 1-часовой PDR (% успешно доставленных пакетов с адаптацией к темпу 1 мин / 5 мин) и средний RSSI. При паузе в вещании >1 часа доступен опциональный эко-режим (по умолчанию выключен). Кнопка «Поиск вещателя (60 сек)» запускает радарную анимацию сканирования."
+                    else "BLE Observer tracks 1-hour PDR (% delivery with 1m/5m sensor cadence adaptation) and average RSSI. Includes optional Eco Mode activating after >1h silence (off by default for maximum reliability). 'Master Search (60s)' triggers live radar sweep animation."
+                )
+                flow.bullet(
                     if (isRu) "Разница технологий: BLE-мост TIRUp vs Зеркало Juggluco" else "TIRUp BLE vs Juggluco Mirroring",
                     if (isRu) "TIRUp работает как автономный радиомаяк (Broadcast): без сопряжения, расход <1% батареи, свободен BT-канал для помпы и часов (без квитирования ACK). Juggluco держит постоянный сокет (RFCOMM/Wi-Fi) с гарантией доставки ACK и выкачкой всей истории SQLite, но требует сопряжения и держит постоянное соединение."
                     else "TIRUp uses connectionless BLE broadcast: zero-pairing, <1% battery, free BT slot for pump/watch (no ACK). Juggluco maintains a persistent socket (RFCOMM/Wi-Fi) with delivery ACKs and SQLite history backfill, but requires device pairing and holds connection."
@@ -708,6 +723,11 @@ class UserManualPdfGenerator(private val context: Context) {
                     if (isRu) "Компенсатор рассчитывает время для цели (TIR ≥70%). За 1–2 ч до точки невозврата звучит «Последний шанс для TIR». Каждое воскресенье в 20:00 формируется аналитический Sunday Digest со сравнением параметров (±Δ%)."
                     else "Calculates in-range time for daily goal (TIR ≥70%). Emits 'Last Chance for TIR' 1-2h before point of no return. Generates Sunday Digest every Sunday at 20:00 (±Δ%)."
                 )
+                flow.bullet(
+                    if (isRu) "Произвольный интервал (1–365 дней) в трендах и отчёте AGP PDF" else "Custom Selectable Period (1-365 Days)",
+                    if (isRu) "Кнопка-шестерёнка [⚙️] в селекторе периодов позволяет задать любое число дней от 1 до 365 (быстрые чипы 2, 3, 5, 20, 60 дней или ручной ввод). Выбранный интервал бесшовно применяется на графиках трендов и при экспорте клинического PDF-отчёта AGP."
+                    else "Gear button [⚙️] in period selector enables custom range from 1 to 365 days (quick chips 2, 3, 5, 20, 60d or manual entry). Seamlessly applies to Trends screen and Clinical AGP PDF report export."
+                )
                 flow.callout(
                     CalloutType.INFO,
                     if (isRu) "📊 ЭКСПОРТ AGP ОТЧЁТА ДЛЯ ВРАЧА:" else "📊 EXPORTING AGP REPORTS FOR PHYSICIANS:",
@@ -742,6 +762,11 @@ class UserManualPdfGenerator(private val context: Context) {
                     if (isRu) "Новогодний дайджест 31 декабря, Zero-Lag и автобэкап" else "Dec 31 Year-End Digest, Zero-Lag & Backups",
                     if (isRu) "31 декабря в 20:00 формируется новогодний дайджест 🥂 с PDF-открыткой, а замеры года запечатываются в tirup_readings_YYYY.csv (Zero-Lag база). Каждые сутки в 23:59:59 создаётся локальный автобэкап, доступен экспорт ZIP."
                     else "On Dec 31 at 20:00, Year-End Digest 🥂 exports a PDF holiday card, sealing year readings into tirup_readings_YYYY.csv (Zero-Lag). Nightly auto-backup at 23:59:59 plus ZIP export."
+                )
+                flow.bullet(
+                    if (isRu) "Рекордный стрик (bestStreakDays) и Сетка активности TIR" else "Historical Best Streak & GitHub-Style TIR Grid",
+                    if (isRu) "Диалог мотивации стрика отображает золотой кубок 🏆 с лучшим историческим рекордом непрерывной компенсации. Сетка суточного контроля TIR выполнена в стиле GitHub Dark Theme с 5 уровнями и мягкой янтарной буферной зоной 67–69.9% («Почти у цели»)."
+                    else "Streak motivator features a gold trophy 🏆 showing the all-time best streak. The TIR Activity Grid follows GitHub Dark Theme aesthetics with 5 levels and an amber 67-69.9% buffer zone ('Nearly on Target')."
                 )
                 flow.callout(
                     CalloutType.INFO,

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/Version-1.0.0-brightgreen.svg)
+![Version](https://img.shields.io/badge/Version-1.0.1-brightgreen.svg)
 ![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-green.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-blue.svg)
 ![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%2F%20Material%203-blueviolet.svg)
@@ -180,6 +180,10 @@
   - **Doze-Resistant Keep-Alive (AlarmManager)**: 5-minute `RTC_WAKEUP` heartbeat maintaining system `WakeLock` via `goAsync()`, ensuring continuous operation on Android 8–16 during deep CPU sleep.
   - **AOSP 30-Minute Scan Limit & Silence Watchdog**: proactive scanner reset every 20 minutes prevents opportunistic throttling; silence watcher resets receiver under mutex if packets cease for $\ge 6$ minutes.
   - `BleObserverService` runs as an Android Foreground Service tied to persistent notification/AOD, preventing OS termination.
+  - **Self-Healing Bridge & Adaptive Eco Mode**:
+    - Optional power-saving mode (`enableEcoMode`, off by default) transitioning scanner to `SCAN_MODE_LOW_POWER` after $\ge 1$ hour of silence to preserve battery, with instant self-healing restoration to `LOW_LATENCY` upon detecting the next packet.
+    - Live **Radio Channel Metrics**: sliding 1-hour PDR (% Packet Delivery Rate adapting dynamically to 1-min or 5-min sensor cadence) and average RSSI dBm.
+    - **Active Radar Search (60s)**: dynamic animated radar sweep on the Home status badge with remaining second countdown (`⚡ 59s`).
 - **Dual Operating Modes**:
   - **Broadcaster**: transmits child's real-time CGM telemetry.
   - **Observer**: continuously scans in the background, displays packet age badge (`RX`, `<1m`, `1m`...), and shows compact signal toasts (`🟢 BLE: 🩸7.8 →, 💉1.5, 🔋85%`).
@@ -341,7 +345,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 <div align="center">
 
-![Версия](https://img.shields.io/badge/Версия-1.0.0-brightgreen.svg)
+![Версия](https://img.shields.io/badge/Версия-1.0.1-brightgreen.svg)
 ![Платформа](https://img.shields.io/badge/Платформа-Android%208.0%2B-green.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-blue.svg)
 ![Jetpack Compose](https://img.shields.io/badge/Интерфейс-Jetpack%20Compose%20%2F%20Material%203-blueviolet.svg)
@@ -519,6 +523,10 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
   - **Аппаратный пульс сквозь Doze (AlarmManager Keep-Alive)**: 5-минутный таймер `RTC_WAKEUP` с удержанием системного `WakeLock` через `goAsync()`. Гарантирует бесперебойную работу в фоновом режиме на Android 8–16 даже при глубоком сне процессора и погашенном экране.
   - **Защита от 30-минутного лимита AOSP и тишины**: проактивный сброс сканера каждые 20 минут предотвращает скрытый перевод в `SCAN_MODE_OPPORTUNISTIC`, а реактивный ватчер тишины (при отсутствии пакетов $\ge 6$ мин) моментально перезапускает приёмник под мьютексом с защитным 60-секундным кулдауном от троттлинга.
   - Фоновая служба `BleObserverService` (`Foreground Service` с привязкой к постоянному уведомлению в шторке/AOD) исключает усыпление радиомодуля системой.
+  - **Self-Healing Bridge и Адаптивный эко-режим (1 час)**:
+    - Настраиваемый эко-режим (`enableEcoMode`, по умолчанию выключен для 100% надёжности приёма): переход в `SCAN_MODE_LOW_POWER` только после $\ge 1$ часа тишины мастера. При первом пойманном пакете приёмник мгновенно самовосстанавливается в непрерывный `LOW_LATENCY`.
+    - **Метрики качества радиоканала**: скользящий 1-часовой PDR (% успешно доставленных замеров с автоопределением темпа 1 мин / 5 мин) и средний уровень сигнала RSSI dBm.
+    - **Активный радарный поиск вещателя (60 сек)**: динамическая радарная анимация расходящихся импульсов сканирования прямо на пиктограмме Главного экрана с обратным отсчетом секунд (`⚡ 59с`).
 - **Удобное управление питанием и режимами**: главный переключатель питания в заголовке карточки со световой индикацией статуса (зелёный — приёмник, синий — вещатель) и полноразмерные кнопки выбора режима («Вещатель», «Приёмник»).
 - Два режима:
   - **Вещатель (Broadcaster)**: передаёт текущий срез данных ребенка.

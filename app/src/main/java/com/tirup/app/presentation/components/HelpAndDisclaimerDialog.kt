@@ -117,29 +117,23 @@ fun HelpAndDisclaimerDialog(
                     }
                 )
 
-                // 2. xDrip+ Integration Guide
+                // 2. Data Sources & Synchronization Guide
                 HelpSectionCard(
                     icon = Icons.Default.SettingsInputAntenna,
                     iconTint = PrimaryEmerald,
-                    title = if (isRu) "Настройка связи с xDrip+" else "xDrip+ Connection Guide",
+                    title = if (isRu) "Источники данных и синхронизация" else "Data Sources & Synchronization",
                     content = if (isRu) {
-                        "Для полной интеграции выполните настройку в xDrip+ и Android:\n" +
-                        "1. Настройки xDrip+ ➔ Межпрограммная интеграция:\n" +
-                        "   • Широковещательные передачи: включите «Широковещательные передачи xDrip» и «Совместимый широковещатель»;\n" +
-                        "   • Широковещательная служба: включите «Поддержка широковещательной службы»;\n" +
-                        "   • Локальный веб-сервер: включите «Включить локальный веб-сервер» и обязательно «Включить сообщения об IoB в конечной точке Web Service API...» (для передачи активного инсулина IoB и углеводов);\n" +
-                        "2. Настройки системы Android ➔ Приложения ➔ TIRUp и xDrip+ ➔ Батарея:\n" +
-                        "   • Выберите режим «Без ограничений» (отключите оптимизацию расхода аккумулятора).\n" +
-                        "3. TIRUp будет автоматически принимать замеры, стрелки тренда, активный инсулин (IoB) и историю Treatments в фоне без интернета."
+                        "TIRUp поддерживает 4 уровня источников данных с автоматической дедупликацией:\n" +
+                        "1. Локальный xDrip+ (высший приоритет): приём интентов и службы Broadcast Service (<0.1 с) без интернета;\n" +
+                        "2. Семейный BLE-мост (Bluetooth LE): прямая связь между смартфонами ребёнка и родителя без Wi-Fi и SIM (радиус до 25–50 м с Long Range Coded PHY, метрики качества PDR%, поиск 60 с и эко-режим);\n" +
+                        "3. Wi-Fi LAN Follower: прямой опрос локального веб-сервера xDrip+ мастера (порт 17580) в домашней сети или точке доступа;\n" +
+                        "4. Nightscout Cloud Follower: фоновое получение замеров сахара, IoB, CoB и батареи мастера из облачного REST API Nightscout."
                     } else {
-                        "For complete integration, configure the following in xDrip+ and Android:\n" +
-                        "1. xDrip+ Settings ➔ Inter-app settings:\n" +
-                        "   • Broadcast service: enable 'Broadcast locally' and 'Compatible Broadcast';\n" +
-                        "   • Broadcast service support: enable 'Broadcast service support';\n" +
-                        "   • Local Web Server: enable 'Enable Local Web Server' and 'Show IOB in Web Service API endpoints' (for IoB and active carbs);\n" +
-                        "2. Android System Settings ➔ Apps ➔ TIRUp & xDrip+ ➔ Battery:\n" +
-                        "   • Choose 'Unrestricted' (disable battery optimization).\n" +
-                        "3. TIRUp will automatically receive readings, trend arrows, IoB, and Treatments in the background locally."
+                        "TIRUp supports 4 stratified data sources with automatic deduplication:\n" +
+                        "1. Local xDrip+ (highest priority): instant local intents & Broadcast Service (<0.1s) offline;\n" +
+                        "2. Family BLE Bridge (Bluetooth LE): direct link between phones without Wi-Fi or SIM (up to 25-50m with Long Range Coded PHY, live PDR% metrics, 60s radar search and eco mode);\n" +
+                        "3. Wi-Fi LAN Follower: direct local polling of master's xDrip+ server (port 17580) over Wi-Fi/Hotspot;\n" +
+                        "4. Nightscout Cloud Follower: background retrieval of glucose, IoB, CoB, and master battery via REST API."
                     }
                 )
 
@@ -147,15 +141,15 @@ fun HelpAndDisclaimerDialog(
                 HelpSectionCard(
                     icon = Icons.Default.Summarize,
                     iconTint = ActionBlue,
-                    title = if (isRu) "Отчёты и файлы баз данных" else "AGP Reports & Database Import",
+                    title = if (isRu) "Отчёты, периоды и клинический AGP" else "AGP Reports & Custom Periods",
                     content = if (isRu) {
-                        "• Для построения амбулаторного профиля (AGP) за 7, 14, 30 или 90 дней выгрузите архив базы данных из xDrip+ (ZIP или CSV).\n" +
-                        "• Во вкладке «Отчёты» нажмите «Загрузить файл(ы)» — поддерживается выбор сразу нескольких файлов или архивов одновременно.\n" +
-                        "• Приложение рассчитает клинические показатели (TIR, TING, GRI, eA1c) и сформирует готовый PDF-отчёт."
+                        "• Произвольный период: кнопка-шестерёнка [⚙️] в селекторе периодов позволяет выбрать любое число дней от 1 до 365 (чипы 2, 3, 5, 20, 60 дней или ручной ввод).\n" +
+                        "• Амбулаторный профиль AGP: клинический отчёт по консенсусу ATTD/ADA за выбранный период (TIR, TING, TBR, TAR, CV, SD, GRI, GMI) с печатью стандартизированного PDF-документа для врача.\n" +
+                        "• Импорт архивов: поддержка многофайловой загрузки баз данных xDrip+ (ZIP и CSV)."
                     } else {
-                        "• To build an AGP profile for 7, 14, 30, or 90 days, export your database archive from xDrip+ (ZIP or CSV).\n" +
-                        "• Go to the 'Reports' tab, tap 'Upload File(s)' — supports multi-file selection of CSV and ZIP archives simultaneously.\n" +
-                        "• TIRUp will calculate clinical indices (TIR, TING, GRI, eA1c) and generate a printable PDF report."
+                        "• Custom Period: gear icon [⚙️] in period selector enables any duration from 1 to 365 days (quick chips 2, 3, 5, 20, 60d or custom input).\n" +
+                        "• Clinical AGP Profile: standardized report compliant with ATTD/ADA consensus (TIR, TING, TBR, TAR, CV, SD, GRI, GMI) with export to PDF for endocrinologists.\n" +
+                        "• Database Archive Import: supports multi-file upload of xDrip+ ZIP and CSV archives simultaneously."
                     }
                 )
 
