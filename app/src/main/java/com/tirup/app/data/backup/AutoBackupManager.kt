@@ -656,6 +656,7 @@ object AutoBackupManager {
         writer.name("transmitBattery").value(ble.transmitBattery)
         writer.name("useLongRange").value(ble.useLongRange)
         writer.name("showPacketBanner").value(ble.showPacketBanner)
+        writer.name("enableEcoMode").value(ble.enableEcoMode)
         writer.endObject()
 
         // Nightscout Settings
@@ -1985,6 +1986,7 @@ object AutoBackupManager {
                     var transmitBattery = true
                     var useLongRange = false
                     var showPacketBanner = false
+                    var enableEcoMode = false
                     reader.beginObject()
                     while (reader.hasNext()) {
                         when (reader.nextName()) {
@@ -1994,6 +1996,7 @@ object AutoBackupManager {
                             "transmitBattery" -> transmitBattery = reader.nextBoolean()
                             "useLongRange" -> useLongRange = reader.nextBoolean()
                             "showPacketBanner" -> showPacketBanner = reader.nextBoolean()
+                            "enableEcoMode" -> enableEcoMode = reader.nextBoolean()
                             else -> reader.skipValue()
                         }
                     }
@@ -2004,7 +2007,8 @@ object AutoBackupManager {
                         familyPin = familyPin,
                         transmitBattery = transmitBattery,
                         useLongRange = useLongRange,
-                        showPacketBanner = showPacketBanner
+                        showPacketBanner = showPacketBanner,
+                        enableEcoMode = enableEcoMode
                     )
                 }
                 "nightscoutSettings" -> {

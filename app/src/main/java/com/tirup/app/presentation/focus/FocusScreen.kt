@@ -23,7 +23,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothDisabled
-import androidx.compose.material.icons.filled.BluetoothSearching
+import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import android.Manifest
 import android.bluetooth.BluetoothManager
 import android.content.Context
@@ -393,6 +393,7 @@ fun FocusScreen(
                 isBleBroadcasting = isBleBroadcasting,
                 broadcastRemainingSec = broadcastRemainingSec,
                 nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
+                boostRemainingSec = boostRemainingSec,
                 blePacketReceivedAt = blePacketReceivedAt,
                 xdripLanSettings = userSettings.xdripLanSettings,
                 lanStatus = lanStatus,
@@ -1610,6 +1611,7 @@ private fun BleBridgeBadge(
     isBleBroadcasting: Boolean,
     broadcastRemainingSec: Int,
     nextHeartbeatRemainingSec: Int,
+    boostRemainingSec: Int = 0,
     blePacketReceivedAt: Long,
     isRu: Boolean,
     onClick: () -> Unit = {},
@@ -1889,6 +1891,86 @@ private fun BleBridgeBadge(
                         tint = ActionBlue,
                         modifier = Modifier.size(15.dp)
                     )
+                }
+            }
+        } else if (boostRemainingSec > 0) {
+            // Active Radar Search Animation (60s countdown)
+            val transition = rememberInfiniteTransition(label = "BleRadarSearch")
+            val ring1Progress by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 1300, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "ring1"
+            )
+            val ring2Progress by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 1300, delayMillis = 650, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "ring2"
+            )
+
+            Surface(
+                modifier = modifier
+                    .size(width = 68.dp, height = 24.dp)
+                    .clickable { onClick() },
+                shape = RoundedCornerShape(10.dp),
+                color = PrimaryEmerald.copy(alpha = 0.14f),
+                border = BorderStroke(0.9.dp, PrimaryEmerald.copy(alpha = 0.6f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(2.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val center = Offset(13.dp.toPx(), size.height / 2f)
+                        val maxRadius = size.height * 1.15f
+                        val rings = listOf(ring1Progress, ring2Progress)
+                        for (prog in rings) {
+                            if (prog > 0.05f) {
+                                val r = prog * maxRadius
+                                val alpha = (1f - prog).coerceIn(0f, 1f) * 0.8f
+                                val strokeW = (2.0f * (1f - prog * 0.4f)).dp.toPx()
+                                drawCircle(
+                                    color = PrimaryEmerald.copy(alpha = alpha),
+                                    radius = r,
+                                    center = center,
+                                    style = Stroke(width = strokeW)
+                                )
+                            }
+                        }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.BluetoothSearching,
+                            contentDescription = "Active search for broadcaster",
+                            tint = PrimaryEmerald,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = "${boostRemainingSec}с",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontFeatureSettings = "tnum"
+                            ),
+                            fontWeight = FontWeight.Bold,
+                            color = PrimaryEmerald,
+                            fontSize = 10.sp
+                        )
+                    }
                 }
             }
         } else {
@@ -2201,28 +2283,44 @@ private fun BleStatusDialog(
                             )
                         }
                     } else {
+                        val isSearching = boostRemainingSec > 0
+                        val searchButtonColor = if (isSearching) PrimaryEmerald else ActionBlue
                         Button(
                             onClick = onBoostScanClick,
-                            enabled = boostRemainingSec <= 0,
+                            enabled = !isSearching,
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = ActionBlue,
+                                containerColor = searchButtonColor,
                                 contentColor = Color.White,
-                                disabledContainerColor = ActionBlue.copy(alpha = 0.35f),
-                                disabledContentColor = Color.White.copy(alpha = 0.6f)
+                                disabledContainerColor = if (isSearching) PrimaryEmerald.copy(alpha = 0.75f) else ActionBlue.copy(alpha = 0.35f),
+                                disabledContentColor = Color.White
                             ),
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            Text(
-                                text = if (boostRemainingSec > 0) {
-                                    if (isRu) "⚡ Активный поиск (${boostRemainingSec}с)..."
-                                    else "⚡ Boost Scan (${boostRemainingSec}s)..."
-                                } else {
-                                    if (isRu) "🔍 Поиск вещателя (60 сек)"
-                                    else "🔍 Master Search (60s)"
-                                },
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                if (isSearching) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.BluetoothSearching,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = Color.White
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                }
+                                Text(
+                                    text = if (isSearching) {
+                                        if (isRu) "Активный поиск (${boostRemainingSec}с)..."
+                                        else "Boost Scan (${boostRemainingSec}s)..."
+                                    } else {
+                                        if (isRu) "🔍 Поиск вещателя (60 сек)"
+                                        else "🔍 Master Search (60s)"
+                                    },
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
@@ -2282,6 +2380,7 @@ private fun HeroGlucoseCard(
     isBleBroadcasting: Boolean = false,
     broadcastRemainingSec: Int = 0,
     nextHeartbeatRemainingSec: Int = 300,
+    boostRemainingSec: Int = 0,
     blePacketReceivedAt: Long = 0L,
     xdripLanSettings: com.tirup.app.domain.model.XdripLanSettings? = null,
     lanStatus: com.tirup.app.domain.model.XdripLanStatus? = null,
@@ -2570,6 +2669,7 @@ private fun HeroGlucoseCard(
                             isBleBroadcasting = isBleBroadcasting,
                             broadcastRemainingSec = broadcastRemainingSec,
                             nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
+                            boostRemainingSec = boostRemainingSec,
                             blePacketReceivedAt = blePacketReceivedAt,
                             isRu = isRu,
                             onClick = onBleClick

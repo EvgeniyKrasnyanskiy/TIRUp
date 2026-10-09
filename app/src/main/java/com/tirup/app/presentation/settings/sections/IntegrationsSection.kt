@@ -592,6 +592,38 @@ fun BleBridgeCard(
                             }
                         }
 
+                        // Eco mode switch for Observer
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 8.dp)
+                            ) {
+                                Text(
+                                    text = if (isRu) "Адаптивный эко-режим приёмника" else "Receiver Adaptive Eco Mode",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isRu) "Снижает расход батареи при паузе в вещании >1 часа. Рекомендуется держать выключенным для максимальной надёжности приёма."
+                                    else "Conserves battery after >1 hour of broadcaster silence. Keep off for highest packet reception reliability.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = ble.enableEcoMode,
+                                onCheckedChange = { isChecked ->
+                                    onUpdateBleSettings(ble.copy(enableEcoMode = isChecked))
+                                }
+                            )
+                        }
+
                         Button(
                             onClick = {
                                 if (!isBtOn) {
@@ -615,7 +647,7 @@ fun BleBridgeCard(
                                 text = if (boostRemaining > 0) {
                                     if (isRu) "⚡ Активный поиск (${boostRemaining}с)..." else "⚡ Boosting (${boostRemaining}s)..."
                                 } else {
-                                    if (isRu) "⚡ Ускорить поиск пакета (30 сек)" else "⚡ Boost Scan (30s)"
+                                    if (isRu) "⚡ Поиск вещателя (60 сек)" else "⚡ Boost Scan (60s)"
                                 },
                                 fontWeight = FontWeight.Bold
                             )

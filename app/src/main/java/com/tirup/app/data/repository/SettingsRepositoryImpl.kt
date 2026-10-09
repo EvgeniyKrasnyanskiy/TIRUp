@@ -153,6 +153,7 @@ class SettingsRepositoryImpl(
             .putInt(KEY_BLE_BRIDGE_LAST_RSSI, settings.bleBridgeSettings.lastRssi)
             .putInt(KEY_BLE_BRIDGE_LAST_MASTER_BATTERY, settings.bleBridgeSettings.lastMasterBattery)
             .putBoolean(KEY_BLE_BRIDGE_SHOW_PACKET_BANNER, settings.bleBridgeSettings.showPacketBanner)
+            .putBoolean(KEY_BLE_BRIDGE_ENABLE_ECO_MODE, settings.bleBridgeSettings.enableEcoMode)
             .putBoolean(KEY_DEVICE_REMINDERS_ENABLED, settings.isDeviceRemindersEnabled)
             .putBoolean(KEY_SENSOR_REMINDER_ENABLED, settings.isSensorReminderEnabled)
             .putBoolean(KEY_PUMP_REMINDER_ENABLED, settings.isPumpReminderEnabled)
@@ -389,7 +390,8 @@ class SettingsRepositoryImpl(
                 lastMasterBattery = prefs.getInt(KEY_BLE_BRIDGE_LAST_MASTER_BATTERY, -1),
                 lastRadioContactMs = prefs.getLong(KEY_BLE_BRIDGE_LAST_RADIO_CONTACT_MS, 0L),
                 useLongRange = prefs.getBoolean(KEY_BLE_BRIDGE_USE_LONG_RANGE, false),
-                showPacketBanner = prefs.getBoolean(KEY_BLE_BRIDGE_SHOW_PACKET_BANNER, false)
+                showPacketBanner = prefs.getBoolean(KEY_BLE_BRIDGE_SHOW_PACKET_BANNER, false),
+                enableEcoMode = prefs.getBoolean(KEY_BLE_BRIDGE_ENABLE_ECO_MODE, false)
             ),
             isDeviceRemindersEnabled = prefs.getBoolean(KEY_DEVICE_REMINDERS_ENABLED, true),
             isSensorReminderEnabled = prefs.getBoolean(KEY_SENSOR_REMINDER_ENABLED, true),
@@ -649,6 +651,7 @@ class SettingsRepositoryImpl(
         private const val KEY_BLE_BRIDGE_LAST_RSSI = "key_ble_bridge_last_rssi"
         private const val KEY_BLE_BRIDGE_LAST_MASTER_BATTERY = "key_ble_bridge_last_master_battery"
         private const val KEY_BLE_BRIDGE_SHOW_PACKET_BANNER = "key_ble_bridge_show_packet_banner"
+        private const val KEY_BLE_BRIDGE_ENABLE_ECO_MODE = "key_ble_bridge_enable_eco_mode"
 
         private const val KEY_DEVICE_REMINDERS_ENABLED = "key_device_reminders_enabled"
         private const val KEY_SENSOR_REMINDER_ENABLED = "key_sensor_reminder_enabled"

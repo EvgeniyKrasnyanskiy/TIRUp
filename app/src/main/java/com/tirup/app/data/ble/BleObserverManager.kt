@@ -53,7 +53,7 @@ data class BleRadioChannelMetrics(
 object BleObserverManager {
 
     private const val TAG = "BleObserverManager"
-    const val ECO_SILENCE_TIMEOUT_MS = 330_000L // 5.5 minutes (> 5 min transmitter interval)
+    const val ECO_SILENCE_TIMEOUT_MS = 3_600_000L // 1 hour (60 minutes without transmitter packet)
     private const val MIN_RESTART_COOLDOWN_MS = 60_000L // anti-spam cooldown (protects against max 5 starts / 30s AOSP limit)
     private const val SILENCE_TIMEOUT_MS = 6 * 60 * 1000L // 6 minutes without packet triggers reactive restart
     private const val PROACTIVE_RESET_INTERVAL_MS = 27 * 60 * 1000L // 27 minutes continuous scan triggers proactive AOSP 30-min limit reset
@@ -590,11 +590,19 @@ object BleObserverManager {
                 if (!isScanning) continue
                 val now = System.currentTimeMillis()
                 val silenceMs = if (lastPacketReceivedSystemMs > 0L) now - lastPacketReceivedSystemMs else (now - scanStartTimestampMs)
-                if (silenceMs >= ECO_SILENCE_TIMEOUT_MS && !_isEcoModeFlow.value && !isBoostActive) {
-                    Log.i(TAG, "Silence of ${silenceMs / 1000}s detected (> 5.5 min). Switching to ECO power-saving mode (SCAN_MODE_LOW_POWER).")
+                val currentSettings = cachedSettingsRepo?.getSettings()?.firstOrNull()
+                val isEcoConfigured = currentSettings?.bleBridgeSettings?.enableEcoMode == true
+
+                if (isEcoConfigured && silenceMs >= ECO_SILENCE_TIMEOUT_MS && !_isEcoModeFlow.value && !isBoostActive) {
+                    Log.i(TAG, "Silence of ${silenceMs / 1000}s detected (>= 1 hour). Switching to ECO power-saving mode (SCAN_MODE_LOW_POWER).")
                     _isEcoModeFlow.value = true
                     _channelMetricsFlow.value = _channelMetricsFlow.value.copy(isEcoMode = true)
                     restartScanInternal("eco_mode_silence", boost = false)
+                } else if (!isEcoConfigured && _isEcoModeFlow.value) {
+                    Log.i(TAG, "ECO mode disabled in settings. Instantly restoring LOW_LATENCY.")
+                    _isEcoModeFlow.value = false
+                    _channelMetricsFlow.value = _channelMetricsFlow.value.copy(isEcoMode = false)
+                    restartScanInternal("eco_mode_disabled_by_settings", boost = false)
                 }
                 // Recalculate metrics periodically so PDR degrades naturally during signal loss
                 _channelMetricsFlow.value = calculateMetrics(now)
