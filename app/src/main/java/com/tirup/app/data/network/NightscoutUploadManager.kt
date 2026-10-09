@@ -31,7 +31,7 @@ object NightscoutUploadManager {
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
-    private fun formatIso8601(timestampMs: Long): String {
+    fun formatIso8601(timestampMs: Long): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("UTC")
         return sdf.format(Date(timestampMs))

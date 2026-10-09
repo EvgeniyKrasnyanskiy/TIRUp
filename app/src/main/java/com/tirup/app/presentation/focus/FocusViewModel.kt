@@ -422,64 +422,6 @@ class FocusViewModel(
 
             if (!hasInsulin && !hasCarbs && !hasNotes && !hasGlucose) return@launch
 
-            var uploadedUuid: String? = null
-
-            // 1. Upload to Nightscout micro-backend if enabled
-            if (ns.isEnabled && ns.isValidUrl) {
-                val uploadResult = com.tirup.app.data.network.NightscoutUploadManager.uploadTreatment(
-                    settings = ns,
-                    insulin = if (hasInsulin) insulinUnits else null,
-                    carbs = if (hasCarbs) carbsGrams else null,
-                    glucose = if (hasGlucose) glucoseValue else null,
-                    unit = userSettings.unit,
-                    notes = notes,
-                    timestamp = timestamp
-                )
-
-                if (uploadResult.isSuccess) {
-                    uploadedUuid = uploadResult.getOrNull()
-                    val msg = if (ns.requireXdripConfirmation) {
-                        if (isRu) "✓ Отправлено на сервер • Ожидание синхронизации с xDrip+"
-                        else "✓ Sent to server • Waiting for xDrip+ sync"
-                    } else {
-                        if (isRu) "✓ Отправлено на сервер" else "✓ Sent to server"
-                    }
-                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
-
-                    // Trigger check of local xDrip after a short grace period
-                    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                        kotlinx.coroutines.delay(10_000L)
-                        com.tirup.app.data.receiver.DexdripBroadcastReceiver.syncFromLocalXdrip(context)
-                    }
-                } else {
-                    val err = uploadResult.exceptionOrNull()?.message ?: "Unknown"
-                    android.widget.Toast.makeText(
-                        context,
-                        if (isRu) "⚠️ Ошибка отправки на сервер: $err" else "⚠️ Upload error: $err",
-                        android.widget.Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
-
-            // 2. Local database insertion & device renewals processing
-            if (hasInsulin || hasCarbs || hasNotes) {
-                val treatment = Treatment(
-                    timestamp = timestamp,
-                    insulinUnits = if (hasInsulin) insulinUnits else null,
-                    carbsGrams = if (hasCarbs) carbsGrams else null,
-                    notes = notes,
-                    source = "TIRUP",
-                    uuid = uploadedUuid
-                )
-                // If requireXdripConfirmation is false OR Nightscout upload is disabled, insert locally
-                if (!ns.isEnabled || !ns.requireXdripConfirmation) {
-                    glucoseRepository.insertTreatment(treatment)
-                }
-                // Immediately check and update device lifespans if note contains sensor/cannula/lancet
-                com.tirup.app.data.receiver.DexdripBroadcastReceiver.processDeviceRenewals(context, listOf(treatment))
-            }
-
-            // 3. Post to xDrip via local broadcast as extra attempt
             val glucoseMgdl = if (hasGlucose) {
                 if (userSettings.unit == GlucoseUnit.MMOL_L) {
                     glucoseValue!! * 18.0182
@@ -488,7 +430,11 @@ class FocusViewModel(
                 }
             } else null
 
-            com.tirup.app.data.receiver.DexdripBroadcastReceiver.postTreatmentToXdrip(
+            var uploadedUuid: String? = null
+            var sourceName = "TIRUP"
+
+            // 1. ПРИОРИТЕТ 1: Отправка в локальный xDrip+ (HTTP REST на порту 17580 + Интенты)
+            val isLocalSuccess = com.tirup.app.data.receiver.DexdripBroadcastReceiver.postTreatmentToXdrip(
                 context = context,
                 insulin = if (hasInsulin) insulinUnits else null,
                 carbs = if (hasCarbs) carbsGrams else null,
@@ -496,6 +442,55 @@ class FocusViewModel(
                 notes = notes,
                 timestamp = timestamp
             )
+
+            if (isLocalSuccess) {
+                sourceName = "LOCAL_XDRIP"
+                val msg = if (isRu) "✓ Записано в локальный xDrip+" else "✓ Saved to local xDrip+"
+                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                // 2. ПРИОРИТЕТ 2: Резерв последней очереди — Nightscout Cloud
+                if (ns.isEnabled && ns.isValidUrl) {
+                    val uploadResult = com.tirup.app.data.network.NightscoutUploadManager.uploadTreatment(
+                        settings = ns,
+                        insulin = if (hasInsulin) insulinUnits else null,
+                        carbs = if (hasCarbs) carbsGrams else null,
+                        glucose = if (hasGlucose) glucoseValue else null,
+                        unit = userSettings.unit,
+                        notes = notes,
+                        timestamp = timestamp
+                    )
+
+                    if (uploadResult.isSuccess) {
+                        uploadedUuid = uploadResult.getOrNull()
+                        val msg = if (isRu) "✓ Отправлено в резерв Nightscout (локальный xDrip+ офлайн)"
+                        else "✓ Sent to backup Nightscout (local xDrip+ offline)"
+                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                    } else {
+                        val err = uploadResult.exceptionOrNull()?.message ?: "Unknown"
+                        val msg = if (isRu) "⚠️ Не удалось доставить ни в xDrip+, ни в резерв Nightscout: $err"
+                        else "⚠️ Failed to deliver to xDrip+ and Nightscout: $err"
+                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                    }
+                } else {
+                    val msg = if (isRu) "⚠️ Записано в TIRUp (локальный сервер xDrip+ офлайн)"
+                    else "⚠️ Saved to TIRUp (local xDrip+ server offline)"
+                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            // 3. Сохранение в локальную БД TIRUp и обработка таймеров расходников
+            if (hasInsulin || hasCarbs || hasNotes) {
+                val treatment = Treatment(
+                    timestamp = timestamp,
+                    insulinUnits = if (hasInsulin) insulinUnits else null,
+                    carbsGrams = if (hasCarbs) carbsGrams else null,
+                    notes = notes,
+                    source = sourceName,
+                    uuid = uploadedUuid
+                )
+                glucoseRepository.insertTreatment(treatment)
+                com.tirup.app.data.receiver.DexdripBroadcastReceiver.processDeviceRenewals(context, listOf(treatment))
+            }
         }
     }
     fun updateSensorInstalled(durationDays: Int, installedAt: Long = System.currentTimeMillis()) {
