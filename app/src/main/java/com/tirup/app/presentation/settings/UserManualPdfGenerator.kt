@@ -472,8 +472,8 @@ class UserManualPdfGenerator(private val context: Context) {
                 )
                 flow.bullet(
                     if (isRu) "Семейный BLE-мост (Вещатель — Приёмник)" else "Family BLE Bridge",
-                    if (isRu) "Передача сахара ребёнка родителю по Bluetooth LE без Wi-Fi и SIM. Блок оснащён общим тумблером питания (зелёный индикатор для приёмника, синий для вещателя) и кнопками выбора режима («Вещатель» / «Приёмник»). Телефон ребёнка настраивается как «Вещатель» (импульс 15 с на замер, микропотребление <0.8% батареи/сутки), телефон родителя — как «Приёмник». Пакет шифруется 4-значным Family PIN."
-                    else "Stream patient glucose to parent over BLE without Wi-Fi or SIM. Features a master header switch (green indicator for observer, blue for broadcaster) and dedicated mode buttons ('Broadcaster' / 'Observer'). Broadcaster pulses 15s bursts (<0.8% battery/day), Observer receives. Secured with 4-digit PIN."
+                    if (isRu) "Передача сахара ребёнка родителю по Bluetooth LE без Wi-Fi и SIM. Блок оснащён общим тумблером питания (зелёный индикатор для приёмника, синий для вещателя) и кнопками выбора режима («Вещатель» / «Приёмник»). Телефон ребёнка настраивается как «Вещатель» (импульс 15 с на замер, микропотребление <0.8% батареи/сутки), телефон родителя — как «Приёмник». Пакет шифруется 3-буквенным кодом семьи (Family PIN, A–Z)."
+                    else "Stream patient glucose to parent over BLE without Wi-Fi or SIM. Features a master header switch (green indicator for observer, blue for broadcaster) and dedicated mode buttons ('Broadcaster' / 'Observer'). Broadcaster pulses 15s bursts (<0.8% battery/day), Observer receives. Secured with 3-letter uppercase Family PIN (A–Z)."
                 )
                 flow.bullet(
                     if (isRu) "Режим Long Range (LE Coded PHY)" else "Long Range Mode (LE Coded PHY)",
@@ -486,9 +486,9 @@ class UserManualPdfGenerator(private val context: Context) {
                     else "Direct local polling of master's xDrip+ server (port 17580) over Wi-Fi or Hotspot without internet. Captures glucose, IoB, CoB and master battery with ~1.2s parallel subnet discovery."
                 )
                 flow.bullet(
-                    if (isRu) "Nightscout Cloud Follower и заряд мастера" else "Nightscout Cloud Follower & Master Battery",
-                    if (isRu) "Фоновое скачивание замеров сахара, IoB, CoB и заряда батареи мастера через REST API Nightscout (/api/v1/entries, /pebble, /devicestatus). Единый резолвер приоритета источников батареи (BLE -> Wi-Fi LAN -> Nightscout) и дедупликация 25 с."
-                    else "Background ingestion of glucose, IoB, CoB and master battery via Nightscout REST API (/api/v1/entries, /pebble, /devicestatus). Unified source priority (BLE -> Wi-Fi LAN -> Nightscout) with 25s deduplication."
+                    if (isRu) "Nightscout Cloud Follower [Экспериментально / Для опытных]" else "Nightscout Cloud Follower [Experimental / Advanced]",
+                    if (isRu) "Скрытая опция (доступна только при разблокировке инженерного меню): фоновое скачивание замеров сахара, IoB, CoB и заряда батареи мастера через REST API Nightscout (/api/v1/entries, /pebble, /devicestatus). Единый резолвер приоритета источников батареи (BLE -> Wi-Fi LAN -> Nightscout) и дедупликация 25 с."
+                    else "Hidden feature (available only via developer settings): background ingestion of glucose, IoB, CoB and master battery via Nightscout REST API (/api/v1/entries, /pebble, /devicestatus). Unified source priority (BLE -> Wi-Fi LAN -> Nightscout) with 25s deduplication."
                 )
                 flow.bullet(
                     if (isRu) "Метрики радиоканала и Адаптивный эко-режим (1 час)" else "Radio Metrics & Adaptive Eco Mode (1h)",

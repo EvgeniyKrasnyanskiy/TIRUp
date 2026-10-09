@@ -350,9 +350,9 @@ fun BleBridgeCard(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = if (isRu) "Семейный PIN-код (4 цифры)" else "Family PIN (4 digits)",
+                                    text = if (isRu) "Семейный PIN-код (3 буквы)" else "Family PIN (3 letters)",
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -363,20 +363,12 @@ fun BleBridgeCard(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(
-                                    text = if (ble.familyPin.isNotBlank()) "••••" else "0000",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = ActionBlue
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Edit PIN",
-                                    tint = ActionBlue,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit PIN",
+                                tint = ActionBlue,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
 

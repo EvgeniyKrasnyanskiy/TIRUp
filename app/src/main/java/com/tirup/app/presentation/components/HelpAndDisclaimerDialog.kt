@@ -123,17 +123,15 @@ fun HelpAndDisclaimerDialog(
                     iconTint = PrimaryEmerald,
                     title = if (isRu) "Источники данных и синхронизация" else "Data Sources & Synchronization",
                     content = if (isRu) {
-                        "TIRUp поддерживает 4 уровня источников данных с автоматической дедупликацией:\n" +
+                        "TIRUp поддерживает 3 уровня автономных источников данных с автоматической дедупликацией:\n" +
                         "1. Локальный xDrip+ (высший приоритет): приём интентов и службы Broadcast Service (<0.1 с) без интернета;\n" +
                         "2. Семейный BLE-мост (Bluetooth LE): прямая связь между смартфонами ребёнка и родителя без Wi-Fi и SIM (радиус до 25–50 м с Long Range Coded PHY, метрики качества PDR%, поиск 60 с и эко-режим);\n" +
-                        "3. Wi-Fi LAN Follower: прямой опрос локального веб-сервера xDrip+ мастера (порт 17580) в домашней сети или точке доступа;\n" +
-                        "4. Nightscout Cloud Follower: фоновое получение замеров сахара, IoB, CoB и батареи мастера из облачного REST API Nightscout."
+                        "3. Wi-Fi LAN Follower: прямой опрос локального веб-сервера xDrip+ мастера (порт 17580) в домашней сети или точке доступа."
                     } else {
-                        "TIRUp supports 4 stratified data sources with automatic deduplication:\n" +
+                        "TIRUp supports 3 stratified local data sources with automatic deduplication:\n" +
                         "1. Local xDrip+ (highest priority): instant local intents & Broadcast Service (<0.1s) offline;\n" +
                         "2. Family BLE Bridge (Bluetooth LE): direct link between phones without Wi-Fi or SIM (up to 25-50m with Long Range Coded PHY, live PDR% metrics, 60s radar search and eco mode);\n" +
-                        "3. Wi-Fi LAN Follower: direct local polling of master's xDrip+ server (port 17580) over Wi-Fi/Hotspot;\n" +
-                        "4. Nightscout Cloud Follower: background retrieval of glucose, IoB, CoB, and master battery via REST API."
+                        "3. Wi-Fi LAN Follower: direct local polling of master's xDrip+ server (port 17580) over Wi-Fi/Hotspot."
                     }
                 )
 
