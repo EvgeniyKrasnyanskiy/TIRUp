@@ -93,25 +93,73 @@ class EmergencySmsBuilderTest {
 
     @Test
     fun testBuildQueryReplyMessage() {
-        // Mock 14:35 timestamp
+        // Mock 08:45 timestamp
         val calendar = java.util.Calendar.getInstance().apply {
-            set(java.util.Calendar.HOUR_OF_DAY, 14)
-            set(java.util.Calendar.MINUTE, 35)
+            set(java.util.Calendar.HOUR_OF_DAY, 8)
+            set(java.util.Calendar.MINUTE, 45)
         }
         val msg = EmergencySmsBuilder.buildQueryReplyMessage(
-            patientName = "Иван",
-            glucoseValueMmol = 6.4,
+            patientName = "Дамир",
+            glucoseValueMmol = 5.8,
             trendArrow = "→",
-            deltaMmol = 0.2,
+            deltaMmol = 0.1,
             readingTimestamp = calendar.timeInMillis,
-            todayTirPercent = 82,
-            iob = 1.2,
+            todayTirPercent = 99,
+            iob = 0.1,
+            cob = 15.0,
+            batteryPercent = 33,
+            historyPoints = listOf(5.2, 5.5, 5.7),
             isRu = true,
             unit = GlucoseUnit.MMOL_L
         )
 
-        assertTrue(msg.contains("TIRUp: Иван 6.4 ммоль (→) в 14:35 (+0.2). TIR: 82%. IoB: 1.2U"))
-        assertTrue("Query reply SMS length (${msg.length}) must be <= 70 chars", msg.length <= 70)
+        assertEquals("Damir 5.8 (->) at 08:45 (+0.1) [5.2 > 5.5 > 5.7] TIR: 99% IoB: 0.1U CoB: 15g BAT: 33%", msg)
+        assertTrue("Query reply SMS length (${msg.length}) must be <= 160 chars", msg.length <= EmergencySmsBuilder.MAX_QUERY_SMS_CHARS)
+        // Verify 100% pure Latin/GSM-7 (no Cyrillic letters)
+        assertTrue("Must not contain Cyrillic", !msg.matches(Regex(".*[а-яА-ЯёЁ].*")))
+        assertTrue("Must not contain Unicode arrow", !msg.contains("→"))
+    }
+
+    @Test
+    fun testStrictLengthLimit160CharsWithFullFio() {
+        val calendar = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 23)
+            set(java.util.Calendar.MINUTE, 59)
+        }
+        val msg = EmergencySmsBuilder.buildQueryReplyMessage(
+            patientName = "Краснянский Евгений Юрьевич",
+            glucoseValueMmol = 15.8,
+            trendArrow = "⇈",
+            deltaMmol = 2.4,
+            readingTimestamp = calendar.timeInMillis,
+            todayTirPercent = 74,
+            iob = 4.5,
+            cob = 20.0,
+            batteryPercent = 88,
+            historyPoints = listOf(11.2, 13.0, 14.5),
+            isRu = true,
+            unit = GlucoseUnit.MMOL_L
+        )
+
+        assertTrue("Should extract and transliterate 2nd word 'Evgeniy': $msg", msg.contains("Evgeniy"))
+        assertTrue("Should not include surname", !msg.contains("Краснянский") && !msg.contains("Krasnyanskiy"))
+        assertTrue("Message length (${msg.length}) must strictly be <= 160 chars: '$msg'", msg.length <= EmergencySmsBuilder.MAX_QUERY_SMS_CHARS)
+        assertTrue("Must not contain Cyrillic", !msg.matches(Regex(".*[а-яА-ЯёЁ].*")))
+    }
+
+    @Test
+    fun testGsm7TransliterationAndArrows() {
+        assertEquals("Damir", Gsm7Transliteration.transliterate("Дамир"))
+        assertEquals("Evgeniy", Gsm7Transliteration.transliterate("Евгений"))
+        assertEquals("Aleksandr", Gsm7Transliteration.transliterate("Александр"))
+
+        assertEquals("->", Gsm7Transliteration.normalizeArrow("→"))
+        assertEquals("^", Gsm7Transliteration.normalizeArrow("↑"))
+        assertEquals("v", Gsm7Transliteration.normalizeArrow("↓"))
+        assertEquals("^>", Gsm7Transliteration.normalizeArrow("↗"))
+        assertEquals("v>", Gsm7Transliteration.normalizeArrow("↘"))
+        assertEquals("^^", Gsm7Transliteration.normalizeArrow("⇈"))
+        assertEquals("vv", Gsm7Transliteration.normalizeArrow("⇊"))
     }
 
     @Test
@@ -138,29 +186,6 @@ class EmergencySmsBuilderTest {
         org.junit.Assert.assertEquals("пациент", EmergencySmsBuilder.extractShortName("   "))
         org.junit.Assert.assertEquals("John", EmergencySmsBuilder.extractShortName("Smith John", isRu = false))
         org.junit.Assert.assertEquals("patient", EmergencySmsBuilder.extractShortName("", isRu = false))
-    }
-
-    @Test
-    fun testStrictLengthLimit70CharsWithFullFio() {
-        val calendar = java.util.Calendar.getInstance().apply {
-            set(java.util.Calendar.HOUR_OF_DAY, 23)
-            set(java.util.Calendar.MINUTE, 59)
-        }
-        val msg = EmergencySmsBuilder.buildQueryReplyMessage(
-            patientName = "Краснянский Евгений Юрьевич",
-            glucoseValueMmol = 15.8,
-            trendArrow = "⇈",
-            deltaMmol = 2.4,
-            readingTimestamp = calendar.timeInMillis,
-            todayTirPercent = 74,
-            iob = 4.5,
-            isRu = true,
-            unit = GlucoseUnit.MMOL_L
-        )
-
-        assertTrue("Should extract 2nd word 'Евгений'", msg.contains("Евгений"))
-        assertTrue("Should not include surname", !msg.contains("Краснянский"))
-        assertTrue("Message length (${msg.length}) must strictly be <= 70 chars: '$msg'", msg.length <= 70)
     }
 
     @Test

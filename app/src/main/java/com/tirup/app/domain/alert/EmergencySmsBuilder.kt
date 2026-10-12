@@ -93,9 +93,12 @@ object EmergencySmsBuilder {
         } else msg
     }
 
+    const val MAX_QUERY_SMS_CHARS = 160
+
     /**
      * Builds an auto-reply SMS with current glucose telemetry when requested via SMS by a trusted contact.
-     * Fits strictly within a single SMS segment (<= 70 chars) guaranteed.
+     * Fits strictly within a single GSM 7-bit SMS segment (<= 160 chars) guaranteed.
+     * Transliterates patient name and maps trend arrows to ASCII (->, ^, v) to prevent UCS-2 encoding fallback.
      */
     fun buildQueryReplyMessage(
         patientName: String,
@@ -105,18 +108,23 @@ object EmergencySmsBuilder {
         readingTimestamp: Long,
         todayTirPercent: Int? = null,
         iob: Double? = null,
+        cob: Double? = null,
+        batteryPercent: Int? = null,
+        historyPoints: List<Double> = emptyList(),
         isRu: Boolean = true,
         unit: GlucoseUnit = GlucoseUnit.MMOL_L
     ): String {
-        var name = extractShortName(patientName, isRu)
+        val rawName = extractShortName(patientName, isRu)
+        var name = Gsm7Transliteration.transliterate(rawName)
 
         val glucoseStr = if (unit == GlucoseUnit.MMOL_L) {
-            String.format(Locale.US, "%.1f ммоль", glucoseValueMmol)
+            String.format(Locale.US, "%.1f", glucoseValueMmol)
         } else {
-            "${(glucoseValueMmol * 18.0182).roundToInt()} mg/dL"
+            "${(glucoseValueMmol * 18.0182).roundToInt()}"
         }
 
-        var arrowPart = if (trendArrow.isNotBlank()) " ($trendArrow)" else ""
+        val safeArrow = Gsm7Transliteration.normalizeArrow(trendArrow)
+        var arrowPart = if (safeArrow.isNotBlank()) " ($safeArrow)" else ""
 
         val timeFormat = java.text.SimpleDateFormat("HH:mm", Locale.US)
         val timeStr = timeFormat.format(java.util.Date(readingTimestamp))
@@ -131,41 +139,74 @@ object EmergencySmsBuilder {
             }
         } else ""
 
+        var historyPart = if (historyPoints.isNotEmpty()) {
+            val pointsStr = historyPoints.joinToString(" > ") {
+                if (unit == GlucoseUnit.MMOL_L) {
+                    String.format(Locale.US, "%.1f", it)
+                } else {
+                    "${(it * 18.0182).roundToInt()}"
+                }
+            }
+            " [$pointsStr]"
+        } else ""
+
         var tirPart = if (todayTirPercent != null) {
-            " TIR: $todayTirPercent%."
+            " TIR: $todayTirPercent%"
         } else ""
 
         var iobPart = if (iob != null && iob > 0.0) {
             String.format(Locale.US, " IoB: %.1fU", iob)
         } else ""
 
+        var cobPart = if (cob != null && cob > 0.0) {
+            String.format(Locale.US, " CoB: %.0fg", cob)
+        } else ""
+
+        var batPart = if (batteryPercent != null && batteryPercent in 0..100) {
+            " BAT: $batteryPercent%"
+        } else ""
+
         fun assemble(): String {
-            val sep = if (isRu) "в" else "at"
-            return "TIRUp: $name $glucoseStr$arrowPart $sep $timeStr$deltaStr.$tirPart$iobPart".trim()
+            return "$name $glucoseStr$arrowPart at $timeStr$deltaStr$historyPart$tirPart$iobPart$cobPart$batPart".trim()
         }
 
-        var result = assemble()
+        var result = Gsm7Transliteration.toGsm7Safe(assemble())
 
-        // Dynamic pruning to strictly guarantee <= 70 characters
-        if (result.length > MAX_SINGLE_SMS_CHARS && deltaStr.isNotEmpty()) {
+        // Dynamic pruning to strictly guarantee <= 160 characters (1 standard GSM SMS)
+        if (result.length > MAX_QUERY_SMS_CHARS && cobPart.isNotEmpty()) {
+            cobPart = ""
+            result = Gsm7Transliteration.toGsm7Safe(assemble())
+        }
+        if (result.length > MAX_QUERY_SMS_CHARS && historyPart.isNotEmpty()) {
+            historyPart = ""
+            result = Gsm7Transliteration.toGsm7Safe(assemble())
+        }
+        if (result.length > MAX_QUERY_SMS_CHARS && deltaStr.isNotEmpty()) {
             deltaStr = ""
-            result = assemble()
+            result = Gsm7Transliteration.toGsm7Safe(assemble())
         }
-        if (result.length > MAX_SINGLE_SMS_CHARS && iobPart.isNotEmpty()) {
+        if (result.length > MAX_QUERY_SMS_CHARS && iobPart.isNotEmpty()) {
             iobPart = ""
-            result = assemble()
+            result = Gsm7Transliteration.toGsm7Safe(assemble())
         }
-        if (result.length > MAX_SINGLE_SMS_CHARS && tirPart.isNotEmpty()) {
+        if (result.length > MAX_QUERY_SMS_CHARS && batPart.isNotEmpty()) {
+            batPart = ""
+            result = Gsm7Transliteration.toGsm7Safe(assemble())
+        }
+        if (result.length > MAX_QUERY_SMS_CHARS && tirPart.isNotEmpty()) {
             tirPart = ""
-            result = assemble()
+            result = Gsm7Transliteration.toGsm7Safe(assemble())
         }
-        if (result.length > MAX_SINGLE_SMS_CHARS && arrowPart.isNotEmpty()) {
+        if (result.length > MAX_QUERY_SMS_CHARS && arrowPart.isNotEmpty()) {
             arrowPart = ""
-            result = assemble()
+            result = Gsm7Transliteration.toGsm7Safe(assemble())
         }
-        if (result.length > MAX_SINGLE_SMS_CHARS && name.length > 5) {
+        if (result.length > MAX_QUERY_SMS_CHARS && name.length > 5) {
             name = name.take(4) + "."
-            result = assemble()
+            result = Gsm7Transliteration.toGsm7Safe(assemble())
+        }
+        if (result.length > MAX_QUERY_SMS_CHARS) {
+            result = result.take(MAX_QUERY_SMS_CHARS)
         }
 
         return result

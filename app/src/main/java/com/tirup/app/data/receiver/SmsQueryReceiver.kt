@@ -3,6 +3,8 @@ package com.tirup.app.data.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.provider.Telephony
 import android.util.Log
 import com.tirup.app.TirupApplication
@@ -15,6 +17,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 class SmsQueryReceiver : BroadcastReceiver() {
 
@@ -102,8 +106,23 @@ class SmsQueryReceiver : BroadcastReceiver() {
 
             val isRu = settings.language.equals("RU", ignoreCase = true)
             val db = AppDatabase.getInstance(context)
-            val recentEntities = db.glucoseReadingDao().getRecentReadingsSync(2)
-            val latestEntity = recentEntities.firstOrNull()
+            val latestEntity = db.glucoseReadingDao().getRecentReadingsSync(1).firstOrNull()
+
+            val battery = try {
+                val bm = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+                val cap = bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                if (cap != null && cap in 0..100) {
+                    cap
+                } else {
+                    val ifilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+                    val bStatus = context.registerReceiver(null, ifilter)
+                    val level = bStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+                    val scale = bStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+                    if (level >= 0 && scale > 0) (level * 100 / scale) else null
+                }
+            } catch (e: Exception) {
+                null
+            }
 
             val replyText = if (latestEntity == null || (now - latestEntity.timestamp > 30 * 60_000L)) {
                 EmergencySmsBuilder.buildNoDataReplyMessage(
@@ -111,11 +130,32 @@ class SmsQueryReceiver : BroadcastReceiver() {
                     isRu = isRu
                 )
             } else {
-                // Calculate delta from previous reading if available
-                val previousEntity = if (recentEntities.size > 1) recentEntities[1] else null
-                val delta = if (previousEntity != null && (latestEntity.timestamp - previousEntity.timestamp <= 15 * 60_000L)) {
-                    latestEntity.valueMmol - previousEntity.valueMmol
+                // Fetch readings from the last 25 minutes for clinical 5-min delta and 15-min history
+                val pastReadings = db.glucoseReadingDao().getReadingsBetweenSync(
+                    latestEntity.timestamp - 25 * 60_000L,
+                    latestEntity.timestamp
+                )
+
+                val t5 = latestEntity.timestamp - 5 * 60_000L
+                val t10 = latestEntity.timestamp - 10 * 60_000L
+                val t15 = latestEntity.timestamp - 15 * 60_000L
+
+                val p15 = pastReadings.filter { it.timestamp in (t15 - 180_000L)..(t15 + 150_000L) }
+                    .minByOrNull { abs(it.timestamp - t15) }
+                val p10 = pastReadings.filter { it.timestamp in (t10 - 150_000L)..(t10 + 150_000L) }
+                    .minByOrNull { abs(it.timestamp - t10) }
+                val p5 = pastReadings.filter { it.timestamp in (t5 - 150_000L)..(t5 + 120_000L) && it.timestamp < latestEntity.timestamp }
+                    .minByOrNull { abs(it.timestamp - t5) }
+
+                // Calculate clinical 5-min velocity delta (stable across 1m and 5m sensors)
+                val reference = p5 ?: pastReadings.filter { it.timestamp < latestEntity.timestamp }.maxByOrNull { it.timestamp }
+                val delta = if (reference != null && (latestEntity.timestamp - reference.timestamp <= 15 * 60_000L)) {
+                    val d = latestEntity.valueMmol - reference.valueMmol
+                    (d * 10.0).roundToInt() / 10.0
                 } else null
+
+                // Chronological history points [oldest -> newest]: ~15m > ~10m > ~5m
+                val historyPoints = listOfNotNull(p15?.valueMmol, p10?.valueMmol, p5?.valueMmol)
 
                 // Calculate today's TIR percent
                 val startOfDay = getStartOfDayMillis()
@@ -135,6 +175,9 @@ class SmsQueryReceiver : BroadcastReceiver() {
                     readingTimestamp = latestEntity.timestamp,
                     todayTirPercent = tirPercent,
                     iob = latestEntity.iob,
+                    cob = latestEntity.cob,
+                    batteryPercent = battery,
+                    historyPoints = historyPoints,
                     isRu = isRu,
                     unit = settings.unit
                 )
