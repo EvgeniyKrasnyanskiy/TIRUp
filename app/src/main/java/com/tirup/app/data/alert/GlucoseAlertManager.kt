@@ -1955,8 +1955,33 @@ object GlucoseAlertManager {
             when (criticalToneType) {
                 MedicalSoundPlayer.CriticalToneType.EXTRA_HYPO -> MedicalSoundPlayer.playExtraHypoSiren()
                 MedicalSoundPlayer.CriticalToneType.EXTRA_HYPER -> MedicalSoundPlayer.playExtraHyperAlarm()
-                MedicalSoundPlayer.CriticalToneType.STANDARD -> MedicalSoundPlayer.playSound(tier, volumePercent)
+                MedicalSoundPlayer.CriticalToneType.STANDARD -> {
+                    if (title.contains("гипо", ignoreCase = true) || title.contains("low", ignoreCase = true)) {
+                        MedicalSoundPlayer.playProlongedHypoAlert(volumePercent)
+                    } else {
+                        MedicalSoundPlayer.playProlongedHyperAlert(volumePercent)
+                    }
+                }
             }
+        } else if (tier == AlertTier.PREDICTIVE) {
+            MedicalSoundPlayer.playPredictiveAlert(volumePercent)
+        } else if (tier == AlertTier.MAIN) {
+            when {
+                trendArrow in listOf("⇊", "↓↓") || title.contains("паден", ignoreCase = true) || title.contains("drop", ignoreCase = true) || title.contains("fall", ignoreCase = true) -> {
+                    MedicalSoundPlayer.playFallingFastAlert(volumePercent)
+                }
+                trendArrow in listOf("⇈", "↑↑") || title.contains("рост", ignoreCase = true) || title.contains("rise", ignoreCase = true) || title.contains("rising", ignoreCase = true) -> {
+                    MedicalSoundPlayer.playRisingFastAlert(volumePercent)
+                }
+                title.contains("низк", ignoreCase = true) || title.contains("low", ignoreCase = true) -> {
+                    MedicalSoundPlayer.playLowAlert(volumePercent)
+                }
+                else -> {
+                    MedicalSoundPlayer.playHighAlert(volumePercent)
+                }
+            }
+        } else if (tier == AlertTier.SIGNAL_LOSS) {
+            MedicalSoundPlayer.playSignalLossAlert(volumePercent)
         } else {
             MedicalSoundPlayer.playSound(tier, volumePercent)
         }

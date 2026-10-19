@@ -317,7 +317,7 @@ fun CriticalThresholdDialog(
                                     )
                                     Text(
                                         text = if (isHypoPlaying) (if (isRu) "⏹️ Стоп" else "⏹️ Stop")
-                                               else (if (isRu) "Тест сирены (50с)" else "Test siren (50s)"),
+                                               else (if (isRu) "Тест сирены (~60с)" else "Test siren (~60s)"),
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.SemiBold,
                                         color = if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow
@@ -379,9 +379,9 @@ fun CriticalThresholdDialog(
 
                         Text(
                             text = if (isRu)
-                                "16-секундный резкий пульсирующий сигнал высокой тональности (1760/2349 Гц). Предупреждает о критической гипергликемии и необходимости контроля подколки/кетонов."
+                                "Резкий пульсирующий сигнал тревоги (~35 секунд). Предупреждает о критической гипергликемии и необходимости контроля подколки/кетонов."
                             else
-                                "16-second piercing high-frequency pulsed alert (1760/2349 Hz). Alerts to severe hyperglycemia and need for insulin/ketone check.",
+                                "Piercing high-frequency pulsed alert (~35s). Alerts to severe hyperglycemia and need for insulin/ketone check.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -413,7 +413,7 @@ fun CriticalThresholdDialog(
                                     )
                                     Text(
                                         text = if (isHyperPlaying) (if (isRu) "⏹️ Стоп" else "⏹️ Stop")
-                                               else (if (isRu) "Тест сигнала (16с)" else "Test alarm (16s)"),
+                                               else (if (isRu) "Тест тревоги (~35с)" else "Test alarm (~35s)"),
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.SemiBold,
                                         color = if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh
@@ -833,9 +833,9 @@ fun ExtraAlertSoundsInfoDialog(
             ) {
                 Text(
                     text = if (isRu)
-                        "Для экстремальных значений гликемии в TIRUp предусмотрены уникальные математически синтезированные звуки тревог, резко отличающиеся от стандартных сигналов:"
+                        "Для экстремальных значений гликемии в TIRUp предусмотрены специализированные звуки тревог, резко отличающиеся от стандартных сигналов:"
                     else
-                        "For extreme glucose excursions, TIRUp features dedicated mathematically synthesized alert sounds distinct from standard chimes:",
+                        "For extreme glucose excursions, TIRUp features dedicated alert sounds distinct from standard chimes:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -860,9 +860,9 @@ fun ExtraAlertSoundsInfoDialog(
                         )
                         Text(
                             text = if (isRu)
-                                "50-секундная мощная сирена ГО / GDH с плавной частотной модуляцией (450–850 Гц) со второй гармоникой на 100% громкости. Срабатывает мгновенно по первой точке для гарантированного пробуждения из глубокого сна как пациента, так и фоловера."
+                                "Мощная непрерывная сирена (~60 секунд) на 100% громкости. Срабатывает мгновенно по первой точке для гарантированного пробуждения из глубокого сна как пациента, так и фоловера."
                             else
-                                "50-second continuous civil defense air-raid siren sweeping smoothly between 450 Hz and 850 Hz with 2nd harmonic. Triggers immediately to wake patient or follower.",
+                                "Continuous civil defense air-raid siren (~60s) on max volume. Triggers immediately to wake patient or follower.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -894,7 +894,7 @@ fun ExtraAlertSoundsInfoDialog(
                                     )
                                     Text(
                                         text = if (isHypoPlaying) (if (isRu) "⏹️ Стоп" else "⏹️ Stop")
-                                               else (if (isRu) "Тест сирены (50с)" else "Test siren (50s)"),
+                                               else (if (isRu) "Тест сирены (~60с)" else "Test siren (~60s)"),
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.SemiBold,
                                         color = if (isHypoPlaying) MaterialTheme.colorScheme.error else ColorVeryLow
@@ -925,9 +925,9 @@ fun ExtraAlertSoundsInfoDialog(
                         )
                         Text(
                             text = if (isRu)
-                                "16-секундный резкий пульсирующий сигнал высокой тональности (1760/2349 Гц), резко контрастирующий с сиреной гипогликемии. Предупреждает о критической гипергликемии и необходимости контроля подколки/кетонов."
+                                "Пульсирующий сигнал тревоги (~35 секунд), резко контрастирующий с сиреной гипогликемии. Предупреждает о критической гипергликемии и необходимости контроля подколки/кетонов."
                             else
-                                "16-second piercing high-frequency pulsed alert (1760/2349 Hz), sharply distinguishing hyperglycemia from hypo alarms.",
+                                "Piercing pulsed alert (~35s), sharply distinguishing hyperglycemia from hypo alarms.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -959,7 +959,7 @@ fun ExtraAlertSoundsInfoDialog(
                                     )
                                     Text(
                                         text = if (isHyperPlaying) (if (isRu) "⏹️ Стоп" else "⏹️ Stop")
-                                               else (if (isRu) "Тест сигнала (16с)" else "Test alarm (16s)"),
+                                               else (if (isRu) "Тест тревоги (~35с)" else "Test alarm (~35s)"),
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.SemiBold,
                                         color = if (isHyperPlaying) MaterialTheme.colorScheme.error else ColorHigh

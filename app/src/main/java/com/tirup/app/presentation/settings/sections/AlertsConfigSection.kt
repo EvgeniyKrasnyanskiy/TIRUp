@@ -36,7 +36,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -64,7 +66,7 @@ fun AlertsConfigSection(
     currentlyPlayingTag: String?,
     onUpdateAlertSettings: (AlertSettings) -> Unit,
     onTestAlert: (AlertTier) -> Unit,
-    onTestCaregiverSosScreen: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onTestCaregiverSosScreen: () -> Unit = {},
     onPlayTestSound: (Int) -> Unit,
     onSoundClick: (String, () -> Unit) -> Unit,
     onShowCriticalHypoSafetyDialog: () -> Unit,
@@ -412,11 +414,18 @@ fun AlertsConfigSection(
                     // Tier 3: Critical (Prolonged / Extreme)
                     val isCriticalInPauseState = isCriticalPaused && !alerts.isCriticalHypoPermanentDisabled
                     val isCriticalEffectiveEnabled = if (isCriticalInPauseState) true else (isMaster && alerts.isCriticalEnabled && !alerts.isCriticalHypoPermanentDisabled)
-                    val tier3Tag = if (alerts.isCaregiverRole) "CAREGIVER_SOS" else AlertTier.CRITICAL.name
+                    val isCriticalTesting = (currentlyPlayingTag in listOf("EXTRA_HYPO", "EXTRA_HYPER", AlertTier.CRITICAL.name, "CAREGIVER_SOS"))
+                    var criticalToneTestIndex by remember { mutableIntStateOf(0) }
+
+                    val activeCriticalTestSub = when (currentlyPlayingTag) {
+                        "EXTRA_HYPO" -> if (isRu) "🔊 Тест: Крит. ГИПО (< ${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)} ммоль/л)" else "🔊 Test: Crit. HYPO (< ${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)} mmol/L)"
+                        "EXTRA_HYPER" -> if (isRu) "🔊 Тест: Крит. ГИПЕР (> ${String.format(Locale.US, "%.1f", alerts.criticalHighThresholdMmol)} ммоль/л)" else "🔊 Test: Crit. HYPER (> ${String.format(Locale.US, "%.1f", alerts.criticalHighThresholdMmol)} mmol/L)"
+                        else -> criticalSub
+                    }
 
                     AlertTierConfigRow(
                         title = if (isRu) "3. Опасные и критические" else "3. Dangerous & Critical",
-                        subtitle = criticalSub,
+                        subtitle = activeCriticalTestSub,
                         enabled = isCriticalEffectiveEnabled,
                         onEnabledChange = { isEnabled ->
                             if (!isEnabled) {
@@ -438,18 +447,22 @@ fun AlertsConfigSection(
                         onFlashChange = { onUpdateAlertSettings(alerts.copy(isCriticalFlash = it)) },
                         accentColor = ColorVeryLow,
                         onTestClick = {
-                            onSoundClick(tier3Tag) {
-                                if (alerts.isCaregiverRole) {
-                                    onTestCaregiverSosScreen()
+                            if (isCriticalTesting) {
+                                MedicalSoundPlayer.stopAll()
+                            } else {
+                                if (criticalToneTestIndex % 2 == 0) {
+                                    onSoundClick("EXTRA_HYPO") {
+                                        MedicalSoundPlayer.playExtraHypoSiren()
+                                    }
                                 } else {
-                                    MedicalSoundPlayer.playSound(
-                                        AlertTier.CRITICAL,
-                                        alerts.alertVolumePercent
-                                    )
+                                    onSoundClick("EXTRA_HYPER") {
+                                        MedicalSoundPlayer.playExtraHyperAlarm()
+                                    }
                                 }
+                                criticalToneTestIndex++
                             }
                         },
-                        isTesting = (currentlyPlayingTag == tier3Tag),
+                        isTesting = isCriticalTesting,
                         isRu = isRu,
                         timerBadge = criticalBadge,
                         isPaused = isCriticalInPauseState,

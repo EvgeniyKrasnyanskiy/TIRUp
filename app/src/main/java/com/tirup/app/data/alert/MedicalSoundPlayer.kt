@@ -3,9 +3,14 @@ package com.tirup.app.data.alert
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.media.MediaPlayer
 import android.util.Log
+import androidx.annotation.RawRes
+import com.tirup.app.R
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,73 +40,131 @@ object MedicalSoundPlayer {
     val currentlyPlayingTag: StateFlow<String?> = _currentlyPlayingTag.asStateFlow()
 
     private var currentAudioTrack: AudioTrack? = null
+    private var currentMediaPlayer: MediaPlayer? = null
 
-    fun playSound(tier: AlertTier, volumePercent: Int = 80, customTag: String? = null) {
+    /**
+     * Plays a pre-mastered MP3 audio resource with full hardware-independent loudness
+     * on the USAGE_ALARM audio stream. Supports clean repeating / looping and instant stopping.
+     */
+    private fun playRawResource(
+        @RawRes resId: Int,
+        repeatCount: Int = 1,
+        volumePercent: Int = 80,
+        customTag: String? = null,
+        pauseBetweenRepeatsMs: Long = 0L,
+        boostVolume: Boolean = false
+    ) {
+        stopAll()
         isPlayingActive = true
         _isPlaying.value = true
-        _currentlyPlayingTag.value = customTag ?: tier.name
+        _currentlyPlayingTag.value = customTag
+        if (boostVolume) {
+            boostAlarmVolumeIfNeeded()
+        }
         audioScope.launch {
             try {
-                when (tier) {
-                    AlertTier.PREDICTIVE -> playPredictiveChime(volumePercent)
-                    AlertTier.MAIN -> playTripleMainBeep(volumePercent)
-                    AlertTier.CRITICAL -> {
-                        boostAlarmVolumeIfNeeded()
+                val context = try { com.tirup.app.TirupApplication.instance } catch (_: Exception) { null } ?: return@launch
+                ensureAlarmStreamAudible()
+                val factor = (volumePercent / 100f).coerceIn(0.15f, 1.0f)
+
+                val audioAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+
+                for (cycle in 0 until repeatCount) {
+                    if (!isPlayingActive) break
+
+                    val mp = MediaPlayer()
+                    synchronized(this@MedicalSoundPlayer) {
+                        if (!isPlayingActive) {
+                            try { mp.release() } catch (_: Exception) {}
+                            return@launch
+                        }
+                        currentMediaPlayer = mp
+                    }
+
+                    mp.setAudioAttributes(audioAttributes)
+                    val afd = context.resources.openRawResourceFd(resId) ?: run {
+                        synchronized(this@MedicalSoundPlayer) {
+                            try { mp.release() } catch (_: Exception) {}
+                            if (currentMediaPlayer == mp) currentMediaPlayer = null
+                        }
+                        return@launch
+                    }
+                    mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                    afd.close()
+                    mp.setVolume(factor, factor)
+                    mp.prepare()
+
+                    val completionDeferred = CompletableDeferred<Unit>()
+                    mp.setOnCompletionListener {
+                        completionDeferred.complete(Unit)
+                    }
+                    mp.setOnErrorListener { _, what, extra ->
+                        Log.w(TAG, "MediaPlayer error: what=$what extra=$extra")
+                        completionDeferred.complete(Unit)
+                        true
+                    }
+
+                    mp.start()
+
+                    while (!completionDeferred.isCompleted && isPlayingActive) {
+                        delay(40L)
+                    }
+
+                    synchronized(this@MedicalSoundPlayer) {
                         try {
-                            playCriticalAlarmSeries()
-                        } finally {
-                            isCriticalActive = false
-                            restoreAlarmVolumeIfNeeded()
+                            if (mp.isPlaying) mp.stop()
+                        } catch (_: Exception) {}
+                        try {
+                            mp.release()
+                        } catch (_: Exception) {}
+                        if (currentMediaPlayer == mp) {
+                            currentMediaPlayer = null
                         }
                     }
-                    AlertTier.SIGNAL_LOSS -> {
-                        boostAlarmVolumeIfNeeded()
-                        playSignalLossTone()
+
+                    if (cycle < repeatCount - 1 && isPlayingActive && pauseBetweenRepeatsMs > 0) {
+                        var pausedElapsed = 0L
+                        while (pausedElapsed < pauseBetweenRepeatsMs && isPlayingActive) {
+                            val step = 50L.coerceAtMost(pauseBetweenRepeatsMs - pausedElapsed)
+                            delay(step)
+                            pausedElapsed += step
+                        }
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to play synthesized medical sound for tier=$tier: ${e.message}")
+                Log.e(TAG, "Error playing raw resource $resId: ${e.message}")
             } finally {
                 _isPlaying.value = false
                 _currentlyPlayingTag.value = null
+                if (boostVolume) {
+                    restoreAlarmVolumeIfNeeded()
+                }
             }
         }
     }
 
+    fun playSound(tier: AlertTier, volumePercent: Int = 80, customTag: String? = null) {
+        when (tier) {
+            AlertTier.PREDICTIVE -> playPredictiveAlert(volumePercent, customTag)
+            AlertTier.MAIN -> playLowAlert(volumePercent, repeatCount = 1, customTag = customTag)
+            AlertTier.CRITICAL -> playProlongedHypoAlert(volumePercent, customTag)
+            AlertTier.SIGNAL_LOSS -> playSignalLossAlert(volumePercent, customTag)
+        }
+    }
+
     /**
-     * Plays a rich, clear melodic test chime (~1.0s) to allow accurate volume evaluation.
+     * Plays a rich, clear melodic test chime to allow accurate volume evaluation.
      */
     fun playTestSound(volumePercent: Int = 80) {
-        isPlayingActive = true
-        _isPlaying.value = true
-        _currentlyPlayingTag.value = "TEST_SOUND"
-        audioScope.launch {
-            try {
-                ensureAlarmStreamAudible()
-                val factor = (volumePercent / 100f).coerceIn(0.15f, 1.0f)
-                val prefix = ShortArray((SAMPLE_RATE * 0.05).toInt()) // 50ms silence for smooth DAC wake
-                val n1 = generateSineWave(freq = 587.33, durationMs = 180, volume = 0.65f * factor)
-                val n2 = generateSineWave(freq = 783.99, durationMs = 180, volume = 0.75f * factor)
-                val n3 = generateSineWave(freq = 880.00, durationMs = 200, volume = 0.85f * factor)
-                val n4 = generateSineWave(freq = 1174.66, durationMs = 350, volume = 0.95f * factor)
-
-                val totalLen = prefix.size + n1.size + n2.size + n3.size + n4.size
-                val audioData = ShortArray(totalLen)
-                var off = 0
-                System.arraycopy(prefix, 0, audioData, off, prefix.size); off += prefix.size
-                System.arraycopy(n1, 0, audioData, off, n1.size); off += n1.size
-                System.arraycopy(n2, 0, audioData, off, n2.size); off += n2.size
-                System.arraycopy(n3, 0, audioData, off, n3.size); off += n3.size
-                System.arraycopy(n4, 0, audioData, off, n4.size)
-
-                playRawPcm(audioData, usage = AudioAttributes.USAGE_ALARM)
-            } catch (e: Exception) {
-                Log.w(TAG, "Test sound failed: ${e.message}")
-            } finally {
-                _isPlaying.value = false
-                _currentlyPlayingTag.value = null
-            }
-        }
+        playRawResource(
+            resId = R.raw.tirup_predict,
+            repeatCount = 1,
+            volumePercent = volumePercent,
+            customTag = "TEST_SOUND"
+        )
     }
 
     private fun ensureAlarmStreamAudible() {
@@ -265,11 +328,21 @@ object MedicalSoundPlayer {
         isPlayingActive = false
         _isPlaying.value = false
         _currentlyPlayingTag.value = null
-        try {
-            currentAudioTrack?.stop()
-            currentAudioTrack?.release()
+        synchronized(this) {
+            try {
+                currentMediaPlayer?.let {
+                    if (it.isPlaying) it.stop()
+                    it.release()
+                }
+            } catch (_: Exception) {}
+            currentMediaPlayer = null
+
+            try {
+                currentAudioTrack?.stop()
+                currentAudioTrack?.release()
+            } catch (_: Exception) {}
             currentAudioTrack = null
-        } catch (_: Exception) {}
+        }
         restoreAlarmVolumeIfNeeded()
     }
 
@@ -423,174 +496,160 @@ object MedicalSoundPlayer {
         playRawPcm(audioData, usage = AudioAttributes.USAGE_ALARM)
     }
 
-    enum class CriticalToneType {
-        STANDARD,      // ~12s 5-tone medical alarm
-        EXTRA_HYPO,    // ~50s GDH FM sweep siren (450-850 Hz)
-        EXTRA_HYPER    // ~16s high-pitched pulsed alarm
-    }
-
     /**
-     * Plays a critical alarm with the specified tone type.
+     * Tier 1: Soft predictive warning chime (1 play)
      */
-    fun playCriticalAlarm(type: CriticalToneType = CriticalToneType.STANDARD) {
-        isPlayingActive = true
-        isCriticalActive = true
-        _isPlaying.value = true
-        _currentlyPlayingTag.value = when (type) {
-            CriticalToneType.STANDARD -> AlertTier.CRITICAL.name
-            CriticalToneType.EXTRA_HYPO -> "EXTRA_HYPO"
-            CriticalToneType.EXTRA_HYPER -> "EXTRA_HYPER"
-        }
-        audioScope.launch {
-            try {
-                boostAlarmVolumeIfNeeded()
-                when (type) {
-                    CriticalToneType.STANDARD -> playCriticalAlarmSeries()
-                    CriticalToneType.EXTRA_HYPO -> runExtraHypoSirenLoop()
-                    CriticalToneType.EXTRA_HYPER -> runExtraHyperAlarmLoop()
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Critical alarm playback failed for type=$type: ${e.message}")
-            } finally {
-                isCriticalActive = false
-                _isPlaying.value = false
-                _currentlyPlayingTag.value = null
-                restoreAlarmVolumeIfNeeded()
-            }
-        }
+    fun playPredictiveAlert(volumePercent: Int = 80, customTag: String? = null) {
+        playRawResource(
+            resId = R.raw.tirup_predict,
+            repeatCount = 1,
+            volumePercent = volumePercent,
+            customTag = customTag ?: AlertTier.PREDICTIVE.name
+        )
     }
 
     /**
-     * Extra-HYPO civil defense / GDH siren (~50 seconds) for glucose below critical threshold.
+     * Tier 2: Confirmed Low glucose (1 play by default)
+     */
+    fun playLowAlert(volumePercent: Int = 80, repeatCount: Int = 1, customTag: String? = null) {
+        playRawResource(
+            resId = R.raw.tirup_low,
+            repeatCount = repeatCount,
+            volumePercent = volumePercent,
+            customTag = customTag ?: AlertTier.MAIN.name
+        )
+    }
+
+    /**
+     * Tier 2: Confirmed High glucose (1 play by default)
+     */
+    fun playHighAlert(volumePercent: Int = 80, repeatCount: Int = 1, customTag: String? = null) {
+        playRawResource(
+            resId = R.raw.tirup_high,
+            repeatCount = repeatCount,
+            volumePercent = volumePercent,
+            customTag = customTag ?: AlertTier.MAIN.name
+        )
+    }
+
+    /**
+     * Tier 2 Speed: Rapid glucose drop (1 play)
+     */
+    fun playFallingFastAlert(volumePercent: Int = 80, customTag: String? = null) {
+        playRawResource(
+            resId = R.raw.tirup_falling_fast,
+            repeatCount = 1,
+            volumePercent = volumePercent,
+            customTag = customTag ?: "FALLING_FAST"
+        )
+    }
+
+    /**
+     * Tier 2 Speed: Rapid glucose rise (1 play)
+     */
+    fun playRisingFastAlert(volumePercent: Int = 80, customTag: String? = null) {
+        playRawResource(
+            resId = R.raw.tirup_rising_fast,
+            repeatCount = 1,
+            volumePercent = volumePercent,
+            customTag = customTag ?: "RISING_FAST"
+        )
+    }
+
+    /**
+     * Tier 4: Sensor signal loss (1 play)
+     */
+    fun playSignalLossAlert(volumePercent: Int = 80, customTag: String? = null) {
+        playRawResource(
+            resId = R.raw.tirup_obsolete,
+            repeatCount = 1,
+            volumePercent = volumePercent,
+            customTag = customTag ?: AlertTier.SIGNAL_LOSS.name,
+            boostVolume = true
+        )
+    }
+
+    /**
+     * Tier 3 Critical: Prolonged Hypo (< 3.9 for > 20 min) -> 5 repeats of tirup_low with 400ms pause
+     */
+    fun playProlongedHypoAlert(volumePercent: Int = 100, customTag: String? = null) {
+        playRawResource(
+            resId = R.raw.tirup_low,
+            repeatCount = 5,
+            volumePercent = volumePercent,
+            customTag = customTag ?: AlertTier.CRITICAL.name,
+            pauseBetweenRepeatsMs = 400L,
+            boostVolume = true
+        )
+    }
+
+    /**
+     * Tier 3 Critical: Prolonged Hyper (> 10.0 for > 90 min) -> 5 repeats of tirup_high with 400ms pause
+     */
+    fun playProlongedHyperAlert(volumePercent: Int = 100, customTag: String? = null) {
+        playRawResource(
+            resId = R.raw.tirup_high,
+            repeatCount = 5,
+            volumePercent = volumePercent,
+            customTag = customTag ?: AlertTier.CRITICAL.name,
+            pauseBetweenRepeatsMs = 400L,
+            boostVolume = true
+        )
+    }
+
+    /**
+     * Tier 3 Critical: Severe / Extreme Hypo (< 3.0 mmol/l) -> 20 cycles (~60s) of tirup_very_low siren
      */
     fun playExtraHypoSiren() {
-        playCriticalAlarm(CriticalToneType.EXTRA_HYPO)
+        playRawResource(
+            resId = R.raw.tirup_very_low,
+            repeatCount = 20,
+            volumePercent = 100,
+            customTag = "EXTRA_HYPO",
+            boostVolume = true
+        )
     }
 
     /**
-     * Extra-HYPER piercing rapid pulsed alarm (~16 seconds) for glucose above critical threshold.
+     * Tier 3 Critical: Severe / Extreme Hyper (> 13.9 mmol/l) -> 10 cycles (~35s) of tirup_very_high alarm
      */
     fun playExtraHyperAlarm() {
-        playCriticalAlarm(CriticalToneType.EXTRA_HYPER)
+        playRawResource(
+            resId = R.raw.tirup_very_high,
+            repeatCount = 10,
+            volumePercent = 100,
+            customTag = "EXTRA_HYPER",
+            boostVolume = true
+        )
     }
 
     fun playSuperHypoSiren() = playExtraHypoSiren()
     fun playSuperHyperAlarm() = playExtraHyperAlarm()
 
     /**
-     * Tier 3: High-urgency alternating alarm siren (USAGE_ALARM).
-     * Plays a series lasting ~12 seconds (8 bursts with 300ms pause), cancellable anytime.
-     */
-    private fun playCriticalAlarmSeries() {
-        isCriticalActive = true
-
-        val pulse1 = generateSineWave(freq = 1046.5, durationMs = 150, volume = 1.0f)
-        val pulse2 = generateSineWave(freq = 784.0, durationMs = 150, volume = 1.0f)
-        val pulse3 = generateSineWave(freq = 1046.5, durationMs = 150, volume = 1.0f)
-        val pulse4 = generateSineWave(freq = 784.0, durationMs = 150, volume = 1.0f)
-        val pulse5 = generateSineWave(freq = 1174.66, durationMs = 320, volume = 1.0f)
-        val pause = ShortArray((SAMPLE_RATE * 0.35).toInt()) // 350ms pause
-
-        val burstLen = pulse1.size + pulse2.size + pulse3.size + pulse4.size + pulse5.size + pause.size
-        val burstData = ShortArray(burstLen)
-        var offset = 0
-        System.arraycopy(pulse1, 0, burstData, offset, pulse1.size); offset += pulse1.size
-        System.arraycopy(pulse2, 0, burstData, offset, pulse2.size); offset += pulse2.size
-        System.arraycopy(pulse3, 0, burstData, offset, pulse3.size); offset += pulse3.size
-        System.arraycopy(pulse4, 0, burstData, offset, pulse4.size); offset += pulse4.size
-        System.arraycopy(pulse5, 0, burstData, offset, pulse5.size); offset += pulse5.size
-        System.arraycopy(pause, 0, burstData, offset, pause.size)
-
-        // Repeat 8 times (~12 seconds total), but stop immediately if cancelled
-        for (cycle in 0 until 8) {
-            if (!isCriticalActive || !isPlayingActive) break
-            playRawPcm(burstData, usage = AudioAttributes.USAGE_ALARM)
-        }
-    }
-
-    /**
-     * Generates and plays the 50-second continuous civil defense / GDH air-raid siren.
-     * Uses FM modulation oscillating smoothly between 520 Hz and 980 Hz with multi-harmonic
-     * piercing acoustic saturation (1st, 2nd, 3rd, 4th harmonics + tanh overdrive) for maximum
-     * phone speaker loudness and urgency.
-     */
-    private fun runExtraHypoSirenLoop() {
-        val cycleSec = 3.0
-        val numSamples = (SAMPLE_RATE * cycleSec).toInt()
-        val sirenCycle = ShortArray(numSamples)
-        var phase = 0.0
-
-        for (i in 0 until numSamples) {
-            val t = i.toDouble() / SAMPLE_RATE
-            // Cosine modulation: starts at 520 Hz, peaks at 980 Hz at 1.5s, returns to 520 Hz at 3.0s
-            val modProgress = 0.5 * (1.0 - kotlin.math.cos(2.0 * PI * t / cycleSec))
-            val currentFreq = 520.0 + (980.0 - 520.0) * modProgress
-            phase += 2.0 * PI * currentFreq / SAMPLE_RATE
-            if (phase > 2.0 * PI) phase -= 2.0 * PI
-
-            // Powerful air-raid siren timbre: fundamental + 2nd, 3rd (piercing 1.5-3 kHz), 4th harmonics
-            val raw = 0.45 * sin(phase) + 0.28 * sin(2.0 * phase) + 0.20 * sin(3.0 * phase) + 0.07 * sin(4.0 * phase)
-            // Saturated overdrive via tanh for maximum RMS acoustical loudness on mobile transducers
-            val saturated = kotlin.math.tanh(raw * 1.6)
-            val sampleVal = (saturated * Short.MAX_VALUE * 0.98).toInt()
-            sirenCycle[i] = sampleVal.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
-        }
-
-        // Loop 17 cycles (~51 seconds total)
-        for (cycle in 0 until 17) {
-            if (!isCriticalActive || !isPlayingActive) break
-            playRawPcm(sirenCycle, usage = AudioAttributes.USAGE_ALARM)
-        }
-    }
-
-    /**
-     * Generates and plays the 16-second piercing pulsed high-urgency alarm for extreme hyper.
-     * High-pitched alternating chime bursts (1760 Hz & 2349 Hz).
-     */
-    private fun runExtraHyperAlarmLoop() {
-        val b1 = generateSineWave(freq = 1760.00, durationMs = 80, volume = 0.95f)
-        val b2 = generateSineWave(freq = 2349.32, durationMs = 80, volume = 1.0f)
-        val b3 = generateSineWave(freq = 1760.00, durationMs = 80, volume = 0.95f)
-        val b4 = generateSineWave(freq = 2349.32, durationMs = 140, volume = 1.0f)
-        val pause = ShortArray((SAMPLE_RATE * 0.62).toInt()) // 620ms pause -> 1.0s total cycle
-
-        val burstLen = b1.size + b2.size + b3.size + b4.size + pause.size
-        val burstData = ShortArray(burstLen)
-        var offset = 0
-        System.arraycopy(b1, 0, burstData, offset, b1.size); offset += b1.size
-        System.arraycopy(b2, 0, burstData, offset, b2.size); offset += b2.size
-        System.arraycopy(b3, 0, burstData, offset, b3.size); offset += b3.size
-        System.arraycopy(b4, 0, burstData, offset, b4.size); offset += b4.size
-        System.arraycopy(pause, 0, burstData, offset, pause.size)
-
-        // Loop 16 cycles (~16 seconds total)
-        for (cycle in 0 until 16) {
-            if (!isCriticalActive || !isPlayingActive) break
-            playRawPcm(burstData, usage = AudioAttributes.USAGE_ALARM)
-        }
-    }
-
-    /**
-     * Caregiver SOS Wakeup: Plays 50-second continuous civil defense Extra-Hypo siren
-     * with volume forced to 100% on USAGE_ALARM stream.
+     * Caregiver SOS Wakeup: 20 cycles of tirup_very_low on USAGE_ALARM stream at 100% volume
      */
     fun playCaregiverSosAlarm() {
-        isPlayingActive = true
-        isCriticalActive = true
-        _isPlaying.value = true
-        _currentlyPlayingTag.value = "CAREGIVER_SOS"
-        audioScope.launch {
-            try {
-                boostAlarmVolumeToMax()
-                runExtraHypoSirenLoop()
-            } catch (e: Exception) {
-                Log.e(TAG, "Caregiver SOS alarm playback error: ${e.message}")
-            } finally {
-                isCriticalActive = false
-                _isPlaying.value = false
-                _currentlyPlayingTag.value = null
-                restoreAlarmVolumeIfNeeded()
-            }
+        playRawResource(
+            resId = R.raw.tirup_very_low,
+            repeatCount = 20,
+            volumePercent = 100,
+            customTag = "CAREGIVER_SOS",
+            boostVolume = true
+        )
+    }
+
+    enum class CriticalToneType {
+        STANDARD,      // Prolonged out-of-range alarm
+        EXTRA_HYPO,    // ~60s tirup_very_low emergency siren
+        EXTRA_HYPER    // ~35s tirup_very_high emergency alarm
+    }
+
+    fun playCriticalAlarm(type: CriticalToneType = CriticalToneType.STANDARD) {
+        when (type) {
+            CriticalToneType.STANDARD -> playProlongedHypoAlert()
+            CriticalToneType.EXTRA_HYPO -> playExtraHypoSiren()
+            CriticalToneType.EXTRA_HYPER -> playExtraHyperAlarm()
         }
     }
 
