@@ -991,15 +991,15 @@ object GlucoseAlertManager {
 
         val title = when (tier) {
             AlertTier.PREDICTIVE -> if (isRu) "🔔 Тест: Предиктивная тревога" else "🔔 Test: Predictive Alert"
-            AlertTier.MAIN -> if (isRu) "⚠️ Тест: Основная тревога (3 бипа)" else "⚠️ Test: Main Alert (3 beeps)"
+            AlertTier.MAIN -> if (isRu) "⚠️ Тест: Основная тревога (Низкий)" else "⚠️ Test: Main Alert (Low)"
             AlertTier.CRITICAL -> if (isRu) "🚨 Тест: Критическая сирена" else "🚨 Test: Critical Alarm"
             AlertTier.SIGNAL_LOSS -> if (isRu) "📡 Тест: Потеря сигнала" else "📡 Test: Signal Loss"
         }
         val text = when (tier) {
             AlertTier.PREDICTIVE -> if (isRu) "Мягкий сигнал прогноза падения/роста." else "Soft warning before crossing range."
-            AlertTier.MAIN -> if (isRu) "Тройной сигнал при подтверждённом выходе за границы диапазона." else "Triple beep (1.5s pause) on confirmed out-of-range."
-            AlertTier.CRITICAL -> if (isRu) "Серия громкой сирены ~12 сек. Нажмите «ОК» в уведомлении для отключения звука." else "Loud siren series ~12s. Tap 'Dismiss' to silence."
-            AlertTier.SIGNAL_LOSS -> if (isRu) "Двухтональный сигнал при отсутствии данных более 20 минут." else "Two-tone alert on missing data for >20 minutes."
+            AlertTier.MAIN -> if (isRu) "Сигнал при подтверждённом выходе за границы диапазона." else "Alert tone on confirmed out-of-range."
+            AlertTier.CRITICAL -> if (isRu) "Экстренная сирена. Нажмите «ОК» в уведомлении для отключения звука." else "Emergency siren. Tap 'Dismiss' to silence."
+            AlertTier.SIGNAL_LOSS -> if (isRu) "Сигнал при отсутствии данных более 20 минут." else "Alert tone on missing data for >20 minutes."
         }
 
         sendNotification(
@@ -1966,19 +1966,10 @@ object GlucoseAlertManager {
         } else if (tier == AlertTier.PREDICTIVE) {
             MedicalSoundPlayer.playPredictiveAlert(volumePercent)
         } else if (tier == AlertTier.MAIN) {
-            when {
-                trendArrow in listOf("⇊", "↓↓") || title.contains("паден", ignoreCase = true) || title.contains("drop", ignoreCase = true) || title.contains("fall", ignoreCase = true) -> {
-                    MedicalSoundPlayer.playFallingFastAlert(volumePercent)
-                }
-                trendArrow in listOf("⇈", "↑↑") || title.contains("рост", ignoreCase = true) || title.contains("rise", ignoreCase = true) || title.contains("rising", ignoreCase = true) -> {
-                    MedicalSoundPlayer.playRisingFastAlert(volumePercent)
-                }
-                title.contains("низк", ignoreCase = true) || title.contains("low", ignoreCase = true) -> {
-                    MedicalSoundPlayer.playLowAlert(volumePercent)
-                }
-                else -> {
-                    MedicalSoundPlayer.playHighAlert(volumePercent)
-                }
+            if (title.contains("низк", ignoreCase = true) || title.contains("low", ignoreCase = true) || title.contains("гипо", ignoreCase = true)) {
+                MedicalSoundPlayer.playLowAlert(volumePercent)
+            } else {
+                MedicalSoundPlayer.playHighAlert(volumePercent)
             }
         } else if (tier == AlertTier.SIGNAL_LOSS) {
             MedicalSoundPlayer.playSignalLossAlert(volumePercent)

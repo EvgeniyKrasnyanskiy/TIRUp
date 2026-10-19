@@ -365,7 +365,7 @@ fun AlertsConfigSection(
                     AlertTierConfigRow(
                         title = if (isRu) "2. Основные (3–5 точек вне нормы)" else "2. Main (3–5 points confirmed)",
                         subtitle = if (!isMaster) (if (isRu) "Выключено (общий тумблер выключен)" else "Disabled (master switch off)")
-                        else if (isRu) "Тройной сигнал (3 точки для 5-мин / 5 точек для 1-мин). Глушится при падении с IoB" else "Triple beep (3 pts for 5-min / 5 pts for 1-min). Muted on drop with IoB",
+                        else if (isRu) "Сигнал (3 точки для 5-мин / 5 точек для 1-мин). Глушится при падении с IoB" else "Alert tone (3 pts for 5-min / 5 pts for 1-min). Muted on drop with IoB",
                         enabled = isMaster && alerts.isMainEnabled,
                         onEnabledChange = { isChecked ->
                             if (isChecked) {
