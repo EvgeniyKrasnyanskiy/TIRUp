@@ -106,6 +106,7 @@ class SettingsRepositoryImpl(
             .putBoolean(KEY_ALERT_MASTER_ENABLED, settings.alertSettings.isAlertsMasterEnabled)
             .putLong(KEY_ALERT_MUTE_UNTIL, settings.alertSettings.alertsMuteUntilTimestamp)
             .putInt(KEY_ALERT_VOLUME_PERCENT, settings.alertSettings.alertVolumePercent)
+            .putInt(KEY_NIGHT_ALERT_VOLUME_PERCENT, settings.alertSettings.nightAlertVolumePercent)
             .putBoolean(KEY_ALERT_PREDICTIVE_ENABLED, settings.alertSettings.isPredictiveEnabled)
             .putInt(KEY_ALERT_PREDICTIVE_MINUTES, settings.alertSettings.predictiveMinutesAhead)
             .putBoolean(KEY_ALERT_PREDICTIVE_VIBRATE, settings.alertSettings.isPredictiveVibrate)
@@ -340,6 +341,7 @@ class SettingsRepositoryImpl(
                 isAlertsMasterEnabled = prefs.getBoolean(KEY_ALERT_MASTER_ENABLED, true),
                 alertsMuteUntilTimestamp = prefs.getLong(KEY_ALERT_MUTE_UNTIL, 0L),
                 alertVolumePercent = prefs.getInt(KEY_ALERT_VOLUME_PERCENT, 80),
+                nightAlertVolumePercent = prefs.getInt(KEY_NIGHT_ALERT_VOLUME_PERCENT, 80),
                 isPredictiveEnabled = prefs.getBoolean(KEY_ALERT_PREDICTIVE_ENABLED, true),
                 predictiveMinutesAhead = prefs.getInt(KEY_ALERT_PREDICTIVE_MINUTES, 15),
                 isPredictiveVibrate = prefs.getBoolean(KEY_ALERT_PREDICTIVE_VIBRATE, true),
@@ -613,6 +615,7 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_MASTER_ENABLED = "key_alert_master_enabled"
         private const val KEY_ALERT_MUTE_UNTIL = "key_alert_mute_until"
         private const val KEY_ALERT_VOLUME_PERCENT = "key_alert_volume_percent"
+        private const val KEY_NIGHT_ALERT_VOLUME_PERCENT = "key_night_alert_volume_percent"
         private const val KEY_ALERT_PREDICTIVE_ENABLED = "key_alert_predictive_enabled"
         private const val KEY_ALERT_PREDICTIVE_MINUTES = "key_alert_predictive_minutes"
         private const val KEY_ALERT_PREDICTIVE_VIBRATE = "key_alert_predictive_vibrate"

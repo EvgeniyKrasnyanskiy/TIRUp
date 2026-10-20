@@ -388,7 +388,7 @@ private fun GitHubTirContributionGrid(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(if (!isTingMode) PrimaryEmerald else Color.Transparent)
+                                .background(if (!isTingMode) ActionBlue else Color.Transparent)
                                 .clickable {
                                     isTingMode = false
                                     selectedDetail = null
@@ -406,7 +406,7 @@ private fun GitHubTirContributionGrid(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(if (isTingMode) PrimaryEmerald else Color.Transparent)
+                                .background(if (isTingMode) ActionBlue else Color.Transparent)
                                 .clickable {
                                     isTingMode = true
                                     selectedDetail = null
@@ -571,7 +571,7 @@ private fun GitHubTirContributionGrid(
             Text(
                 text = selectedDetail ?: if (isRu) "Нажмите на день для деталей" else "Tap a day for details",
                 style = MaterialTheme.typography.labelSmall,
-                color = if (selectedDetail != null) PrimaryEmerald else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (selectedDetail != null) ActionBlue else MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = if (selectedDetail != null) FontWeight.SemiBold else FontWeight.Normal,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()

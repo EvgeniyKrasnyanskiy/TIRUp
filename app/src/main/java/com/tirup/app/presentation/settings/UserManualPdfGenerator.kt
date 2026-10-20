@@ -558,12 +558,12 @@ class UserManualPdfGenerator(private val context: Context) {
                 // =========================================================================
                 flow.chapter(
                     3,
-                    if (isRu) "ГЛАВА 3. МНОГОУРОВНЕВАЯ СИСТЕМА ТРЕВОГ И ЭКРАН СПАСЕНИЯ" else "CHAPTER 3. 4-TIER ALARMS, COMA GUARD & RESCUE SCREEN",
-                    if (isRu) "Клиническая градация Tier 1–4, предиктивный тренд на 25 минут, обход DND и Coma Guard" else "Tier 1-4 escalation, 25-min predictive trend, DND bypass and Coma Guard protocol"
+                    if (isRu) "ГЛАВА 3. МНОГОУРОВНЕВАЯ СИСТЕМА ТРЕВОГ И ЭКРАН СПАСЕНИЯ" else "CHAPTER 3. 5-TIER ALARMS, COMA GUARD & RESCUE SCREEN",
+                    if (isRu) "Клиническая градация Tier 1–5, скоростные тревоги, MP3-звуки, обход DND и Coma Guard" else "Tier 1-5 escalation, speed alerts, MP3 audio, DND bypass and Coma Guard protocol"
                 )
                 flow.paragraph(
-                    if (isRu) "Одной из главных проблем пользователей CGM является «усталость от тревог» (Alarm Fatigue), когда частые ложные сигналы приводят к отключению звука. В TIRUp реализована адаптивная 4-уровневая система безопасности, которая отсекает шум и включает сирены только тогда, когда существует реальная клиническая угроза здоровью:"
-                    else "To resolve CGM alarm fatigue, TIRUp incorporates an adaptive 4-tier safety model that filters transient sensor artifacts and escalates alerts only for verified clinical hazards:"
+                    if (isRu) "Одной из главных проблем пользователей CGM является «усталость от тревог» (Alarm Fatigue), когда частые ложные сигналы приводят к отключению звука. В TIRUp реализована адаптивная 5-уровневая система безопасности, которая отсекает шум и включает сирены только тогда, когда существует реальная клиническая угроза здоровью:"
+                    else "To resolve CGM alarm fatigue, TIRUp incorporates an adaptive 5-tier safety model that filters transient sensor artifacts and escalates alerts only for verified clinical hazards:"
                 )
                 flow.bullet(
                     if (isRu) "Уровень 1: Предиктивный тренд на 25 минут" else "Tier 1: 25-Min Predictive Trend",
@@ -581,14 +581,19 @@ class UserManualPdfGenerator(private val context: Context) {
                     else "Prolonged alerts (>20m hypo or >90m hyper) sound a 12s medical chime. Critical thresholds (<3.0 or >13.9 mmol/L) trigger powerful emergency sirens over lockscreen (WakeLock), bypass DND at 100% volume, and pulse camera flash. Configured via the unified '🚨 Critical Alerts' dialog."
                 )
                 flow.bullet(
-                    if (isRu) "Уровень 4: Потеря сигнала (20–25 мин) и ночной профиль" else "Tier 4: Signal Loss & Night Profile",
+                    if (isRu) "Уровень 4: Скоростные тревоги (резкое падение и рост)" else "Tier 4: Speed Alerts (Rapid Fall & Rise)",
+                    if (isRu) "Оповещает о стремительном изменении гликемии (>0.11 ммоль/л/мин, что соответствует >2 мг/дл/мин). Алгоритм с линейной регрессией отсекает случайный шум сенсора. Воспроизводятся характерные мелодии с циклической проверкой кнопок («Тест L / Тест H») и независимой настройкой вибрации и вспышки камеры."
+                    else "Alerts on rapid glucose changes (>0.11 mmol/L/min or >2 mg/dL/min). Linear regression filtering suppresses sensor noise. Features distinct audio chimes with rotating test buttons ('Test L / Test H') and independent vibration/flash controls."
+                )
+                flow.bullet(
+                    if (isRu) "Уровень 5: Потеря сигнала (20–25 мин) и ночной профиль" else "Tier 5: Signal Loss & Night Profile",
                     if (isRu) "При отсутствии точек >20 мин подаётся сигнал будильника. В Настройках задаются «Часы ночного сна» (по умолчанию 23:00–07:00), в этот период действуют отдельные ночные пороги тревог и строгий контроль связи."
                     else "Alarm sounds if readings stop for >20 mins. Configurable Night Sleep Window (default 23:00-07:00) applies dedicated nocturnal thresholds and strict signal checks."
                 )
-                flow.section(if (isRu) "3.2. Градация сирен: Крит. ГИПО (GDH) и Крит. ГИПЕР" else "3.2. Siren Escalation: Crit. HYPO (GDH) & Crit. HYPER")
+                flow.section(if (isRu) "3.2. Градация сирен и аудиосистема MP3" else "3.2. Siren Escalation & MP3 Audio System")
                 flow.paragraph(
-                    if (isRu) "В TIRUp критические тревоги разделены на мгновенные экстремальные и подтверждённые затяжные с уникальным математически синтезированным звуковым оформлением (PCM без утяжеления приложения аудиофайлами):"
-                    else "In TIRUp critical alerts are segregated into instant extreme and verified prolonged states with mathematically synthesized PCM tones (zero APK audio bloat):"
+                    if (isRu) "В TIRUp тревоги воспроизводятся через откалиброванную аудиосистему на базе MP3 и синтезированных сирен, обеспечивая одинаковый и мощный уровень громкости на любых смартфонах (диапазон настройки 5–100%):"
+                    else "In TIRUp alerts utilize a calibrated audio engine combining dedicated MP3 chimes and synthesized sirens for uniform acoustic performance across all Android devices (5-100% volume slider):"
                 )
                 flow.bullet(
                     if (isRu) "🚨 Крит. ГИПО (<3.0 ммоль/л или настроенный порог) — 50-секундная сирена ГО" else "🚨 Crit. HYPO (<3.0 mmol/L) — 50-Second GDH Siren",
@@ -648,6 +653,11 @@ class UserManualPdfGenerator(private val context: Context) {
                     if (isRu) "Роли «Мастер» и «Фоловер» вверху настроек" else "Master & Follower Roles",
                     if (isRu) "Переключатель роли расположен сразу под карточкой «Мой профиль». Для мастера кнопка «Тест» проверяет экран спасения при гипогликемии, а для фоловера — сирену и экран с карточкой подопечного."
                     else "Device role is toggled at the very top of Settings under My Profile. Master role tests hypo rescue, while Follower role tests incoming distress sirens and patient telemetry card."
+                )
+                flow.bullet(
+                    if (isRu) "GSM 7-bit транслитерация (до 160 символов)" else "GSM 7-bit Transliteration (Up to 160 chars)",
+                    if (isRu) "Все тревожные и информационные SMS автоматически транслитерируются в латиницу (GSM 7-bit). Это увеличивает лимит одной SMS с 70 до 160 символов, предотвращает дробление сообщений операторами связи и гарантирует мгновенную доставку даже в зонах слабого приёма."
+                    else "All distress and telemetry SMS are automatically converted to GSM 7-bit ASCII transliteration. This expands single-part SMS limit from 70 to 160 chars, preventing message splitting and ensuring instant carrier delivery under poor signal conditions."
                 )
                 flow.section(if (isRu) "4.2. Настройка разрешений SMS и экрана блокировки" else "4.2. SMS & Lockscreen Permissions")
                 flow.paragraph(

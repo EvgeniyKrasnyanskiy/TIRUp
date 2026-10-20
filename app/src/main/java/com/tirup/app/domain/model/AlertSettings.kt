@@ -5,6 +5,7 @@ data class AlertSettings(
     val isAlertsMasterEnabled: Boolean = true,
     val alertsMuteUntilTimestamp: Long = 0L,
     val alertVolumePercent: Int = 80,
+    val nightAlertVolumePercent: Int = 80,
 
     // Tier 1: Predictive (Soft / Умные упреждающие)
     val isPredictiveEnabled: Boolean = true,

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/Version-1.0.1-brightgreen.svg)
+![Version](https://img.shields.io/badge/Version-1.0.2-brightgreen.svg)
 ![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-green.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-blue.svg)
 ![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%2F%20Material%203-blueviolet.svg)
@@ -95,15 +95,16 @@
 - Empowers preemptive hypo intervention with fast-acting carbohydrates 15–20 minutes before breaking clinical thresholds.
 - Interactive tap inspector on any forecast point showing estimated time and projected glucose level.
 
-### 8. Smart 4-Tier Safety Alarms & Battery Supervision
+### 8. Smart 5-Tier Safety Alarms & Calibrated Audio Engine
 - **Tier 1 (Predictive Trend Alert, 15 min)**: mathematical velocity regression calculating exact astronomical event time (*"at 16:42"*) with gentle, low-stress chime.
-- **Tier 2 (Confirmed Out-of-Range)**: triggers after 3–5 consecutive readings outside personal thresholds; distinct triple medical chime with 1.5s pause.
+- **Tier 2 (Confirmed Out-of-Range)**: triggers after 3–5 consecutive readings outside personal thresholds; distinct medical chime with rotating test preview (Low / High).
 - **Tier 3 (Dangerous & Critical Alarms)**:
-  - *Dangerous (Prolonged)*: glucose < 3.9 mmol/L for > 20 min or > 10.0 mmol/L for > 90 min — 12-second sustained medical warning.
-  - *Critical (Urgent)*: customizable thresholds (defaults: < 3.0 and > 13.9 mmol/L). Instant single-point trigger: powerful 50-second civil-defense GDH air-raid siren (520–980 Hz frequency sweep with saturation harmonics) for Crit. HYPO waking up the rescue screen over lockscreen with SOS countdown to followers; or a 16-second pulsating emergency tone (1760/2349 Hz) for Crit. HYPER. Unified modal for thresholds and siren configuration.
-- **Tier 4 (Sensor Signal Loss >20 min)**: gentle disconnect reminder with progressive day/night schedule (sleep window: repeated alarm cycle for reliable waking; daytime: courteous reminder intervals).
+  - *Dangerous (Prolonged)*: glucose < 3.9 mmol/L for > 20 min or > 10.0 mmol/L for > 90 min — 15-second sustained medical warning (5 repeats of `tirup_low.mp3` or `tirup_high.mp3` with 400ms pause).
+  - *Critical (Urgent)*: customizable thresholds (defaults: < 3.0 and > 13.9 mmol/L). Instant single-point trigger: powerful 60-second air-raid siren (20 cycles of `tirup_very_low.mp3`) for Crit. HYPO waking up the rescue screen over lockscreen with SOS countdown to followers; or a 35-second pulsating emergency alarm (10 cycles of `tirup_very_high.mp3`) for Crit. HYPER. Unified modal for thresholds and siren configuration.
+- **Tier 4 (Speed Alerts: Rapid Drop & Rise)**: warns when rate of change exceeds $\pm 0.11\text{ mmol/L/min}$ ($>2\text{ mg/dL/min}$) using linear regression to filter transient sensor noise. Distinct acoustic chimes (`tirup_falling_fast.mp3` & `tirup_rising_fast.mp3`), rotating test preview (`Test L / Test H`), and independent vibration and camera flashlight strobing.
+- **Tier 5 (Sensor Signal Loss >20 min)**: gentle disconnect reminder (`tirup_signal_loss.mp3`) with progressive day/night schedule (sleep window: repeated alarm cycle for reliable waking; daytime: courteous reminder intervals).
 - **Stepped Critical Battery Alarms (<15%, <10%, <5%)**: intelligent warning with hysteresis, anti-spam protection, and quick acknowledgment button ("OK") directly in the Android notification shade.
-- **Independent Alarm Volume Slider (20% – 100%)**: dedicated volume control in Settings with live "Test 🔔" playback button.
+- **Calibrated MP3 Audio System & Wide Volume Slider (5% – 100%)**: identical acoustic clarity and loudness across all smartphone models. Independent volume control in Settings with live test playback.
 - **Quick Snooze All**: temporarily silence all alarms from the Focus screen (`10m`, `30m`, default `1h`, `2h`, `4h`, `8h`) with automatic suppression of signal loss chimes.
 - **Bilingual Alert Log**: on-the-fly translation of logged alarm events, titles, and snooze states when toggling system language (EN/RU).
 - **Clinical Smart Snooze**:
@@ -438,15 +439,16 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - Помогает заблаговременно купировать приближающуюся гипогликемию быстрыми углеводами за 15–20 минут до пробития порога.
 - Интерактивный инспектор при тапе на фиолетовую точку прогноза с точным расчётным временем и прогнозируемым уровнем сахара.
 
-### 8. Система безопасности и тревог (Smart 4-Tier Alarms & Battery)
+### 8. Система безопасности и тревог (Smart 5-Tier Alarms & Battery)
 - **Уровень 1 (Предиктивный прогноз за 15 мин)**: математическая регрессия скорости изменения сахара с расчётом точного астрономического времени события (*«в 16:42»*) и мягким перезвоном без стресса.
-- **Уровень 2 (Подтверждённый выход за границы)**: фиксация 3-5 замеров подряд вне персональных порогов; отчётливый тройной медицинский тон с паузой 1.5 сек.
+- **Уровень 2 (Подтверждённый выход за границы)**: фиксация 3-5 замеров подряд вне персональных порогов; отчётливый медицинский тон с циклической проверкой («Тест L / Тест H»).
 - **Уровень 3 (Опасные и критические)**:
-  - *Опасные (затяжные)*: фиксация сахара < 3.9 ммоль/л (> 20 мин) или > 10.0 ммоль/л (> 90 мин) — 12-секундный медицинский сигнал.
-  - *Критические (экстра)*: настраиваемые границы (по умолчанию < 3.0 и > 13.9 ммоль/л). Мгновенное срабатывание по первой точке: мощная 50-секундная сирена ГО (520–980 Гц с гармониками и насыщением) при Крит. ГИПО с пробуждением экрана спасения поверх блокировки и отсчётом SOS фоловерам, либо 16-секундный резкий пульсирующий сигнал (1760/2349 Гц) при Крит. ГИПЕР. Управление порогами и сиренами объединено в единое модальное окно.
-- **Уровень 4 (Потеря сигнала сенсора >20 мин)**: мягкий сигнал потери связи с прогрессивным расписанием день/ночь (в окне сна: серия будильников для надёжного пробуждения; днём: щадящие интервалы).
+  - *Опасные (затяжные)*: фиксация сахара < 3.9 ммоль/л (> 20 мин) или > 10.0 ммоль/л (> 90 мин) — 15-секундный медицинский сигнал (5 повторов `tirup_low.mp3` или `tirup_high.mp3` с паузой 400 мс).
+  - *Критические (экстра)*: настраиваемые границы (по умолчанию < 3.0 и > 13.9 ммоль/л). Мгновенное срабатывание по первой точке: мощная 60-секундная сирена (20 циклов `tirup_very_low.mp3`) при Крит. ГИПО с пробуждением экрана спасения поверх блокировки и отсчётом SOS фоловерам, либо 35-секундная пульсирующая тревога (10 циклов `tirup_very_high.mp3`) при Крит. ГИПЕР. Управление порогами и сиренами объединено в единое модальное окно.
+- **Уровень 4 (Скоростные тревоги: резкое падение и рост)**: предупреждение при скорости изменения более $\pm 0.11\text{ ммоль/л/мин}$ ($>2\text{ мг/дл/мин}$) с линейной регрессионной фильтрацией помех сенсора. Индивидуальные мелодии (`tirup_falling_fast.mp3` и `tirup_rising_fast.mp3`), циклическая проверка в настройках («Тест L / Тест H») и независимые тумблеры вибрации и вспышки.
+- **Уровень 5 (Потеря сигнала сенсора >20 мин)**: мягкий сигнал потери связи (`tirup_signal_loss.mp3`) с прогрессивным расписанием день/ночь (в окне сна: серия будильников для надёжного пробуждения; днём: щадящие интервалы).
 - **Ступенчатые оповещения о критическом разряде батареи (<15%, <10%, <5%)**: интеллектуальное предупреждение о скором выключении телефона со ступенчатыми порогами, гистерезисом, защитой от повторного спама и подтверждением («ОК») прямо из шторки уведомлений.
-- **Независимый слайдер громкости тревог (20% – 100%)**: отдельный регулятор уровня звука тревог в настройках с кнопкой «Тест 🔔», воспроизводящей реалистичную мелодию оповещения.
+- **Калиброванная MP3-аудиосистема и широкий слайдер громкости (5% – 100%)**: одинаково отчётливая и чистая слышимость на смартфонах любых брендов. Отдельный регулятор уровня звука тревог в настройках с кнопкой оперативной проверки.
 - **Быстрая пауза всех тревог (Snooze All)**: возможность отложить все тревоги на экране «Фокус» с удобным выбором пресетов (`10м`, `30м`, `1ч` по умолчанию, `2ч`, `4ч`, `8ч`) с автоматическим глушением сигналов потери связи.
 - **Двуязычный журнал тревог (Alert Log)**: на лету переводит все записи событий и таймеры пауз при переключении языка приложения (RU/EN).
 - **Клинический адаптивный Снуз (Smart Snooze)**:

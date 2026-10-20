@@ -65,7 +65,7 @@ object MedicalSoundPlayer {
             try {
                 val context = try { com.tirup.app.TirupApplication.instance } catch (_: Exception) { null } ?: return@launch
                 ensureAlarmStreamAudible()
-                val factor = (volumePercent / 100f).coerceIn(0.05f, 1.0f)
+                val factor = (volumePercent / 100f).coerceIn(0.01f, 1.0f)
 
                 val audioAttributes = AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)

@@ -1326,7 +1326,7 @@ object GlucoseAlertManager {
                 val body = if (isRu) bodyRu else bodyEn
 
                 val channelId = if (targetThreshold <= 5) CHANNEL_CRITICAL else CHANNEL_MAIN
-                val volume = alerts.alertVolumePercent
+                val volume = getEffectiveAlertVolume(settings)
                 val vibrate = when (tier) {
                     AlertTier.CRITICAL -> alerts.isCriticalVibrate
                     AlertTier.MAIN -> alerts.isMainVibrate
@@ -1447,24 +1447,26 @@ object GlucoseAlertManager {
             return
         }
 
+        val effectiveVolume = getEffectiveAlertVolume(settings)
+
         // ----------------------------------------------------
         // SPEED ALERTS: RAPID CHANGE (FALLING / RISING FAST)
         // ----------------------------------------------------
-        if (evaluateRapidChangeAlert(context, latest, sorted, alerts, now, isRu)) {
+        if (evaluateRapidChangeAlert(context, latest, sorted, alerts, now, isRu, effectiveVolume)) {
             return
         }
 
         // ----------------------------------------------------
         // TIER 2: MAIN (CONFIRMED OUT OF RANGE)
         // ----------------------------------------------------
-        if (evaluateMainAlert(context, latest, sorted, alerts, targetRanges, now, isRu)) {
+        if (evaluateMainAlert(context, latest, sorted, alerts, targetRanges, now, isRu, effectiveVolume)) {
             return
         }
 
         // ----------------------------------------------------
         // TIER 1: PREDICTIVE (15-MIN FORECAST)
         // ----------------------------------------------------
-        evaluatePredictiveAlert(context, latest, sorted, alerts, settings, targetRanges, now, isRu)
+        evaluatePredictiveAlert(context, latest, sorted, alerts, settings, targetRanges, now, isRu, effectiveVolume)
     }
 
     private fun evaluateCriticalHypo(
@@ -1627,7 +1629,8 @@ object GlucoseAlertManager {
         alerts: AlertSettings,
         targetRanges: com.tirup.app.domain.model.TargetRanges,
         now: Long,
-        isRu: Boolean
+        isRu: Boolean,
+        effectiveVolume: Int = alerts.alertVolumePercent
     ): Boolean {
         val mainLow = alerts.mainLowThresholdMmol
         val mainHigh = alerts.mainHighThresholdMmol
@@ -1661,7 +1664,7 @@ object GlucoseAlertManager {
                 latest.valueMmol,
                 mainLow
             )
-            sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash, alerts.alertVolumePercent)
+            sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash, effectiveVolume)
             return true
         } else if (isHighConfirmed) {
             val isExtremeHigh = latest.valueMmol > targetRanges.veryHighThresholdMmol
@@ -1701,7 +1704,7 @@ object GlucoseAlertManager {
                     latest.valueMmol,
                     mainHigh
                 )
-                sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash, alerts.alertVolumePercent)
+                sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash, effectiveVolume)
                 return true
             }
         }
@@ -1716,7 +1719,8 @@ object GlucoseAlertManager {
         settings: UserSettings,
         targetRanges: com.tirup.app.domain.model.TargetRanges,
         now: Long,
-        isRu: Boolean
+        isRu: Boolean,
+        effectiveVolume: Int = alerts.alertVolumePercent
     ): Boolean {
         if (!alerts.isPredictiveEnabled || sorted.size < 5) return false
 
@@ -1757,7 +1761,7 @@ object GlucoseAlertManager {
                 iobNotice,
                 kotlin.math.abs(prediction.rateOfChangeMmolPerMin)
             )
-            sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash, alerts.alertVolumePercent)
+            sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash, effectiveVolume)
             return true
         } else if (prediction.event == PredictedEvent.PREDICTED_HIGH && now - lastPredictive >= 30 * 60000L) {
             lastPredictiveAlertTimestamp.set(now)
@@ -1779,7 +1783,7 @@ object GlucoseAlertManager {
                 arrow,
                 prediction.rateOfChangeMmolPerMin
             )
-            sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash, alerts.alertVolumePercent)
+            sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash, effectiveVolume)
             return true
         }
         return false
@@ -1791,7 +1795,8 @@ object GlucoseAlertManager {
         sorted: List<GlucoseReading>,
         alerts: AlertSettings,
         now: Long,
-        isRu: Boolean
+        isRu: Boolean,
+        effectiveVolume: Int = alerts.alertVolumePercent
     ): Boolean {
         if (!alerts.isRapidChangeEnabled || sorted.size < 2) return false
 
@@ -1857,7 +1862,7 @@ object GlucoseAlertManager {
             tier = AlertTier.RAPID_CHANGE,
             vibrate = alerts.isRapidChangeVibrate,
             flash = alerts.isRapidChangeFlash,
-            volumePercent = alerts.alertVolumePercent,
+            volumePercent = effectiveVolume,
             glucoseDisplay = String.format(Locale.US, "%.1f", latest.valueMmol),
             trendArrow = arrow,
             isRu = isRu
@@ -2587,6 +2592,17 @@ object GlucoseAlertManager {
     }
 
     /**
+     * Resolves the alert volume percent according to daytime / nighttime sleep schedule.
+     */
+    fun getEffectiveAlertVolume(settings: UserSettings): Int {
+        return if (isNightNow(settings)) {
+            settings.alertSettings.nightAlertVolumePercent
+        } else {
+            settings.alertSettings.alertVolumePercent
+        }
+    }
+
+    /**
      * Day/night schedule for Signal Loss (Tier 4):
      * Night (attempt to wake up user): 6x5m, 6x10m, 6x20m, then 30m until morning.
      * Day: 3x5m, 3x20m, then 60m until night.
@@ -2770,7 +2786,8 @@ object GlucoseAlertManager {
                         text = text,
                         tier = AlertTier.SIGNAL_LOSS,
                         vibrate = alerts.isSignalLossVibrate,
-                        flash = alerts.isSignalLossFlash
+                        flash = alerts.isSignalLossFlash,
+                        volumePercent = getEffectiveAlertVolume(settings)
                     )
                 }
 

@@ -165,7 +165,7 @@ fun MainThresholdDialog(
                         onDismiss()
                     }
                 ) {
-                    Text(if (isRu) "Сброс к норме (3.9 - 10.0)" else "Default (3.9 - 10.0)")
+                    Text(if (isRu) "К норме (3.9 - 10.0)" else "Default (3.9 - 10.0)")
                 }
                 TextButton(
                     onClick = onDismiss
@@ -290,9 +290,9 @@ fun CriticalThresholdDialog(
 
                         Text(
                             text = if (isRu)
-                                "50-секундная сирена ГО / GDH на 100% громкости, окно спасения поверх блокировки и вызов фоловеров при отсутствии ответа."
+                                "60-секундная сирена ГО / GDH на 100% громкости, окно спасения поверх блокировки и вызов фоловеров при отсутствии ответа."
                             else
-                                "50-second continuous civil defense air-raid siren at 100% volume, rescue window over lockscreen, and follower SOS.",
+                                "60-second continuous civil defense air-raid siren at 100% volume, rescue window over lockscreen, and follower SOS.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -386,9 +386,9 @@ fun CriticalThresholdDialog(
 
                         Text(
                             text = if (isRu)
-                                "Резкий пульсирующий сигнал тревоги (~35 секунд). Предупреждает о критической гипергликемии и необходимости контроля подколки/кетонов."
+                                "Резкий пульсирующий сигнал тревоги (~30 секунд). Предупреждает о критической гипергликемии и необходимости контроля подколки/кетонов."
                             else
-                                "Piercing high-frequency pulsed alert (~35s). Alerts to severe hyperglycemia and need for insulin/ketone check.",
+                                "Piercing high-frequency pulsed alert (~30s). Alerts to severe hyperglycemia and need for insulin/ketone check.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )

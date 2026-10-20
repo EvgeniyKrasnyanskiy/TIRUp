@@ -65,7 +65,7 @@ fun AlertsConfigSection(
     isRu: Boolean,
     currentlyPlayingTag: String?,
     onUpdateAlertSettings: (AlertSettings) -> Unit,
-    onTestAlert: (AlertTier) -> Unit,
+    @Suppress("UNUSED_PARAMETER") onTestAlert: (AlertTier) -> Unit,
     @Suppress("UNUSED_PARAMETER") onTestCaregiverSosScreen: () -> Unit = {},
     onPlayTestSound: (Int) -> Unit,
     onSoundClick: (String, () -> Unit) -> Unit,
@@ -108,7 +108,7 @@ fun AlertsConfigSection(
                         )
                         Column {
                             Text(
-                                text = if (isRu) "Тревоги (4 уровня)" else "Alarms (4 Tiers)",
+                                text = if (isRu) "Тревоги (5 уровней)" else "Alarms (5 Tiers)",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -117,7 +117,7 @@ fun AlertsConfigSection(
                                 text = if (!alerts.isAlertsMasterEnabled) {
                                     if (isRu) "Все тревоги выключены" else "All alarms disabled"
                                 } else {
-                                    if (isRu) "Предиктивные, основные, критические, связь" else "Predictive, main, critical, signal loss"
+                                    if (isRu) "Предиктивные, основные, критические, скоростные, связь" else "Predictive, main, critical, speed, signal loss"
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (!alerts.isAlertsMasterEnabled) ColorVeryLow else MaterialTheme.colorScheme.onSurfaceVariant
@@ -352,7 +352,18 @@ fun AlertsConfigSection(
                         flash = alerts.isPredictiveFlash,
                         onFlashChange = { onUpdateAlertSettings(alerts.copy(isPredictiveFlash = it)) },
                         accentColor = ActionBlue,
-                        onTestClick = { onSoundClick(AlertTier.PREDICTIVE.name) { onTestAlert(AlertTier.PREDICTIVE) } },
+                        onTestClick = {
+                            if (currentlyPlayingTag == AlertTier.PREDICTIVE.name) {
+                                MedicalSoundPlayer.stopAll()
+                            } else {
+                                onSoundClick(AlertTier.PREDICTIVE.name) {
+                                    MedicalSoundPlayer.playPredictiveAlert(
+                                        volumePercent = alerts.alertVolumePercent,
+                                        customTag = AlertTier.PREDICTIVE.name
+                                    )
+                                }
+                            }
+                        },
                         isTesting = (currentlyPlayingTag == AlertTier.PREDICTIVE.name),
                         isRu = isRu,
                         thresholdBadge = if (isRu) "⏱️ Горизонт: ${alerts.predictiveMinutesAhead} мин" else "⏱️ Horizon: ${alerts.predictiveMinutesAhead} min",
@@ -432,8 +443,8 @@ fun AlertsConfigSection(
                         !alerts.isCriticalEnabled -> {
                             if (isRu) "Выключено пользователем" else "Disabled by user"
                         }
-                        else -> if (isRu) "Опасные (12с): <3.9 (>20 мин) или >10.0 (>90 мин). Критические: экстренные сирены и экран спасения"
-                        else "Dangerous (12s): <3.9 (>20 min) or >10.0 (>90 min). Critical: emergency alarms & rescue screen"
+                        else -> if (isRu) "Опасные (~15с): <3.9 (>20 мин) или >10.0 (>90 мин). Критические: экстренные сирены и экран спасения"
+                        else "Dangerous (~15s): <3.9 (>20 min) or >10.0 (>90 min). Critical: emergency alarms & rescue screen"
                     }
 
                     // Tier 3: Critical (Prolonged / Extreme)
@@ -569,7 +580,18 @@ fun AlertsConfigSection(
                         flash = alerts.isSignalLossFlash,
                         onFlashChange = { onUpdateAlertSettings(alerts.copy(isSignalLossFlash = it)) },
                         accentColor = Color(0xFF8B5CF6),
-                        onTestClick = { onSoundClick(AlertTier.SIGNAL_LOSS.name) { onTestAlert(AlertTier.SIGNAL_LOSS) } },
+                        onTestClick = {
+                            if (currentlyPlayingTag == AlertTier.SIGNAL_LOSS.name) {
+                                MedicalSoundPlayer.stopAll()
+                            } else {
+                                onSoundClick(AlertTier.SIGNAL_LOSS.name) {
+                                    MedicalSoundPlayer.playSignalLossAlert(
+                                        volumePercent = alerts.alertVolumePercent,
+                                        customTag = AlertTier.SIGNAL_LOSS.name
+                                    )
+                                }
+                            }
+                        },
                         isTesting = (currentlyPlayingTag == AlertTier.SIGNAL_LOSS.name),
                         isRu = isRu
                     )

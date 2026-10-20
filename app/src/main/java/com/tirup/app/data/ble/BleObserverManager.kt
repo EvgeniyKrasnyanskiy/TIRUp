@@ -752,9 +752,6 @@ object BleObserverManager {
 
         recordChannelPacket(now, packet.timestamp, rssi)
 
-        // Cancel active boost search immediately on master packet arrival
-        cancelBoost()
-
         // Self-Healing: if we were in ECO power-saving mode, instantly restore LOW_LATENCY
         if (_isEcoModeFlow.value) {
             Log.i(TAG, "Self-Healing: Master packet detected while in ECO mode! Instantly restoring LOW_LATENCY.")
