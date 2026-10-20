@@ -624,6 +624,11 @@ object AutoBackupManager {
         writer.name("isCriticalHypoPermanentDisabled").value(a.isCriticalHypoPermanentDisabled)
         writer.name("criticalLowThresholdMmol").value(a.criticalLowThresholdMmol)
         writer.name("criticalHighThresholdMmol").value(a.criticalHighThresholdMmol)
+        writer.name("isRapidChangeEnabled").value(a.isRapidChangeEnabled)
+        writer.name("rapidFallThresholdMmolPerMin").value(a.rapidFallThresholdMmolPerMin)
+        writer.name("rapidRiseThresholdMmolPerMin").value(a.rapidRiseThresholdMmolPerMin)
+        writer.name("isRapidChangeVibrate").value(a.isRapidChangeVibrate)
+        writer.name("isRapidChangeFlash").value(a.isRapidChangeFlash)
         writer.name("isSignalLossEnabled").value(a.isSignalLossEnabled)
         writer.name("signalLossMinutes").value(a.signalLossMinutes)
         writer.name("isSignalLossVibrate").value(a.isSignalLossVibrate)
@@ -2285,6 +2290,11 @@ object AutoBackupManager {
         var critPermDisabled = false
         var critLow = 3.0
         var critHigh = 13.9
+        var rapidChangeEnabled = false
+        var rapidFallThreshold = 0.11
+        var rapidRiseThreshold = 0.11
+        var rapidChangeVib = true
+        var rapidChangeFlash = false
         var sigLossEnabled = true
         var sigLossMin = 20
         var sigLossVib = true
@@ -2331,6 +2341,11 @@ object AutoBackupManager {
                 "isCriticalHypoPermanentDisabled" -> critPermDisabled = reader.nextBoolean()
                 "criticalLowThresholdMmol" -> critLow = reader.nextDouble()
                 "criticalHighThresholdMmol" -> critHigh = reader.nextDouble()
+                "isRapidChangeEnabled" -> rapidChangeEnabled = reader.nextBoolean()
+                "rapidFallThresholdMmolPerMin" -> rapidFallThreshold = reader.nextDouble()
+                "rapidRiseThresholdMmolPerMin" -> rapidRiseThreshold = reader.nextDouble()
+                "isRapidChangeVibrate" -> rapidChangeVib = reader.nextBoolean()
+                "isRapidChangeFlash" -> rapidChangeFlash = reader.nextBoolean()
                 "isSignalLossEnabled" -> sigLossEnabled = reader.nextBoolean()
                 "signalLossMinutes" -> sigLossMin = reader.nextInt()
                 "isSignalLossVibrate" -> sigLossVib = reader.nextBoolean()
@@ -2379,6 +2394,11 @@ object AutoBackupManager {
             isCriticalHypoPermanentDisabled = critPermDisabled,
             criticalLowThresholdMmol = critLow,
             criticalHighThresholdMmol = critHigh,
+            isRapidChangeEnabled = rapidChangeEnabled,
+            rapidFallThresholdMmolPerMin = rapidFallThreshold,
+            rapidRiseThresholdMmolPerMin = rapidRiseThreshold,
+            isRapidChangeVibrate = rapidChangeVib,
+            isRapidChangeFlash = rapidChangeFlash,
             isSignalLossEnabled = sigLossEnabled,
             signalLossMinutes = sigLossMin,
             isSignalLossVibrate = sigLossVib,

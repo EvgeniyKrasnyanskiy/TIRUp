@@ -60,7 +60,8 @@ enum class AlertTier {
     PREDICTIVE,  // Tier 1: Soft / Упреждающий за 15 мин
     MAIN,        // Tier 2: Confirmed 5 points / Основной (тройной сигнал)
     CRITICAL,    // Tier 3: Prolonged / Критический «кричащий» (сирена 12 сек)
-    SIGNAL_LOSS  // Tier 4: Signal Loss / Потеря связи (>20 мин)
+    SIGNAL_LOSS, // Tier 4: Signal Loss / Потеря связи (>20 мин)
+    RAPID_CHANGE // Speed Alerts: Резкое падение / Резкий рост
 }
 
 data class ActiveAlertBanner(
@@ -269,6 +270,7 @@ object GlucoseAlertManager {
     const val CHANNEL_MAIN = "tirup_alert_main_v2"
     const val CHANNEL_CRITICAL = "tirup_alert_critical_v2"
     const val CHANNEL_SIGNAL_LOSS = "tirup_alert_signal_loss_v3"
+    const val CHANNEL_RAPID_CHANGE = "tirup_alert_rapid_change_v1"
     const val CHANNEL_PATTERNS = "tirup_patterns_v1"
     const val CHANNEL_COMPENSATOR = "tirup_compensator_v1"
     const val CHANNEL_LOCKSCREEN = "tirup_lockscreen_status_v1"
@@ -284,6 +286,7 @@ object GlucoseAlertManager {
     const val NOTIFICATION_ID_SIGNAL_LOSS = 1004
     const val NOTIFICATION_ID_LAST_CHANCE = 1005
     const val NOTIFICATION_ID_LOW_BATTERY = 1006
+    const val NOTIFICATION_ID_RAPID_CHANGE = 1007
     const val NOTIFICATION_ID_WEEKLY_DIGEST = 6000
     const val NOTIFICATION_ID_SENSOR_REMINDER = 9201
     const val NOTIFICATION_ID_PUMP_REMINDER = 9202
@@ -301,6 +304,7 @@ object GlucoseAlertManager {
     private val lastBatteryAlertThreshold = AtomicInteger(100)
     private val lastHyperAlertTimestamp = AtomicLong(0L)
     private val lastPredictiveAlertTimestamp = AtomicLong(0L)
+    private val lastRapidChangeAlertTimestamp = AtomicLong(0L)
     private val lastSignalLossAlertTimestamp = AtomicLong(0L)
     private val signalLossAlertCount = AtomicInteger(0)
 
@@ -415,6 +419,19 @@ object GlucoseAlertManager {
             setBypassDnd(true)
         }
 
+        // Speed Alerts: Rapid Change (Falling / Rising Fast)
+        val rapidChangeChannel = NotificationChannel(
+            CHANNEL_RAPID_CHANGE,
+            if (isRu) "Скоростные тревоги (резкое изменение)" else "Rapid Change Alerts",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            group = GROUP_ALERTS
+            description = if (isRu) "Сигналы при резком падении или быстром росте сахара"
+            else "Alerts for rapid fall or rise in glucose"
+            setSound(null, null)
+            enableVibration(false)
+        }
+
         // Tier 5: Daily Compensator (Last Chance TIR)
         val compensatorChannel = NotificationChannel(
             CHANNEL_COMPENSATOR,
@@ -459,6 +476,7 @@ object GlucoseAlertManager {
         nm.createNotificationChannel(mainChannel)
         nm.createNotificationChannel(criticalChannel)
         nm.createNotificationChannel(signalLossChannel)
+        nm.createNotificationChannel(rapidChangeChannel)
         nm.createNotificationChannel(compensatorChannel)
         nm.createNotificationChannel(lockscreenChannel)
         nm.createNotificationChannel(weeklyDigestChannel)
@@ -981,12 +999,14 @@ object GlucoseAlertManager {
             AlertTier.MAIN -> CHANNEL_MAIN
             AlertTier.CRITICAL -> CHANNEL_CRITICAL
             AlertTier.SIGNAL_LOSS -> CHANNEL_SIGNAL_LOSS
+            AlertTier.RAPID_CHANGE -> CHANNEL_RAPID_CHANGE
         }
         val notificationId = when (tier) {
             AlertTier.PREDICTIVE -> NOTIFICATION_ID_PREDICTIVE
             AlertTier.MAIN -> NOTIFICATION_ID_MAIN
             AlertTier.CRITICAL -> NOTIFICATION_ID_CRITICAL
             AlertTier.SIGNAL_LOSS -> NOTIFICATION_ID_SIGNAL_LOSS
+            AlertTier.RAPID_CHANGE -> NOTIFICATION_ID_RAPID_CHANGE
         }
 
         val title = when (tier) {
@@ -994,12 +1014,14 @@ object GlucoseAlertManager {
             AlertTier.MAIN -> if (isRu) "⚠️ Тест: Основная тревога (Низкий)" else "⚠️ Test: Main Alert (Low)"
             AlertTier.CRITICAL -> if (isRu) "🚨 Тест: Критическая сирена" else "🚨 Test: Critical Alarm"
             AlertTier.SIGNAL_LOSS -> if (isRu) "📡 Тест: Потеря сигнала" else "📡 Test: Signal Loss"
+            AlertTier.RAPID_CHANGE -> if (isRu) "⚡ Тест: Скоростная тревога" else "⚡ Test: Rapid Change Alert"
         }
         val text = when (tier) {
             AlertTier.PREDICTIVE -> if (isRu) "Мягкий сигнал прогноза падения/роста." else "Soft warning before crossing range."
             AlertTier.MAIN -> if (isRu) "Сигнал при подтверждённом выходе за границы диапазона." else "Alert tone on confirmed out-of-range."
             AlertTier.CRITICAL -> if (isRu) "Экстренная сирена. Нажмите «ОК» в уведомлении для отключения звука." else "Emergency siren. Tap 'Dismiss' to silence."
             AlertTier.SIGNAL_LOSS -> if (isRu) "Сигнал при отсутствии данных более 20 минут." else "Alert tone on missing data for >20 minutes."
+            AlertTier.RAPID_CHANGE -> if (isRu) "Сигнал при резком падении или быстром росте сахара." else "Alert tone on rapid fall or rise."
         }
 
         sendNotification(
@@ -1401,6 +1423,7 @@ object GlucoseAlertManager {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             nm?.cancel(NOTIFICATION_ID_MAIN)
             nm?.cancel(NOTIFICATION_ID_PREDICTIVE)
+            nm?.cancel(NOTIFICATION_ID_RAPID_CHANGE)
             _activeAlertBanner.value = null
         }
 
@@ -1421,6 +1444,13 @@ object GlucoseAlertManager {
         // TIER 3: CRITICAL HYPER
         // ----------------------------------------------------
         if (evaluateCriticalHyper(context, latest, sorted, alerts, tirHigh, now, isRu)) {
+            return
+        }
+
+        // ----------------------------------------------------
+        // SPEED ALERTS: RAPID CHANGE (FALLING / RISING FAST)
+        // ----------------------------------------------------
+        if (evaluateRapidChangeAlert(context, latest, sorted, alerts, now, isRu)) {
             return
         }
 
@@ -1755,6 +1785,86 @@ object GlucoseAlertManager {
         return false
     }
 
+    private fun evaluateRapidChangeAlert(
+        context: Context,
+        latest: GlucoseReading,
+        sorted: List<GlucoseReading>,
+        alerts: AlertSettings,
+        now: Long,
+        isRu: Boolean
+    ): Boolean {
+        if (!alerts.isRapidChangeEnabled || sorted.size < 2) return false
+
+        val lastAlert = lastRapidChangeAlertTimestamp.get()
+        if (now - lastAlert < 15 * 60000L) return false
+
+        // Calculate rate of change in mmol/L per minute.
+        // If >= 4 points available, use linear regression from GlucoseTrendPredictor
+        // to filter out sensor noise / compression artifacts.
+        val rate = if (sorted.size >= 4) {
+            val pred = GlucoseTrendPredictor.predictTrend(
+                readings = sorted,
+                targetRanges = com.tirup.app.domain.model.TargetRanges(),
+                minutesAhead = 15
+            )
+            pred.rateOfChangeMmolPerMin
+        } else {
+            val prev = sorted[sorted.size - 2]
+            val dtMin = (latest.timestamp - prev.timestamp).toDouble() / 60000.0
+            if (dtMin in 0.5..15.0) {
+                (latest.valueMmol - prev.valueMmol) / dtMin
+            } else {
+                0.0
+            }
+        }
+
+        val isFallingFast = rate <= -alerts.rapidFallThresholdMmolPerMin
+        val isRisingFast = rate >= alerts.rapidRiseThresholdMmolPerMin
+
+        if (!isFallingFast && !isRisingFast) return false
+
+        lastRapidChangeAlertTimestamp.set(now)
+
+        val arrow = when {
+            rate <= -0.15 -> "⇊"
+            rate <= -0.08 -> "↓"
+            rate >= 0.15 -> "⇈"
+            rate >= 0.08 -> "↑"
+            else -> if (isFallingFast) "↘" else "↗"
+        }
+
+        val title = if (isFallingFast) {
+            if (isRu) "🔻 Резкое падение сахара $arrow" else "🔻 Rapid Glucose Drop $arrow"
+        } else {
+            if (isRu) "🔺 Резкий рост сахара $arrow" else "🔺 Rapid Glucose Rise $arrow"
+        }
+
+        val text = String.format(
+            Locale.US,
+            if (isRu) "Сахар: %.1f ммоль/л (%s), скорость: %.2f ммоль/л/мин."
+            else "Glucose: %.1f mmol/L (%s), rate: %.2f mmol/L/min.",
+            latest.valueMmol,
+            arrow,
+            kotlin.math.abs(rate)
+        )
+
+        sendNotification(
+            context = context,
+            channelId = CHANNEL_RAPID_CHANGE,
+            notificationId = NOTIFICATION_ID_RAPID_CHANGE,
+            title = title,
+            text = text,
+            tier = AlertTier.RAPID_CHANGE,
+            vibrate = alerts.isRapidChangeVibrate,
+            flash = alerts.isRapidChangeFlash,
+            volumePercent = alerts.alertVolumePercent,
+            glucoseDisplay = String.format(Locale.US, "%.1f", latest.valueMmol),
+            trendArrow = arrow,
+            isRu = isRu
+        )
+        return true
+    }
+
     private fun checkProlongedOutOfRange(
         readings: List<GlucoseReading>,
         isLow: Boolean,
@@ -1834,6 +1944,7 @@ object GlucoseAlertManager {
             AlertTier.SIGNAL_LOSS -> NotificationCompat.PRIORITY_MAX
             AlertTier.MAIN -> NotificationCompat.PRIORITY_HIGH
             AlertTier.PREDICTIVE -> NotificationCompat.PRIORITY_HIGH
+            AlertTier.RAPID_CHANGE -> NotificationCompat.PRIORITY_HIGH
         }
 
         val alertHex = when (tier) {
@@ -1841,6 +1952,7 @@ object GlucoseAlertManager {
             AlertTier.MAIN -> if (title.contains("гипо", true) || title.contains("low", true)) "#EF4444" else "#F59E0B"
             AlertTier.PREDICTIVE -> if (title.contains("гипо", true) || title.contains("low", true)) "#F59E0B" else "#F59E0B"
             AlertTier.SIGNAL_LOSS -> "#F59E0B"
+            AlertTier.RAPID_CHANGE -> if (title.contains("паден", true) || title.contains("fall", true) || title.contains("drop", true)) "#EF4444" else "#06B6D4"
         }
 
         val alertColor = Color.parseColor(alertHex)
@@ -1872,8 +1984,8 @@ object GlucoseAlertManager {
             .setAutoCancel(true)
             .addAction(0, if (isRu) "ОК" else "OK", dismissPendingIntent)
 
-        if (tier == AlertTier.PREDICTIVE) {
-            // Unread predictive alert is only valid for 20 minutes
+        if (tier == AlertTier.PREDICTIVE || tier == AlertTier.RAPID_CHANGE) {
+            // Unread predictive/rapid alert is only valid for 20 minutes
             builder.setTimeoutAfter(20 * 60 * 1000L)
         } else if (tier == AlertTier.MAIN) {
             // Automatically clear unread main alerts after 60 minutes
@@ -1965,6 +2077,12 @@ object GlucoseAlertManager {
             }
         } else if (tier == AlertTier.PREDICTIVE) {
             MedicalSoundPlayer.playPredictiveAlert(volumePercent)
+        } else if (tier == AlertTier.RAPID_CHANGE) {
+            if (title.contains("паден", ignoreCase = true) || title.contains("fall", ignoreCase = true) || title.contains("drop", ignoreCase = true)) {
+                MedicalSoundPlayer.playFallingFastAlert(volumePercent)
+            } else {
+                MedicalSoundPlayer.playRisingFastAlert(volumePercent)
+            }
         } else if (tier == AlertTier.MAIN) {
             if (title.contains("низк", ignoreCase = true) || title.contains("low", ignoreCase = true) || title.contains("гипо", ignoreCase = true)) {
                 MedicalSoundPlayer.playLowAlert(volumePercent)
@@ -2013,6 +2131,7 @@ object GlucoseAlertManager {
                 val pattern = when (tier) {
                     AlertTier.PREDICTIVE -> longArrayOf(0, 150, 100, 150)
                     AlertTier.SIGNAL_LOSS -> longArrayOf(0, 250, 150, 250)
+                    AlertTier.RAPID_CHANGE -> longArrayOf(0, 200, 100, 200, 100, 200)
                     // Tier 2: 3 pulses synchronized with 1.5s pauses
                     AlertTier.MAIN -> longArrayOf(0, 320, 1500, 320, 1500, 320)
                     // Tier 3: High urgency repeat pattern for ~12 seconds
@@ -2052,6 +2171,14 @@ object GlucoseAlertManager {
                         cameraManager.setTorchMode(cameraId, true)
                         delay(140)
                         cameraManager.setTorchMode(cameraId, false)
+                    }
+                    AlertTier.RAPID_CHANGE -> {
+                        for (i in 0 until 2) {
+                            cameraManager.setTorchMode(cameraId, true)
+                            delay(120)
+                            cameraManager.setTorchMode(cameraId, false)
+                            if (i < 1) delay(200)
+                        }
                     }
                     AlertTier.MAIN -> {
                         // 3 pulses synchronized with 1.5s pauses

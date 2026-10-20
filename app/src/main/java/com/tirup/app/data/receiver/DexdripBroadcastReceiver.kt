@@ -751,7 +751,26 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
         suspend fun saveTreatmentIfNew(database: AppDatabase, treatment: Treatment) {
             val dao = database.treatmentDao()
-            val windowMs = 45_000L // 45-second window prevents duplicate self-echoes from xDrip broadcasts without blocking sequential boluses
+
+            // 1. Check exact UUID match if available (e.g. from Nightscout Cloud / xDrip sync)
+            if (!treatment.uuid.isNullOrBlank()) {
+                val existingByUuid = dao.getByUuid(treatment.uuid)
+                if (existingByUuid != null) {
+                    var updated = existingByUuid
+                    var changed = false
+                    if (existingByUuid.notes.isNullOrBlank() && !treatment.notes.isNullOrBlank()) {
+                        updated = updated.copy(notes = treatment.notes)
+                        changed = true
+                    }
+                    if (changed) {
+                        dao.insert(updated)
+                    }
+                    Log.d(TAG, "Skipped duplicate treatment matching UUID: ${treatment.uuid}")
+                    return
+                }
+            }
+
+            val windowMs = 180_000L // 3-minute window prevents duplicate cross-sync between Nightscout and xDrip broadcasts
             val existing = dao.getTreatmentsBetweenSync(treatment.timestamp - windowMs, treatment.timestamp + windowMs)
 
             val duplicate = existing.firstOrNull { entity ->

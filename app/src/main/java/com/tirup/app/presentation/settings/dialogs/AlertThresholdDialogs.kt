@@ -158,13 +158,20 @@ fun MainThresholdDialog(
             }
         },
         dismissButton = {
-            TextButton(
-                onClick = {
-                    onResetDefault()
-                    onDismiss()
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(
+                    onClick = {
+                        onResetDefault()
+                        onDismiss()
+                    }
+                ) {
+                    Text(if (isRu) "Сброс к норме (3.9 - 10.0)" else "Default (3.9 - 10.0)")
                 }
-            ) {
-                Text(if (isRu) "Сброс к норме (3.9 - 10.0)" else "Default (3.9 - 10.0)")
+                TextButton(
+                    onClick = onDismiss
+                ) {
+                    Text(if (isRu) "Отмена" else "Cancel")
+                }
             }
         }
     )

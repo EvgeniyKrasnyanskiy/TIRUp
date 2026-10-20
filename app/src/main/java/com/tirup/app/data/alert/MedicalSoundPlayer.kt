@@ -65,7 +65,7 @@ object MedicalSoundPlayer {
             try {
                 val context = try { com.tirup.app.TirupApplication.instance } catch (_: Exception) { null } ?: return@launch
                 ensureAlarmStreamAudible()
-                val factor = (volumePercent / 100f).coerceIn(0.15f, 1.0f)
+                val factor = (volumePercent / 100f).coerceIn(0.05f, 1.0f)
 
                 val audioAttributes = AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)
@@ -152,6 +152,7 @@ object MedicalSoundPlayer {
             AlertTier.MAIN -> playLowAlert(volumePercent, repeatCount = 1, customTag = customTag)
             AlertTier.CRITICAL -> playProlongedHypoAlert(volumePercent, customTag)
             AlertTier.SIGNAL_LOSS -> playSignalLossAlert(volumePercent, customTag)
+            AlertTier.RAPID_CHANGE -> playFallingFastAlert(volumePercent, customTag)
         }
     }
 

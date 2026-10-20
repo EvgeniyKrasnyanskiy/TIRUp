@@ -64,6 +64,7 @@ fun StreakMotivatorDialog(
     bestStreakDays: Int = 0,
     dailySummaries: List<com.tirup.app.domain.model.DailySummary> = emptyList(),
     todayTirPercent: Double = 0.0,
+    todayTingPercent: Double = 0.0,
     onDismiss: () -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "flamePulse")
@@ -187,6 +188,7 @@ fun StreakMotivatorDialog(
                 GitHubTirContributionGrid(
                     dailySummaries = dailySummaries,
                     todayTirPercent = todayTirPercent,
+                    todayTingPercent = todayTingPercent,
                     isRu = isRu
                 )
 
@@ -279,13 +281,15 @@ fun StreakMotivatorDialog(
 private fun GitHubTirContributionGrid(
     dailySummaries: List<com.tirup.app.domain.model.DailySummary>,
     todayTirPercent: Double,
+    todayTingPercent: Double = 0.0,
     isRu: Boolean
 ) {
     var selectedDetail by remember { mutableStateOf<String?>(null) }
     var selectedDayTimestamp by remember { mutableStateOf<Long?>(null) }
+    var isTingMode by remember { mutableStateOf(false) }
 
     // 28 days aligned to Monday..Sunday ending this current week
-    val daysData = remember(dailySummaries, todayTirPercent) {
+    val daysData = remember(dailySummaries, todayTirPercent, todayTingPercent, isTingMode) {
         val list = mutableListOf<DayCellData>()
         val cal = Calendar.getInstance()
         val now = cal.timeInMillis
@@ -308,13 +312,14 @@ private fun GitHubTirContributionGrid(
         val millisPassedToday = (now - todayStart).coerceIn(0L, 86400000L)
         val hoursPassed = millisPassedToday / 3600000.0
         val hoursRemaining = 24.0 - hoursPassed
-        val effectiveTodayTir = todayTirPercent.coerceIn(0.0, 100.0)
-        val inRangeHoursSoFar = hoursPassed * (effectiveTodayTir / 100.0)
-        val minPossibleFinalTir = (inRangeHoursSoFar / 24.0) * 100.0
-        val maxPossibleFinalTir = ((inRangeHoursSoFar + hoursRemaining) / 24.0) * 100.0
+        val currentTargetGoal = if (isTingMode) 50.0 else 70.0
+        val effectiveTodayVal = (if (isTingMode) todayTingPercent else todayTirPercent).coerceIn(0.0, 100.0)
+        val inRangeHoursSoFar = hoursPassed * (effectiveTodayVal / 100.0)
+        val minPossibleFinalVal = (inRangeHoursSoFar / 24.0) * 100.0
+        val maxPossibleFinalVal = ((inRangeHoursSoFar + hoursRemaining) / 24.0) * 100.0
 
-        val isGuaranteedWin = hoursPassed >= 4.0 && minPossibleFinalTir >= 70.0
-        val isGuaranteedLoss = maxPossibleFinalTir < 70.0
+        val isGuaranteedWin = hoursPassed >= 4.0 && minPossibleFinalVal >= currentTargetGoal
+        val isGuaranteedLoss = maxPossibleFinalVal < currentTargetGoal
 
         for (i in 0 until 28) {
             val dayStart = gridStartMon + i * 86400000L
@@ -323,10 +328,10 @@ private fun GitHubTirContributionGrid(
 
             val matchingSummary = dailySummaries.find { abs(it.dateTimestamp - dayStart) < 43200000L }
 
-            val tir: Double? = when {
+            val value: Double? = when {
                 isFuture -> null
-                isToday -> if (effectiveTodayTir > 0.0) effectiveTodayTir else matchingSummary?.tirPercent
-                else -> matchingSummary?.takeIf { it.readingsCount >= 10 }?.tirPercent
+                isToday -> if (effectiveTodayVal > 0.0) effectiveTodayVal else (if (isTingMode) matchingSummary?.tingPercent else matchingSummary?.tirPercent)
+                else -> matchingSummary?.takeIf { it.readingsCount >= 10 }?.let { if (isTingMode) it.tingPercent else it.tirPercent }
             }
 
             val dateLabel = dateFormat.format(Date(dayStart))
@@ -334,7 +339,7 @@ private fun GitHubTirContributionGrid(
                 DayCellData(
                     timestamp = dayStart,
                     dateLabel = dateLabel,
-                    tir = tir,
+                    tir = value,
                     isToday = isToday,
                     isFuture = isFuture,
                     isGuaranteedWin = isToday && isGuaranteedWin,
@@ -364,16 +369,60 @@ private fun GitHubTirContributionGrid(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isRu) "Активность TIR (28 дней)" else "28-Day TIR Activity",
+                    text = if (isTingMode) {
+                        if (isRu) "Активность TING (3.9–7.8)" else "28-Day TING Activity"
+                    } else {
+                        if (isRu) "Активность TIR (3.9–10.0)" else "28-Day TIR Activity"
+                    },
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Text(
-                    text = if (isRu) "Сетка контроля" else "Control Grid",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // Mode Toggle Switch (TIR / TING)
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                ) {
+                    Row(modifier = Modifier.padding(2.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (!isTingMode) PrimaryEmerald else Color.Transparent)
+                                .clickable {
+                                    isTingMode = false
+                                    selectedDetail = null
+                                }
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "TIR",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (!isTingMode) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isTingMode) PrimaryEmerald else Color.Transparent)
+                                .clickable {
+                                    isTingMode = true
+                                    selectedDetail = null
+                                }
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "TING",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isTingMode) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
 
             // Grid of 4 rows x 7 days
@@ -435,11 +484,14 @@ private fun GitHubTirContributionGrid(
                                                         shape = RoundedCornerShape(5.dp)
                                                     )
                                                 else -> {
+                                                    val lowBound = if (isTingMode) 45.0 else 67.0
+                                                    val targetBound = if (isTingMode) 50.0 else 70.0
+                                                    val highBound = if (isTingMode) 65.0 else 85.0
                                                     val solidColor = when {
                                                         cell.tir == null -> Color(0xFF263238)
-                                                        cell.tir < 67.0 -> Color(0xFFEF4444)
-                                                        cell.tir < 70.0 -> Color(0xFFF59E0B)
-                                                        cell.tir < 85.0 -> Color(0xFF10B981)
+                                                        cell.tir < lowBound -> Color(0xFFEF4444)
+                                                        cell.tir < targetBound -> Color(0xFFF59E0B)
+                                                        cell.tir < highBound -> Color(0xFF10B981)
                                                         else -> Color(0xFF34D399)
                                                     }
                                                     Modifier
@@ -453,42 +505,50 @@ private fun GitHubTirContributionGrid(
                                         )
                                         .clickable {
                                             selectedDayTimestamp = cell.timestamp
+                                            val modeLabel = if (isTingMode) "TING" else "TIR"
+                                            val lowBound = if (isTingMode) 45.0 else 67.0
+                                            val targetBound = if (isTingMode) 50.0 else 70.0
+                                            val highBound = if (isTingMode) 65.0 else 85.0
+
                                             if (cell.isFuture) {
                                                 selectedDetail = "${cell.dateLabel}: " + if (isRu) "впереди" else "upcoming"
                                             } else if (cell.isToday) {
                                                 val tirVal = cell.tir?.toInt() ?: 0
                                                 val winLossStatus = when {
                                                     cell.isGuaranteedWin -> if (isRu) " (Цель выполнена! ✓)" else " (Target reached! ✓)"
-                                                    cell.isGuaranteedLoss && (cell.tir ?: 0.0) < 67.0 -> if (isRu) " (Ниже цели)" else " (Below target)"
+                                                    cell.isGuaranteedLoss && (cell.tir ?: 0.0) < lowBound -> if (isRu) " (Ниже цели)" else " (Below target)"
                                                     cell.isGuaranteedLoss -> if (isRu) " (Почти у цели ⚠️)" else " (Near target ⚠️)"
-                                                    (cell.tir ?: 0.0) >= 85.0 -> if (isRu) " (В процессе, отлично ⭐)" else " (In progress, superb ⭐)"
-                                                    (cell.tir ?: 0.0) >= 70.0 -> if (isRu) " (В процессе, в норме ✓)" else " (In progress, in target ✓)"
-                                                    (cell.tir ?: 0.0) >= 67.0 -> if (isRu) " (В процессе, почти у цели ⚠️)" else " (In progress, near target ⚠️)"
-                                                    else -> if (isRu) " (В процессе, цель ≥70%)" else " (In progress, target ≥70%)"
+                                                    (cell.tir ?: 0.0) >= highBound -> if (isRu) " (В процессе, отлично ⭐)" else " (In progress, superb ⭐)"
+                                                    (cell.tir ?: 0.0) >= targetBound -> if (isRu) " (В процессе, в норме ✓)" else " (In progress, in target ✓)"
+                                                    (cell.tir ?: 0.0) >= lowBound -> if (isRu) " (В процессе, почти у цели ⚠️)" else " (In progress, near target ⚠️)"
+                                                    else -> if (isRu) " (В процессе, цель ≥${targetBound.toInt()}%)" else " (In progress, target ≥${targetBound.toInt()}%)"
                                                 }
                                                 val dayPrefix = if (isRu) "Сегодня (${cell.dateLabel})" else "Today (${cell.dateLabel})"
-                                                selectedDetail = "$dayPrefix: TIR $tirVal%$winLossStatus"
+                                                selectedDetail = "$dayPrefix: $modeLabel $tirVal%$winLossStatus"
                                             } else {
                                                 val tirText = if (cell.tir != null) "${cell.tir.toInt()}%" else (if (isRu) "нет данных" else "no data")
                                                 val statusText = when {
                                                     cell.tir == null -> ""
-                                                    cell.tir >= 85.0 -> if (isRu) " (Отлично ⭐)" else " (Superb ⭐)"
-                                                    cell.tir >= 70.0 -> if (isRu) " (В норме ✓)" else " (In target ✓)"
-                                                    cell.tir >= 67.0 -> if (isRu) " (Почти у цели ⚠️)" else " (Near target ⚠️)"
+                                                    cell.tir >= highBound -> if (isRu) " (Отлично ⭐)" else " (Superb ⭐)"
+                                                    cell.tir >= targetBound -> if (isRu) " (В норме ✓)" else " (In target ✓)"
+                                                    cell.tir >= lowBound -> if (isRu) " (Почти у цели ⚠️)" else " (Near target ⚠️)"
                                                     else -> if (isRu) " (Ниже цели)" else " (Below target)"
                                                 }
-                                                selectedDetail = "${cell.dateLabel}: TIR $tirText$statusText"
+                                                selectedDetail = "${cell.dateLabel}: $modeLabel $tirText$statusText"
                                             }
                                         },
                                     contentAlignment = Alignment.BottomCenter
                                 ) {
                                     // Two-tone vertical progress fill for today
                                     if (cell.isToday && cell.tir != null) {
+                                        val targetBound = if (isTingMode) 50.0 else 70.0
+                                        val highBound = if (isTingMode) 65.0 else 85.0
+                                        val lowBound = if (isTingMode) 45.0 else 67.0
                                         val fillFraction = (cell.tir / 100.0).toFloat().coerceIn(0f, 1f)
                                         val fillColor = when {
-                                            cell.isGuaranteedWin || cell.tir >= 85.0 -> Color(0xFF34D399)
-                                            cell.tir >= 70.0 -> Color(0xFF10B981)
-                                            cell.tir >= 67.0 -> Color(0xFFF59E0B)
+                                            cell.isGuaranteedWin || cell.tir >= highBound -> Color(0xFF34D399)
+                                            cell.tir >= targetBound -> Color(0xFF10B981)
+                                            cell.tir >= lowBound -> Color(0xFFF59E0B)
                                             else -> Color(0xFFEF4444)
                                         }
                                         Box(

@@ -620,8 +620,7 @@ fun BleBridgeCard(
                             onClick = {
                                 if (!isBtOn) {
                                     Toast.makeText(context, if (isRu) "Включите Bluetooth на смартфоне" else "Enable Bluetooth first", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    checkAndRequestBlePermissions(BleBridgeRole.OBSERVER)
+                                } else if (checkAndRequestBlePermissions(BleBridgeRole.OBSERVER)) {
                                     onTriggerBleObserverBoost()
                                 }
                             },

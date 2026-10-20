@@ -495,7 +495,7 @@ class FocusViewModel(
                 android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
             }
 
-            // 3. Сохранение в локальную БД TIRUp и обработка таймеров расходников
+            // 3. Сохранение в локальную БД TIRUp с дедупликацией и обработка таймеров расходников
             if (hasInsulin || hasCarbs || hasNotes) {
                 val treatment = Treatment(
                     timestamp = effectiveTimestamp,
@@ -505,7 +505,12 @@ class FocusViewModel(
                     source = sourceName,
                     uuid = uploadedUuid
                 )
-                glucoseRepository.insertTreatment(treatment)
+                val app = context.applicationContext as? com.tirup.app.TirupApplication
+                if (app != null) {
+                    com.tirup.app.data.receiver.DexdripBroadcastReceiver.saveTreatmentIfNew(app.database, treatment)
+                } else {
+                    glucoseRepository.insertTreatment(treatment)
+                }
                 com.tirup.app.data.receiver.DexdripBroadcastReceiver.processDeviceRenewals(context, listOf(treatment))
             }
         }

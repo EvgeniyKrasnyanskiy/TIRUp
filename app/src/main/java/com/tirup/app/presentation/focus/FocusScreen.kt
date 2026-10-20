@@ -385,6 +385,19 @@ fun FocusScreen(
                                     "• Repeating interval: 20 ➔ 40 ➔ 80 min."
                                 }
                             }
+                            AlertTier.RAPID_CHANGE -> {
+                                if (isRu) {
+                                    "⚡ СКОРОСТНАЯ ТРЕВОГА (Уровень 4)\n\n" +
+                                    "Зафиксировано резкое изменение сахара (стрелка ⇊ или ⇈ со скоростью ≥0.11 ммоль/л/мин).\n\n" +
+                                    "• Предупреждает о резком падении или быстром росте до достижения критических значений.\n" +
+                                    "• Повтор сигнала не чаще, чем раз в 15 минут."
+                                } else {
+                                    "⚡ RAPID CHANGE ALERT (Tier 4)\n\n" +
+                                    "Rapid rate of glucose change detected (arrows ⇊ or ⇈ at rate ≥0.11 mmol/L/min).\n\n" +
+                                    "• Warns of sudden drop or rise before reaching critical levels.\n" +
+                                    "• Anti-spam throttle: at most once every 15 minutes."
+                                }
+                            }
                         }
                         detailDialogInfo = Pair(title, desc)
                     }
@@ -1265,6 +1278,7 @@ fun FocusScreen(
             bestStreakDays = userSettings.bestStreakDays,
             dailySummaries = state.recentDailySummaries,
             todayTirPercent = state.statistics.tirPercent,
+            todayTingPercent = state.statistics.tingPercent,
             onDismiss = {
                 showStreakDialog = false
                 viewModel.markStreakCelebrated(state.streakDays)
@@ -2966,6 +2980,7 @@ private fun HeroGlucoseCard(
                     AlertTier.MAIN -> if (activeAlertBanner.title.contains("гипо", ignoreCase = true) || activeAlertBanner.title.contains("low", ignoreCase = true)) ColorVeryLow else ColorHigh
                     AlertTier.PREDICTIVE -> if (activeAlertBanner.title.contains("гипо", ignoreCase = true) || activeAlertBanner.title.contains("low", ignoreCase = true)) ColorLow else ColorHigh
                     AlertTier.SIGNAL_LOSS -> ColorHigh
+                    AlertTier.RAPID_CHANGE -> if (activeAlertBanner.title.contains("паден", true) || activeAlertBanner.title.contains("drop", true) || activeAlertBanner.title.contains("fall", true)) ColorVeryLow else Color(0xFF06B6D4)
                 }
                 Surface(
                     modifier = Modifier
@@ -3539,6 +3554,7 @@ private fun DailyAlertLogsDialog(
                             AlertTier.MAIN -> Pair(if (isRu) "🔔 ОСНОВНОЙ" else "🔔 MAIN", ColorHigh)
                             AlertTier.PREDICTIVE -> Pair(if (isRu) "⚡ УПРЕЖДАЮЩИЙ" else "⚡ PREDICTIVE", ActionBlue)
                             AlertTier.SIGNAL_LOSS -> Pair(if (isRu) "📡 ПОТЕРЯ СВЯЗИ" else "📡 SIGNAL LOSS", Color(0xFF94A3B8))
+                            AlertTier.RAPID_CHANGE -> Pair(if (isRu) "⚡ СКОРОСТНОЙ" else "⚡ RAPID CHANGE", Color(0xFF06B6D4))
                         }
 
                         Surface(

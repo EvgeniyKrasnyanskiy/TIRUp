@@ -125,6 +125,11 @@ class SettingsRepositoryImpl(
             .putBoolean(KEY_ALERT_CRITICAL_HYPO_PERM_DISABLED, settings.alertSettings.isCriticalHypoPermanentDisabled)
             .putFloat(KEY_ALERT_CRITICAL_LOW_THRESHOLD, settings.alertSettings.criticalLowThresholdMmol.toFloat())
             .putFloat(KEY_ALERT_CRITICAL_HIGH_THRESHOLD, settings.alertSettings.criticalHighThresholdMmol.toFloat())
+            .putBoolean(KEY_ALERT_RAPID_CHANGE_ENABLED, settings.alertSettings.isRapidChangeEnabled)
+            .putFloat(KEY_ALERT_RAPID_FALL_THRESHOLD, settings.alertSettings.rapidFallThresholdMmolPerMin.toFloat())
+            .putFloat(KEY_ALERT_RAPID_RISE_THRESHOLD, settings.alertSettings.rapidRiseThresholdMmolPerMin.toFloat())
+            .putBoolean(KEY_ALERT_RAPID_CHANGE_VIBRATE, settings.alertSettings.isRapidChangeVibrate)
+            .putBoolean(KEY_ALERT_RAPID_CHANGE_FLASH, settings.alertSettings.isRapidChangeFlash)
             .putInt(KEY_ALERT_SNOOZE_HYPO, settings.alertSettings.snoozeHypoMinutes)
             .putInt(KEY_ALERT_SNOOZE_HYPER, settings.alertSettings.snoozeHyperMinutes)
             .putBoolean(KEY_ALERT_SIGNAL_LOSS_ENABLED, settings.alertSettings.isSignalLossEnabled)
@@ -354,6 +359,11 @@ class SettingsRepositoryImpl(
                 isCriticalHypoPermanentDisabled = prefs.getBoolean(KEY_ALERT_CRITICAL_HYPO_PERM_DISABLED, false),
                 criticalLowThresholdMmol = prefs.getFloat(KEY_ALERT_CRITICAL_LOW_THRESHOLD, 3.0f).toDouble(),
                 criticalHighThresholdMmol = prefs.getFloat(KEY_ALERT_CRITICAL_HIGH_THRESHOLD, 13.9f).toDouble(),
+                isRapidChangeEnabled = prefs.getBoolean(KEY_ALERT_RAPID_CHANGE_ENABLED, false),
+                rapidFallThresholdMmolPerMin = prefs.getFloat(KEY_ALERT_RAPID_FALL_THRESHOLD, 0.11f).toDouble(),
+                rapidRiseThresholdMmolPerMin = prefs.getFloat(KEY_ALERT_RAPID_RISE_THRESHOLD, 0.11f).toDouble(),
+                isRapidChangeVibrate = prefs.getBoolean(KEY_ALERT_RAPID_CHANGE_VIBRATE, true),
+                isRapidChangeFlash = prefs.getBoolean(KEY_ALERT_RAPID_CHANGE_FLASH, false),
                 snoozeHypoMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPO, 15),
                 snoozeHyperMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPER, 45),
                 isSignalLossEnabled = prefs.getBoolean(KEY_ALERT_SIGNAL_LOSS_ENABLED, true),
@@ -622,6 +632,11 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_CRITICAL_HYPO_PERM_DISABLED = "key_alert_critical_hypo_perm_disabled"
         private const val KEY_ALERT_CRITICAL_LOW_THRESHOLD = "key_alert_critical_low_threshold"
         private const val KEY_ALERT_CRITICAL_HIGH_THRESHOLD = "key_alert_critical_high_threshold"
+        private const val KEY_ALERT_RAPID_CHANGE_ENABLED = "key_alert_rapid_change_enabled"
+        private const val KEY_ALERT_RAPID_FALL_THRESHOLD = "key_alert_rapid_fall_threshold"
+        private const val KEY_ALERT_RAPID_RISE_THRESHOLD = "key_alert_rapid_rise_threshold"
+        private const val KEY_ALERT_RAPID_CHANGE_VIBRATE = "key_alert_rapid_change_vibrate"
+        private const val KEY_ALERT_RAPID_CHANGE_FLASH = "key_alert_rapid_change_flash"
         private const val KEY_ALERT_SNOOZE_HYPO = "key_alert_snooze_hypo"
         private const val KEY_ALERT_SNOOZE_HYPER = "key_alert_snooze_hyper"
         private const val KEY_ALERT_SIGNAL_LOSS_ENABLED = "key_alert_signal_loss_enabled"

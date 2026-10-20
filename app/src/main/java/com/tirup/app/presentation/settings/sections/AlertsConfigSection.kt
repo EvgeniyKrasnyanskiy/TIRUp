@@ -298,13 +298,13 @@ fun AlertsConfigSection(
                                 Slider(
                                     value = alerts.alertVolumePercent.toFloat(),
                                     onValueChange = { newVal ->
-                                        val stepped = (kotlin.math.round(newVal / 5f) * 5f).toInt().coerceIn(20, 100)
+                                        val stepped = (kotlin.math.round(newVal / 5f) * 5f).toInt().coerceIn(5, 100)
                                         if (stepped != alerts.alertVolumePercent) {
                                             onUpdateAlertSettings(alerts.copy(alertVolumePercent = stepped))
                                         }
                                     },
-                                    valueRange = 20f..100f,
-                                    steps = 15,
+                                    valueRange = 5f..100f,
+                                    steps = 18,
                                     modifier = Modifier.weight(1f),
                                     colors = SliderDefaults.colors(
                                         thumbColor = ActionBlue,
@@ -362,10 +362,19 @@ fun AlertsConfigSection(
                     Spacer(modifier = Modifier.height(6.dp))
 
                     // Tier 2: Main (3-5 points confirmed)
+                    var mainToneTestIndex by remember { mutableIntStateOf(0) }
+                    val isMainTesting = (currentlyPlayingTag in listOf("MAIN_LOW", "MAIN_HIGH", AlertTier.MAIN.name))
+                    val activeMainTestSub = when (currentlyPlayingTag) {
+                        "MAIN_LOW" -> if (isRu) "🔊 Тест: Низкий сахар (< ${String.format(Locale.US, "%.1f", alerts.mainLowThresholdMmol)} ммоль/л)" else "🔊 Test: Low Glucose (< ${String.format(Locale.US, "%.1f", alerts.mainLowThresholdMmol)} mmol/L)"
+                        "MAIN_HIGH" -> if (isRu) "🔊 Тест: Высокий сахар (> ${String.format(Locale.US, "%.1f", alerts.mainHighThresholdMmol)} ммоль/л)" else "🔊 Test: High Glucose (> ${String.format(Locale.US, "%.1f", alerts.mainHighThresholdMmol)} mmol/L)"
+                        else -> if (!isMaster) (if (isRu) "Выключено (общий тумблер выключен)" else "Disabled (master switch off)")
+                        else if (isRu) "Сигнал (3 точки для 5-мин / 5 точек для 1-мин). Глушится при падении с IoB" else "Alert tone (3 pts for 5-min / 5 pts for 1-min). Muted on drop with IoB"
+                    }
+                    val mainBtnLabel = if (mainToneTestIndex % 2 == 0) (if (isRu) "Тест L" else "Test L") else (if (isRu) "Тест H" else "Test H")
+
                     AlertTierConfigRow(
                         title = if (isRu) "2. Основные (3–5 точек вне нормы)" else "2. Main (3–5 points confirmed)",
-                        subtitle = if (!isMaster) (if (isRu) "Выключено (общий тумблер выключен)" else "Disabled (master switch off)")
-                        else if (isRu) "Сигнал (3 точки для 5-мин / 5 точек для 1-мин). Глушится при падении с IoB" else "Alert tone (3 pts for 5-min / 5 pts for 1-min). Muted on drop with IoB",
+                        subtitle = activeMainTestSub,
                         enabled = isMaster && alerts.isMainEnabled,
                         onEnabledChange = { isChecked ->
                             if (isChecked) {
@@ -379,9 +388,25 @@ fun AlertsConfigSection(
                         flash = alerts.isMainFlash,
                         onFlashChange = { onUpdateAlertSettings(alerts.copy(isMainFlash = it)) },
                         accentColor = ColorHigh,
-                        onTestClick = { onSoundClick(AlertTier.MAIN.name) { onTestAlert(AlertTier.MAIN) } },
-                        isTesting = (currentlyPlayingTag == AlertTier.MAIN.name),
+                        onTestClick = {
+                            if (isMainTesting) {
+                                MedicalSoundPlayer.stopAll()
+                            } else {
+                                if (mainToneTestIndex % 2 == 0) {
+                                    onSoundClick("MAIN_LOW") {
+                                        MedicalSoundPlayer.playLowAlert(volumePercent = alerts.alertVolumePercent, customTag = "MAIN_LOW")
+                                    }
+                                } else {
+                                    onSoundClick("MAIN_HIGH") {
+                                        MedicalSoundPlayer.playHighAlert(volumePercent = alerts.alertVolumePercent, customTag = "MAIN_HIGH")
+                                    }
+                                }
+                                mainToneTestIndex++
+                            }
+                        },
+                        isTesting = isMainTesting,
                         isRu = isRu,
+                        testButtonLabel = mainBtnLabel,
                         thresholdBadge = "< ${String.format(Locale.US, "%.1f", alerts.mainLowThresholdMmol)}  |  > ${String.format(Locale.US, "%.1f", alerts.mainHighThresholdMmol)}",
                         onThresholdClick = onShowMainThresholdDialog
                     )
@@ -416,6 +441,7 @@ fun AlertsConfigSection(
                     val isCriticalEffectiveEnabled = if (isCriticalInPauseState) true else (isMaster && alerts.isCriticalEnabled && !alerts.isCriticalHypoPermanentDisabled)
                     val isCriticalTesting = (currentlyPlayingTag in listOf("EXTRA_HYPO", "EXTRA_HYPER", AlertTier.CRITICAL.name, "CAREGIVER_SOS"))
                     var criticalToneTestIndex by remember { mutableIntStateOf(0) }
+                    val criticalBtnLabel = if (criticalToneTestIndex % 2 == 0) (if (isRu) "Тест L" else "Test L") else (if (isRu) "Тест H" else "Test H")
 
                     val activeCriticalTestSub = when (currentlyPlayingTag) {
                         "EXTRA_HYPO" -> if (isRu) "🔊 Тест: Крит. ГИПО (< ${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)} ммоль/л)" else "🔊 Test: Crit. HYPO (< ${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)} mmol/L)"
@@ -464,6 +490,7 @@ fun AlertsConfigSection(
                         },
                         isTesting = isCriticalTesting,
                         isRu = isRu,
+                        testButtonLabel = criticalBtnLabel,
                         timerBadge = criticalBadge,
                         isPaused = isCriticalInPauseState,
                         thresholdBadge = if (isRu) "🚨 Критические тревоги (< ${String.format(Locale.US, "%.1f", alerts.criticalLowThresholdMmol)}  или  > ${String.format(Locale.US, "%.1f", alerts.criticalHighThresholdMmol)})"
@@ -473,9 +500,60 @@ fun AlertsConfigSection(
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Tier 4: Signal Loss (20-25 min)
+                    // Speed Alerts: Rapid Change (Falling / Rising fast)
+                    var rapidChangeTestIndex by remember { mutableIntStateOf(0) }
+                    val isRapidTesting = (currentlyPlayingTag in listOf("FALLING_FAST", "RISING_FAST"))
+                    val rapidBtnLabel = if (rapidChangeTestIndex % 2 == 0) (if (isRu) "Тест L" else "Test L") else (if (isRu) "Тест H" else "Test H")
+                    val rapidSubtitle = when (currentlyPlayingTag) {
+                        "FALLING_FAST" -> if (isRu) "🔊 Тест: Резкое падение (tirup_falling_fast)" else "🔊 Test: Falling Fast (tirup_falling_fast)"
+                        "RISING_FAST" -> if (isRu) "🔊 Тест: Резкий рост (tirup_rising_fast)" else "🔊 Test: Rising Fast (tirup_rising_fast)"
+                        else -> if (!isMaster) (if (isRu) "Выключено (общий тумблер выключен)" else "Disabled (master switch off)")
+                        else if (isRu) "Звуковое оповещение при резком изменении сахара (скорость ≥0.11 ммоль/л/мин)"
+                        else "Audio alert on rapid glucose drop or rise (rate ≥0.11 mmol/L/min)"
+                    }
+
                     AlertTierConfigRow(
-                        title = if (isRu) "4. Потеря сигнала сенсора (20–25 мин)" else "4. Signal Loss (20–25 min)",
+                        title = if (isRu) "4. Скоростные тревоги (резкое падение и рост)" else "4. Rapid Change Alerts",
+                        subtitle = rapidSubtitle,
+                        enabled = isMaster && alerts.isRapidChangeEnabled,
+                        onEnabledChange = { isChecked ->
+                            if (isChecked) {
+                                onUpdateAlertSettings(alerts.copy(isAlertsMasterEnabled = true, isRapidChangeEnabled = true))
+                            } else {
+                                onUpdateAlertSettings(alerts.copy(isRapidChangeEnabled = false))
+                            }
+                        },
+                        vibrate = alerts.isRapidChangeVibrate,
+                        onVibrateChange = { onUpdateAlertSettings(alerts.copy(isRapidChangeVibrate = it)) },
+                        flash = alerts.isRapidChangeFlash,
+                        onFlashChange = { onUpdateAlertSettings(alerts.copy(isRapidChangeFlash = it)) },
+                        accentColor = Color(0xFF06B6D4),
+                        onTestClick = {
+                            if (isRapidTesting) {
+                                MedicalSoundPlayer.stopAll()
+                            } else {
+                                if (rapidChangeTestIndex % 2 == 0) {
+                                    onSoundClick("FALLING_FAST") {
+                                        MedicalSoundPlayer.playFallingFastAlert(volumePercent = alerts.alertVolumePercent, customTag = "FALLING_FAST")
+                                    }
+                                } else {
+                                    onSoundClick("RISING_FAST") {
+                                        MedicalSoundPlayer.playRisingFastAlert(volumePercent = alerts.alertVolumePercent, customTag = "RISING_FAST")
+                                    }
+                                }
+                                rapidChangeTestIndex++
+                            }
+                        },
+                        isTesting = isRapidTesting,
+                        isRu = isRu,
+                        testButtonLabel = rapidBtnLabel
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Tier 5: Signal Loss (20-25 min)
+                    AlertTierConfigRow(
+                        title = if (isRu) "5. Потеря сигнала сенсора (20–25 мин)" else "5. Signal Loss (20–25 min)",
                         subtitle = if (!isMaster) (if (isRu) "Выключено (общий тумблер выключен)" else "Disabled (master switch off)")
                         else if (isRu) "Нисходящий сигнал через 20–25 мин с нарастающим интервалом (➔ 40 ➔ 80 мин)" else "Descending tone after 20–25 min with increasing interval (➔ 40 ➔ 80 min)",
                         enabled = isMaster && alerts.isSignalLossEnabled,
@@ -734,7 +812,8 @@ private fun AlertTierConfigRow(
     isPaused: Boolean = false,
     thresholdBadge: String? = null,
     onThresholdClick: (() -> Unit)? = null,
-    isTesting: Boolean = false
+    isTesting: Boolean = false,
+    testButtonLabel: String? = null
 ) {
     val effectiveAccent = if (isPaused) MaterialTheme.colorScheme.onSurfaceVariant else accentColor
 
@@ -898,7 +977,7 @@ private fun AlertTierConfigRow(
                             )
                             Text(
                                 text = if (isTesting) (if (isRu) "Стоп" else "Stop")
-                                else (if (isRu) "Тест" else "Test"),
+                                else (testButtonLabel ?: if (isRu) "Тест" else "Test"),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = btnColor

@@ -31,6 +31,13 @@ data class AlertSettings(
     val criticalLowThresholdMmol: Double = 3.0,
     val criticalHighThresholdMmol: Double = 13.9,
 
+    // Speed Alerts: Rapid change (Резкое падение / Резкий рост сахара)
+    val isRapidChangeEnabled: Boolean = false,
+    val rapidFallThresholdMmolPerMin: Double = 0.11, // ~0.55 ммоль за 5 мин (двойная стрелка вниз)
+    val rapidRiseThresholdMmolPerMin: Double = 0.11, // ~0.55 ммоль за 5 мин (двойная стрелка вверх)
+    val isRapidChangeVibrate: Boolean = true,
+    val isRapidChangeFlash: Boolean = false,
+
     // Tier 4: Signal Loss (Потеря связи с сенсором >20 мин)
     val isSignalLossEnabled: Boolean = true,
     val signalLossMinutes: Int = 20,
