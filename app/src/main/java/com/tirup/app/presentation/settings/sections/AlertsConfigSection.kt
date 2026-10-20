@@ -284,12 +284,12 @@ fun AlertsConfigSection(
                         Column(modifier = Modifier.padding(12.dp)) {
                             // 1. Day Volume
                             val dayTones = listOf(
-                                (if (isRu) "Предикт" else "Predict") to { MedicalSoundPlayer.playPredictiveAlert(alerts.alertVolumePercent, "TEST_DAY") },
-                                (if (isRu) "Низкий" else "Low") to { MedicalSoundPlayer.playLowAlert(alerts.alertVolumePercent, 1, "TEST_DAY") },
-                                (if (isRu) "Высокий" else "High") to { MedicalSoundPlayer.playHighAlert(alerts.alertVolumePercent, 1, "TEST_DAY") },
-                                (if (isRu) "Падение" else "Fall") to { MedicalSoundPlayer.playFallingFastAlert(alerts.alertVolumePercent, "TEST_DAY") },
-                                (if (isRu) "Рост" else "Rise") to { MedicalSoundPlayer.playRisingFastAlert(alerts.alertVolumePercent, "TEST_DAY") },
-                                (if (isRu) "Связь" else "Signal") to { MedicalSoundPlayer.playSignalLossAlert(alerts.alertVolumePercent, "TEST_DAY") }
+                                (if (isRu) "Предикт" else "Predict") to { MedicalSoundPlayer.playPredictiveAlert(alerts.alertVolumePercent, "TEST_DAY_PREDICT") },
+                                (if (isRu) "Низкий" else "Low") to { MedicalSoundPlayer.playLowAlert(alerts.alertVolumePercent, 1, "TEST_DAY_LOW") },
+                                (if (isRu) "Высокий" else "High") to { MedicalSoundPlayer.playHighAlert(alerts.alertVolumePercent, 1, "TEST_DAY_HIGH") },
+                                (if (isRu) "Падение" else "Fall") to { MedicalSoundPlayer.playFallingFastAlert(alerts.alertVolumePercent, "TEST_DAY_FALL") },
+                                (if (isRu) "Рост" else "Rise") to { MedicalSoundPlayer.playRisingFastAlert(alerts.alertVolumePercent, "TEST_DAY_RISE") },
+                                (if (isRu) "Связь" else "Signal") to { MedicalSoundPlayer.playSignalLossAlert(alerts.alertVolumePercent, "TEST_DAY_SIGNAL") }
                             )
                             val dayBtnText = if (lastDayTestClickTime > 0L) {
                                 val currentIdx = (dayToneIndex - 1 + dayTones.size) % dayTones.size
@@ -303,7 +303,7 @@ fun AlertsConfigSection(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
+                                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                                     Text(
                                         text = if (isRu) "Громкость тревог (день)" else "Alert Volume (Day)",
                                         style = MaterialTheme.typography.labelLarge,
@@ -319,9 +319,10 @@ fun AlertsConfigSection(
                                 OutlinedButton(
                                     onClick = {
                                         lastDayTestClickTime = System.currentTimeMillis()
-                                        val tone = dayTones[dayToneIndex % dayTones.size]
+                                        val toneIdx = dayToneIndex % dayTones.size
+                                        val tone = dayTones[toneIdx]
                                         dayToneIndex = (dayToneIndex + 1) % dayTones.size
-                                        onSoundClick("TEST_DAY") {
+                                        onSoundClick("TEST_DAY_$toneIdx") {
                                             tone.second()
                                         }
                                     },
@@ -370,12 +371,12 @@ fun AlertsConfigSection(
 
                             // 2. Night Volume
                             val nightTones = listOf(
-                                (if (isRu) "Предикт" else "Predict") to { MedicalSoundPlayer.playPredictiveAlert(alerts.nightAlertVolumePercent, "TEST_NIGHT") },
-                                (if (isRu) "Низкий" else "Low") to { MedicalSoundPlayer.playLowAlert(alerts.nightAlertVolumePercent, 1, "TEST_NIGHT") },
-                                (if (isRu) "Высокий" else "High") to { MedicalSoundPlayer.playHighAlert(alerts.nightAlertVolumePercent, 1, "TEST_NIGHT") },
-                                (if (isRu) "Падение" else "Fall") to { MedicalSoundPlayer.playFallingFastAlert(alerts.nightAlertVolumePercent, "TEST_NIGHT") },
-                                (if (isRu) "Рост" else "Rise") to { MedicalSoundPlayer.playRisingFastAlert(alerts.nightAlertVolumePercent, "TEST_NIGHT") },
-                                (if (isRu) "Связь" else "Signal") to { MedicalSoundPlayer.playSignalLossAlert(alerts.nightAlertVolumePercent, "TEST_NIGHT") }
+                                (if (isRu) "Предикт" else "Predict") to { MedicalSoundPlayer.playPredictiveAlert(alerts.nightAlertVolumePercent, "TEST_NIGHT_PREDICT") },
+                                (if (isRu) "Низкий" else "Low") to { MedicalSoundPlayer.playLowAlert(alerts.nightAlertVolumePercent, 1, "TEST_NIGHT_LOW") },
+                                (if (isRu) "Высокий" else "High") to { MedicalSoundPlayer.playHighAlert(alerts.nightAlertVolumePercent, 1, "TEST_NIGHT_HIGH") },
+                                (if (isRu) "Падение" else "Fall") to { MedicalSoundPlayer.playFallingFastAlert(alerts.nightAlertVolumePercent, "TEST_NIGHT_FALL") },
+                                (if (isRu) "Рост" else "Rise") to { MedicalSoundPlayer.playRisingFastAlert(alerts.nightAlertVolumePercent, "TEST_NIGHT_RISE") },
+                                (if (isRu) "Связь" else "Signal") to { MedicalSoundPlayer.playSignalLossAlert(alerts.nightAlertVolumePercent, "TEST_NIGHT_SIGNAL") }
                             )
                             val nightBtnText = if (lastNightTestClickTime > 0L) {
                                 val currentIdx = (nightToneIndex - 1 + nightTones.size) % nightTones.size
@@ -392,35 +393,20 @@ fun AlertsConfigSection(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = if (isRu) "Громкость тревог (ночь)" else "Alert Volume (Night)",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        modifier = Modifier.clickable { onShowNightSleepWindowDialog() }
-                                    ) {
-                                        Text(
-                                            text = if (isRu) "Действует в часы сна: с $sleepStartStr до $sleepEndStr" else "Active during sleep: $sleepStartStr to $sleepEndStr",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Text(
-                                            text = "⚙️",
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                }
+                                Text(
+                                    text = if (isRu) "Громкость тревог (ночь)" else "Alert Volume (Night)",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f).padding(end = 8.dp)
+                                )
                                 OutlinedButton(
                                     onClick = {
                                         lastNightTestClickTime = System.currentTimeMillis()
-                                        val tone = nightTones[nightToneIndex % nightTones.size]
+                                        val toneIdx = nightToneIndex % nightTones.size
+                                        val tone = nightTones[toneIdx]
                                         nightToneIndex = (nightToneIndex + 1) % nightTones.size
-                                        onSoundClick("TEST_NIGHT") {
+                                        onSoundClick("TEST_NIGHT_$toneIdx") {
                                             tone.second()
                                         }
                                     },
@@ -431,6 +417,46 @@ fun AlertsConfigSection(
                                         text = nightBtnText,
                                         style = MaterialTheme.typography.labelMedium
                                     )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            // Dedicated Clickable Sleep Hours Badge Row
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onShowNightSleepWindowDialog() }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = if (isRu) "🌙 Окно сна: с $sleepStartStr до $sleepEndStr" else "🌙 Sleep window: $sleepStartStr to $sleepEndStr",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isRu) "Изменить" else "Edit",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = ActionBlue
+                                        )
+                                        Text(
+                                            text = "⚙️",
+                                            fontSize = 11.sp
+                                        )
+                                    }
                                 }
                             }
 
