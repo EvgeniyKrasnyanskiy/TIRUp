@@ -58,6 +58,7 @@ import com.tirup.app.presentation.theme.ColorVeryLow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @Composable
 fun AlertsConfigSection(
@@ -250,13 +251,14 @@ fun AlertsConfigSection(
                         Spacer(modifier = Modifier.height(10.dp))
                     }
 
-                    // Independent Volume Control for Tiers 1-2
+                    // Independent Volume Control for Tiers 1-2 (Day & Night)
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
+                            // 1. Day Volume
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -264,13 +266,13 @@ fun AlertsConfigSection(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = if (isRu) "Громкость упреждающих тревог" else "Alert Volume (Tiers 1–2)",
+                                        text = if (isRu) "Громкость упреждающих тревог (день)" else "Alert Volume (Day)",
                                         style = MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = if (isRu) "Независима от звука уведомлений телефона" else "Independent of phone ringtone volume",
+                                        text = if (isRu) "Независима от звука телефона (диапазон 1–100%)" else "Independent of phone ringtone volume (range 1–100%)",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -298,13 +300,12 @@ fun AlertsConfigSection(
                                 Slider(
                                     value = alerts.alertVolumePercent.toFloat(),
                                     onValueChange = { newVal ->
-                                        val stepped = (kotlin.math.round(newVal / 5f) * 5f).toInt().coerceIn(5, 100)
+                                        val stepped = newVal.roundToInt().coerceIn(1, 100)
                                         if (stepped != alerts.alertVolumePercent) {
                                             onUpdateAlertSettings(alerts.copy(alertVolumePercent = stepped))
                                         }
                                     },
-                                    valueRange = 5f..100f,
-                                    steps = 18,
+                                    valueRange = 1f..100f,
                                     modifier = Modifier.weight(1f),
                                     colors = SliderDefaults.colors(
                                         thumbColor = ActionBlue,
@@ -321,9 +322,77 @@ fun AlertsConfigSection(
                                 )
                             }
 
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // 2. Night Volume
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isRu) "Громкость упреждающих тревог (ночь)" else "Alert Volume (Night)",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = if (isRu) "Автоматически в часы сна (настройка в «Система и экран»)" else "Automatic during sleep hours (in System & Display)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        onPlayTestSound(alerts.nightAlertVolumePercent)
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text(
+                                        text = if (isRu) "Тест 🌙" else "Test 🌙",
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Slider(
+                                    value = alerts.nightAlertVolumePercent.toFloat(),
+                                    onValueChange = { newVal ->
+                                        val stepped = newVal.roundToInt().coerceIn(1, 100)
+                                        if (stepped != alerts.nightAlertVolumePercent) {
+                                            onUpdateAlertSettings(alerts.copy(nightAlertVolumePercent = stepped))
+                                        }
+                                    },
+                                    valueRange = 1f..100f,
+                                    modifier = Modifier.weight(1f),
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = ActionBlue,
+                                        activeTrackColor = ActionBlue
+                                    )
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "${alerts.nightAlertVolumePercent}%",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ActionBlue,
+                                    modifier = Modifier.width(44.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
                             Text(
-                                text = if (isRu) "ℹ️ Критические тревоги (затяжная гипогликемия, потеря связи) всегда звучат на максимальной громкости (100%)."
-                                else "ℹ️ Critical alarms (prolonged hypo, signal loss) always sound at maximum volume (100%).",
+                                text = if (isRu) "ℹ️ Критические тревоги (экстремальная/затяжная гипогликемия, потеря связи) всегда звучат на максимальной громкости (100%)."
+                                else "ℹ️ Critical alarms (extreme/prolonged hypo, signal loss) always sound at maximum volume (100%).",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 11.sp,

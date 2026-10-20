@@ -592,8 +592,8 @@ class UserManualPdfGenerator(private val context: Context) {
                 )
                 flow.section(if (isRu) "3.2. Градация сирен и аудиосистема MP3" else "3.2. Siren Escalation & MP3 Audio System")
                 flow.paragraph(
-                    if (isRu) "В TIRUp тревоги воспроизводятся через откалиброванную аудиосистему на базе MP3 и синтезированных сирен, обеспечивая одинаковый и мощный уровень громкости на любых смартфонах (диапазон настройки 5–100%):"
-                    else "In TIRUp alerts utilize a calibrated audio engine combining dedicated MP3 chimes and synthesized sirens for uniform acoustic performance across all Android devices (5-100% volume slider):"
+                    if (isRu) "В TIRUp тревоги воспроизводятся через откалиброванную аудиосистему на базе MP3 и синтезированных сирен, обеспечивая одинаковый и мощный уровень громкости на любых смартфонах (диапазон настройки 1–100% для дневного и ночного режимов):"
+                    else "In TIRUp alerts utilize a calibrated audio engine combining dedicated MP3 chimes and synthesized sirens for uniform acoustic performance across all Android devices (1-100% volume sliders for day and night):"
                 )
                 flow.bullet(
                     if (isRu) "🚨 Крит. ГИПО (<3.0 ммоль/л или настроенный порог) — 50-секундная сирена ГО" else "🚨 Crit. HYPO (<3.0 mmol/L) — 50-Second GDH Siren",

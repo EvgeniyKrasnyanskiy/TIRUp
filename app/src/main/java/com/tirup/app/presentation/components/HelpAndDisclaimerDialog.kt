@@ -165,7 +165,7 @@ fun HelpAndDisclaimerDialog(
                         "• Плавающий кружок поверх окон: в норме (3.9–10.0) компактный (50%), тап открывает TIRUp. Вне нормы — тревожный режим, короткий тап глушит/снузит алерт, долгое нажатие открывает приложение."
                     } else {
                         "• Tiers 1–4: predictive target departure, confirmed boundary tone, critical 12s siren, and sensor signal loss (>20 min).\n" +
-                        "• Independent Volume: custom alert volume slider (20% – 100%) with realistic preview melody.\n" +
+                        "• Independent Volume: custom alert volume sliders (1% – 100%, day & night) with realistic preview melody.\n" +
                         "• Quick Alarm Pause: selectable interval ('Snooze All' from 10m to 8h, default 1h) on the alert screen.\n" +
                         "• Emergency SOS SMS: sends compact SMS (≤67 chars) with GPS to trusted contact if severe hypo (<3.0) is unacknowledged for 5m.\n" +
                         "• Offline SMS Query: trusted contact can query real-time glucose & TIR via SMS without internet ('sugar', '?', 'bg').\n" +

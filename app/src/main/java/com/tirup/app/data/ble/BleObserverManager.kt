@@ -128,6 +128,12 @@ object BleObserverManager {
     @Volatile
     var isServiceRunning: Boolean = false
 
+    @Volatile
+    private var boostStartedTimestampMs: Long = 0L
+
+    @Volatile
+    private var lastResumeBoostCheckMs: Long = 0L
+
     /**
      * Synchronizes the scanner state with the user settings.
      * Starts scanning if role == OBSERVER, stops otherwise.
@@ -238,6 +244,7 @@ object BleObserverManager {
             mutex.withLock {
                 boostJob?.cancel()
                 isBoostActive = true
+                boostStartedTimestampMs = System.currentTimeMillis()
                 _boostRemainingSec.value = durationSec
 
                 // Restart scanner in low latency mode
@@ -265,15 +272,111 @@ object BleObserverManager {
     }
 
     /**
-     * Immediately cancels active boost search upon master packet arrival or manual cancel.
+     * Gracefully completes active boost scan when a valid packet arrives.
+     * Guarantees a minimum graceful display window of 6 seconds for the droplet animation
+     * so that the user clearly registers the search, then smoothly winds down to 0 and
+     * reverts the BLE scanner to normal energy-efficient mode.
+     */
+    fun onPacketReceivedGracefullyCompleteBoost() {
+        if (!isBoostActive && _boostRemainingSec.value <= 0) return
+        val elapsedMs = System.currentTimeMillis() - boostStartedTimestampMs
+        val minDisplayMs = 6000L // 6 seconds minimum grace period for droplet animation
+
+        if (elapsedMs < minDisplayMs) {
+            val remainingMs = minDisplayMs - elapsedMs
+            val remainingSec = (remainingMs / 1000f).roundToInt().coerceAtLeast(1)
+            Log.i(TAG, "BLE packet received early (${elapsedMs}ms). Gracefully completing boost animation in ${remainingSec}s")
+            boostJob?.cancel()
+            boostJob = scope.launch {
+                var sec = remainingSec
+                _boostRemainingSec.value = sec
+                while (sec > 0) {
+                    delay(1000L)
+                    sec--
+                    _boostRemainingSec.value = sec
+                }
+                revertBoostToNormalMode()
+            }
+        } else {
+            Log.i(TAG, "BLE packet received after ${elapsedMs}ms. Instantly reverting boost scan to normal mode.")
+            revertBoostToNormalMode()
+        }
+    }
+
+    private fun revertBoostToNormalMode() {
+        val context = appContext ?: return
+        val settingsRepo = cachedSettingsRepo ?: return
+        val glucoseRepo = cachedGlucoseRepo ?: return
+
+        scope.launch {
+            val userSettings = settingsRepo.getSettings().firstOrNull() ?: return@launch
+            val ble = userSettings.bleBridgeSettings
+
+            mutex.withLock {
+                if (!isBoostActive && _boostRemainingSec.value <= 0) return@withLock
+                isBoostActive = false
+                _boostRemainingSec.value = 0
+                boostJob?.cancel()
+                boostJob = null
+
+                // Revert scanner from LOW_LATENCY to normal mode
+                stopScanningInternalLocked()
+                if (ble.role == BleBridgeRole.OBSERVER) {
+                    startScanningInternalLocked(
+                        context,
+                        ble.familyPin,
+                        settingsRepo,
+                        glucoseRepo,
+                        boost = false,
+                        useLongRange = ble.useLongRange
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Immediately cancels active boost search upon manual cancel or reset.
      */
     fun cancelBoost() {
         if (!isBoostActive && _boostRemainingSec.value <= 0) return
-        Log.i(TAG, "Cancelling active boost search immediately (packet arrived or reset)")
-        boostJob?.cancel()
-        boostJob = null
-        isBoostActive = false
-        _boostRemainingSec.value = 0
+        Log.i(TAG, "Cancelling active boost search immediately")
+        revertBoostToNormalMode()
+    }
+
+    /**
+     * Checks if BLE receiver data is stale when user opens the app or returns to foreground.
+     * Since modern CGM sensors transmit 1x per minute (rarely 5m), a silence of >= 75 seconds
+     * indicates 1-2 missed readings. Automatically triggers low-latency scan boost to re-catch
+     * transmitter packets without requiring manual clicks.
+     */
+    fun checkAndBoostOnResume(
+        context: Context,
+        settingsRepository: SettingsRepository,
+        glucoseRepository: GlucoseRepository
+    ) {
+        val now = System.currentTimeMillis()
+        if (now - lastResumeBoostCheckMs < 30_000L) {
+            return // Anti-spam cooldown (e.g. rapid activity switching)
+        }
+        lastResumeBoostCheckMs = now
+
+        scope.launch {
+            val userSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
+            val ble = userSettings.bleBridgeSettings
+            if (!ble.isEnabled || ble.role != BleBridgeRole.OBSERVER) return@launch
+
+            val lastContact = ble.lastRadioContactMs.coerceAtLeast(ble.lastPacketTimestamp)
+            val silenceMs = if (lastContact > 0L) now - lastContact else Long.MAX_VALUE
+            val cadence = detectedCadenceIntervalMs.coerceAtLeast(60_000L)
+            // If cadence is 1m, 75s silence means 1-2 missed readings. If 5m, 330s silence means missed reading.
+            val staleThresholdMs = if (cadence <= 60_000L) 75_000L else 330_000L
+
+            if (silenceMs >= staleThresholdMs) {
+                Log.i(TAG, "BLE data stale on resume (silence ${silenceMs / 1000}s >= ${staleThresholdMs / 1000}s). Auto-triggering 60s boost scan.")
+                boostScanFor60Sec(context, settingsRepository, glucoseRepository)
+            }
+        }
     }
 
     /**
@@ -767,6 +870,7 @@ object BleObserverManager {
             // Pure range test ping without real sensor reading: update radio contact and emit event without inserting into Room DB
             Log.i(TAG, "Test ping packet received: ts=${packet.timestamp}, rssi=$rssi (no sensor reading)")
             _packetReceivedEvent.tryEmit(Pair(packet, rssi))
+            onPacketReceivedGracefullyCompleteBoost()
             scope.launch {
                 try {
                     val currentSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
@@ -804,6 +908,7 @@ object BleObserverManager {
         lastHandledTimestamp = packet.timestamp
         Log.i(TAG, "Received valid BLE glucose packet: ts=${packet.timestamp}, bg=${packet.valueMmol}, rssi=$rssi, bat=${packet.batteryPercent}%")
         _packetReceivedEvent.tryEmit(Pair(packet, rssi))
+        onPacketReceivedGracefullyCompleteBoost()
 
         scope.launch {
             try {

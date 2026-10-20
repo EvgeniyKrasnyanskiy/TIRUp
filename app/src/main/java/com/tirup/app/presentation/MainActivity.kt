@@ -285,9 +285,13 @@ class MainActivity : ComponentActivity() {
         DexdripBroadcastReceiver.syncFromLocalXdrip(this@MainActivity)
         com.tirup.app.data.worker.AutoBackupWorker.enqueue(applicationContext, force = false)
 
-        // Ensure floating bubble is active if enabled in settings
         val app = applicationContext as? TirupApplication
         app?.let { application ->
+            com.tirup.app.data.ble.BleObserverManager.checkAndBoostOnResume(
+                applicationContext,
+                application.settingsRepository,
+                application.glucoseRepository
+            )
             lifecycleScope.launch(Dispatchers.IO) {
                 try {
                     val settings = application.settingsRepository.getSettings().first()
