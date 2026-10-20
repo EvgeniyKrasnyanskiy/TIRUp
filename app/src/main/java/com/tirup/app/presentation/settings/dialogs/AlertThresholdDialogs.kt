@@ -1012,3 +1012,90 @@ fun ExtraAlertSoundsInfoDialog(
         }
     )
 }
+
+@Composable
+fun NightSleepWindowDialog(
+    initialStartHour: Int,
+    initialEndHour: Int,
+    isRu: Boolean,
+    onSave: (startHour: Int, endHour: Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var startHour by remember { mutableStateOf(initialStartHour) }
+    var endHour by remember { mutableStateOf(initialEndHour) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = if (isRu) "Часы сна (ночной профиль)" else "Night Profile (Sleep Window)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text(
+                    text = if (isRu) "В это время автоматически действует ночная громкость тревог и специальные интервалы проверки связи."
+                           else "Nighttime alert volume and specialized signal-loss intervals apply automatically during these hours.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    com.tirup.app.presentation.settings.sections.DropdownHourSelector(
+                        label = if (isRu) "Начало сна" else "Sleep Start",
+                        selectedHour = startHour,
+                        isRu = isRu,
+                        modifier = Modifier.weight(1f),
+                        onHourSelected = { startHour = it }
+                    )
+
+                    com.tirup.app.presentation.settings.sections.DropdownHourSelector(
+                        label = if (isRu) "Конец сна" else "Sleep End",
+                        selectedHour = endHour,
+                        isRu = isRu,
+                        modifier = Modifier.weight(1f),
+                        onHourSelected = { endHour = it }
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = ActionBlue.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (isRu) "🌙 Текущее окно сна: ${String.format(Locale.US, "%02d:00", startHour)} – ${String.format(Locale.US, "%02d:00", endHour)}"
+                               else "🌙 Current sleep window: ${String.format(Locale.US, "%02d:00", startHour)} – ${String.format(Locale.US, "%02d:00", endHour)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = ActionBlue,
+                        modifier = Modifier.padding(10.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onSave(startHour, endHour)
+                    onDismiss()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = ActionBlue)
+            ) {
+                Text(text = if (isRu) "Сохранить" else "Save", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = if (isRu) "Отмена" else "Cancel")
+            }
+        }
+    )
+}
+

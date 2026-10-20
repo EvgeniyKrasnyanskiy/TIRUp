@@ -230,6 +230,7 @@ fun SettingsScreen(
     var showMainThresholdDialog by rememberSaveable { mutableStateOf(false) }
     var showPredictiveHorizonDialog by rememberSaveable { mutableStateOf(false) }
     var showPredictiveInfoDialog by rememberSaveable { mutableStateOf(false) }
+    var showNightSleepWindowDialog by rememberSaveable { mutableStateOf(false) }
     var masterOffHintVisible by rememberSaveable { mutableStateOf(false) }
     var showBleHelpModal by rememberSaveable { mutableStateOf(false) }
     var showBlePinDialog by rememberSaveable { mutableStateOf(false) }
@@ -625,6 +626,7 @@ fun SettingsScreen(
                 onShowCriticalThresholdDialog = { showCriticalThresholdDialog = true },
                 onShowMainThresholdDialog = { showMainThresholdDialog = true },
                 onShowPredictiveHorizonDialog = { showPredictiveHorizonDialog = true },
+                onShowNightSleepWindowDialog = { showNightSleepWindowDialog = true },
                 onMasterOffHint = { masterOffHintVisible = true }
             )
         }
@@ -1112,6 +1114,18 @@ fun SettingsScreen(
         PredictiveInfoDialog(
             isRu = isRu,
             onDismiss = { showPredictiveInfoDialog = false }
+        )
+    }
+
+    if (showNightSleepWindowDialog) {
+        com.tirup.app.presentation.settings.dialogs.NightSleepWindowDialog(
+            initialStartHour = settings.nightStartHour,
+            initialEndHour = settings.nightEndHour,
+            isRu = isRu,
+            onSave = { startHour, endHour ->
+                viewModel.autoUpdateNightHours(startHour, endHour)
+            },
+            onDismiss = { showNightSleepWindowDialog = false }
         )
     }
 

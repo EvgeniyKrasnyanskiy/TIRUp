@@ -220,8 +220,8 @@ fun StreakMotivatorDialog(
                     )
                 ) {
                     Text(
-                        text = if (streakDays > 0) (if (isRu) "Так держать!" else "Proud of this! Continue")
-                               else (if (isRu) "Ок" else "OK"),
+                        text = if (streakDays > 0) (if (isRu) "Так держать! 💪" else "Keep it up! 💪")
+                               else (if (isRu) "Понятно" else "Got it"),
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
                     )

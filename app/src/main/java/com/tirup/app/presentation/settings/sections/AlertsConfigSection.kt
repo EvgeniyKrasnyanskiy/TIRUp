@@ -35,8 +35,10 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -68,12 +70,13 @@ fun AlertsConfigSection(
     onUpdateAlertSettings: (AlertSettings) -> Unit,
     @Suppress("UNUSED_PARAMETER") onTestAlert: (AlertTier) -> Unit,
     @Suppress("UNUSED_PARAMETER") onTestCaregiverSosScreen: () -> Unit = {},
-    onPlayTestSound: (Int) -> Unit,
+    @Suppress("UNUSED_PARAMETER") onPlayTestSound: (Int) -> Unit = {},
     onSoundClick: (String, () -> Unit) -> Unit,
     onShowCriticalHypoSafetyDialog: () -> Unit,
     onShowCriticalThresholdDialog: () -> Unit,
     onShowMainThresholdDialog: () -> Unit,
     onShowPredictiveHorizonDialog: () -> Unit,
+    onShowNightSleepWindowDialog: () -> Unit,
     onMasterOffHint: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -251,7 +254,28 @@ fun AlertsConfigSection(
                         Spacer(modifier = Modifier.height(10.dp))
                     }
 
-                    // Independent Volume Control for Tiers 1-2 (Day & Night)
+                    // Independent Volume Control for Tiers 1, 2, 4, 5 (Day & Night)
+                    var dayToneIndex by remember { mutableIntStateOf(0) }
+                    var nightToneIndex by remember { mutableIntStateOf(0) }
+                    var lastDayTestClickTime by remember { mutableLongStateOf(0L) }
+                    var lastNightTestClickTime by remember { mutableLongStateOf(0L) }
+
+                    LaunchedEffect(lastDayTestClickTime) {
+                        if (lastDayTestClickTime > 0L) {
+                            kotlinx.coroutines.delay(10_000L)
+                            dayToneIndex = 0
+                            lastDayTestClickTime = 0L
+                        }
+                    }
+
+                    LaunchedEffect(lastNightTestClickTime) {
+                        if (lastNightTestClickTime > 0L) {
+                            kotlinx.coroutines.delay(10_000L)
+                            nightToneIndex = 0
+                            lastNightTestClickTime = 0L
+                        }
+                    }
+
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -259,6 +283,21 @@ fun AlertsConfigSection(
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             // 1. Day Volume
+                            val dayTones = listOf(
+                                (if (isRu) "Предикт" else "Predict") to { MedicalSoundPlayer.playPredictiveAlert(alerts.alertVolumePercent, "TEST_DAY") },
+                                (if (isRu) "Низкий" else "Low") to { MedicalSoundPlayer.playLowAlert(alerts.alertVolumePercent, 1, "TEST_DAY") },
+                                (if (isRu) "Высокий" else "High") to { MedicalSoundPlayer.playHighAlert(alerts.alertVolumePercent, 1, "TEST_DAY") },
+                                (if (isRu) "Падение" else "Fall") to { MedicalSoundPlayer.playFallingFastAlert(alerts.alertVolumePercent, "TEST_DAY") },
+                                (if (isRu) "Рост" else "Rise") to { MedicalSoundPlayer.playRisingFastAlert(alerts.alertVolumePercent, "TEST_DAY") },
+                                (if (isRu) "Связь" else "Signal") to { MedicalSoundPlayer.playSignalLossAlert(alerts.alertVolumePercent, "TEST_DAY") }
+                            )
+                            val dayBtnText = if (lastDayTestClickTime > 0L) {
+                                val currentIdx = (dayToneIndex - 1 + dayTones.size) % dayTones.size
+                                "${dayTones[currentIdx].first} 🔔"
+                            } else {
+                                if (isRu) "Тест 🔔" else "Test 🔔"
+                            }
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -266,26 +305,31 @@ fun AlertsConfigSection(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = if (isRu) "Громкость упреждающих тревог (день)" else "Alert Volume (Day)",
+                                        text = if (isRu) "Громкость тревог (день)" else "Alert Volume (Day)",
                                         style = MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = if (isRu) "Независима от звука телефона (диапазон 1–100%)" else "Independent of phone ringtone volume (range 1–100%)",
+                                        text = if (isRu) "Все тревоги (предиктив, выход из нормы, скорость, потеря связи)" else "All standard alerts (predictive, main limits, rapid change, signal loss)",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                                 OutlinedButton(
                                     onClick = {
-                                        onPlayTestSound(alerts.alertVolumePercent)
+                                        lastDayTestClickTime = System.currentTimeMillis()
+                                        val tone = dayTones[dayToneIndex % dayTones.size]
+                                        dayToneIndex = (dayToneIndex + 1) % dayTones.size
+                                        onSoundClick("TEST_DAY") {
+                                            tone.second()
+                                        }
                                     },
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                     modifier = Modifier.height(32.dp)
                                 ) {
                                     Text(
-                                        text = if (isRu) "Тест 🔔" else "Test 🔔",
+                                        text = dayBtnText,
                                         style = MaterialTheme.typography.labelMedium
                                     )
                                 }
@@ -325,6 +369,24 @@ fun AlertsConfigSection(
                             Spacer(modifier = Modifier.height(10.dp))
 
                             // 2. Night Volume
+                            val nightTones = listOf(
+                                (if (isRu) "Предикт" else "Predict") to { MedicalSoundPlayer.playPredictiveAlert(alerts.nightAlertVolumePercent, "TEST_NIGHT") },
+                                (if (isRu) "Низкий" else "Low") to { MedicalSoundPlayer.playLowAlert(alerts.nightAlertVolumePercent, 1, "TEST_NIGHT") },
+                                (if (isRu) "Высокий" else "High") to { MedicalSoundPlayer.playHighAlert(alerts.nightAlertVolumePercent, 1, "TEST_NIGHT") },
+                                (if (isRu) "Падение" else "Fall") to { MedicalSoundPlayer.playFallingFastAlert(alerts.nightAlertVolumePercent, "TEST_NIGHT") },
+                                (if (isRu) "Рост" else "Rise") to { MedicalSoundPlayer.playRisingFastAlert(alerts.nightAlertVolumePercent, "TEST_NIGHT") },
+                                (if (isRu) "Связь" else "Signal") to { MedicalSoundPlayer.playSignalLossAlert(alerts.nightAlertVolumePercent, "TEST_NIGHT") }
+                            )
+                            val nightBtnText = if (lastNightTestClickTime > 0L) {
+                                val currentIdx = (nightToneIndex - 1 + nightTones.size) % nightTones.size
+                                "${nightTones[currentIdx].first} 🌙"
+                            } else {
+                                if (isRu) "Тест 🌙" else "Test 🌙"
+                            }
+
+                            val sleepStartStr = String.format(Locale.US, "%02d:00", settings.nightStartHour)
+                            val sleepEndStr = String.format(Locale.US, "%02d:00", settings.nightEndHour)
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -332,26 +394,41 @@ fun AlertsConfigSection(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = if (isRu) "Громкость упреждающих тревог (ночь)" else "Alert Volume (Night)",
+                                        text = if (isRu) "Громкость тревог (ночь)" else "Alert Volume (Night)",
                                         style = MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
-                                    Text(
-                                        text = if (isRu) "Автоматически в часы сна (настройка в «Система и экран»)" else "Automatic during sleep hours (in System & Display)",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        modifier = Modifier.clickable { onShowNightSleepWindowDialog() }
+                                    ) {
+                                        Text(
+                                            text = if (isRu) "Действует в часы сна: с $sleepStartStr до $sleepEndStr" else "Active during sleep: $sleepStartStr to $sleepEndStr",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = "⚙️",
+                                            fontSize = 12.sp
+                                        )
+                                    }
                                 }
                                 OutlinedButton(
                                     onClick = {
-                                        onPlayTestSound(alerts.nightAlertVolumePercent)
+                                        lastNightTestClickTime = System.currentTimeMillis()
+                                        val tone = nightTones[nightToneIndex % nightTones.size]
+                                        nightToneIndex = (nightToneIndex + 1) % nightTones.size
+                                        onSoundClick("TEST_NIGHT") {
+                                            tone.second()
+                                        }
                                     },
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                     modifier = Modifier.height(32.dp)
                                 ) {
                                     Text(
-                                        text = if (isRu) "Тест 🌙" else "Test 🌙",
+                                        text = nightBtnText,
                                         style = MaterialTheme.typography.labelMedium
                                     )
                                 }
@@ -400,6 +477,7 @@ fun AlertsConfigSection(
                             )
                         }
                     }
+
 
                     Spacer(modifier = Modifier.height(10.dp))
 
