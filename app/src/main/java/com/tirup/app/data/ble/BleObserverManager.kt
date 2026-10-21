@@ -134,6 +134,12 @@ object BleObserverManager {
     @Volatile
     private var lastResumeBoostCheckMs: Long = 0L
 
+    @Volatile
+    private var currentFamilyPin: String? = null
+
+    @Volatile
+    private var currentUseLongRange: Boolean = false
+
     /**
      * Synchronizes the scanner state with the user settings.
      * Starts scanning if role == OBSERVER, stops otherwise.
@@ -165,7 +171,15 @@ object BleObserverManager {
                         Log.w(TAG, "Failed to start BleObserverService: ${e.message}")
                     }
                 }
-                startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = isBoostActive, useLongRange = ble.useLongRange)
+                val configChanged = currentFamilyPin != ble.familyPin || currentUseLongRange != ble.useLongRange
+                if (isScanning && configChanged) {
+                    Log.i(TAG, "BLE Observer configuration changed (pin/phy), restarting cleanly")
+                    stopScanningInternal()
+                    delay(800L)
+                    startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = isBoostActive, useLongRange = ble.useLongRange)
+                } else if (!isScanning) {
+                    startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = isBoostActive, useLongRange = ble.useLongRange)
+                }
             } else {
                 if (isServiceRunning) {
                     try {
@@ -195,9 +209,18 @@ object BleObserverManager {
             val userSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
             val ble = userSettings.bleBridgeSettings
             if (ble.isEnabled && ble.role == BleBridgeRole.OBSERVER) {
-                // Ensure any previous dead or stale scan registration is cleared before starting fresh
-                stopScanningInternal()
-                startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = isBoostActive, useLongRange = ble.useLongRange)
+                if (isScanning) {
+                    val configChanged = currentFamilyPin != ble.familyPin || currentUseLongRange != ble.useLongRange
+                    if (configChanged) {
+                        stopScanningInternal()
+                        delay(800L)
+                        startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = isBoostActive, useLongRange = ble.useLongRange)
+                    } else {
+                        Log.d(TAG, "Observer scanner already running from service with matching config")
+                    }
+                } else {
+                    startScanningInternal(context, ble.familyPin, settingsRepository, glucoseRepository, boost = isBoostActive, useLongRange = ble.useLongRange)
+                }
             } else {
                 try {
                     context.stopService(Intent(context, BleObserverService::class.java))
@@ -240,6 +263,7 @@ object BleObserverManager {
         scope.launch {
             val userSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
             val ble = userSettings.bleBridgeSettings
+            if (!ble.isEnabled || ble.role != BleBridgeRole.OBSERVER) return@launch
 
             mutex.withLock {
                 boostJob?.cancel()
@@ -247,9 +271,28 @@ object BleObserverManager {
                 boostStartedTimestampMs = System.currentTimeMillis()
                 _boostRemainingSec.value = durationSec
 
-                // Restart scanner in low latency mode
-                stopScanningInternalLocked()
-                startScanningInternalLocked(context, ble.familyPin, settingsRepository, glucoseRepository, boost = true, useLongRange = ble.useLongRange)
+                // If scanner is already active in LOW_LATENCY (service running and not in ECO mode),
+                // do NOT restart hardware scanner! Tearing down and restarting burns AOSP rate limits
+                // and creates packet reception blind spots.
+                val isAlreadyLowLatency = isScanning && isServiceRunning && !_isEcoModeFlow.value
+                if (!isAlreadyLowLatency) {
+                    _isEcoModeFlow.value = false
+                    _channelMetricsFlow.value = _channelMetricsFlow.value.copy(isEcoMode = false)
+                    if (isScanning) {
+                        stopScanningInternalLocked()
+                        delay(800L)
+                    }
+                    startScanningInternalLocked(
+                        context,
+                        ble.familyPin,
+                        settingsRepository,
+                        glucoseRepository,
+                        boost = true,
+                        useLongRange = ble.useLongRange
+                    )
+                } else {
+                    Log.i(TAG, "Boost activated for UI countdown ($durationSec s): hardware scanner already running in LOW_LATENCY")
+                }
 
                 boostJob = launch {
                     while (_boostRemainingSec.value > 0) {
@@ -259,10 +302,19 @@ object BleObserverManager {
                     mutex.withLock {
                         if (isBoostActive) {
                             isBoostActive = false
-                            // Revert to normal scan mode if observer, else stop
-                            stopScanningInternalLocked()
-                            if (ble.role == BleBridgeRole.OBSERVER) {
-                                startScanningInternalLocked(context, ble.familyPin, settingsRepository, glucoseRepository, boost = false, useLongRange = ble.useLongRange)
+                            // If observer service is running, it stays in LOW_LATENCY, no hardware restart needed!
+                            // Only if service is NOT running and we need to drop from boost to balanced:
+                            if (!isServiceRunning && isScanning && ble.role == BleBridgeRole.OBSERVER) {
+                                stopScanningInternalLocked()
+                                delay(800L)
+                                startScanningInternalLocked(
+                                    context,
+                                    ble.familyPin,
+                                    settingsRepository,
+                                    glucoseRepository,
+                                    boost = false,
+                                    useLongRange = ble.useLongRange
+                                )
                             }
                         }
                     }
@@ -319,9 +371,11 @@ object BleObserverManager {
                 boostJob?.cancel()
                 boostJob = null
 
-                // Revert scanner from LOW_LATENCY to normal mode
-                stopScanningInternalLocked()
-                if (ble.role == BleBridgeRole.OBSERVER) {
+                // If service is running, it continues scanning in LOW_LATENCY, no hardware restart needed!
+                // Only restart if service is NOT running and we need to drop from boost to balanced
+                if (!isServiceRunning && isScanning && ble.role == BleBridgeRole.OBSERVER) {
+                    stopScanningInternalLocked()
+                    delay(800L)
                     startScanningInternalLocked(
                         context,
                         ble.familyPin,
@@ -518,18 +572,22 @@ object BleObserverManager {
                     try {
                         mutex.withLock {
                             if (isScanning && !isBoostActive) {
-                                Log.i(TAG, "Reverting scan mode from boost (LOW_LATENCY) to BALANCED")
-                                try {
-                                    if (hasScanPermission(context)) {
-                                        activeCallback?.let { cb -> scanner?.stopScan(cb) }
-                                    }
-                                } catch (_: SecurityException) {
-                                } catch (_: Exception) {}
-                                activeCallback = null
-                                scanner = null
-                                isScanning = false
-                                delay(800L)
-                                startScanningInternalLocked(context, ble.familyPin, settingsRepo, glucoseRepo, boost = false, useLongRange = ble.useLongRange)
+                                if (!isServiceRunning) {
+                                    Log.i(TAG, "Reverting scan mode from boost (LOW_LATENCY) to BALANCED")
+                                    try {
+                                        if (hasScanPermission(context)) {
+                                            activeCallback?.let { cb -> scanner?.stopScan(cb) }
+                                        }
+                                    } catch (_: SecurityException) {
+                                    } catch (_: Exception) {}
+                                    activeCallback = null
+                                    scanner = null
+                                    isScanning = false
+                                    delay(800L)
+                                    startScanningInternalLocked(context, ble.familyPin, settingsRepo, glucoseRepo, boost = false, useLongRange = ble.useLongRange)
+                                } else {
+                                    Log.i(TAG, "Boost ended: observer service remains active in LOW_LATENCY (no hardware restart needed)")
+                                }
                             }
                         }
                     } finally {
@@ -595,12 +653,14 @@ object BleObserverManager {
             return
         }
 
-        // Manufacturer ScanFilter with exact 'TU' magic header ensures hardware filtering keeps scanning alive while screen is off (Android 8+)
+        currentFamilyPin = familyPin
+        currentUseLongRange = useLongRange
+
+        // Manufacturer ScanFilter without byte masks ensures hardware filtering keeps scanning alive while screen is off (Android 8+)
         val scanFilter = ScanFilter.Builder()
             .setManufacturerData(
                 BlePacketCodec.MANUFACTURER_ID,
-                byteArrayOf(0x54, 0x55), // magic "TU"
-                byteArrayOf(0xFF.toByte(), 0xFF.toByte()) // exact match mask
+                byteArrayOf(0x54, 0x55) // magic "TU"
             )
             .build()
 
@@ -649,9 +709,17 @@ object BleObserverManager {
                     SCAN_FAILED_INTERNAL_ERROR -> "SCAN_FAILED_INTERNAL_ERROR (3)"
                     SCAN_FAILED_FEATURE_UNSUPPORTED -> "SCAN_FAILED_FEATURE_UNSUPPORTED (4)"
                     SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES -> "SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES (5)"
+                    6 -> "SCAN_FAILED_SCANNING_TOO_FREQUENTLY (6)"
                     else -> "SCAN_FAILED_UNKNOWN ($errorCode)"
                 }
                 Log.e(TAG, "BLE Scan failed: $errorDesc")
+
+                // Release scanning state to prevent permanent deadlock
+                synchronized(this@BleObserverManager) {
+                    isScanning = false
+                    activeCallback = null
+                    scanner = null
+                }
                 _isScanningFlow.value = false
                 _isLongRangeScanActive.value = false
 
@@ -665,12 +733,21 @@ object BleObserverManager {
                     return
                 }
 
+                if (errorCode == 6) { // SCAN_FAILED_SCANNING_TOO_FREQUENTLY
+                    Log.w(TAG, "AOSP scan rate limit reached (5 starts / 30s). Waiting 30s cooldown before self-recovery.")
+                    scope.launch {
+                        delay(30_000L)
+                        restartScanInternal("aosp_rate_limit_recovery", boost = false)
+                    }
+                    return
+                }
+
                 if (errorCode == SCAN_FAILED_ALREADY_STARTED ||
                     errorCode == SCAN_FAILED_APPLICATION_REGISTRATION_FAILED ||
                     errorCode == SCAN_FAILED_INTERNAL_ERROR
                 ) {
                     scope.launch {
-                        delay(2500L)
+                        delay(3000L)
                         restartScanInternal("on_scan_failed_recovery", boost = false)
                     }
                 }
@@ -693,9 +770,15 @@ object BleObserverManager {
             Log.i(TAG, "BLE Observer started scanning successfully (mode=$scanMode, boost=$boost, eco=${_isEcoModeFlow.value})")
         } catch (e: SecurityException) {
             Log.w(TAG, "SecurityException starting scan: ${e.message}")
+            isScanning = false
+            activeCallback = null
+            scanner = null
             _isScanningFlow.value = false
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start scan: ${e.message}")
+            isScanning = false
+            activeCallback = null
+            scanner = null
             _isScanningFlow.value = false
         }
     }
@@ -978,6 +1061,8 @@ object BleObserverManager {
         _channelMetricsFlow.value = _channelMetricsFlow.value.copy(isEcoMode = false)
         packetRecords1h.clear()
         scanStartTimestampMs = 0L
+        currentFamilyPin = null
+        currentUseLongRange = false
         activeCallback = null
         scanner = null
         isScanning = false

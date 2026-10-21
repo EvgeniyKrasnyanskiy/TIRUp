@@ -2743,10 +2743,15 @@ private fun BleStatusDialog(
                 else "\n• Delivery (1h): ${channelMetrics.pdrPercent}% (${channelMetrics.receivedCountLastHour}/$totalExpected readings, avg ${channelMetrics.avgRssi} dBm)"
             } else ""
 
-            val isSilenceAlert = !isObserverLongRangeActive && (contactAgeSecs != null && contactAgeSecs >= 360L)
+            val isSilenceAlert = contactAgeSecs != null && contactAgeSecs >= 360L
             val silenceWarning = if (isSilenceAlert) {
-                if (isRu) "\n\n⚠️ Внимание: данный смартфон принимает только обычный Bluetooth (Legacy 1M). Если на телефоне пациента включен режим Long Range — отключите его там для восстановления связи."
-                else "\n\n⚠️ Warning: this phone receives standard Bluetooth only. If patient phone has Long Range enabled, disable it there to restore connection."
+                if (isObserverLongRangeActive) {
+                    if (isRu) "\n\n⚠️ Внимание: включен режим Long Range (Coded PHY). Убедитесь, что на телефоне пациента режим Long Range также включен в настройках BLE."
+                    else "\n\n⚠️ Warning: Long Range (Coded PHY) is enabled. Ensure Long Range is also enabled on patient device in BLE settings."
+                } else {
+                    if (isRu) "\n\n⚠️ Внимание: данный смартфон принимает обычный Bluetooth (Legacy 1M). Если на телефоне пациента включен режим Long Range — отключите его там или включите здесь для связи."
+                    else "\n\n⚠️ Warning: this phone receives standard Bluetooth (Legacy 1M). If patient phone has Long Range enabled, disable it there or enable it here."
+                }
             } else ""
 
             if (isRu) {
