@@ -27,6 +27,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import com.tirup.app.data.receiver.DexdripBroadcastReceiver
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -197,39 +198,99 @@ object NightscoutStatusManager {
         lastPollTime = System.currentTimeMillis()
         val cleanUrl = settings.getCleanBaseUrl()
 
-        // 1. Telemetry: Try /api/v1/devicestatus.json?count=1
-        val dsResult = fetchDeviceStatus(cleanUrl, settings.apiSecret)
         var batteryFound = false
+        var isConnected = false
+        var lastError: String? = null
+        var pebbleData: XdripPebbleResult? = null
+
+        // 1. Telemetry: Try /api/v1/devicestatus.json?count=1 (standard Nightscout)
+        val dsResult = fetchDeviceStatus(cleanUrl, settings.apiSecret)
         if (dsResult.isSuccess) {
             val status = dsResult.getOrNull()!!
+            isConnected = true
             if (status.masterBattery != null) {
                 updateSuccess(status)
                 batteryFound = true
             }
+        } else {
+            val ex = dsResult.exceptionOrNull()
+            val msg = ex?.message
+            if (msg != null && !msg.contains("404") && !msg.contains("405")) {
+                lastError = msg
+            }
         }
 
         // 2. Fetch /pebble (for battery fallback and live IoB/CoB/Glucose)
-        var pebbleData: XdripPebbleResult? = null
         val pebbleResult = fetchPebbleStatus(cleanUrl, settings.apiSecret)
         if (pebbleResult.isSuccess) {
             val (status, pebble) = pebbleResult.getOrNull()!!
             pebbleData = pebble
-            if (!batteryFound) {
+            isConnected = true
+            if (!batteryFound && status.masterBattery != null) {
+                updateSuccess(status)
+                batteryFound = true
+            }
+        } else {
+            val ex = pebbleResult.exceptionOrNull()
+            val msg = ex?.message
+            if (msg != null && !msg.contains("404") && !msg.contains("405") && lastError == null) {
+                lastError = msg
+            }
+        }
+
+        // 3. Fetch /api/v1/current (for Glycemia Micro-Backend & xDripWidget server)
+        val currentResult = fetchCurrentStatus(cleanUrl, settings.apiSecret)
+        if (currentResult.isSuccess) {
+            val (status, curPebble) = currentResult.getOrNull()!!
+            isConnected = true
+            if (pebbleData == null) {
+                pebbleData = curPebble
+            } else {
+                pebbleData = pebbleData.copy(
+                    battery = pebbleData.battery ?: curPebble.battery,
+                    iob = pebbleData.iob ?: curPebble.iob,
+                    cob = pebbleData.cob ?: curPebble.cob,
+                    glucoseMmol = pebbleData.glucoseMmol ?: curPebble.glucoseMmol,
+                    trendArrow = pebbleData.trendArrow ?: curPebble.trendArrow,
+                    timestamp = pebbleData.timestamp ?: curPebble.timestamp
+                )
+            }
+            if (!batteryFound && status.masterBattery != null) {
                 updateSuccess(status)
                 batteryFound = true
             }
         }
 
-        if (!batteryFound && !dsResult.isSuccess && !pebbleResult.isSuccess) {
-            val err = dsResult.exceptionOrNull()?.message ?: pebbleResult.exceptionOrNull()?.message
+        // 4. If not connected yet, probe /api/v1/status.json
+        if (!isConnected) {
+            val statusResult = fetchServerStatus(cleanUrl, settings.apiSecret)
+            if (statusResult.isSuccess) {
+                val status = statusResult.getOrNull()!!
+                updateSuccess(status)
+                isConnected = true
+            } else {
+                lastError = statusResult.exceptionOrNull()?.message ?: lastError
+            }
+        } else if (!batteryFound) {
+            val prev = _statusFlow.value
+            updateSuccess(
+                NightscoutStatus(
+                    masterBattery = prev.masterBattery,
+                    lastBatteryTimestamp = prev.lastBatteryTimestamp,
+                    lastSuccessTimestamp = System.currentTimeMillis()
+                )
+            )
+        }
+
+        if (!isConnected) {
             _statusFlow.value = _statusFlow.value.copy(
                 isConnected = false,
-                errorMessage = err,
+                errorMessage = lastError ?: "Ошибка связи с Nightscout",
                 lastCheckTimestamp = System.currentTimeMillis()
             )
         }
 
-        // 3. Process glucose readings (Cloud Follower) if enabled
+        // 5. Process glucose readings (Cloud Follower) if enabled
         if (settings.downloadGlucose) {
             try {
                 fetchAndProcessGlucose(cleanUrl, settings, pebbleData)
@@ -329,6 +390,96 @@ object NightscoutStatusManager {
                 return Result.success(Pair(status, pebble))
             } else {
                 return Result.failure(IllegalStateException("HTTP $code from pebble"))
+            }
+        } catch (e: Exception) {
+            return Result.failure(e)
+        } finally {
+            conn?.disconnect()
+        }
+    }
+
+    private fun fetchCurrentStatus(cleanUrl: String, apiSecret: String): Result<Pair<NightscoutStatus, XdripPebbleResult>> {
+        var conn: HttpURLConnection? = null
+        try {
+            val url = URL("$cleanUrl/api/v1/current")
+            conn = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = TIMEOUT_MS
+                readTimeout = TIMEOUT_MS
+                requestMethod = "GET"
+                setRequestProperty("Accept", "application/json")
+                if (apiSecret.isNotBlank()) {
+                    setRequestProperty("api-secret", sha1(apiSecret))
+                }
+            }
+
+            val code = conn.responseCode
+            if (code in 200..299) {
+                val body = conn.inputStream.bufferedReader().use { it.readText() }
+                val root = JSONObject(body)
+                val battery = extractBattery(root)
+                val rawTs = extractTimestamp(root)
+                val ts = if (rawTs > 0L) rawTs else System.currentTimeMillis()
+                val iob = if (root.has("iob")) root.optDouble("iob").takeIf { !it.isNaN() && it >= 0.0 } else null
+                val cob = if (root.has("cob")) root.optDouble("cob").takeIf { !it.isNaN() && it >= 0.0 } else null
+                val mmol = if (root.has("mmol")) {
+                    root.optDouble("mmol").takeIf { !it.isNaN() && it > 0.0 }
+                } else if (root.has("sgv")) {
+                    val sgv = root.optDouble("sgv").takeIf { !it.isNaN() && it > 0.0 }
+                    if (sgv != null && sgv > 35.0) sgv / 18.0182 else sgv
+                } else null
+                val dir = root.optString("direction").ifBlank { null }
+                val trendArrow = if (dir != null) DexdripBroadcastReceiver.Companion.slopeToArrow(dir) else null
+
+                val pebbleResult = XdripPebbleResult(
+                    iob = iob,
+                    cob = cob,
+                    battery = battery,
+                    glucoseMmol = mmol,
+                    trendArrow = trendArrow,
+                    timestamp = ts
+                )
+
+                val status = NightscoutStatus(
+                    masterBattery = battery,
+                    lastBatteryTimestamp = if (battery != null) ts else 0L,
+                    lastSuccessTimestamp = System.currentTimeMillis()
+                )
+                return Result.success(Pair(status, pebbleResult))
+            } else {
+                return Result.failure(IllegalStateException("HTTP $code from current"))
+            }
+        } catch (e: Exception) {
+            return Result.failure(e)
+        } finally {
+            conn?.disconnect()
+        }
+    }
+
+    private fun fetchServerStatus(cleanUrl: String, apiSecret: String): Result<NightscoutStatus> {
+        var conn: HttpURLConnection? = null
+        try {
+            val url = URL("$cleanUrl/api/v1/status.json")
+            conn = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = TIMEOUT_MS
+                readTimeout = TIMEOUT_MS
+                requestMethod = "GET"
+                setRequestProperty("Accept", "application/json")
+                if (apiSecret.isNotBlank()) {
+                    setRequestProperty("api-secret", sha1(apiSecret))
+                }
+            }
+
+            val code = conn.responseCode
+            if (code in 200..299) {
+                return Result.success(
+                    NightscoutStatus(
+                        lastSuccessTimestamp = System.currentTimeMillis()
+                    )
+                )
+            } else if (code == 401) {
+                return Result.failure(IllegalStateException("Неверный API Secret (401 Unauthorized)"))
+            } else {
+                return Result.failure(IllegalStateException("HTTP $code from status.json"))
             }
         } catch (e: Exception) {
             return Result.failure(e)

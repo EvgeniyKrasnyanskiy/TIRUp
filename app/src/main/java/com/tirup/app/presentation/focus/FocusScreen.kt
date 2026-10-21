@@ -52,6 +52,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -2922,6 +2924,7 @@ private fun BleStatusDialog(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HeroGlucoseCard(
     latestReading: GlucoseReading?,
@@ -3104,128 +3107,38 @@ private fun HeroGlucoseCard(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            val hasIob = (latestReading?.iob != null && latestReading.iob > 0.0)
-            val hasCob = (latestReading?.cob != null && latestReading.cob > 0.0)
+            val rawIob = latestReading?.iob
+            val rawCob = latestReading?.cob
+            val hasIobActive = (rawIob != null && rawIob > 0.0)
+            val hasCobActive = (rawCob != null && rawCob > 0.0)
+            val showIob = hasIobActive || (hasCobActive && rawIob != null)
+            val showCob = hasCobActive || (hasIobActive && rawCob != null)
             val hasBattery = masterBatteryPct != null && masterBatteryPct in 0..100 && !isMasterBatteryStale
 
-            // Header Row: Symmetrical status chips [ Bell + Wi-Fi LAN ] --- [ Battery/IoB/CoB ] --- [ BLE Bridge + AoD ]
-            Row(
+            // Header Row: Symmetrical status chips [ Bell + Nightscout + Wi-Fi LAN + Battery + BLE Bridge + AoD ]
+            FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Left: Alert History Bell & Wi-Fi LAN Follower Badge
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                // 1. Alert History Bell
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (dailyAlertsCount > 0) ColorHigh.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                    border = BorderStroke(0.8.dp, if (dailyAlertsCount > 0) ColorHigh.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                    modifier = Modifier.clickable { onAlertHistoryClick() }
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (dailyAlertsCount > 0) ColorHigh.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                        border = BorderStroke(0.8.dp, if (dailyAlertsCount > 0) ColorHigh.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
-                        modifier = Modifier.clickable { onAlertHistoryClick() }
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Text(text = if (areAlertsMuted) "🔕" else "🔔", fontSize = if (areAlertsMuted) 13.sp else 11.5.sp)
-                            if (dailyAlertsCount > 0) {
-                                Text(
-                                    text = "$dailyAlertsCount",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
-                                    color = ColorHigh
-                                )
-                            }
-                        }
-                    }
-
-                    if (nightscoutSettings != null && nightscoutSettings.isEnabled) {
-                        NightscoutBadge(
-                            nightscoutSettings = nightscoutSettings,
-                            status = nightscoutStatus ?: NightscoutStatus(),
-                            isSyncing = isNightscoutSyncing,
-                            isRu = isRu,
-                            onClick = onNightscoutClick,
-                            onLongClick = onNightscoutLongClick
-                        )
-                    }
-
-                    if (xdripLanSettings != null && xdripLanSettings.isEnabled) {
-                        WifiLanBadge(
-                            xdripLan = xdripLanSettings,
-                            lanStatus = lanStatus ?: com.tirup.app.domain.model.XdripLanStatus(),
-                            isDiscovering = isLanDiscovering || isLanSyncing,
-                            isRu = isRu,
-                            onClick = onLanClick,
-                            onLongClick = onLanLongClick
-                        )
-                    }
-                }
-
-                // Center: Dynamic Badges (Battery, IoB, CoB)
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (hasBattery) {
-                        val color = when {
-                            masterBatteryPct!! <= 15 -> ColorVeryLow
-                            masterBatteryPct <= 25 -> ColorHigh
-                            else -> PrimaryEmerald
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = color.copy(alpha = 0.12f),
-                            border = BorderStroke(0.8.dp, color.copy(alpha = 0.35f)),
-                            modifier = Modifier.clickable { onBatteryClick() }
-                        ) {
+                        Text(text = if (areAlertsMuted) "🔕" else "🔔", fontSize = if (areAlertsMuted) 13.sp else 11.5.sp)
+                        if (dailyAlertsCount > 0) {
                             Text(
-                                text = "🔋 $masterBatteryPct%",
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
-                                color = color
-                            )
-                        }
-                    }
-
-                    if (hasIob) {
-                        if (hasBattery) Spacer(modifier = Modifier.width(4.dp))
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = ActionBlue.copy(alpha = 0.12f),
-                            border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.35f)),
-                            modifier = Modifier.clickable { onIobClick() }
-                        ) {
-                            Text(
-                                text = String.format(Locale.US, if (isRu) "💉 %.2f Ед" else "💉 %.2f U", latestReading!!.iob),
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
-                                color = ActionBlue
-                            )
-                        }
-                    }
-
-                    if (hasCob) {
-                        if (hasIob || hasBattery) Spacer(modifier = Modifier.width(4.dp))
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = ColorHigh.copy(alpha = 0.12f),
-                            border = BorderStroke(0.8.dp, ColorHigh.copy(alpha = 0.35f)),
-                            modifier = Modifier.clickable { onCobClick() }
-                        ) {
-                            Text(
-                                text = String.format(Locale.US, if (isRu) "🍞 %.0f г" else "🍞 %.0f g", latestReading!!.cob),
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
+                                text = "$dailyAlertsCount",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp,
@@ -3235,41 +3148,86 @@ private fun HeroGlucoseCard(
                     }
                 }
 
-                // Right: Master/Receiver BLE status badge + Moon AOD button (rightmost)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    if (bleBridgeSettings != null && bleBridgeSettings.isEnabled) {
-                        BleBridgeBadge(
-                            bleSettings = bleBridgeSettings,
-                            isBleBroadcasting = isBleBroadcasting,
-                            broadcastRemainingSec = broadcastRemainingSec,
-                            nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
-                            boostRemainingSec = boostRemainingSec,
-                            blePacketReceivedAt = blePacketReceivedAt,
-                            isRu = isRu,
-                            onClick = onBleClick,
-                            onLongClick = onBleLongClick
-                        )
+                // 2. Nightscout Sync Badge
+                if (nightscoutSettings != null && nightscoutSettings.isEnabled) {
+                    NightscoutBadge(
+                        nightscoutSettings = nightscoutSettings,
+                        status = nightscoutStatus ?: NightscoutStatus(),
+                        isSyncing = isNightscoutSyncing,
+                        isRu = isRu,
+                        onClick = onNightscoutClick,
+                        onLongClick = onNightscoutLongClick
+                    )
+                }
+
+                // 3. Wi-Fi LAN Follower Badge
+                if (xdripLanSettings != null && xdripLanSettings.isEnabled) {
+                    WifiLanBadge(
+                        xdripLan = xdripLanSettings,
+                        lanStatus = lanStatus ?: com.tirup.app.domain.model.XdripLanStatus(),
+                        isDiscovering = isLanDiscovering || isLanSyncing,
+                        isRu = isRu,
+                        onClick = onLanClick,
+                        onLongClick = onLanLongClick
+                    )
+                }
+
+                // 4. Battery Telemetry (BLE / LAN / Nightscout)
+                if (hasBattery) {
+                    val color = when {
+                        masterBatteryPct!! <= 15 -> ColorVeryLow
+                        masterBatteryPct <= 25 -> ColorHigh
+                        else -> PrimaryEmerald
                     }
                     Surface(
-                        modifier = Modifier
-                            .size(width = 28.dp, height = 24.dp)
-                            .clickable { onAodClick() },
-                        shape = RoundedCornerShape(8.dp),
-                        color = ColorHigh.copy(alpha = 0.12f),
-                        border = BorderStroke(0.8.dp, ColorHigh.copy(alpha = 0.5f))
+                        shape = RoundedCornerShape(10.dp),
+                        color = color.copy(alpha = 0.12f),
+                        border = BorderStroke(0.8.dp, color.copy(alpha = 0.35f)),
+                        modifier = Modifier.clickable { onBatteryClick() }
                     ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "🌙",
-                                fontSize = 11.5.sp
-                            )
-                        }
+                        Text(
+                            text = "🔋 $masterBatteryPct%",
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = color
+                        )
+                    }
+                }
+
+                // 5. Master/Receiver BLE status badge
+                if (bleBridgeSettings != null && bleBridgeSettings.isEnabled) {
+                    BleBridgeBadge(
+                        bleSettings = bleBridgeSettings,
+                        isBleBroadcasting = isBleBroadcasting,
+                        broadcastRemainingSec = broadcastRemainingSec,
+                        nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
+                        boostRemainingSec = boostRemainingSec,
+                        blePacketReceivedAt = blePacketReceivedAt,
+                        isRu = isRu,
+                        onClick = onBleClick,
+                        onLongClick = onBleLongClick
+                    )
+                }
+
+                // 6. Moon AOD button
+                Surface(
+                    modifier = Modifier
+                        .size(width = 28.dp, height = 24.dp)
+                        .clickable { onAodClick() },
+                    shape = RoundedCornerShape(8.dp),
+                    color = ColorHigh.copy(alpha = 0.12f),
+                    border = BorderStroke(0.8.dp, ColorHigh.copy(alpha = 0.5f))
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "🌙",
+                            fontSize = 11.5.sp
+                        )
                     }
                 }
             }
@@ -3346,88 +3304,173 @@ private fun HeroGlucoseCard(
             }
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Large Hero Value with Trend Arrow and Delta (Smooth Animated Transitions)
+            // Central Block: [ IoB (Left) ] --- [ Large Glucose Value + Trend + Delta ] --- [ CoB (Right) ]
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                val displayVal = if (latestReading != null) {
-                    if (unit == GlucoseUnit.MMOL_L) {
-                        String.format(Locale.US, "%.1f", latestReading.valueMmol)
-                    } else {
-                        String.format(Locale.US, "%d", (latestReading.valueMmol * 18.0182).toInt())
-                    }
-                } else "--"
-
-                AnimatedContent(
-                    targetState = displayVal,
-                    transitionSpec = {
-                        (fadeIn(animationSpec = tween(350)) + slideInVertically(animationSpec = tween(350)) { height -> height / 3 })
-                            .togetherWith(fadeOut(animationSpec = tween(250)) + slideOutVertically(animationSpec = tween(250)) { height -> -height / 3 })
-                    },
-                    label = "glucoseValueAnimation"
-                ) { targetVal ->
-                    Text(
-                        text = targetVal,
-                        style = MaterialTheme.typography.displayLarge,
-                        color = valueColor,
-                        fontSize = 68.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Column {
-                    Text(
-                        text = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = onSurfaceVariant
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val trendArrow = latestReading?.trendArrow ?: ""
-                        AnimatedContent(
-                            targetState = trendArrow,
-                            transitionSpec = {
-                                fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(200))
-                            },
-                            label = "trendArrowAnimation"
-                        ) { targetArrow ->
-                            if (targetArrow.isNotEmpty()) {
-                                Text(
-                                    text = targetArrow,
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    color = valueColor,
-                                    fontWeight = FontWeight.Bold
-                                )
+                // Left Flank: Active Insulin (IoB)
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    if (showIob && rawIob != null) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = ActionBlue.copy(alpha = 0.14f),
+                            border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.4f)),
+                            modifier = Modifier.clickable { onIobClick() }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Text("💉", fontSize = 14.5.sp)
+                                Column {
+                                    Text(
+                                        text = String.format(Locale.US, if (isRu) "%.2f Ед" else "%.2f U", rawIob),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ActionBlue,
+                                        fontSize = 13.sp
+                                    )
+                                    Text(
+                                        text = "IoB",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = ActionBlue.copy(alpha = 0.75f),
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
                         }
+                    }
+                }
 
-                        val deltaFormatted = if (delta5Min != null) {
-                            val deltaVal = delta5Min.second
-                            if (unit == GlucoseUnit.MMOL_L) {
-                                String.format(Locale.US, "%+.1f", deltaVal)
-                            } else {
-                                val mg = (deltaVal * 18.0182).roundToInt()
-                                "${if (mg > 0) "+" else ""}$mg"
-                            }
-                        } else ""
+                // Center: Large Hero Value with Trend Arrow and Delta (Strictly centered via flanking weights)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    val displayVal = if (latestReading != null) {
+                        if (unit == GlucoseUnit.MMOL_L) {
+                            String.format(Locale.US, "%.1f", latestReading.valueMmol)
+                        } else {
+                            String.format(Locale.US, "%d", (latestReading.valueMmol * 18.0182).toInt())
+                        }
+                    } else "--"
 
-                        AnimatedContent(
-                            targetState = deltaFormatted,
-                            transitionSpec = {
-                                fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(200))
-                            },
-                            label = "deltaAnimation"
-                        ) { targetDelta ->
-                            if (targetDelta.isNotEmpty()) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Spacer(modifier = Modifier.width(6.dp))
+                    AnimatedContent(
+                        targetState = displayVal,
+                        transitionSpec = {
+                            (fadeIn(animationSpec = tween(350)) + slideInVertically(animationSpec = tween(350)) { height -> height / 3 })
+                                .togetherWith(fadeOut(animationSpec = tween(250)) + slideOutVertically(animationSpec = tween(250)) { height -> -height / 3 })
+                        },
+                        label = "glucoseValueAnimation"
+                    ) { targetVal ->
+                        Text(
+                            text = targetVal,
+                            style = MaterialTheme.typography.displayLarge,
+                            color = valueColor,
+                            fontSize = 62.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    Column {
+                        Text(
+                            text = if (unit == GlucoseUnit.MMOL_L) (if (isRu) "ммоль/л" else "mmol/L") else (if (isRu) "мг/дл" else "mg/dL"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = onSurfaceVariant
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            val trendArrow = latestReading?.trendArrow ?: ""
+                            AnimatedContent(
+                                targetState = trendArrow,
+                                transitionSpec = {
+                                    fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(200))
+                                },
+                                label = "trendArrowAnimation"
+                            ) { targetArrow ->
+                                if (targetArrow.isNotEmpty()) {
                                     Text(
-                                        text = targetDelta,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = onSurfaceVariant,
+                                        text = targetArrow,
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        color = valueColor,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            val deltaFormatted = if (delta5Min != null) {
+                                val deltaVal = delta5Min.second
+                                if (unit == GlucoseUnit.MMOL_L) {
+                                    String.format(Locale.US, "%+.1f", deltaVal)
+                                } else {
+                                    val mg = (deltaVal * 18.0182).roundToInt()
+                                    "${if (mg > 0) "+" else ""}$mg"
+                                }
+                            } else ""
+
+                            AnimatedContent(
+                                targetState = deltaFormatted,
+                                transitionSpec = {
+                                    fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(200))
+                                },
+                                label = "deltaAnimation"
+                            ) { targetDelta ->
+                                if (targetDelta.isNotEmpty()) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = targetDelta,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = onSurfaceVariant,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Right Flank: Active Carbs (CoB)
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    if (showCob && rawCob != null) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = ColorHigh.copy(alpha = 0.14f),
+                            border = BorderStroke(1.dp, ColorHigh.copy(alpha = 0.4f)),
+                            modifier = Modifier.clickable { onCobClick() }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Text("🍞", fontSize = 14.5.sp)
+                                Column {
+                                    Text(
+                                        text = String.format(Locale.US, if (isRu) "%.0f г" else "%.0f g", rawCob),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ColorHigh,
+                                        fontSize = 13.sp
+                                    )
+                                    Text(
+                                        text = "CoB",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = ColorHigh.copy(alpha = 0.75f),
+                                        fontSize = 9.5.sp,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                 }
