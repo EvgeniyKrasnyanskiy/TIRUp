@@ -1279,6 +1279,8 @@ fun FocusScreen(
             dailySummaries = state.recentDailySummaries,
             todayTirPercent = state.statistics.tirPercent,
             todayTingPercent = state.statistics.tingPercent,
+            todayStats = state.statistics,
+            unit = userSettings.unit,
             onDismiss = {
                 showStreakDialog = false
                 viewModel.markStreakCelebrated(state.streakDays)
