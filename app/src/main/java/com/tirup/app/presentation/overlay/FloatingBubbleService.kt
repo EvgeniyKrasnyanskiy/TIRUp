@@ -17,6 +17,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -53,6 +54,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -70,6 +72,8 @@ class FloatingBubbleService : Service() {
     private var rippleAnimatorSet: AnimatorSet? = null
     private var edgeAnimator: ValueAnimator? = null
     private var snoozeJob: Job? = null
+    private var bubbleVibrateJob: Job? = null
+    private var currentVibrateCadenceMs: Long = 0L
     @Volatile
     private var snoozeUntilTimestamp: Long = 0L
     @Volatile
@@ -244,6 +248,7 @@ class FloatingBubbleService : Service() {
                             // Hide bubble immediately since sugar is in normal range
                             bubbleView?.visibility = View.GONE
                             setHypoRipple(false)
+                            stopBubbleVibration()
                         }
                     }
                     true
@@ -287,11 +292,13 @@ class FloatingBubbleService : Service() {
                                 // Long-press in alarm mode: silence + open TIRUp
                                 GlucoseAlertManager.silenceCurrentSoundOnly()
                                 GlucoseAlertManager.dismissCriticalAlarm(this@FloatingBubbleService, fromUser = true)
+                                stopBubbleVibration()
                                 openMainActivity()
                             } else {
                                 // Short tap in alarm mode: silence + snooze
                                 GlucoseAlertManager.silenceCurrentSoundOnly()
                                 GlucoseAlertManager.dismissCriticalAlarm(this@FloatingBubbleService, fromUser = true)
+                                stopBubbleVibration()
                                 MedicalSoundPlayer.playBubblePopOut()
 
                                 val currentMmol = lastKnownReading?.valueMmol ?: 5.0
@@ -311,6 +318,7 @@ class FloatingBubbleService : Service() {
                                 val snoozeDuration = snoozeMinutes * 60 * 1000L
                                 snoozeUntilTimestamp = System.currentTimeMillis() + snoozeDuration
                                 setHypoRipple(false)
+                                stopBubbleVibration()
                                 bubbleView?.visibility = View.GONE
 
                                 snoozeJob?.cancel()
@@ -521,6 +529,7 @@ class FloatingBubbleService : Service() {
             tvArrow?.visibility = View.GONE
             tvDelta?.visibility = View.GONE
             bubbleRipple?.visibility = View.GONE
+            stopBubbleVibration()
 
             container.pivotX = if (isRightSide) container.width.toFloat() else 0f
             container.pivotY = container.height / 2f
@@ -629,6 +638,7 @@ class FloatingBubbleService : Service() {
                     } else {
                         bubbleView?.visibility = View.GONE
                         setHypoRipple(false)
+                        stopBubbleVibration()
                     }
                 }
             } catch (e: Exception) {
@@ -697,6 +707,7 @@ class FloatingBubbleService : Service() {
                 // Alarm is snoozed: bubble is completely hidden while glucose is out of range!
                 bubbleView?.visibility = View.GONE
                 setHypoRipple(false)
+                stopBubbleVibration()
                 return
             } else {
                 val wasPreviouslyOutOfRange = wasOutOfRange
@@ -718,12 +729,14 @@ class FloatingBubbleService : Service() {
             wasHypoActive = false
             snoozeUntilTimestamp = 0L // clear snooze because glucose normalized!
             setHypoRipple(false)
+            stopBubbleVibration()
 
             if (settings.isFloatingBubbleAlwaysVisible) {
                 applyBubbleMode(isMini = true)
                 bubbleView?.visibility = View.VISIBLE
             } else {
                 bubbleView?.visibility = View.GONE
+                stopBubbleVibration()
                 return
             }
         }
@@ -756,8 +769,10 @@ class FloatingBubbleService : Service() {
         // Water ripple waves on hypoglycemia (< 3.9 mmol/L) only in alarm mode
         if (isCurrentlyMiniMode) {
             setHypoRipple(false)
+            stopBubbleVibration()
         } else {
             setHypoRipple(isHypo)
+            updateBubbleVibration(valueMmol, settings, isVisibleOutOfRange = isOutOfRange)
         }
     }
 
@@ -815,6 +830,86 @@ class FloatingBubbleService : Service() {
         }
     }
 
+    @Suppress("DEPRECATION")
+    private fun vibratePulse(isDouble: Boolean = false) {
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            if (powerManager?.isInteractive == false) return
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                val vibrator = vm?.defaultVibrator ?: return
+                if (isDouble) {
+                    val timings = longArrayOf(0, 45, 80, 45)
+                    val amplitudes = intArrayOf(0, 220, 0, 220)
+                    vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+                } else {
+                    vibrator.vibrate(VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE))
+                }
+            } else {
+                val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator ?: return
+                if (isDouble) {
+                    val pattern = longArrayOf(0, 45, 80, 45)
+                    v.vibrate(pattern, -1)
+                } else {
+                    v.vibrate(VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE))
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun updateBubbleVibration(valueMmol: Double, settings: UserSettings, isVisibleOutOfRange: Boolean) {
+        if (!isVisibleOutOfRange || isCurrentlyMiniMode) {
+            stopBubbleVibration()
+            return
+        }
+
+        val isCriticalHypo = valueMmol < 3.0
+        val isHypo = valueMmol < 3.9
+        val isExtremeHigh = valueMmol > 13.9
+        val isHigh = valueMmol > 10.0
+
+        val isVibrateAllowed = settings.isFloatingBubbleVibrateEnabled || isCriticalHypo
+        if (!isVibrateAllowed) {
+            stopBubbleVibration()
+            return
+        }
+
+        val targetCadenceMs = when {
+            isCriticalHypo -> 3500L
+            isHypo -> 7000L
+            isExtremeHigh -> 30000L
+            isHigh -> 60000L
+            else -> 0L
+        }
+
+        if (targetCadenceMs <= 0L) {
+            stopBubbleVibration()
+            return
+        }
+
+        if (bubbleVibrateJob?.isActive == true && currentVibrateCadenceMs == targetCadenceMs) {
+            return
+        }
+
+        stopBubbleVibration()
+        currentVibrateCadenceMs = targetCadenceMs
+
+        bubbleVibrateJob = serviceScope.launch {
+            vibratePulse(isDouble = isCriticalHypo)
+            while (isActive) {
+                delay(targetCadenceMs)
+                vibratePulse(isDouble = isCriticalHypo)
+            }
+        }
+    }
+
+    private fun stopBubbleVibration() {
+        bubbleVibrateJob?.cancel()
+        bubbleVibrateJob = null
+        currentVibrateCadenceMs = 0L
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         miniCountdownJob?.cancel()
@@ -827,6 +922,7 @@ class FloatingBubbleService : Service() {
         edgeAnimator = null
         rippleAnimatorSet?.cancel()
         rippleAnimatorSet = null
+        stopBubbleVibration()
         try {
             bubbleView?.let { bv ->
                 if (bv.isAttachedToWindow) {

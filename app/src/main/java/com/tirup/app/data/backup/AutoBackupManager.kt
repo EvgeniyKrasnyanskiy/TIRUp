@@ -571,6 +571,7 @@ object AutoBackupManager {
         writer.name("widgetBackgroundOpacity").value(settings.widgetBackgroundOpacity)
         writer.name("isFloatingBubbleEnabled").value(settings.isFloatingBubbleEnabled)
         writer.name("isFloatingBubbleAlwaysVisible").value(settings.isFloatingBubbleAlwaysVisible)
+        writer.name("isFloatingBubbleVibrateEnabled").value(settings.isFloatingBubbleVibrateEnabled)
 
         writer.name("isDeviceRemindersEnabled").value(settings.isDeviceRemindersEnabled)
         writer.name("isSensorReminderEnabled").value(settings.isSensorReminderEnabled)
@@ -1886,6 +1887,7 @@ object AutoBackupManager {
         var widgetOpacity = 85
         var isFloatingBubble = false
         var isFloatingBubbleAlwaysVisible = false
+        var isFloatingBubbleVibrate = true
         var alertSettings = AlertSettings()
         var bleBridgeSettings = BleBridgeSettings()
         var nightscoutSettings = NightscoutSettings()
@@ -1928,6 +1930,7 @@ object AutoBackupManager {
                 "widgetBackgroundOpacity" -> widgetOpacity = reader.nextInt()
                 "isFloatingBubbleEnabled" -> isFloatingBubble = reader.nextBoolean()
                 "isFloatingBubbleAlwaysVisible" -> isFloatingBubbleAlwaysVisible = reader.nextBoolean()
+                "isFloatingBubbleVibrateEnabled" -> isFloatingBubbleVibrate = reader.nextBoolean()
                 "targetRanges" -> {
                     var tirLow = 3.9
                     var tirHigh = 10.0
@@ -2195,6 +2198,7 @@ object AutoBackupManager {
             widgetBackgroundOpacity = widgetOpacity,
             isFloatingBubbleEnabled = isFloatingBubble,
             isFloatingBubbleAlwaysVisible = isFloatingBubbleAlwaysVisible,
+            isFloatingBubbleVibrateEnabled = isFloatingBubbleVibrate,
             alertSettings = alertSettings,
             bleBridgeSettings = bleBridgeSettings,
             isDeviceRemindersEnabled = isDeviceReminders,

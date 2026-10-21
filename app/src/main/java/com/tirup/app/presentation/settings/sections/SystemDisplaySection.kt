@@ -787,6 +787,7 @@ fun FloatingGlucoseBubbleCard(
     isRu: Boolean,
     onToggleFloatingBubble: (Boolean) -> Unit,
     onToggleFloatingBubbleAlwaysVisible: (Boolean) -> Unit,
+    onToggleFloatingBubbleVibrate: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -887,6 +888,43 @@ fun FloatingGlucoseBubbleCard(
                                 checked = settings.isFloatingBubbleAlwaysVisible,
                                 onCheckedChange = { isChecked ->
                                     onToggleFloatingBubbleAlwaysVisible(isChecked)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = ActionBlue
+                                )
+                            )
+                        }
+
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                            thickness = 0.5.dp
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isRu) "Тактильная пульсация при тревогах" else "Haptic ripple pulse on alerts",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (isRu) "Вибрация с нарастающей частотой при выходе за пределы нормы. При критической гипогликемии (<3.0 ммоль/л) экстренная вибрация остаётся активной для безопасности"
+                                    else "Vibration with increasing cadence when out of range. Stays active on critical hypo (<3.0 mmol/L) for patient safety",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Switch(
+                                checked = settings.isFloatingBubbleVibrateEnabled,
+                                onCheckedChange = { isChecked ->
+                                    onToggleFloatingBubbleVibrate(isChecked)
                                 },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = Color.White,

@@ -605,6 +605,14 @@ class SettingsViewModel(
         }
     }
 
+    fun toggleFloatingBubbleVibrate(enabled: Boolean) {
+        viewModelScope.launch {
+            val updated = _uiState.value.userSettings.copy(isFloatingBubbleVibrateEnabled = enabled)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+        }
+    }
+
     fun testAlert(tier: com.tirup.app.data.alert.AlertTier) {
         val alerts = _uiState.value.userSettings.alertSettings
         if (tier == com.tirup.app.data.alert.AlertTier.CRITICAL && alerts.isCaregiverRole) {

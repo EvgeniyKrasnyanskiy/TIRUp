@@ -792,7 +792,8 @@ fun SettingsScreen(
                                 settings = settings,
                                 isRu = isRu,
                                 onToggleFloatingBubble = { viewModel.toggleFloatingBubble(it) },
-                                onToggleFloatingBubbleAlwaysVisible = { viewModel.toggleFloatingBubbleAlwaysVisible(it) }
+                                onToggleFloatingBubbleAlwaysVisible = { viewModel.toggleFloatingBubbleAlwaysVisible(it) },
+                                onToggleFloatingBubbleVibrate = { viewModel.toggleFloatingBubbleVibrate(it) }
                             )
 
             WidgetPreviewCard(

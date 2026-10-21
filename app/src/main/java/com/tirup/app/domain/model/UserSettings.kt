@@ -165,6 +165,7 @@ data class UserSettings(
     val widgetBackgroundOpacity: Int = 85,
     val isFloatingBubbleEnabled: Boolean = false,
     val isFloatingBubbleAlwaysVisible: Boolean = false,
+    val isFloatingBubbleVibrateEnabled: Boolean = true,
     val isWeeklyDigestEnabled: Boolean = false,
     val dismissedWeeklyDigestTimestamp: Long = 0L,
     val showTreatmentsOnChart: Boolean = true,
