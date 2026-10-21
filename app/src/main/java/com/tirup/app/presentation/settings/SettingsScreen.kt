@@ -287,6 +287,9 @@ fun SettingsScreen(
             highlightLan = true
             delay(2800L)
             highlightLan = false
+        } else if (target == "nightscout") {
+            showAdvancedSettings = true
+            showNightscoutDialog = true
         } else if (target == "hba1c") {
             viewModel.toggleHba1cDialog(true)
         }

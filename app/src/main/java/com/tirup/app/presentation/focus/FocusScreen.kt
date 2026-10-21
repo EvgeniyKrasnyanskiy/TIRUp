@@ -45,6 +45,10 @@ import androidx.compose.ui.graphics.luminance
 import com.tirup.app.presentation.components.BentoCard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,6 +77,11 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
+import com.tirup.app.domain.model.NightscoutSettings
+import com.tirup.app.domain.model.NightscoutStatus
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.rememberCoroutineScope
 import com.tirup.app.domain.model.XdripLanSettings
@@ -163,8 +172,12 @@ fun FocusScreen(
     val isLanDiscovering by XdripLanManager.isDiscoveringFlow.collectAsState()
     val nightscoutStatus by com.tirup.app.data.network.NightscoutStatusManager.statusFlow.collectAsState()
     val coroutineScope = rememberCoroutineScope()
-    var showLanStatusDialog by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    var showLanStatusDialog by rememberSaveable { mutableStateOf(false) }
+    var showNightscoutStatusDialog by rememberSaveable { mutableStateOf(false) }
+    var isNightscoutSyncing by remember { mutableStateOf(false) }
+    var isLanSyncing by remember { mutableStateOf(false) }
 
     val userSettings = state.userSettings
     val isRu = userSettings.language.equals("RU", ignoreCase = true)
@@ -413,6 +426,10 @@ fun FocusScreen(
                 xdripLanSettings = userSettings.xdripLanSettings,
                 lanStatus = lanStatus,
                 isLanDiscovering = isLanDiscovering,
+                isLanSyncing = isLanSyncing,
+                nightscoutSettings = userSettings.nightscoutSettings,
+                nightscoutStatus = nightscoutStatus,
+                isNightscoutSyncing = isNightscoutSyncing,
                 dailyAlertsCount = dailyAlertLogs.size,
                 areAlertsMuted = run {
                     val a = userSettings.alertSettings
@@ -421,7 +438,50 @@ fun FocusScreen(
                     isPaused || !a.isAlertsMasterEnabled || (!a.isPredictiveEnabled && !a.isMainEnabled && !a.isSignalLossEnabled && !a.isLastChanceAlertEnabled)
                 },
                 onAlertHistoryClick = { showDailyAlertLogsDialog = true },
-                onLanClick = { showLanStatusDialog = true },
+                onNightscoutClick = {
+                    if (!isNightscoutSyncing) {
+                        isNightscoutSyncing = true
+                        coroutineScope.launch {
+                            try {
+                                val res = com.tirup.app.data.network.NightscoutStatusManager.pollNow()
+                                if (res.isSuccess) {
+                                    Toast.makeText(context, if (isRu) "Данные Nightscout обновлены" else "Nightscout data synced", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    val err = res.exceptionOrNull()?.message ?: (if (isRu) "Ошибка связи с Nightscout" else "Sync failed")
+                                    Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                                }
+                            } finally {
+                                isNightscoutSyncing = false
+                            }
+                        }
+                    }
+                },
+                onNightscoutLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    showNightscoutStatusDialog = true
+                },
+                onLanClick = {
+                    if (!isLanSyncing && !isLanDiscovering) {
+                        isLanSyncing = true
+                        coroutineScope.launch {
+                            try {
+                                val res = XdripLanManager.pollNow()
+                                if (res.isSuccess) {
+                                    Toast.makeText(context, if (isRu) "Данные Wi-Fi LAN обновлены" else "Wi-Fi LAN data synced", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    val err = res.exceptionOrNull()?.message ?: (if (isRu) "Ошибка связи по Wi-Fi" else "Wi-Fi LAN poll failed")
+                                    Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                                }
+                            } finally {
+                                isLanSyncing = false
+                            }
+                        }
+                    }
+                },
+                onLanLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    showLanStatusDialog = true
+                },
                 onBatteryClick = {
                     val resBat = resolvedMasterBattery
                     val title = when (resBat?.source) {
@@ -501,7 +561,29 @@ fun FocusScreen(
                     }
                     detailDialogInfo = Pair(title, desc)
                 },
-                onBleClick = { showBleStatusDialog = true },
+                onBleClick = {
+                    val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+                    val isBtOn = bluetoothManager?.adapter?.isEnabled == true
+                    if (!isBtOn) {
+                        Toast.makeText(context, if (isRu) "Включите Bluetooth на смартфоне" else "Enable Bluetooth first", Toast.LENGTH_SHORT).show()
+                    } else if (heroBleSettings.role == BleBridgeRole.BROADCASTER) {
+                        if (checkAndRequestBlePermissions(BleBridgeRole.BROADCASTER)) {
+                            viewModel.sendBleTestPing(context)
+                            Toast.makeText(context, if (isRu) "Отправлен тестовый BLE-пакет" else "Sent BLE test packet", Toast.LENGTH_SHORT).show()
+                        }
+                    } else if (heroBleSettings.role == BleBridgeRole.OBSERVER) {
+                        if (checkAndRequestBlePermissions(BleBridgeRole.OBSERVER)) {
+                            viewModel.boostBleObserverScan(context)
+                            Toast.makeText(context, if (isRu) "Активирован форсированный поиск BLE (60 с)" else "Boosted BLE scan activated (60s)", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        showBleStatusDialog = true
+                    }
+                },
+                onBleLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    showBleStatusDialog = true
+                },
                 onAodClick = {
                     val aodIntent = Intent(context, com.tirup.app.presentation.aod.AodActivity::class.java).apply {
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -1389,6 +1471,333 @@ fun FocusScreen(
             onDismiss = { showBleStatusDialog = false }
         )
     }
+
+    if (showNightscoutStatusDialog) {
+        val ns = userSettings.nightscoutSettings
+        NightscoutStatusDialog(
+            nightscoutSettings = ns,
+            status = nightscoutStatus,
+            isSyncing = isNightscoutSyncing,
+            isRu = isRu,
+            onSyncClick = {
+                if (!isNightscoutSyncing) {
+                    isNightscoutSyncing = true
+                    coroutineScope.launch {
+                        try {
+                            val res = com.tirup.app.data.network.NightscoutStatusManager.pollNow()
+                            if (res.isSuccess) {
+                                Toast.makeText(context, if (isRu) "Данные Nightscout обновлены" else "Nightscout data synced", Toast.LENGTH_SHORT).show()
+                            } else {
+                                val err = res.exceptionOrNull()?.message ?: (if (isRu) "Ошибка связи с Nightscout" else "Sync failed")
+                                Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                            }
+                        } finally {
+                            isNightscoutSyncing = false
+                        }
+                    }
+                }
+            },
+            onToggleEnable = { viewModel.setNightscoutEnabled(!ns.isEnabled) },
+            onOpenSettings = {
+                showNightscoutStatusDialog = false
+                onOpenSettings("nightscout")
+            },
+            onDismiss = { showNightscoutStatusDialog = false }
+        )
+    }
+}
+
+private data class NightscoutBadgeStyle(
+    val bg: Color,
+    val borderColor: Color,
+    val iconColor: Color,
+    val isBusy: Boolean = false
+)
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun NightscoutBadge(
+    nightscoutSettings: NightscoutSettings,
+    status: NightscoutStatus,
+    isSyncing: Boolean,
+    isRu: Boolean,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    if (!nightscoutSettings.isEnabled) return
+
+    val isBusy = isSyncing
+    var showSpinner by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isBusy) {
+        if (isBusy) {
+            showSpinner = true
+            delay(3800L) // 3.8s max spinner animation
+            showSpinner = false
+        } else {
+            showSpinner = false
+        }
+    }
+
+    val style = when {
+        showSpinner || isBusy -> NightscoutBadgeStyle(
+            bg = ActionBlue.copy(alpha = 0.15f),
+            borderColor = ActionBlue.copy(alpha = 0.45f),
+            iconColor = ActionBlue,
+            isBusy = true
+        )
+        status.isConnected -> NightscoutBadgeStyle(
+            bg = PrimaryEmerald.copy(alpha = 0.15f),
+            borderColor = PrimaryEmerald.copy(alpha = 0.45f),
+            iconColor = PrimaryEmerald
+        )
+        status.errorMessage != null -> NightscoutBadgeStyle(
+            bg = ColorVeryLow.copy(alpha = 0.15f),
+            borderColor = ColorVeryLow.copy(alpha = 0.45f),
+            iconColor = ColorVeryLow
+        )
+        else -> NightscoutBadgeStyle(
+            bg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
+            iconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+        )
+    }
+
+    Surface(
+        modifier = modifier
+            .size(width = 28.dp, height = 24.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
+        shape = RoundedCornerShape(8.dp),
+        color = style.bg,
+        border = BorderStroke(1.2.dp, style.borderColor)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            if (style.isBusy) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(12.dp),
+                    strokeWidth = 1.8.dp,
+                    color = style.iconColor
+                )
+            } else {
+                Icon(
+                    imageVector = if (status.isConnected) Icons.Default.CloudDone else if (status.errorMessage != null) Icons.Default.CloudOff else Icons.Default.Cloud,
+                    contentDescription = if (isRu) "Nightscout Cloud" else "Nightscout Cloud",
+                    tint = style.iconColor,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NightscoutStatusDialog(
+    nightscoutSettings: NightscoutSettings,
+    status: NightscoutStatus,
+    isSyncing: Boolean,
+    isRu: Boolean,
+    onSyncClick: () -> Unit,
+    onToggleEnable: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val statusTitle = when {
+        isSyncing -> if (isRu) "Nightscout: Синхронизация..." else "Nightscout: Syncing..."
+        status.isConnected -> if (isRu) "Nightscout: Подключен" else "Nightscout: Connected"
+        status.errorMessage != null -> if (isRu) "Nightscout: Ошибка связи" else "Nightscout: Error"
+        !nightscoutSettings.isValidUrl -> if (isRu) "Nightscout: Не настроен" else "Nightscout: Not configured"
+        else -> if (isRu) "Nightscout: Офлайн" else "Nightscout: Offline"
+    }
+
+    val statusColor = when {
+        isSyncing -> ActionBlue
+        status.isConnected -> PrimaryEmerald
+        status.errorMessage != null -> ColorVeryLow
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("☁️", fontSize = 20.sp)
+                Text(
+                    text = statusTitle,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = statusColor
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (isRu) "Сервер:" else "Server:",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = if (nightscoutSettings.serverUrl.isNotBlank()) nightscoutSettings.getCleanBaseUrl().removePrefix("https://").removePrefix("http://") else if (isRu) "Не указан" else "Not set",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        if (status.masterBattery != null) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (isRu) "Батарея мастера:" else "Master battery:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "🔋 ${status.masterBattery}%",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PrimaryEmerald
+                                )
+                            }
+                        }
+
+                        if (status.lastSuccessTimestamp > 0L) {
+                            val diffMins = ((System.currentTimeMillis() - status.lastSuccessTimestamp) / 60000L).coerceAtLeast(0)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (isRu) "Последний замер:" else "Last reading:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = if (diffMins == 0L) (if (isRu) "Только что" else "Just now") else (if (isRu) "$diffMins мин. назад" else "$diffMins m ago"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        if (status.errorMessage != null && !status.isConnected) {
+                            Text(
+                                text = "⚠️ ${status.errorMessage}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    text = if (isRu) {
+                        "Синхронизация гликемии, болюсов, углеводов и телеметрии с вашим сервером Nightscout в облаке."
+                    } else {
+                        "Cloud sync of glucose, boluses, carbs, and telemetry with your Nightscout server."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 16.sp
+                )
+
+                // Full-width "Sync Now" button
+                Button(
+                    onClick = { if (!isSyncing) onSyncClick() },
+                    enabled = !isSyncing,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ActionBlue,
+                        contentColor = Color.White,
+                        disabledContainerColor = ActionBlue.copy(alpha = 0.35f),
+                        disabledContentColor = Color.White.copy(alpha = 0.6f)
+                    )
+                ) {
+                    if (isSyncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (isRu) "Синхронизация..." else "Syncing...", fontWeight = FontWeight.Bold)
+                    } else {
+                        Icon(Icons.Default.Cloud, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (isRu) "Синхронизировать сейчас" else "Sync Now", fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Settings link
+                TextButton(
+                    onClick = onOpenSettings,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text(
+                        text = if (isRu) "⚙️ Настройки Nightscout..." else "⚙️ Nightscout Settings...",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = ActionBlue
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = if (isRu) "Закрыть" else "Close", color = ActionBlue, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            Button(
+                onClick = {
+                    onToggleEnable()
+                    onDismiss()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (nightscoutSettings.isEnabled) MaterialTheme.colorScheme.error.copy(alpha = 0.85f) else ActionBlue
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = if (nightscoutSettings.isEnabled) {
+                        if (isRu) "Отключить" else "Disable"
+                    } else {
+                        if (isRu) "Включить" else "Enable"
+                    },
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    )
 }
 
 private data class LanBadgeStyle(
@@ -1398,6 +1807,7 @@ private data class LanBadgeStyle(
     val isBusy: Boolean = false
 )
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun WifiLanBadge(
     xdripLan: XdripLanSettings,
@@ -1405,6 +1815,7 @@ private fun WifiLanBadge(
     isDiscovering: Boolean,
     isRu: Boolean,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (!xdripLan.isEnabled) return
@@ -1455,7 +1866,11 @@ private fun WifiLanBadge(
     Surface(
         modifier = modifier
             .size(width = 28.dp, height = 24.dp)
-            .clickable { onClick() },
+            .clip(RoundedCornerShape(8.dp))
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(8.dp),
         color = style.bg,
         border = BorderStroke(1.2.dp, style.borderColor)
@@ -1682,6 +2097,7 @@ private fun LanStatusDialog(
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BleBridgeBadge(
     bleSettings: com.tirup.app.domain.model.BleBridgeSettings,
@@ -1692,6 +2108,7 @@ private fun BleBridgeBadge(
     blePacketReceivedAt: Long,
     isRu: Boolean,
     onClick: () -> Unit = {},
+    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val isBridgeActive = bleSettings.isEnabled && bleSettings.role != BleBridgeRole.DISABLED
@@ -1700,7 +2117,11 @@ private fun BleBridgeBadge(
         Surface(
             modifier = modifier
                 .size(width = 62.dp, height = 24.dp)
-                .clickable { onClick() },
+                .clip(RoundedCornerShape(10.dp))
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = onLongClick
+                ),
             shape = RoundedCornerShape(10.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
@@ -1763,7 +2184,11 @@ private fun BleBridgeBadge(
             Surface(
                 modifier = modifier
                     .size(width = 62.dp, height = 24.dp)
-                    .clickable { onClick() },
+                    .clip(RoundedCornerShape(10.dp))
+                    .combinedClickable(
+                        onClick = onClick,
+                        onLongClick = onLongClick
+                    ),
                 shape = RoundedCornerShape(10.dp),
                 color = ActionBlue.copy(alpha = 0.14f),
                 border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.45f))
@@ -1824,7 +2249,11 @@ private fun BleBridgeBadge(
             Surface(
                 modifier = modifier
                     .size(width = badgeWidth, height = 24.dp)
-                    .clickable { onClick() },
+                    .clip(RoundedCornerShape(10.dp))
+                    .combinedClickable(
+                        onClick = onClick,
+                        onLongClick = onLongClick
+                    ),
                 shape = RoundedCornerShape(10.dp),
                 color = ActionBlue.copy(alpha = 0.08f),
                 border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.25f))
@@ -1917,7 +2346,11 @@ private fun BleBridgeBadge(
             Surface(
                 modifier = modifier
                     .size(width = 62.dp, height = 24.dp)
-                    .clickable { onClick() },
+                    .clip(RoundedCornerShape(10.dp))
+                    .combinedClickable(
+                        onClick = onClick,
+                        onLongClick = onLongClick
+                    ),
                 shape = RoundedCornerShape(10.dp),
                 color = ActionBlue.copy(alpha = 0.14f),
                 border = BorderStroke(0.8.dp, ActionBlue.copy(alpha = 0.5f))
@@ -1986,7 +2419,11 @@ private fun BleBridgeBadge(
             Surface(
                 modifier = modifier
                     .size(width = 68.dp, height = 24.dp)
-                    .clickable { onClick() },
+                    .clip(RoundedCornerShape(10.dp))
+                    .combinedClickable(
+                        onClick = onClick,
+                        onLongClick = onLongClick
+                    ),
                 shape = RoundedCornerShape(10.dp),
                 color = PrimaryEmerald.copy(alpha = 0.08f)
             ) {
@@ -2113,7 +2550,11 @@ private fun BleBridgeBadge(
             Surface(
                 modifier = modifier
                     .size(width = 62.dp, height = 24.dp)
-                    .clickable { onClick() },
+                    .clip(RoundedCornerShape(10.dp))
+                    .combinedClickable(
+                        onClick = onClick,
+                        onLongClick = onLongClick
+                    ),
                 shape = RoundedCornerShape(10.dp),
                 color = containerColor.copy(alpha = 0.08f),
                 border = BorderStroke(0.8.dp, containerColor.copy(alpha = 0.25f))
@@ -2498,20 +2939,28 @@ private fun HeroGlucoseCard(
     nextHeartbeatRemainingSec: Int = 300,
     boostRemainingSec: Int = 0,
     blePacketReceivedAt: Long = 0L,
+    nightscoutSettings: com.tirup.app.domain.model.NightscoutSettings? = null,
+    nightscoutStatus: com.tirup.app.domain.model.NightscoutStatus? = null,
+    isNightscoutSyncing: Boolean = false,
     xdripLanSettings: com.tirup.app.domain.model.XdripLanSettings? = null,
     lanStatus: com.tirup.app.domain.model.XdripLanStatus? = null,
     isLanDiscovering: Boolean = false,
+    isLanSyncing: Boolean = false,
     dailyAlertsCount: Int = 0,
     areAlertsMuted: Boolean = false,
     lastImportantMessage: LastImportantMessage? = null,
     onImportantMessageClick: (LastImportantMessage) -> Unit = {},
     onDismissImportantMessage: () -> Unit = {},
     onAlertHistoryClick: () -> Unit = {},
+    onNightscoutClick: () -> Unit = {},
+    onNightscoutLongClick: (() -> Unit)? = null,
     onBatteryClick: () -> Unit = {},
     onLanClick: () -> Unit = {},
+    onLanLongClick: (() -> Unit)? = null,
     onIobClick: () -> Unit = {},
     onCobClick: () -> Unit = {},
     onBleClick: () -> Unit = {},
+    onBleLongClick: (() -> Unit)? = null,
     onAodClick: () -> Unit = {},
     onClick: () -> Unit
 ) {
@@ -2696,13 +3145,25 @@ private fun HeroGlucoseCard(
                         }
                     }
 
+                    if (nightscoutSettings != null && nightscoutSettings.isEnabled) {
+                        NightscoutBadge(
+                            nightscoutSettings = nightscoutSettings,
+                            status = nightscoutStatus ?: NightscoutStatus(),
+                            isSyncing = isNightscoutSyncing,
+                            isRu = isRu,
+                            onClick = onNightscoutClick,
+                            onLongClick = onNightscoutLongClick
+                        )
+                    }
+
                     if (xdripLanSettings != null && xdripLanSettings.isEnabled) {
                         WifiLanBadge(
                             xdripLan = xdripLanSettings,
                             lanStatus = lanStatus ?: com.tirup.app.domain.model.XdripLanStatus(),
-                            isDiscovering = isLanDiscovering,
+                            isDiscovering = isLanDiscovering || isLanSyncing,
                             isRu = isRu,
-                            onClick = onLanClick
+                            onClick = onLanClick,
+                            onLongClick = onLanLongClick
                         )
                     }
                 }
@@ -2788,7 +3249,8 @@ private fun HeroGlucoseCard(
                             boostRemainingSec = boostRemainingSec,
                             blePacketReceivedAt = blePacketReceivedAt,
                             isRu = isRu,
-                            onClick = onBleClick
+                            onClick = onBleClick,
+                            onLongClick = onBleLongClick
                         )
                     }
                     Surface(

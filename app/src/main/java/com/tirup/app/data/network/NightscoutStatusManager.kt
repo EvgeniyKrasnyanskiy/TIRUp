@@ -169,18 +169,28 @@ object NightscoutStatusManager {
         Log.i(TAG, "Stopped Nightscout telemetry & sync polling")
     }
 
-    suspend fun pollNow() = withContext(Dispatchers.IO) {
-        val repo = cachedSettingsRepo ?: return@withContext
-        val settings = repo.getSettings().firstOrNull()?.nightscoutSettings ?: return@withContext
-        if (!settings.isEnabled || !settings.isValidUrl) return@withContext
+    suspend fun pollNow(): Result<NightscoutStatus> = withContext(Dispatchers.IO) {
+        val repo = cachedSettingsRepo ?: return@withContext Result.failure(IllegalStateException("Репозиторий недоступен"))
+        val settings = repo.getSettings().firstOrNull()?.nightscoutSettings ?: return@withContext Result.failure(IllegalStateException("Настройки недоступны"))
+        if (!settings.isEnabled || !settings.isValidUrl) return@withContext Result.failure(IllegalStateException("Nightscout не настроен"))
 
         val now = System.currentTimeMillis()
-        if (now - lastPollTime < 8_000L) {
+        if (now - lastPollTime < 5_000L) {
             Log.d(TAG, "Skipping pollNow (debounced)")
-            return@withContext
+            return@withContext Result.success(_statusFlow.value)
         }
 
-        executeFetchCycle(settings)
+        try {
+            executeFetchCycle(settings)
+            val current = _statusFlow.value
+            if (current.isConnected) {
+                Result.success(current)
+            } else {
+                Result.failure(IllegalStateException(current.errorMessage ?: "Ошибка связи с Nightscout"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     private suspend fun executeFetchCycle(settings: NightscoutSettings) = withContext(Dispatchers.IO) {

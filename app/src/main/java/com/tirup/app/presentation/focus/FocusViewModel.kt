@@ -693,4 +693,13 @@ class FocusViewModel(
             settingsRepository.updateSettings(current.copy(xdripLanSettings = updated))
         }
     }
+
+    fun setNightscoutEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = settingsRepository.getSettings().firstOrNull() ?: return@launch
+            val updated = current.nightscoutSettings.copy(isEnabled = enabled)
+            settingsRepository.updateSettings(current.copy(nightscoutSettings = updated))
+        }
+    }
 }
+

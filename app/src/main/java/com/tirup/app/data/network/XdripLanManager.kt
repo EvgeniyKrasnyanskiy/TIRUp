@@ -332,13 +332,33 @@ object XdripLanManager {
         Log.i(TAG, "Stopped xDrip LAN follower polling")
     }
 
-    suspend fun pollNow() = withContext(Dispatchers.IO) {
-        val settings = cachedSettingsRepo?.getSettings()?.firstOrNull() ?: return@withContext
+    suspend fun pollNow(): Result<XdripLanStatus> = withContext(Dispatchers.IO) {
+        val repo = cachedSettingsRepo ?: return@withContext Result.failure(IllegalStateException("Репозиторий недоступен"))
+        val settings = repo.getSettings().firstOrNull() ?: return@withContext Result.failure(IllegalStateException("Настройки недоступны"))
         val lan = settings.xdripLanSettings
-        if (!lan.isEnabled || !lan.isConfigured) return@withContext
-        val ctx = appContext ?: return@withContext
-        if (!isWifiOrHotspotConnected(ctx)) return@withContext
-        executePollCycle(lan, settings)
+        if (!lan.isEnabled || !lan.isConfigured) return@withContext Result.failure(IllegalStateException("Wi-Fi LAN не настроен"))
+        val ctx = appContext ?: return@withContext Result.failure(IllegalStateException("Контекст недоступен"))
+        if (!isWifiOrHotspotConnected(ctx)) return@withContext Result.failure(IllegalStateException("Нет подключения к Wi-Fi / Hotspot"))
+
+        val now = System.currentTimeMillis()
+        if (now - lastPollExecutionTime < 4_000L) {
+            Log.d(TAG, "Skipping pollNow (debounced)")
+            return@withContext Result.success(_statusFlow.value)
+        }
+
+        try {
+            executePollCycle(lan, settings)
+            val current = _statusFlow.value
+            if (current.state == LanConnectionState.CONNECTED) {
+                Result.success(current)
+            } else if (current.state == LanConnectionState.ERROR) {
+                Result.failure(IllegalStateException(current.errorMessage ?: "Ошибка связи с мастером"))
+            } else {
+                Result.success(current)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     suspend fun discoverMaster(): Result<String> = withContext(Dispatchers.IO) {
