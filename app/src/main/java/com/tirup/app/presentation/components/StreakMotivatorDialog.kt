@@ -958,12 +958,62 @@ private fun DayDetailSummaryDialog(
                                 modifier = Modifier.weight(1f)
                             )
 
+                            val activePercentStr = if (isToday && todayStats != null) {
+                                String.format(Locale.US, "%.0f%%", todayStats.activeTimePercent)
+                            } else null
+
+                            val coverageColor = when {
+                                isToday && (todayStats?.activeTimePercent ?: 0.0) >= 90.0 -> PrimaryEmerald
+                                isToday && (todayStats?.activeTimePercent ?: 0.0) >= 70.0 -> ActionBlue
+                                coveragePercent >= 70 -> PrimaryEmerald
+                                else -> Color(0xFFF59E0B)
+                            }
+
                             DayMetricCard(
                                 title = if (isRu) "Замеры / Охват" else "Readings / Coverage",
                                 value = "$readingsCount ${if (isRu) "точек" else "pts"}",
-                                subtitle = "$coveragePercent% ${if (isRu) "суток" else "of day"}",
-                                accentColor = if (coveragePercent >= 70) PrimaryEmerald else Color(0xFFF59E0B),
+                                subtitle = if (isToday && activePercentStr != null) {
+                                    if (isRu) "$coveragePercent% суток • Связь $activePercentStr"
+                                    else "$coveragePercent% day • Active $activePercentStr"
+                                } else {
+                                    if (isRu) "$coveragePercent% от 24 ч суток"
+                                    else "$coveragePercent% of 24h day"
+                                },
+                                accentColor = coverageColor,
                                 modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    // Explanation note for coverage vs active sensor time
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text("ℹ️", fontSize = 13.sp)
+                            Text(
+                                text = if (isToday) {
+                                    if (isRu) {
+                                        "Охват суток ($coveragePercent%) считается от полных 24 часов. День продолжается, при этом активное время работы сенсора составляет ${todayStats?.activeTimePercent?.roundToInt() ?: 100}% (без разрывов связи)."
+                                    } else {
+                                        "Day coverage ($coveragePercent%) is measured against full 24 hours. Today is still in progress; sensor active time is ${todayStats?.activeTimePercent?.roundToInt() ?: 100}% (continuous signal)."
+                                    }
+                                } else {
+                                    if (isRu) {
+                                        "Охват ($coveragePercent%) показывает долю полных 24 часов суток ($readingsCount из ${expectedPoints.toInt()} точек), в течение которых поступали данные от сенсора."
+                                    } else {
+                                        "Coverage ($coveragePercent%) reflects the proportion of the full 24-hour day ($readingsCount of ${expectedPoints.toInt()} expected points) with sensor data."
+                                    }
+                                },
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 15.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }

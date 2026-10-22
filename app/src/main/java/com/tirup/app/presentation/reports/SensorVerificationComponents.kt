@@ -391,13 +391,13 @@ fun SensorAccuracyInfoDialog(
                     )
                     Text(
                         text = if (isRu) {
-                            "• Сенсор измеряет сахар в межтканевой (интерстициальной) жидкости под кожей, а не в цельной крови. Физиологическое запаздывание (lag time) составляет 5–10 минут.\n" +
-                            "• Для чистоты оценки TIRUp сопоставляет замеры глюкометра с CGM в строгом окне ±7 минут.\n" +
-                            "• Зоны быстрого изменения сахара (> 0.12 ммоль/л/мин) автоматически отфильтровываются, чтобы исключить ложные расхождения, вызванные естественной задержкой диффузии глюкозы."
+                            "• Сенсор измеряет глюкозу в межтканевой (интерстициальной) жидкости под кожей, а не в цельной крови. У современных сенсоров средний лаг составляет около 3–6 минут, но у части измерений он превышает 7 минут, а при быстрых изменениях глюкозы может доходить до 10 минут и более.\n" +
+                            "• Окно сопоставления ±7 минут — международный клинический стандарт протоколов испытаний (FDA / CLSI POCT05). Оно подбирает ближайшую точку сенсора при 5-минутном шаге с запасом на рассинхрон часов.\n" +
+                            "• Фильтрация динамики: зоны быстрого изменения сахара (> 0.12 ммоль/л/мин) автоматически исключаются алгоритмом TIRUp, чтобы не штрафовать исправный сенсор за естественное запаздывание диффузии в моменты скачков."
                         } else {
-                            "• Sensors measure interstitial fluid glucose, not capillary blood. Physiological lag time is 5–10 minutes.\n" +
-                            "• TIRUp matches fingerstick points with CGM in a strict ±7-minute window.\n" +
-                            "• High rate-of-change periods (> 0.12 mmol/L/min) are automatically excluded to eliminate false bias caused by physiological lag."
+                            "• Sensors measure interstitial fluid glucose, not capillary blood. In modern CGMs, the median physiological lag is about 3–6 minutes, but for a subset of readings it exceeds 7 minutes, and during rapid glucose excursions it can reach 10 minutes or more.\n" +
+                            "• The ±7-minute matching window is an international clinical trial benchmark (FDA / CLSI POCT05), pairing closest points in 5-minute sensor grids with tolerance for clock drift.\n" +
+                            "• Dynamic filtration: rapid rate-of-change periods (> 0.12 mmol/L/min) are automatically excluded by TIRUp so the sensor is not penalized for natural diffusion lag during spikes."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
