@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.tirup.app.data.local.AppDatabase
+import com.tirup.app.data.local.entity.HistoricalMeterReadingEntity
 import com.tirup.app.data.local.entity.HistoricalReadingEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -11,6 +12,7 @@ import java.io.BufferedInputStream
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
+import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -52,6 +54,7 @@ class StreamingGlucoseImporter(
             if (clearPrevious) {
                 // Clear previous historical dataset so each upload is fresh and isolated
                 database.historicalReadingDao().clearAll()
+                database.historicalMeterReadingDao().clearAll()
                 seenTimestamps?.clear()
             }
             onProgress(0.02f, 0)
@@ -80,6 +83,7 @@ class StreamingGlucoseImporter(
                     headerBytes[3] == 0x04.toByte()
 
             val chunk = ArrayList<HistoricalReadingEntity>(CHUNK_SIZE)
+            val meterChunk = ArrayList<HistoricalMeterReadingEntity>(CHUNK_SIZE)
 
             val dateFormats = listOf(
                 SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.US).apply { isLenient = false },
@@ -113,6 +117,11 @@ class StreamingGlucoseImporter(
                         (n.endsWith(".csv") || n.endsWith(".tsv") || n.endsWith(".txt")) &&
                                 !n.contains("treatment") && !n.contains("calibrat")
                     }
+                    val calEntries = entries.filter {
+                        val n = it.name.lowercase()
+                        (n.endsWith(".csv") || n.endsWith(".tsv") || n.endsWith(".txt")) &&
+                                (n.contains("treatment") || n.contains("calibrat"))
+                    }
 
                     val totalUncompressed = csvEntries.sumOf { it.size }.coerceAtLeast(1L)
                     var bytesAccumulator = 0L
@@ -125,6 +134,7 @@ class StreamingGlucoseImporter(
                                 val count = processCsvStream(
                                     inputStream = countingStream,
                                     chunk = chunk,
+                                    meterChunk = meterChunk,
                                     dateFormats = dateFormats,
                                     seenTimestamps = seenTimestamps,
                                     onProgressUpdate = { inStreamCount ->
@@ -140,6 +150,18 @@ class StreamingGlucoseImporter(
                     } else {
                         Log.w(TAG, "No valid CSV found in ZIP archive.")
                     }
+
+                    // Also extract meter calibrations from treatments/calibrations entries if available
+                    for (calEntry in calEntries) {
+                        try {
+                            Log.d(TAG, "Processing calibrations entry: ${calEntry.name}")
+                            zipFile.getInputStream(calEntry).use { calStream ->
+                                processCalibrationStream(calStream, meterChunk, dateFormats)
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed parsing calibration entry: ${calEntry.name}", e)
+                        }
+                    }
                 } finally {
                     try { zipFile.close() } catch (_: Exception) {}
                     try { tempZipFile.delete() } catch (_: Exception) {}
@@ -151,6 +173,7 @@ class StreamingGlucoseImporter(
                 val count = processCsvStream(
                     inputStream = countingStream,
                     chunk = chunk,
+                    meterChunk = meterChunk,
                     dateFormats = dateFormats,
                     seenTimestamps = seenTimestamps,
                     onProgressUpdate = { inStreamCount ->
@@ -161,11 +184,15 @@ class StreamingGlucoseImporter(
                 totalImported += count
             }
 
-            // Flush remaining chunk
+            // Flush remaining chunks
             if (chunk.isNotEmpty()) {
                 insertHistoricalChunk(chunk)
                 totalImported += chunk.size
                 chunk.clear()
+            }
+            if (meterChunk.isNotEmpty()) {
+                database.historicalMeterReadingDao().insertBatch(meterChunk)
+                meterChunk.clear()
             }
             onProgress(1.0f, totalImported)
 
@@ -180,6 +207,7 @@ class StreamingGlucoseImporter(
     private suspend fun processCsvStream(
         inputStream: InputStream,
         chunk: ArrayList<HistoricalReadingEntity>,
+        meterChunk: ArrayList<HistoricalMeterReadingEntity>,
         dateFormats: List<SimpleDateFormat>,
         seenTimestamps: MutableSet<Long>?,
         onProgressUpdate: (Int) -> Unit
@@ -191,6 +219,7 @@ class StreamingGlucoseImporter(
         var timeCol = -1
         var singleTsCol = -1
         var valueCol = -1
+        var meterCol = -1
         var headerFound = false
 
         var line: String? = reader.readLine()
@@ -216,6 +245,7 @@ class StreamingGlucoseImporter(
                 var tempTime = -1
                 var tempSingleTs = -1
                 var tempVal = -1
+                var tempMeterVal = -1
 
                 for (i in headerLower.indices) {
                     val h = headerLower[i]
@@ -235,6 +265,14 @@ class StreamingGlucoseImporter(
                     } else if (tempVal == -1 && (h.contains("historic") || h == "glucose" || h == "sgv" || h.contains("glukose") || h.contains("сахар") || h.contains("глюкоза") || h == "value")) {
                         tempVal = i
                     }
+
+                    // Meter (Blood Glucose / Fingerstick / Calibration) columns
+                    if (h == "udt_blood_glucose" || h == "bg_level" || h == "fingerstick" || h == "meter_bg" ||
+                        h.contains("calibration") || h.contains("fingerstick") || (h.contains("meter") && !h.contains("meter_timestamp")) ||
+                        h.contains("blood glucose") || h.contains("калибров") || h.contains("глюкометр")
+                    ) {
+                        tempMeterVal = i
+                    }
                 }
 
                 if ((tempSingleTs != -1 || (tempDay != -1 && tempTime != -1)) && tempVal != -1) {
@@ -242,6 +280,7 @@ class StreamingGlucoseImporter(
                     dayCol = tempDay
                     timeCol = tempTime
                     valueCol = tempVal
+                    meterCol = tempMeterVal
                     headerFound = true
                     line = reader.readLine()
                     continue
@@ -250,6 +289,28 @@ class StreamingGlucoseImporter(
 
             // 2. Parse Reading
             var reading: HistoricalReadingEntity? = null
+
+            // Check for Meter Glucose value in this row (fingerstick / calibration)
+            if (meterCol != -1 && meterCol < parts.size) {
+                val rawMeter = parts[meterCol].replace(',', '.').trim()
+                if (rawMeter.isNotEmpty() && !rawMeter.equals("nan", ignoreCase = true)) {
+                    val mVal = rawMeter.toDoubleOrNull()
+                    if (mVal != null && mVal > 0.5) {
+                        val ts = if (dayCol != -1 && timeCol != -1 && dayCol < parts.size && timeCol < parts.size) {
+                            parseTimestamp("${parts[dayCol]} ${parts[timeCol]}", dateFormats)
+                        } else if (singleTsCol != -1 && singleTsCol < parts.size) {
+                            parseTimestamp(parts[singleTsCol], dateFormats)
+                        } else null
+
+                        if (ts != null) {
+                            val valueMmol = if (mVal <= 30.0) mVal else mVal / 18.0182
+                            if (valueMmol in 1.1..35.0) {
+                                meterChunk.add(HistoricalMeterReadingEntity(timestamp = ts, valueMmol = valueMmol))
+                            }
+                        }
+                    }
+                }
+            }
 
             // A. Separate DAY and TIME columns (xDrip export format)
             if (dayCol != -1 && timeCol != -1 && valueCol != -1 && dayCol < parts.size && timeCol < parts.size) {
@@ -322,6 +383,81 @@ class StreamingGlucoseImporter(
         }
 
         return importedInStream
+    }
+
+    private suspend fun processCalibrationStream(
+        inputStream: InputStream,
+        meterChunk: ArrayList<HistoricalMeterReadingEntity>,
+        dateFormats: List<SimpleDateFormat>
+    ) {
+        val reader = BufferedReader(InputStreamReader(inputStream, StandardCharsets.UTF_8), 32 * 1024)
+        val firstLine = reader.readLine() ?: return
+        val delimiter = if (firstLine.contains(",")) "," else if (firstLine.contains(";")) ";" else "\t"
+        var line: String? = firstLine
+
+        var tsCol = -1
+        var dayCol = -1
+        var timeCol = -1
+        var bgCol = -1
+        var headerFound = false
+
+        while (line != null) {
+            val trimmed = line.trim()
+            if (trimmed.isEmpty()) {
+                line = reader.readLine()
+                continue
+            }
+            val parts = trimmed.split(delimiter).map { it.trim().trim('"', '\'') }
+            if (parts.isEmpty()) {
+                line = reader.readLine()
+                continue
+            }
+
+            if (!headerFound) {
+                val headerLower = parts.map { it.lowercase() }
+                for (i in headerLower.indices) {
+                    val h = headerLower[i]
+                    if (tsCol == -1 && (h == "timestamp" || h == "mills" || h == "created_at" || h == "date" || h == "time" || h == "datetime")) {
+                        tsCol = i
+                    }
+                    if (dayCol == -1 && (h == "day" || h.contains("дата"))) dayCol = i
+                    if (timeCol == -1 && (h == "time" || h.contains("время"))) timeCol = i
+                    if (bgCol == -1 && (h == "bg" || h == "glucose" || h == "value" || h.contains("meter") || h.contains("finger") || h.contains("blood"))) {
+                        bgCol = i
+                    }
+                }
+                if (bgCol != -1 && (tsCol != -1 || (dayCol != -1 && timeCol != -1))) {
+                    headerFound = true
+                    line = reader.readLine()
+                    continue
+                }
+            }
+
+            if (bgCol != -1 && bgCol < parts.size) {
+                val rawVal = parts[bgCol].replace(',', '.').trim()
+                val bg = rawVal.toDoubleOrNull()
+                if (bg != null && bg > 0.5) {
+                    val ts = if (dayCol != -1 && timeCol != -1 && dayCol < parts.size && timeCol < parts.size) {
+                        parseTimestamp("${parts[dayCol]} ${parts[timeCol]}", dateFormats)
+                    } else if (tsCol != -1 && tsCol < parts.size) {
+                        parseTimestamp(parts[tsCol], dateFormats)
+                    } else null
+
+                    if (ts != null) {
+                        val valueMmol = if (bg <= 30.0) bg else bg / 18.0182
+                        if (valueMmol in 1.1..35.0) {
+                            meterChunk.add(HistoricalMeterReadingEntity(timestamp = ts, valueMmol = valueMmol))
+                            if (meterChunk.size >= CHUNK_SIZE) {
+                                database.historicalMeterReadingDao().insertBatch(meterChunk)
+                                meterChunk.clear()
+                            }
+                        }
+                    }
+                }
+            }
+
+            line = reader.readLine()
+        }
     }
 
     private suspend fun insertHistoricalChunk(chunk: List<HistoricalReadingEntity>) {

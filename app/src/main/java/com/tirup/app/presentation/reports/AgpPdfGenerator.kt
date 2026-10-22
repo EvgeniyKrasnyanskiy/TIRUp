@@ -31,7 +31,8 @@ class AgpPdfGenerator(private val context: Context) {
         statistics: GlucoseStatistics,
         userSettings: UserSettings,
         selectedPeriod: TrendPeriod = TrendPeriod.PERIOD_14D,
-        customDays: Int = 14
+        customDays: Int = 14,
+        verificationResult: com.tirup.app.domain.calculator.SensorVerificationResult? = null
     ): Result<File> = withContext(Dispatchers.IO) {
         val document = PdfDocument()
         val isRu = userSettings.language.equals("RU", ignoreCase = true)
@@ -126,10 +127,19 @@ class AgpPdfGenerator(private val context: Context) {
             }
             canvas.drawText(metaLine, margin + 12f, 70f, subTextPaint)
 
-            val metaLine2 = if (isRu) {
-                "Сформировано: ${SimpleDateFormat("dd MMMM yyyy HH:mm", Locale("ru")).format(Date())} • Локальное офлайн-приложение TIRUp"
+            val metaLine2 = if (verificationResult != null && verificationResult.pairedPointsCount >= 1) {
+                val sign = if (verificationResult.meanBiasMmol >= 0) "+" else ""
+                if (isRu) {
+                    "Верификация сенсора (ISO 15197): MARD ${String.format(Locale.US, "%.1f%%", verificationResult.mardPercent)} • Смещение: $sign${String.format(Locale.US, "%.2f", verificationResult.meanBiasMmol)} ммоль/л • ISO 15197: ${String.format(Locale.US, "%.1f%%", verificationResult.isoPassPercent)} (${verificationResult.pairedPointsCount} пар)"
+                } else {
+                    "Sensor Verification (ISO 15197): MARD ${String.format(Locale.US, "%.1f%%", verificationResult.mardPercent)} • Bias: $sign${String.format(Locale.US, "%.2f", verificationResult.meanBiasMmol)} mmol/L • ISO Pass: ${String.format(Locale.US, "%.1f%%", verificationResult.isoPassPercent)} (${verificationResult.pairedPointsCount} pairs)"
+                }
             } else {
-                "Generated: ${SimpleDateFormat("dd MMM yyyy HH:mm", Locale.US).format(Date())} • TIRUp Offline App"
+                if (isRu) {
+                    "Сформировано: ${SimpleDateFormat("dd MMMM yyyy HH:mm", Locale("ru")).format(Date())} • Локальное офлайн-приложение TIRUp"
+                } else {
+                    "Generated: ${SimpleDateFormat("dd MMM yyyy HH:mm", Locale.US).format(Date())} • TIRUp Offline App"
+                }
             }
             canvas.drawText(metaLine2, margin + 12f, 84f, subTextPaint)
 

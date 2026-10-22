@@ -7,11 +7,13 @@ import androidx.room.RoomDatabase
 import com.tirup.app.data.local.dao.DailySummaryDao
 import com.tirup.app.data.local.dao.DeviceInstallationDao
 import com.tirup.app.data.local.dao.GlucoseReadingDao
+import com.tirup.app.data.local.dao.HistoricalMeterReadingDao
 import com.tirup.app.data.local.dao.HistoricalReadingDao
 import com.tirup.app.data.local.dao.TreatmentDao
 import com.tirup.app.data.local.entity.DailySummaryEntity
 import com.tirup.app.data.local.entity.DeviceInstallationEntity
 import com.tirup.app.data.local.entity.GlucoseReadingEntity
+import com.tirup.app.data.local.entity.HistoricalMeterReadingEntity
 import com.tirup.app.data.local.entity.HistoricalReadingEntity
 import com.tirup.app.data.local.entity.TreatmentEntity
 
@@ -20,10 +22,11 @@ import com.tirup.app.data.local.entity.TreatmentEntity
         GlucoseReadingEntity::class,
         DailySummaryEntity::class,
         HistoricalReadingEntity::class,
+        HistoricalMeterReadingEntity::class,
         TreatmentEntity::class,
         DeviceInstallationEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -31,6 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun glucoseReadingDao(): GlucoseReadingDao
     abstract fun dailySummaryDao(): DailySummaryDao
     abstract fun historicalReadingDao(): HistoricalReadingDao
+    abstract fun historicalMeterReadingDao(): HistoricalMeterReadingDao
     abstract fun treatmentDao(): TreatmentDao
     abstract fun deviceInstallationDao(): DeviceInstallationDao
 
@@ -92,6 +96,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `historical_meter_readings` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        `value_mmol` REAL NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_historical_meter_readings_timestamp` ON `historical_meter_readings` (`timestamp`)")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -99,7 +116,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "tirup_database.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build()
                 INSTANCE = instance

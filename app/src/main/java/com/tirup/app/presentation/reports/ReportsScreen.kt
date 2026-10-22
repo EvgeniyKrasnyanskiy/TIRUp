@@ -77,6 +77,8 @@ import com.tirup.app.domain.model.GlucoseUnit
 import com.tirup.app.presentation.components.BentoCard
 import com.tirup.app.presentation.components.MetricsOrderDialog
 import com.tirup.app.presentation.components.RangeDistributionBar
+import com.tirup.app.domain.calculator.SensorAccuracyGrade
+import com.tirup.app.domain.calculator.SensorVerificationResult
 import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorTargetSoft
@@ -927,6 +929,16 @@ private fun HistoricalReportCard(
                     onReorderClick = onReorderClick
                 )
 
+                // Sensor Verification Card (MARD & ISO 15197:2013)
+                hist.verification?.let { verif ->
+                    if (verif.pairedPointsCount >= 1) {
+                        SensorVerificationCard(
+                            verification = verif,
+                            isRu = isRu
+                        )
+                    }
+                }
+
                 // Action Buttons: Import File above, Save & Share below
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
@@ -1024,6 +1036,155 @@ private fun HistoricalReportCard(
                     color = if (isError) MaterialTheme.colorScheme.error else PrimaryEmerald
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SensorVerificationCard(
+    verification: SensorVerificationResult,
+    isRu: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val gradeColor = when (verification.accuracyGrade) {
+        SensorAccuracyGrade.EXCELLENT -> PrimaryEmerald
+        SensorAccuracyGrade.GOOD -> Color(0xFF0284C7)
+        SensorAccuracyGrade.MODERATE -> Color(0xFFF59E0B)
+        SensorAccuracyGrade.POOR -> Color(0xFFEF4444)
+    }
+
+    val gradeLabel = if (isRu) verification.accuracyGrade.labelRu else verification.accuracyGrade.labelEn
+    val sign = if (verification.meanBiasMmol >= 0) "+" else ""
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f),
+        border = BorderStroke(1.dp, gradeColor.copy(alpha = 0.35f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Header: Title & Grade Badge
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("🎯", fontSize = 14.sp)
+                    Text(
+                        text = if (isRu) "Верификация сенсора (ISO 15197)" else "Sensor Verification (ISO 15197)",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = gradeColor.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, gradeColor.copy(alpha = 0.4f))
+                ) {
+                    Text(
+                        text = gradeLabel,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = gradeColor,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            // 3 Stat Badges: MARD, Bias, ISO Pass
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // MARD
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "MARD",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${String.format(Locale.US, "%.1f", verification.mardPercent)}%",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = gradeColor
+                        )
+                    }
+                }
+
+                // Mean Bias
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = if (isRu) "Смещение" else "Bias",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "$sign${String.format(Locale.US, "%.2f", verification.meanBiasMmol)}",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                // ISO 15197 Pass %
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "ISO 15197",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${String.format(Locale.US, "%.1f", verification.isoPassPercent)}%",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = if (verification.isoPassPercent >= 95.0) PrimaryEmerald else Color(0xFFF59E0B)
+                        )
+                    }
+                }
+            }
+
+            // Footer Subtitle with pairs count
+            Text(
+                text = if (isRu) {
+                    "${verification.pairedPointsCount} парных замеров с глюкометром (окно ±7 мин, отфильтрованы зоны быстрого тренда)"
+                } else {
+                    "${verification.pairedPointsCount} paired meter checks (±7m window, rapid rate-of-change excluded)"
+                },
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -1520,7 +1681,41 @@ private fun ParametersGuidebookModal(
                         }
                     }
 
-                    // Section 5: Clinical Disclaimer
+                    // Section 5: Sensor Accuracy & ISO 15197:2013
+                    item {
+                        GuidebookSectionHeader(
+                            title = if (isRu) "5. Точность сенсоров и стандарт ISO 15197:2013" else "5. Sensor Accuracy & ISO 15197:2013 Standard"
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            GuidebookItemCard(
+                                title = if (isRu) "Стандарт ISO 15197:2013 и клинические допуски" else "ISO 15197:2013 Standard & Clinical Tolerances",
+                                target = if (isRu) "≥95% измерений в допуске • 99% в зонах A/B" else "≥95% within boundary • 99% in Zone A/B",
+                                desc = if (isRu) "Международный стандарт точности систем контроля глюкозы. Требует, чтобы не менее 95% измерений укладывались в строгие клинические допуски:\n• При сахаре < 5.55 ммоль/л (<100 мг/дл): погрешность не более ±0.83 ммоль/л (±15 мг/дл) от референсного анализатора.\n• При сахаре ≥ 5.55 ммоль/л (≥100 мг/дл): погрешность не более ±15% от референсного значения.\nКроме того, 99% всех значений обязаны попадать в безопасные зоны A и B консенсусной решётки ошибок Паркса (Clarke/Parkes EGA), исключая ошибки при расчёте доз инсулина."
+                                       else "International accuracy standard for glucose monitoring systems. Mandates that at least 95% of readings satisfy strict boundaries:\n• For glucose < 5.55 mmol/L (<100 mg/dL): within ±0.83 mmol/L (±15 mg/dL) of reference laboratory value.\n• For glucose ≥ 5.55 mmol/L (≥100 mg/dL): within ±15% of reference value.\nAdditionally, 99% of readings must fall into safe Zones A & B of Consensus Error Grid (Parkes/Clarke EGA), preventing adverse insulin dosing errors."
+                            )
+                            GuidebookItemCard(
+                                title = if (isRu) "MARD (Средняя абсолютная относительная разность)" else "MARD (Mean Absolute Relative Difference)",
+                                target = if (isRu) "Отлично: <10.0% • Норма: 10–14% • Умеренно: 14–18%" else "Optimal: <10.0% • Good: 10–14% • Moderate: 14–18%",
+                                desc = if (isRu) "Золотой международный эталон оценки точности систем CGM (|CGM - BG| / BG × 100%). Значение MARD < 10% признано FDA и регуляторами достаточным для самостоятельного принятия решений по введению инсулина без контрольного прокола пальца (Non-adjunctive use). Значение 10–14% означает хорошую точность; 14–18% — умеренную; MARD > 18% указывает на необходимость калибровки или замену сенсора."
+                                       else "Gold standard metric of continuous glucose sensor accuracy (|CGM - BG| / BG * 100%). MARD < 10% is accepted by FDA and regulators for non-adjunctive insulin dosing decisions without confirmatory fingersticks. 10–14% indicates good accuracy; 14–18% is moderate; MARD > 18% signals sensor inaccuracy requiring calibration or replacement."
+                            )
+                            GuidebookItemCard(
+                                title = if (isRu) "Mean Bias (Систематическое смещение сенсора)" else "Mean Bias (Systematic Sensor Bias)",
+                                target = if (isRu) "Норма: в пределах ±0.50 ммоль/л (±9 мг/дл)" else "Target: within ±0.50 mmol/L (±9 mg/dL)",
+                                desc = if (isRu) "Средняя арифметическая разность между показаниями сенсора и капиллярной крови. Показывает систематический дрейф: положительное смещение (+) означает, что сенсор стабильно завышает глюкозу, отрицательное (-) — стабильно занижает. Помогает врачу и пациенту учесть специфику работы конкретного сенсора."
+                                       else "Arithmetic mean of differences between sensor and capillary meter readings. Reflects directional drift: positive bias (+) means sensor consistently overreads, negative (-) means it underreads. Guides clinical interpretation of specific sensor performance."
+                            )
+                            GuidebookItemCard(
+                                title = if (isRu) "Физиологический лаг и правила верификации" else "Physiological Lag & Verification Rules",
+                                target = if (isRu) "Лаг: 5–12 мин • Тренд: <0.12 ммоль/л/мин (→)" else "Lag: 5–12 min • RoC: <0.12 mmol/L/min (→)",
+                                desc = if (isRu) "Сенсор CGM измеряет глюкозу в межтканевой (интерстициальной) жидкости, а глюкометр — в капиллярной крови. Физиологическое время диффузии создаёт естественное отставание на 5–12 минут. Корректное сравнение CGM с глюкометром достоверно ТОЛЬКО при стабильном горизонтальном тренде. В фазе резкого подъёма сенсор закономерно отстаёт вниз, а при резком падении — отстаёт вверх."
+                                       else "CGM measures interstitial glucose, whereas fingersticks measure capillary blood. Diffusion physics produces a natural 5–12 minute physiological delay. Comparing CGM with a meter is valid ONLY during steady flat trend (rate of change <0.12 mmol/L/min). During rapid spikes CGM lags below blood, and during fast drops it lags above blood."
+                            )
+                        }
+                    }
+
+                    // Section 6: Clinical Disclaimer
                     item {
                         Surface(
                             shape = RoundedCornerShape(16.dp),
@@ -1535,15 +1730,15 @@ private fun ParametersGuidebookModal(
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Text(
-                                    text = if (isRu) "⚠️ Важные примечания:"
+                                    text = if (isRu) "⚠️ Важные клинические примечания:"
                                            else "⚠️ Clinical Notice Regarding Continuous Glucose Monitoring (CGM):",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF92400E) // Amber 800
                                 )
                                 Text(
-                                    text = if (isRu) "• Физиологическое запаздывание: датчики CGM измеряют концентрацию глюкозы в интерстициальной (межтканевой) жидкости, а не в крови. В период быстрых изменений отставание от капиллярной крови составляет 5–15 минут.\n\n• Погрешность сенсора (MARD): современный стандарт MARD составляет 8–10%. Возможны ложные занижения показаний при сдавливании сенсора во сне (compression lows).\n\n• Назначение отчёта: данный аналитический отчёт носит информационно-ознакомительный характер и не является клиническим диагнозом. При расхождении самочувствия с показаниями CGM выполните замер глюкометром по капле крови и обратитесь к лечащему врачу."
-                                           else "• Physiological Lag: CGM sensors measure interstitial fluid; physiological lag relative to blood is 5–15 minutes during rapid fluctuations.\n\n• Sensor MARD: standard accuracy error is 8–10%. Compression lows during sleep may occur.\n\n• Informational Use: this report does not replace clinical consultation. Always verify unusual readings with a fingerstick blood glucose test.",
+                                    text = if (isRu) "• Физиологическое запаздывание: датчики CGM измеряют концентрацию глюкозы в интерстициальной (межтканевой) жидкости, а не в крови. В период быстрых изменений отставание от капиллярной крови составляет 5–15 минут.\n\n• Стандарты точности: эталонный допуск глюкометров регламентируется ISO 15197:2013 (±0.83 ммоль/л при <5.55 и ±15% при ≥5.55 ммоль/л). Современный стандарт MARD сенсоров CGM составляет 8–10%. Возможны ложные занижения при сдавливании датчика во сне (compression lows).\n\n• Назначение отчёта: данный аналитический отчёт носит информационно-ознакомительный характер и не является клиническим диагнозом. При расхождении самочувствия с показаниями CGM выполните замер глюкометром по капле крови и обратитесь к лечащему врачу."
+                                           else "• Physiological Lag: CGM sensors measure interstitial fluid; lag relative to blood is 5–15 minutes during rapid fluctuations.\n\n• Accuracy Standards: meter tolerances follow ISO 15197:2013 (±0.83 mmol/L at <5.55 and ±15% at ≥5.55 mmol/L). Standard CGM MARD is 8–10%. Sleep compression lows may occur.\n\n• Informational Use: this report does not replace clinical consultation. Always verify unusual readings with a fingerstick blood glucose test.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color(0xFF78350F), // Amber 900
                                     lineHeight = 18.sp

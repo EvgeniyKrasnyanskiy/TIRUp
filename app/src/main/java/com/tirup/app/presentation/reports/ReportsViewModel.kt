@@ -13,6 +13,9 @@ import androidx.lifecycle.viewModelScope
 import com.tirup.app.data.importer.StreamingGlucoseImporter
 import com.tirup.app.data.local.AppDatabase
 import com.tirup.app.domain.calculator.GlucoseMetricsCalculator
+import com.tirup.app.domain.calculator.MeterReading
+import com.tirup.app.domain.calculator.SensorAccuracyCalculator
+import com.tirup.app.domain.calculator.SensorVerificationResult
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseStatistics
 import com.tirup.app.domain.model.UserSettings
@@ -42,7 +45,8 @@ data class HistoricalReportData(
     val readings: List<GlucoseReading> = emptyList(),
     val statistics: GlucoseStatistics = GlucoseStatistics(),
     val dateRangeStr: String = "",
-    val fileName: String = ""
+    val fileName: String = "",
+    val verification: SensorVerificationResult? = null
 )
 
 data class ReportsUiState(
@@ -158,8 +162,9 @@ class ReportsViewModel(
                 database.historicalReadingDao().getAllReadings().map { entities ->
                     entities.map { it.toDomain() }.distinctBy { it.timestamp }
                 },
+                database.historicalMeterReadingDao().getAllReadings(),
                 settingsRepository.getSettings()
-            ) { readings, settings ->
+            ) { readings, meterEntities, settings ->
                 _uiState.value = _uiState.value.copy(userSettings = settings)
 
                 if (readings.isEmpty()) {
@@ -178,11 +183,15 @@ class ReportsViewModel(
                     val fmt = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
                     val rangeStr = "${fmt.format(Date(minTs))} — ${fmt.format(Date(maxTs))}"
 
+                    val meterReadings = meterEntities.map { MeterReading(it.timestamp, it.valueMmol) }
+                    val verification = SensorAccuracyCalculator.calculateVerification(readings, meterReadings)
+
                     HistoricalReportData(
                         hasData = true,
                         readings = readings,
                         statistics = stats,
-                        dateRangeStr = rangeStr
+                        dateRangeStr = rangeStr,
+                        verification = verification
                     )
                 }
             }.collect { histData ->
@@ -287,6 +296,7 @@ class ReportsViewModel(
     fun clearHistoricalReport() {
         viewModelScope.launch {
             database.historicalReadingDao().clearAll()
+            database.historicalMeterReadingDao().clearAll()
             _uiState.value = _uiState.value.copy(
                 historicalReport = HistoricalReportData(hasData = false),
                 importMessage = null
@@ -360,7 +370,8 @@ class ReportsViewModel(
                 readings = hist.readings,
                 statistics = hist.statistics,
                 userSettings = _uiState.value.userSettings,
-                selectedPeriod = TrendPeriod.PERIOD_ALL
+                selectedPeriod = TrendPeriod.PERIOD_ALL,
+                verificationResult = hist.verification
             )
 
             result.onSuccess { pdfFile ->
@@ -385,7 +396,8 @@ class ReportsViewModel(
                 readings = hist.readings,
                 statistics = hist.statistics,
                 userSettings = _uiState.value.userSettings,
-                selectedPeriod = TrendPeriod.PERIOD_ALL
+                selectedPeriod = TrendPeriod.PERIOD_ALL,
+                verificationResult = hist.verification
             )
 
             result.onSuccess { pdfFile ->

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/Version-1.0.3-brightgreen.svg)
+![Version](https://img.shields.io/badge/Version-1.0.4-brightgreen.svg)
 ![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-green.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-blue.svg)
 ![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%2F%20Material%203-blueviolet.svg)
@@ -162,10 +162,12 @@
 - Card toggle `[📊 Chart | 🔢 Metrics]` switching between the percentile curves and a 12-parameter clinical metrics grid (Mean, eA1c, SD, %CV, TIR, TING, TBR, TAR, GRI, GVI, PGS, Min/Max).
 - Hidden clinical pattern detector: automated recognition of nocturnal drops during sleep hours, dawn phenomenon, and postprandial glycemic spikes with dismiss capability (✕).
 
-### 14. Standardized Medical AGP PDF Reports & User Manual
-- **Clinical AGP Report for Endocrinologist**: official ATTD/ADA 1-page standard sheet for 7, 14, 30, or 90 days with patient demographics and automated clinical findings.
-- **CGM Parameter Reference Guide (A4)**: in-depth breakdown of 12 clinical metrics, formulas, and target reference intervals.
-- **Three-Page User Manual (PDF)**: illustrated printable guide covering data source pairing, widgets, alarms, smart snooze, emergency SMS, and family BLE bridge setup.
+### 14. Standardized Medical AGP PDF Reports, Sensor Verification & User Manual
+- **Retrospective Sensor Verification (MARD & ISO 15197:2013)**: Ingests reference capillary blood glucose calibrations (`udt_blood_glucose`, `bg_level`, `calibrations.csv`, `treatments.csv`) from historical ZIP/CSV files. Computes clinical MARD (%), Mean Bias (systematic drift in mmol/L), and ISO 15197:2013 boundary compliance ($\pm 0.83$ mmol/L at $< 5.55$ mmol/L and $\pm 15\%$ at $\ge 5.55$ mmol/L) with rapid rate-of-change suppression to eliminate interstitial fluid lag distortion.
+- **Sensor Verification Card in Reports**: Instant visual card in the Reports tab displaying accuracy grade (*Optimal / Good / Moderate / Inaccurate*), MARD %, Bias, and paired checks counter.
+- **Verification Metadata in Clinical AGP PDF**: Automated sensor verification line in official AGP reports for endocrinologists validating sensor curve credibility.
+- **Two-Page CGM Parameter Reference Guide (A4)**: In-depth clinical breakdown of 12 glycemic parameters plus dedicated Section 5 on sensor accuracy standards (ISO 15197:2013, MARD thresholds, Mean Bias, and interstitial lag physics).
+- **Three-Page User Manual (PDF)**: Illustrated printable guide covering data source pairing, widgets, alarms, smart snooze, emergency SMS, and family BLE bridge setup.
 
 ### 15. Daily Sandbox Auto-Backup (Permissionless)
 - Exact `AlarmManager.RTC_WAKEUP` triggers daily at **23:59:59**, backing up Room database and preferences into the app's secure private sandbox.
@@ -358,7 +360,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 <div align="center">
 
-![Версия](https://img.shields.io/badge/Версия-1.0.3-brightgreen.svg)
+![Версия](https://img.shields.io/badge/Версия-1.0.4-brightgreen.svg)
 ![Платформа](https://img.shields.io/badge/Платформа-Android%208.0%2B-green.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-blue.svg)
 ![Jetpack Compose](https://img.shields.io/badge/Интерфейс-Jetpack%20Compose%20%2F%20Material%203-blueviolet.svg)
@@ -518,10 +520,12 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - Переключатель карточки `[📊 График | 🔢 Параметры]` между перцентильной кривой и сеткой 12 клинических параметров (Mean, eA1c, SD, %CV, TIR, TING, TBR, TAR, GRI, GVI, PGS, Min/Max).
 - Детектор скрытых клинических паттернов: распознавание ночных падений в индивидуальные часы сна, феномена утренней зари и постпрандиальных всплесков с возможностью индивидуального скрытия (✕).
 
-### 14. Медицинские PDF-отчёты AGP и Руководство пользователя
-- **Клинический AGP-отчёт для эндокринолога**: стандарт ATTD/ADA в один клик за 7, 14, 30 или 90 дней с данными пациента и автоматическим заключением.
-- **Справочник параметров CGM (лист А4)**: подробный разбор 12 параметров, формул и клинических норм.
-- **Трёхстраничное руководство пользователя (PDF)**: печатная иллюстрированная памятка по связке с источниками, виджетам, тревогам, снузу, экстренным SMS и технологиям семейного BLE-моста.
+### 14. Медицинские PDF-отчёты AGP, верификация сенсоров (MARD & ISO 15197) и Руководство пользователя
+- **Ретроспективный анализ точности сенсоров по глюкометру (MARD & ISO 15197:2013)**: Автоматическое извлечение замеров глюкометра из CSV/ZIP-архивов (`udt_blood_glucose`, `bg_level`, `calibrations.csv`, `treatments.csv`). Расчёт международной погрешности MARD (%), систематического смещения Mean Bias (ммоль/л) и соответствия стандарту ISO 15197:2013 ($\pm 0.83$ ммоль/л при $< 5.55$ ммоль/л и $\pm 15\%$ при $\ge 5.55$ ммоль/л) с отсевом зон быстрого тренда для исключения физиологического лага межтканевой жидкости.
+- **Информационная плашка точности в отчётах**: Наглядная карточка `SensorVerificationCard` на 3-м экране («Отчёты») с цветовым бейджем градации качества сенсора (*Отличная / Хорошая / Умеренная / Неточный*), значениями MARD, Bias и счётчиком парных замеров.
+- **Строка верификации данных в AGP PDF**: Вывод согласованности сенсора с глюкометром в метаданных официального AGP-отчёта для лечащего врача.
+- **Двухстраничный Справочник параметров CGM (PDF А4)**: Клинический разбор 12 параметров плюс отдельный раздел «5. Точность сенсоров и стандарт ISO 15197:2013».
+- **Трёхстраничное руководство пользователя (PDF)**: Печатная иллюстрированная памятка по связке с источниками, виджетам, тревогам, снузу, экстренным SMS и технологиям семейного BLE-моста.
 
 ### 15. Ежедневный автобэкап без системных разрешений
 - Точный будильник `AlarmManager.RTC_WAKEUP` сохраняет базу данных и настройки ежедневно строго в **23:59:59** в изолированную песочницу приложения.
