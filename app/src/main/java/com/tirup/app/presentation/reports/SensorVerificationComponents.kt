@@ -359,7 +359,7 @@ fun SensorAccuracyInfoDialog(
                 // Section 4: Sample Size & Low Pair Count Impact
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = if (isRu) "4. Почему процент ISO может быть около 50%? Влияние выборки" else "4. Why is ISO ~50%? Sample Size Impact",
+                        text = if (isRu) "4. Почему процент ISO может быть менее 70%? Влияние выборки" else "4. Why is ISO <70%? Sample Size Impact",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary

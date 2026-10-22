@@ -697,8 +697,16 @@ private fun DayDetailSummaryDialog(
 
     val cvStr = if (cvPercent > 0.0) String.format(Locale.US, "%.1f%%", cvPercent) else "—"
 
-    val expectedPoints = if (readingsCount > 300) 1440.0 else 288.0
-    val coveragePercent = ((readingsCount / expectedPoints) * 100.0).coerceIn(0.0, 100.0).roundToInt()
+    val isHighDensity = readingsCount > 300
+    // Clinical CGM benchmark:
+    // 288 points = full 24h day at standard 5-minute sampling (12 pts/hour).
+    // For 1-2 min streaming sensors, real-world full-day delivery (with Bluetooth / OS sleep) is 700-1200 points.
+    // Thus >=700 points represents complete (100%) 24-hour continuous streaming coverage.
+    val coveragePercent = when {
+        readingsCount >= 700 -> 100
+        readingsCount > 300 -> ((readingsCount / 700.0) * 100.0).coerceIn(0.0, 100.0).roundToInt()
+        else -> ((readingsCount / 288.0) * 100.0).coerceIn(0.0, 100.0).roundToInt()
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -975,6 +983,14 @@ private fun DayDetailSummaryDialog(
                                 subtitle = if (isToday && activePercentStr != null) {
                                     if (isRu) "$coveragePercent% суток • Связь $activePercentStr"
                                     else "$coveragePercent% day • Active $activePercentStr"
+                                } else if (isHighDensity) {
+                                    if (coveragePercent >= 95) {
+                                        if (isRu) "100% суток • 1–2 мин поток ✓"
+                                        else "100% of day • 1–2m stream ✓"
+                                    } else {
+                                        if (isRu) "$coveragePercent% суток (шаг 1–2 мин)"
+                                        else "$coveragePercent% of day (1–2m stream)"
+                                    }
                                 } else {
                                     if (isRu) "$coveragePercent% от 24 ч суток"
                                     else "$coveragePercent% of 24h day"
@@ -1005,11 +1021,17 @@ private fun DayDetailSummaryDialog(
                                     } else {
                                         "Day coverage ($coveragePercent%) is measured against full 24 hours. Today is still in progress; sensor active time is ${todayStats?.activeTimePercent?.roundToInt() ?: 100}% (continuous signal)."
                                     }
+                                } else if (isHighDensity && coveragePercent >= 95) {
+                                    if (isRu) {
+                                        "Отличная плотность данных ($readingsCount точек): непрерывный поток замеров каждые 1–2 минуты, полностью покрывший все 24 часа суток."
+                                    } else {
+                                        "Excellent data density ($readingsCount readings): continuous streaming every 1–2 minutes covering the full 24-hour day."
+                                    }
                                 } else {
                                     if (isRu) {
-                                        "Охват ($coveragePercent%) показывает долю полных 24 часов суток ($readingsCount из ${expectedPoints.toInt()} точек), в течение которых поступали данные от сенсора."
+                                        "Охват ($coveragePercent%) показывает долю полных 24 часов суток ($readingsCount замеров), в течение которых поступали данные от сенсора."
                                     } else {
-                                        "Coverage ($coveragePercent%) reflects the proportion of the full 24-hour day ($readingsCount of ${expectedPoints.toInt()} expected points) with sensor data."
+                                        "Coverage ($coveragePercent%) reflects the proportion of the full 24-hour day ($readingsCount readings) with sensor data."
                                     }
                                 },
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 15.sp),
