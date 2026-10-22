@@ -165,37 +165,55 @@ class GlucoseRepositoryImpl(
     override suspend fun recalculateDailySummaries(startDate: Long, endDate: Long) = withContext(Dispatchers.IO) {
         val startOfDay = getStartOfDay(startDate)
         val endOfDay = getStartOfDay(endDate) + 86400000L - 1
-
-        val allReadings = readingDao.getReadingsBetweenSync(startOfDay, endOfDay)
-        if (allReadings.isEmpty()) return@withContext
+        if (startOfDay > endOfDay) return@withContext
 
         val defaultTargets = TargetRanges()
+        val summaries = mutableListOf<DailySummaryEntity>()
 
-        // Group by normalized day timestamp
-        val groupedByDay = allReadings.groupBy { entity ->
-            getStartOfDay(entity.timestamp)
+        var currentDayStart = startOfDay
+        while (currentDayStart <= endOfDay) {
+            val currentDayEnd = currentDayStart + 86400000L - 1
+            val dayEntities = readingDao.getReadingsBetweenSync(currentDayStart, currentDayEnd)
+            if (dayEntities.isNotEmpty()) {
+                val domainReadings = dayEntities.map { it.toDomain() }
+                val stats = GlucoseMetricsCalculator.calculateStatistics(domainReadings, defaultTargets)
+
+                summaries.add(
+                    DailySummaryEntity(
+                        dateTimestamp = currentDayStart,
+                        mean = stats.meanMmol,
+                        tir = stats.tirPercent,
+                        ting = stats.tingPercent,
+                        tbrVeryLow = stats.tbrVeryLowPercent,
+                        tbrLow = stats.tbrLowPercent,
+                        tarHigh = stats.tarHighPercent,
+                        tarVeryHigh = stats.tarVeryHighPercent,
+                        sd = stats.sdMmol,
+                        cv = stats.cvPercent,
+                        count = stats.totalCount
+                    )
+                )
+            }
+
+            val cal = Calendar.getInstance().apply {
+                timeInMillis = currentDayStart
+                add(Calendar.DAY_OF_YEAR, 1)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val nextDayStart = cal.timeInMillis
+            if (nextDayStart <= currentDayStart) {
+                currentDayStart += 86400000L
+            } else {
+                currentDayStart = nextDayStart
+            }
         }
 
-        val summaries = groupedByDay.map { (dayStart, dayEntities) ->
-            val domainReadings = dayEntities.map { it.toDomain() }
-            val stats = GlucoseMetricsCalculator.calculateStatistics(domainReadings, defaultTargets)
-
-            DailySummaryEntity(
-                dateTimestamp = dayStart,
-                mean = stats.meanMmol,
-                tir = stats.tirPercent,
-                ting = stats.tingPercent,
-                tbrVeryLow = stats.tbrVeryLowPercent,
-                tbrLow = stats.tbrLowPercent,
-                tarHigh = stats.tarHighPercent,
-                tarVeryHigh = stats.tarVeryHighPercent,
-                sd = stats.sdMmol,
-                cv = stats.cvPercent,
-                count = stats.totalCount
-            )
+        if (summaries.isNotEmpty()) {
+            summaryDao.insertBatch(summaries)
         }
-
-        summaryDao.insertBatch(summaries)
     }
 
     override suspend fun ensureDailySummariesUpToDate() = withContext(Dispatchers.IO) {

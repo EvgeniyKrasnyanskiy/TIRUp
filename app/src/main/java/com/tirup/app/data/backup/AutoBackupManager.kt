@@ -2233,29 +2233,39 @@ object AutoBackupManager {
             val earliest = database.glucoseReadingDao().getEarliestTimestamp() ?: return@withContext
             val latest = database.glucoseReadingDao().getLatestTimestamp() ?: return@withContext
             val defaultTargets = TargetRanges()
+            val summaries = mutableListOf<DailySummaryEntity>()
 
-            val allReadings = database.glucoseReadingDao().getReadingsBetweenSync(earliest, latest)
-            if (allReadings.isEmpty()) return@withContext
+            var currentDayStart = getStartOfDay(earliest)
+            val endDayStart = getStartOfDay(latest)
 
-            val groupedByDay = allReadings.groupBy { getStartOfDay(it.timestamp) }
-            val summaries = groupedByDay.map { (dayStart, dayEntities) ->
-                val domainReadings = dayEntities.map { it.toDomain() }
-                val stats = GlucoseMetricsCalculator.calculateStatistics(domainReadings, defaultTargets)
-                DailySummaryEntity(
-                    dateTimestamp = dayStart,
-                    mean = stats.meanMmol,
-                    tir = stats.tirPercent,
-                    ting = stats.tingPercent,
-                    tbrVeryLow = stats.tbrVeryLowPercent,
-                    tbrLow = stats.tbrLowPercent,
-                    tarHigh = stats.tarHighPercent,
-                    tarVeryHigh = stats.tarVeryHighPercent,
-                    sd = stats.sdMmol,
-                    cv = stats.cvPercent,
-                    count = stats.totalCount
-                )
+            while (currentDayStart <= endDayStart) {
+                val currentDayEnd = currentDayStart + 86400000L - 1
+                val dayEntities = database.glucoseReadingDao().getReadingsBetweenSync(currentDayStart, currentDayEnd)
+                if (dayEntities.isNotEmpty()) {
+                    val domainReadings = dayEntities.map { it.toDomain() }
+                    val stats = GlucoseMetricsCalculator.calculateStatistics(domainReadings, defaultTargets)
+                    summaries.add(
+                        DailySummaryEntity(
+                            dateTimestamp = currentDayStart,
+                            mean = stats.meanMmol,
+                            tir = stats.tirPercent,
+                            ting = stats.tingPercent,
+                            tbrVeryLow = stats.tbrVeryLowPercent,
+                            tbrLow = stats.tbrLowPercent,
+                            tarHigh = stats.tarHighPercent,
+                            tarVeryHigh = stats.tarVeryHighPercent,
+                            sd = stats.sdMmol,
+                            cv = stats.cvPercent,
+                            count = stats.totalCount
+                        )
+                    )
+                }
+                currentDayStart += 86400000L
             }
-            database.dailySummaryDao().insertBatch(summaries)
+
+            if (summaries.isNotEmpty()) {
+                database.dailySummaryDao().insertBatch(summaries)
+            }
             Log.d(TAG, "recalculateSummariesAfterRestore: generated ${summaries.size} daily summaries")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to recalculate summaries after restore: ${e.message}", e)

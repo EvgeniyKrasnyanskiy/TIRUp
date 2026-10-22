@@ -37,6 +37,12 @@ interface GlucoseReadingDao {
     @Query("SELECT COUNT(*) FROM glucose_readings WHERE timestamp BETWEEN :startTime AND :endTime")
     suspend fun getCountBetween(startTime: Long, endTime: Long): Long
 
+    @Query("SELECT AVG(value_mmol) FROM glucose_readings WHERE timestamp BETWEEN :startTime AND :endTime")
+    suspend fun getAverageBetween(startTime: Long, endTime: Long): Double?
+
+    @Query("SELECT COUNT(*) FROM glucose_readings WHERE timestamp BETWEEN :startTime AND :endTime AND value_mmol >= :low AND value_mmol <= :high")
+    suspend fun getCountInRange(startTime: Long, endTime: Long, low: Double = 3.9, high: Double = 10.0): Long
+
     @Query("SELECT * FROM glucose_readings ORDER BY timestamp ASC LIMIT :limit OFFSET :offset")
     suspend fun getReadingsPaginated(limit: Int, offset: Int): List<GlucoseReadingEntity>
 

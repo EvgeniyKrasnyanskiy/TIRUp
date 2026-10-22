@@ -531,9 +531,11 @@ object BleObserverManager {
             Log.i(TAG, "Executing clean BLE scan restart: reason='$reason', boost=$boost")
 
             // 1. Stop current scan and discard old callback object
+            val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+            val leScanner = scanner ?: bm?.adapter?.bluetoothLeScanner
             try {
                 if (hasScanPermission(context)) {
-                    activeCallback?.let { cb -> scanner?.stopScan(cb) }
+                    activeCallback?.let { cb -> leScanner?.stopScan(cb) }
                 }
             } catch (e: SecurityException) {
                 Log.w(TAG, "SecurityException stopping scan during restart: ${e.message}")
@@ -630,7 +632,7 @@ object BleObserverManager {
         boost: Boolean,
         useLongRange: Boolean = false
     ) {
-        if (isScanning) return
+        if (isScanning && activeCallback != null) return
 
         if (!hasScanPermission(context)) {
             Log.w(TAG, "Cannot start BLE scanner: scan permission not granted")
@@ -651,6 +653,16 @@ object BleObserverManager {
             Log.w(TAG, "BluetoothLeScanner not available")
             _isScanningFlow.value = false
             return
+        }
+
+        // Clean up any stale unstopped callback before registering a new one
+        if (activeCallback != null) {
+            try {
+                if (hasScanPermission(context)) {
+                    leScanner.stopScan(activeCallback)
+                }
+            } catch (_: Exception) {}
+            activeCallback = null
         }
 
         currentFamilyPin = familyPin
@@ -714,11 +726,22 @@ object BleObserverManager {
                 }
                 Log.e(TAG, "BLE Scan failed: $errorDesc")
 
+                // Explicitly stop the failed callback so the Bluetooth daemon releases the client slot
+                try {
+                    if (hasScanPermission(context)) {
+                        leScanner.stopScan(this)
+                    }
+                } catch (e: Exception) {
+                    Log.d(TAG, "Cleanup stopScan on failure: ${e.message}")
+                }
+
                 // Release scanning state to prevent permanent deadlock
                 synchronized(this@BleObserverManager) {
-                    isScanning = false
-                    activeCallback = null
-                    scanner = null
+                    if (activeCallback === this) {
+                        isScanning = false
+                        activeCallback = null
+                        scanner = null
+                    }
                 }
                 _isScanningFlow.value = false
                 _isLongRangeScanActive.value = false
@@ -1048,10 +1071,14 @@ object BleObserverManager {
 
     @android.annotation.SuppressLint("MissingPermission")
     private fun stopScanningInternalLocked() {
-        if (!isScanning) return
+        val context = appContext ?: TirupApplication.instance
+        val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        val leScanner = scanner ?: bm?.adapter?.bluetoothLeScanner
         try {
-            activeCallback?.let { cb ->
-                scanner?.stopScan(cb)
+            if (hasScanPermission(context)) {
+                activeCallback?.let { cb ->
+                    leScanner?.stopScan(cb)
+                }
             }
         } catch (_: SecurityException) {
         } catch (_: Exception) {}

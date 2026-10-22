@@ -57,11 +57,11 @@ class YearEndDigestWorker(
                     set(Calendar.MILLISECOND, 999)
                 }.timeInMillis
 
-                val readings = database.glucoseReadingDao().getReadingsBetweenSync(startOfYear, endOfYear)
-                if (readings.isNotEmpty()) {
-                    val inRangeCount = readings.count { it.valueMmol in 3.9..10.0 }
-                    val tirPercent = (inRangeCount.toDouble() / readings.size.toDouble()) * 100.0
-                    val meanMmol = readings.map { it.valueMmol }.average()
+                val totalCount = database.glucoseReadingDao().getCountBetween(startOfYear, endOfYear)
+                if (totalCount > 0L) {
+                    val inRangeCount = database.glucoseReadingDao().getCountInRange(startOfYear, endOfYear, 3.9, 10.0)
+                    val tirPercent = (inRangeCount.toDouble() / totalCount.toDouble()) * 100.0
+                    val meanMmol = database.glucoseReadingDao().getAverageBetween(startOfYear, endOfYear) ?: 7.0
                     val gmi = 3.31 + 0.431 * meanMmol
 
                     val isRu = settings.language.equals("RU", ignoreCase = true)

@@ -63,10 +63,9 @@ class Hba1cReminderWorker(
                 }
             }
 
-            // Calculate 90-day GMI from database readings
+            // Calculate 90-day GMI directly in SQLite without loading thousands of rows into memory
             val ninetyDaysAgo = now - 90L * 86_400_000L
-            val readings = database.glucoseReadingDao().getReadingsBetweenSync(ninetyDaysAgo, now)
-            val meanMmol = if (readings.isNotEmpty()) readings.map { it.valueMmol }.average() else null
+            val meanMmol = database.glucoseReadingDao().getAverageBetween(ninetyDaysAgo, now)
             val gmi = if (meanMmol != null) 3.31 + 0.431 * meanMmol else null
 
             val isRepeat = settings.hba1cRemindersCountInCycle == 1

@@ -33,6 +33,7 @@ class TirupApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        initCursorWindowSize()
 
         database = AppDatabase.getInstance(this)
         glucoseRepository = GlucoseRepositoryImpl(database)
@@ -104,6 +105,16 @@ class TirupApplication : Application() {
             )
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    private fun initCursorWindowSize() {
+        try {
+            val field = android.database.CursorWindow::class.java.getDeclaredField("sCursorWindowSize")
+            field.isAccessible = true
+            field.set(null, 50 * 1024 * 1024) // 50 MB safety window
+        } catch (e: Throwable) {
+            android.util.Log.w("TirupApplication", "Could not adjust CursorWindow size: ${e.message}")
         }
     }
 
