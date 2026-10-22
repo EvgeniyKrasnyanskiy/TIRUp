@@ -4,7 +4,7 @@
 
 ![Version](https://img.shields.io/badge/Version-1.0.3-brightgreen.svg)
 ![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-green.svg)
-![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-blue.svg)
+![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-blue.svg)
 ![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%2F%20Material%203-blueviolet.svg)
 ![Architecture](https://img.shields.io/badge/Architecture-Clean%20%2F%20MVVM-orange.svg)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)
@@ -136,17 +136,21 @@
 - Compact circular floating widget (60x60dp) overlaying all apps.
 - **Smart Visibility**: displays **only when glucose is out of target** (< 3.9 or > 10.0 mmol/L) and automatically vanishes when back in range (always-on mode also available).
 - **Dynamic Haptic Feedback**: pulsating vibration synchronized with clinical urgency — gentle, spaced-out taps for mild hyper (every 8s) up to rapid alert pulses for hypoglycemia.
-- **Coma Guard Safety Override**: at severe hypoglycemia (< 3.0 mmol/L / < 54 mg/dL), haptic pulses trigger unalterably every 1.5s as an emergency tactile alarm, even if general vibration is toggled off.
+- **Coma Guard Safety Override**: at severe hypoglycemia (< 3.0 mmol/L / < 54 mg/dL), haptic pulses trigger unalterably every 1.5s as an emergency tactile alarm, even if general vibration is toggled off. *(Note: 3.0 mmol/L threshold triggers tactile bubble alerts, while 2.8 mmol/L triggers the Smart Snooze emergency audible override).*
 - **AMOLED Pixel-Shift Protection**: subtle vertical drift every 60 seconds with edge alternation every 15 minutes (mirroring clinical "Rule of 15").
 - Hypoglycemia water-ripple pulsing animation.
 - Tap on bubble mutes siren, snoozes bubble for 5 minutes, and opens the app.
 
-### 11. Glance Desktop Widgets (5 Formats)
-- **5 formats for any launcher grid**:
+### 11. Desktop Widgets (8 Formats)
+- **8 formats for any launcher grid**:
   - **5x1 (Information Strip)**: continuous AGP core visualization: `TIR`, `TBR` (hypo, goal < 4%), and `TAR` (hyper) in dedicated blocks, plus dynamic slots for active insulin (💉 IoB), master battery (🔋), streak (🔥), time (⏱), and daily statistics (`Avg` / `CV` / `TING` / `GMI`).
-  - **4x2 / 3x2**: comprehensive dashboard with 4-hour HD Canvas sparkline and segmented point coloring.
+  - **4x2**: comprehensive dashboard with 4-hour HD Canvas sparkline and segmented point coloring.
+  - **3x2**: medium dashboard with trend sparkline and key metrics.
   - **2x2**: ergonomic square focus widget.
+  - **2x1**: compact horizontal card with glucose, trend arrow, and target TIR.
+  - **3x1**: medium horizontal widget with glucose, velocity delta, and active insulin.
   - **1x2**: vertical glance stack.
+  - **1x1**: micro minimalist widget showing glucose and trend arrow.
 - **Instant Widget Localization**: language (EN/RU) and measurement units (mmol/L or mg/dL) update immediately on the launcher upon changing in Settings.
 - **Live Indicators**: active insulin (💉) and carbs (🍞) badges, target streak count (🔥 X d.).
 - **Adjustable Opacity (0%..100%)**: smooth background transparency slider with live wallpaper preview.
@@ -183,7 +187,7 @@
   - **UI Diagnostic Badges**: `📡 LR` badge on Home screen indicates active broadcast mode; silent receiver timeout (>6 min) suggests switching broadcaster back to Legacy.
 - **Ultra-Stable 24/7 Radio Protocol**:
   - Adaptive broadcast pulse: 12 seconds for 1-minute sensors and 15 seconds for 5-minute sensors.
-  - **Doze-Resistant Keep-Alive (AlarmManager)**: 5-minute `RTC_WAKEUP` heartbeat maintaining system `WakeLock` via `goAsync()`, ensuring continuous operation on Android 8–16 during deep CPU sleep.
+  - **Doze-Resistant Keep-Alive (AlarmManager)**: 5-minute `RTC_WAKEUP` heartbeat maintaining system `WakeLock` via `goAsync()`, ensuring continuous operation on Android 8–14 during deep CPU sleep.
   - **AOSP Rate-Limit Guard & 30-Minute Reset**: Built-in sliding rate-limiter prevents OS scan throttling (max 5 scan starts per 30 seconds), while proactive resets every 20 minutes avert opportunistic downgrade. Deadlock-free state recovery guarantees uninterrupted scanning.
   - **Optimized Hardware ScanFilter**: Target manufacturer ID filtering without payload masks enables instantaneous hardware matching and consistent 3-second packet reception without skipping.
   - **Self-Healing Bridge & Adaptive Eco Mode**:
@@ -193,7 +197,7 @@
 - **Dual Operating Modes**:
   - **Broadcaster**: transmits child's real-time CGM telemetry.
   - **Observer**: continuously scans in the background, displays packet age badge (`RX`, `<1m`, `1m`...), and shows compact signal toasts (`🟢 BLE: 🩸7.8 →, 💉1.5, 🔋85%`).
-- Privacy protected by a 3-digit **Family PIN** (foreign BLE advertisements automatically dropped).
+- Privacy protected by a 3-letter uppercase **Family PIN** (A–Z) (foreign BLE advertisements automatically dropped).
 
 ### 17. Clinical Laboratory HbA1c Journal & Quarterly Tracking
 - Logs venous blood HbA1c lab results.
@@ -305,18 +309,18 @@ All clinical algorithms in TIRUp adhere to the international consensus standards
 <a name="tech-stack"></a>
 ## 🛠 Technology Stack
 
-- **Language**: Kotlin 2.0.0
+- **Language**: Kotlin 1.9.22
 - **UI Toolkit**: Jetpack Compose, Material 3 (Bento Grid layout)
-- **Home Screen Widgets**: Jetpack Glance + RemoteViews
+- **Home Screen Widgets**: RemoteViews + AppWidgetProvider
 - **Architecture**: Clean Architecture + MVVM + Unidirectional Data Flow (UDF)
 - **Background Processing**: WorkManager, AlarmManager (RTC_WAKEUP), Foreground Services
 - **Asynchronous Flow**: Kotlin Coroutines, StateFlow, SharedFlow
-- **Persistence**: Room Database (SQLite) with automatic multi-version migrations (v1 ➔ v7)
-- **Networking**: HttpURLConnection, OkHttp, LAN Follower client, and Nightscout REST API
+- **Persistence**: Room Database (SQLite) with automatic multi-version migrations (v1 ➔ v8)
+- **Networking**: HttpURLConnection, LAN Follower client, and Nightscout REST API
 - **Document Generation**: Android Native Canvas Graphics (high-resolution vector PDF)
-- **Audio Engine**: AudioTrack pure sine wave tone generator (zero external MP3 dependencies)
+- **Audio Engine**: AudioTrack sine wave synthesis + pre-mastered MP3 medical alarm library
 - **SMS & Telephony**: SmsManager, Telephony SMS BroadcastReceiver
-- **Compatibility**: Android 8.0 (API Level 26) through Android 15 (Target SDK 35)
+- **Compatibility**: Android 8.0 (API Level 26) through Android 14 (Target SDK 34)
 
 ---
 
@@ -325,7 +329,7 @@ All clinical algorithms in TIRUp adhere to the international consensus standards
 
 ### Prerequisites:
 - JDK 17 (recommended: Eclipse Adoptium Temurin 17)
-- Android SDK 35 / Build Tools 35.0.0
+- Android SDK 34 / Build Tools 34.0.0
 
 ### Build Commands:
 ```bash
@@ -352,6 +356,9 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - This software is **not a certified medical device** and does not provide clinical diagnoses.
 - Information provided by TIRUp is not a substitute for professional medical advice from an endocrinologist or physician.
 - Any modifications to insulin doses, medication regimens, or therapeutic procedures must be made exclusively under the supervision of a licensed healthcare provider.
+- **Trend and predictive alerts** are mathematical estimations and should not be used as sole guidance for immediate medical or therapeutic interventions.
+- **Emergency SOS messaging** relies on cellular network connectivity (SMS), device GPS reception, and OS permissions; delivery cannot be guaranteed in areas with poor or no coverage.
+- **Sensor accuracy metrics (MARD / ISO 15197:2013)** rely on user-entered fingerstick capillary blood glucose meter readings and do not constitute clinical sensor calibration or official device validation.
 
 ---
 
@@ -362,7 +369,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ![Версия](https://img.shields.io/badge/Версия-1.0.3-brightgreen.svg)
 ![Платформа](https://img.shields.io/badge/Платформа-Android%208.0%2B-green.svg)
-![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-blue.svg)
+![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-blue.svg)
 ![Jetpack Compose](https://img.shields.io/badge/Интерфейс-Jetpack%20Compose%20%2F%20Material%203-blueviolet.svg)
 ![Архитектура](https://img.shields.io/badge/Архитектура-Clean%20%2F%20MVVM-orange.svg)
 ![Лицензия](https://img.shields.io/badge/Лицензия-MIT-lightgrey.svg)
@@ -494,17 +501,21 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - Компактный круглый индикатор (60x60dp) поверх всех приложений.
 - **Умная видимость**: отображается **только когда сахар вне нормы** (< 3.9 или > 10.0 ммоль/л) и автоматически скрывается, когда гликемия возвращается в норму (также доступен режим постоянного отображения).
 - **Синхронная тактильная вибро-пульсация**: частота вибрации возрастает пропорционально клинической опасности сахара (редкая при гипергликемии, частая при гипо).
-- **Неотключаемый протокол Coma Guard Safety Override**: при критически низком сахаре (< 3.0 ммоль/л) тактильная сигнализация срабатывает каждые 1.5 сек в обязательном порядке для защиты от бессимптомной гипогликемии, даже если вибрация отключена в настройках.
+- **Неотключаемый протокол Coma Guard Safety Override**: при критически низком сахаре (< 3.0 ммоль/л) тактильная сигнализация срабатывает каждые 1.5 сек в обязательном порядке для защиты от бессимптомной гипогликемии, даже если вибрация отключена в настройках. *(Примечание: порог 3.0 ммоль/л управляет тактильным алертом кружка, а 2.8 ммоль/л — экстренным снятием снуза со звуковых сирен).*
 - **Защита AMOLED от выгорания (Pixel Shift)**: активный дрейф кружка по вертикали каждую 1 минуту со сменой стороны экрана каждые 15 минут (по аналогии с «правилом 15»).
 - Пульсирующий эффект «круги на воде» при гипогликемии.
 - Тап по пузырьку мгновенно глушит сирену, скрывает пузырёк на 5 минут (снуз) и открывает приложение.
 
-### 11. Виджеты рабочего стола Glance (5 форматов)
-- **5 форматов виджетов под любую сетку лончера**:
+### 11. Виджеты рабочего стола (8 форматов)
+- **8 форматов виджетов под любую сетку лончера**:
   - **5х1 (Информационная полоса)**: непрерывное отображение клинического AGP-ядра: `TIR`, `TBR` (гипо, цель < 4%) и `TAR` (гипер) в постоянных блоках, плюс динамические слоты под активный инсулин (💉 IoB), батарею мастера (🔋), стрик (🔥), время (⏱) и суточную статистику (`Ср` / `CV` / `TING` / `GMI`). Оптимизированная геометрия исключает обрезание текста.
-  - **4х2 / 3х2**: информативный дашборд с 4-часовым HD Canvas sparkline-графиком с сегментной раскраской точек.
+  - **4х2**: информативный дашборд с 4-часовым HD Canvas sparkline-графиком с сегментной раскраской точек.
+  - **3х2**: средний дашборд с графиком тренда и ключевыми показателями.
   - **2х2**: эргономичный квадратный виджет-фокус.
+  - **2х1**: компактная горизонтальная плашка со значением сахара, стрелкой тренда и суточным TIR.
+  - **3х1**: горизонтальный виджет средней ширины со скоростью изменения и активным инсулином.
   - **1х2**: вертикальный информационный стек.
+  - **1х1**: микро-виджет с текущим сахаром и стрелкой тренда.
 - **Мгновенная локализация виджетов**: перерисовка языка (RU/EN) и единиц измерения (ммоль/мг) на рабочем столе происходит немедленно при изменении в настройках.
 - **Индикаторы**: бейджи активного инсулина (💉) и углеводов (🍞), стрик дней в цели (🔥 X д.).
 - **Настройка прозрачности (0%..100%)**: плавный ползунок прозрачности подложки виджетов с живым окном предпросмотра на фоне обоев.
@@ -541,7 +552,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
   - **Сквозная индикация и диагностика в UI**: бейдж `📡 LR` на Главном экране показывает активный режим вещания, а при таймауте тишины (>6 мин) на Legacy-приёмнике выводится точечная рекомендация переключить вещатель в Legacy.
 - **Сверхстабильный радиопротокол 24/7**:
   - Адаптивный импульс вещания: 12 секунд для минутных сенсоров и 15 секунд для 5-минутных для гарантированного захвата сканером Наблюдателя.
-  - **Аппаратный пульс сквозь Doze (AlarmManager Keep-Alive)**: 5-минутный таймер `RTC_WAKEUP` с удержанием системного `WakeLock` через `goAsync()`. Гарантирует бесперебойную работу в фоновом режиме на Android 8–16 даже при глубоком сне процессора и погашенном экране.
+  - **Аппаратный пульс сквозь Doze (AlarmManager Keep-Alive)**: 5-минутный таймер `RTC_WAKEUP` с удержанием системного `WakeLock` через `goAsync()`. Гарантирует бесперебойную работу в фоновом режиме на Android 8–14 даже при глубоком сне процессора и погашенном экране.
   - **Защита от лимитов AOSP и сброс дедлоков**: встроенный скользящий ограничитель предотвращает блокировку системным сканером Android (не более 5 стартов за 30 с), устраняет состояние дедлока при ошибках и проводит превентивный перезапуск каждые 20 минут.
   - **Оптимизированный аппаратный ScanFilter**: фильтрация по целевому Manufacturer ID без маски полезной нагрузки обеспечивает мгновенный аппаратный захват пакетов каждые 3 секунды без пропусков.
   - Фоновая служба `BleObserverService` (`Foreground Service` с привязкой к постоянному уведомлению в шторке/AOD) исключает усыпление радиомодуля системой.
@@ -553,7 +564,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - Два режима:
   - **Вещатель (Broadcaster)**: передаёт текущий срез данных ребенка.
   - **Наблюдатель (Observer)**: непрерывно сканирует эфир в фоне, отображает бейдж возраста пакета (статус `RX` в ожидании первого пакета, далее `<1м`, `1м`...) и выводит компактные тосты с индикатором сигнала (`🟢 BLE: 🩸7.8 →, 💉1.5, 🔋85%`).
-- Защита конфиденциальности 3-значным **Family PIN** (пакеты соседей и чужих устройств автоматически игнорируются).
+- Защита конфиденциальности 3-буквенным **Family PIN (A–Z)** (пакеты соседей и чужих устройств автоматически игнорируются).
 
 ### 17. Журнал лабораторного HbA1c и квартальный контроль
 - Ведение истории реальных анализов венозной крови на гликированный гемоглобин (HbA1c) из лаборатории.
@@ -665,18 +676,18 @@ TIRUp поддерживает все популярные автономные 
 <a name="ru-tech-stack"></a>
 ## 🛠 Технологический стек
 
-- **Язык**: Kotlin 2.0.0
+- **Язык**: Kotlin 1.9.22
 - **UI Toolkit**: Jetpack Compose, Material 3 (Bento Grid layout)
-- **Виджеты рабочего стола**: Jetpack Glance + RemoteViews
+- **Виджеты рабочего стола**: RemoteViews + AppWidgetProvider
 - **Архитектура**: Clean Architecture + MVVM + Unidirectional Data Flow (UDF)
 - **Фоновые задачи**: WorkManager, AlarmManager (RTC_WAKEUP), Foreground Service
 - **Асинхронность**: Kotlin Coroutines, StateFlow, SharedFlow
-- **База данных**: Room Persistence Library (SQLite) с автоматическими миграциями (v1 ➔ v7)
-- **Сетевой стек**: HttpURLConnection, OkHttp, локальный REST-клиент LAN Follower и Nightscout API
+- **База данных**: Room Persistence Library (SQLite) с автоматическими миграциями (v1 ➔ v8)
+- **Сетевой стек**: HttpURLConnection, локальный REST-клиент LAN Follower и Nightscout API
 - **Генерация документов**: Android Native Canvas Graphics (векторные PDF высокого разрешения)
-- **Звук**: AudioTrack синтезатор чистых медицинских частот без внешних MP3-файлов
+- **Звук**: Гибридная аудиосистема: AudioTrack-синтез чистых тонов + библиотека медицинских MP3-тревог
 - **SMS & Телеком**: SmsManager, Telephony SMS BroadcastReceiver
-- **Минимальная версия Android**: Android 8.0 (API level 26) / Target SDK 35
+- **Минимальная версия Android**: Android 8.0 (API level 26) / Target SDK 34 (Android 14)
 
 ---
 
@@ -685,7 +696,7 @@ TIRUp поддерживает все популярные автономные 
 
 ### Требования:
 - JDK 17 (рекомендуется Eclipse Adoptium Temurin 17)
-- Android SDK 35 / Build Tools 35.0.0
+- Android SDK 34 / Build Tools 34.0.0
 
 ### Команды для сборки:
 ```bash
@@ -712,6 +723,9 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - Приложение **не является сертифицированным медицинским изделием** и не ставит клинических диагнозов.
 - Информация в приложении не заменяет очной консультации врача-эндокринолога.
 - Любые изменения дозировок инсулина, лекарственных средств и схем терапии должны производиться строго под контролем лечащего врача.
+- **Прогностические и скоростные тревоги** представляют собой математическую оценку динамики и не должны служить единственным основанием для экстренных терапевтических решений.
+- **Экстренная отправка SOS-сообщений** близким зависит от наличия сотовой связи (SMS), устойчивого приёма GPS и системных разрешений Android; доставка не гарантируется в условиях отсутствия сети.
+- **Метрики ретроспективной верификации сенсора (MARD / ISO 15197:2013)** строятся на сопоставлении с замерами глюкометра пользователя и не являются метрологической поверкой сенсора.
 
 ---
 
