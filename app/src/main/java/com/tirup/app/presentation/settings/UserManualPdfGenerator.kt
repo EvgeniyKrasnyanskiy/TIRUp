@@ -49,9 +49,9 @@ class UserManualPdfGenerator(private val context: Context) {
         val document = PdfDocument()
         try {
             val appVersion = try {
-                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.4"
+                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.3"
             } catch (_: Exception) {
-                "1.0.4"
+                "1.0.3"
             }
 
             // Typography Paints

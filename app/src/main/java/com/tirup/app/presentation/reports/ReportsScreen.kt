@@ -105,6 +105,7 @@ fun ReportsScreen(
     var showXdripExportHelp by remember { mutableStateOf(false) }
     var showLiveDivergenceInfo by remember { mutableStateOf(false) }
     var showMetricsOrderDialog by remember { mutableStateOf(false) }
+    var showSensorAccuracyHelp by remember { mutableStateOf(false) }
     var importErrorMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val isRu = state.userSettings.language.equals("RU", ignoreCase = true)
@@ -277,7 +278,8 @@ fun ReportsScreen(
                     viewModel = viewModel,
                     onCardClick = { viewModel.showHistoricalDetails(true) },
                     onHelpClick = { showXdripExportHelp = true },
-                    onReorderClick = { showMetricsOrderDialog = true }
+                    onReorderClick = { showMetricsOrderDialog = true },
+                    onVerificationClick = { showSensorAccuracyHelp = true }
                 )
             }
 
@@ -348,6 +350,7 @@ fun ReportsScreen(
             readings = hist.readings,
             statistics = hist.statistics,
             userSettings = state.userSettings,
+            verificationResult = hist.verification,
             isGenerating = state.isGeneratingHistorical,
             snackbarHostState = snackbarHostState,
             onSavePdf = { viewModel.saveHistoricalPdfToDownloads() },
@@ -460,6 +463,13 @@ fun ReportsScreen(
                     Text(text = if (isRu) "Понятно" else "Got it", color = ActionBlue, fontWeight = FontWeight.Bold)
                 }
             }
+        )
+    }
+
+    if (showSensorAccuracyHelp) {
+        SensorAccuracyInfoDialog(
+            onDismiss = { showSensorAccuracyHelp = false },
+            isRu = isRu
         )
     }
 
@@ -728,7 +738,8 @@ private fun HistoricalReportCard(
     viewModel: ReportsViewModel,
     onCardClick: () -> Unit,
     onHelpClick: () -> Unit,
-    onReorderClick: () -> Unit
+    onReorderClick: () -> Unit,
+    onVerificationClick: () -> Unit = {}
 ) {
     val hist = state.historicalReport
     val isRu = state.userSettings.language.equals("RU", ignoreCase = true)
@@ -934,7 +945,8 @@ private fun HistoricalReportCard(
                     if (verif.pairedPointsCount >= 1) {
                         SensorVerificationCard(
                             verification = verif,
-                            isRu = isRu
+                            isRu = isRu,
+                            onClick = onVerificationClick
                         )
                     }
                 }
@@ -1036,155 +1048,6 @@ private fun HistoricalReportCard(
                     color = if (isError) MaterialTheme.colorScheme.error else PrimaryEmerald
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun SensorVerificationCard(
-    verification: SensorVerificationResult,
-    isRu: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val gradeColor = when (verification.accuracyGrade) {
-        SensorAccuracyGrade.EXCELLENT -> PrimaryEmerald
-        SensorAccuracyGrade.GOOD -> Color(0xFF0284C7)
-        SensorAccuracyGrade.MODERATE -> Color(0xFFF59E0B)
-        SensorAccuracyGrade.POOR -> Color(0xFFEF4444)
-    }
-
-    val gradeLabel = if (isRu) verification.accuracyGrade.labelRu else verification.accuracyGrade.labelEn
-    val sign = if (verification.meanBiasMmol >= 0) "+" else ""
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f),
-        border = BorderStroke(1.dp, gradeColor.copy(alpha = 0.35f))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Header: Title & Grade Badge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text("🎯", fontSize = 14.sp)
-                    Text(
-                        text = if (isRu) "Верификация сенсора (ISO 15197)" else "Sensor Verification (ISO 15197)",
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = gradeColor.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, gradeColor.copy(alpha = 0.4f))
-                ) {
-                    Text(
-                        text = gradeLabel,
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = gradeColor,
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                    )
-                }
-            }
-
-            // 3 Stat Badges: MARD, Bias, ISO Pass
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // MARD
-                Surface(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "MARD",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "${String.format(Locale.US, "%.1f", verification.mardPercent)}%",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = gradeColor
-                        )
-                    }
-                }
-
-                // Mean Bias
-                Surface(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = if (isRu) "Смещение" else "Bias",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "$sign${String.format(Locale.US, "%.2f", verification.meanBiasMmol)}",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-
-                // ISO 15197 Pass %
-                Surface(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "ISO 15197",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "${String.format(Locale.US, "%.1f", verification.isoPassPercent)}%",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = if (verification.isoPassPercent >= 95.0) PrimaryEmerald else Color(0xFFF59E0B)
-                        )
-                    }
-                }
-            }
-
-            // Footer Subtitle with pairs count
-            Text(
-                text = if (isRu) {
-                    "${verification.pairedPointsCount} парных замеров с глюкометром (окно ±7 мин, отфильтрованы зоны быстрого тренда)"
-                } else {
-                    "${verification.pairedPointsCount} paired meter checks (±7m window, rapid rate-of-change excluded)"
-                },
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }

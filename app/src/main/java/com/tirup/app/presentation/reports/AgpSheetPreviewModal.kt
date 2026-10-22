@@ -32,6 +32,10 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.tirup.app.domain.calculator.AGPPercentilesCalculator
+import com.tirup.app.domain.calculator.SensorVerificationResult
 import com.tirup.app.domain.model.GlucoseReading
 import com.tirup.app.domain.model.GlucoseStatistics
 import com.tirup.app.domain.model.GlucoseUnit
@@ -64,6 +69,7 @@ fun AgpSheetPreviewModal(
     readings: List<GlucoseReading>,
     statistics: GlucoseStatistics,
     userSettings: UserSettings,
+    verificationResult: SensorVerificationResult? = null,
     isGenerating: Boolean,
     snackbarHostState: SnackbarHostState? = null,
     onSavePdf: () -> Unit,
@@ -74,6 +80,7 @@ fun AgpSheetPreviewModal(
     val isRu = userSettings.language.equals("RU", ignoreCase = true)
     val isMmol = userSettings.unit == GlucoseUnit.MMOL_L
     val agpBins = AGPPercentilesCalculator.calculatePercentiles(readings, binsCount = 48)
+    var showAccuracyHelp by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -158,6 +165,23 @@ fun AgpSheetPreviewModal(
                                     fontSize = 10.5.sp,
                                     color = Color(0xFF475569)
                                 )
+
+                                verificationResult?.let { verif ->
+                                    if (verif.pairedPointsCount >= 1) {
+                                        val verifSign = if (verif.meanBiasMmol >= 0) "+" else ""
+                                        val verifLine = if (isRu) {
+                                            "🎯 Верификация (ISO 15197): MARD ${String.format(Locale.US, "%.1f%%", verif.mardPercent)} • Смещение: $verifSign${String.format(Locale.US, "%.2f", verif.meanBiasMmol)} • Допуск ISO: ${String.format(Locale.US, "%.1f%%", verif.isoPassPercent)} (${verif.pairedPointsCount} пар)"
+                                        } else {
+                                            "🎯 Verification (ISO 15197): MARD ${String.format(Locale.US, "%.1f%%", verif.mardPercent)} • Bias: $verifSign${String.format(Locale.US, "%.2f", verif.meanBiasMmol)} • ISO Pass: ${String.format(Locale.US, "%.1f%%", verif.isoPassPercent)} (${verif.pairedPointsCount} pairs)"
+                                        }
+                                        Text(
+                                            text = verifLine,
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF0284C7)
+                                        )
+                                    }
+                                }
 
                                 val genDateFmt = if (isRu) SimpleDateFormat("dd MMMM yyyy HH:mm", Locale("ru")) else SimpleDateFormat("dd MMM yyyy HH:mm", Locale.US)
                                 val genLine = if (isRu) {
@@ -314,6 +338,20 @@ fun AgpSheetPreviewModal(
                                                      else "Night Sleep Profile (${String.format(Locale.US, "%02d:00", nStart)}–${String.format(Locale.US, "%02d:00", nEnd)}):"
                                     ReportStatLine(nightTitle, nightStr)
                                 }
+                            }
+                        }
+                    }
+
+                    // 2.5 Sensor Verification Card (if paired meter readings exist)
+                    verificationResult?.let { verif ->
+                        if (verif.pairedPointsCount >= 1) {
+                            item {
+                                SensorVerificationCard(
+                                    verification = verif,
+                                    isRu = isRu,
+                                    isLightMode = true,
+                                    onClick = { showAccuracyHelp = true }
+                                )
                             }
                         }
                     }
@@ -494,6 +532,13 @@ fun AgpSheetPreviewModal(
                 }
             }
         }
+    }
+
+    if (showAccuracyHelp) {
+        SensorAccuracyInfoDialog(
+            onDismiss = { showAccuracyHelp = false },
+            isRu = isRu
+        )
     }
 }
 
