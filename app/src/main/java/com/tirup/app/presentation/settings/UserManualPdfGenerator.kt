@@ -49,9 +49,9 @@ class UserManualPdfGenerator(private val context: Context) {
         val document = PdfDocument()
         try {
             val appVersion = try {
-                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.1"
+                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.3"
             } catch (_: Exception) {
-                "1.0.1"
+                "1.0.3"
             }
 
             // Typography Paints
@@ -487,13 +487,13 @@ class UserManualPdfGenerator(private val context: Context) {
                 )
                 flow.bullet(
                     if (isRu) "Nightscout Cloud Follower [Экспериментально / Для опытных]" else "Nightscout Cloud Follower [Experimental / Advanced]",
-                    if (isRu) "Скрытая опция (доступна только при разблокировке инженерного меню): фоновое скачивание замеров сахара, IoB, CoB и заряда батареи мастера через REST API Nightscout (/api/v1/entries, /pebble, /devicestatus). Единый резолвер приоритета источников батареи (BLE -> Wi-Fi LAN -> Nightscout) и дедупликация 25 с."
-                    else "Hidden feature (available only via developer settings): background ingestion of glucose, IoB, CoB and master battery via Nightscout REST API (/api/v1/entries, /pebble, /devicestatus). Unified source priority (BLE -> Wi-Fi LAN -> Nightscout) with 25s deduplication."
+                    if (isRu) "Скрытая опция (доступна только при разблокировке инженерного меню): фоновое скачивание замеров сахара, IoB, CoB и заряда батареи мастера через REST API Nightscout (/api/v1/current, /entries, /pebble, /devicestatus). Поддерживает мгновенный опрос свежего статуса, единый резолвер приоритета источников батареи (BLE -> Wi-Fi LAN -> Nightscout) и дедупликацию 25 с."
+                    else "Hidden feature (available only via developer settings): background ingestion of glucose, IoB, CoB and master battery via Nightscout REST API (/api/v1/current, /entries, /pebble, /devicestatus). Features instantaneous status polling, unified battery source priority (BLE -> Wi-Fi LAN -> Nightscout), and 25s deduplication."
                 )
                 flow.bullet(
-                    if (isRu) "Метрики радиоканала и Адаптивный эко-режим (1 час)" else "Radio Metrics & Adaptive Eco Mode (1h)",
-                    if (isRu) "Приёмник BLE рассчитывает скользящий 1-часовой PDR (% успешно доставленных пакетов с адаптацией к темпу 1 мин / 5 мин) и средний RSSI. При паузе в вещании >1 часа доступен опциональный эко-режим (по умолчанию выключен). Кнопка «Поиск вещателя (60 сек)» запускает радарную анимацию сканирования."
-                    else "BLE Observer tracks 1-hour PDR (% delivery with 1m/5m sensor cadence adaptation) and average RSSI. Includes optional Eco Mode activating after >1h silence (off by default for maximum reliability). 'Master Search (60s)' triggers live radar sweep animation."
+                    if (isRu) "Метрики радиоканала, защита AOSP и Адаптивный эко-режим (1 час)" else "Radio Metrics, AOSP Rate-Limit Guard & Adaptive Eco Mode (1h)",
+                    if (isRu) "Приёмник BLE оснащён защитой от троттлинга AOSP (не более 5 стартов сканирования за 30 с) и оптимизированными фильтрами ScanFilter для стабильного приёма каждые 3 с. Рассчитывает скользящий 1-часовой PDR (% успешно доставленных пакетов) и средний RSSI. При паузе в вещании >1 часа доступен опциональный эко-режим. Кнопка «Поиск вещателя (60 сек)» запускает радарную анимацию сканирования."
+                    else "BLE Observer incorporates AOSP scan rate-limit protection (max 5 scan starts per 30s) and optimized ScanFilter rules for reliable delivery every 3s. Tracks 1-hour PDR (% delivery with sensor cadence adaptation) and average RSSI. Includes optional Eco Mode after >1h silence. 'Master Search (60s)' triggers live radar sweep."
                 )
                 flow.bullet(
                     if (isRu) "Разница технологий: BLE-мост TIRUp vs Зеркало Juggluco" else "TIRUp BLE vs Juggluco Mirroring",
@@ -614,6 +614,11 @@ class UserManualPdfGenerator(private val context: Context) {
                 flow.paragraph(
                     if (isRu) "При сахаре <3.0 ммоль/л (или затяжной гипо >20 мин) TIRUp пробуждает спящий телефон и разворачивает поверх пароля боевой интерфейс спасения с крупными цифрами сахара, стрелкой падения, таймером SOS SMS и кнопкой купирования. При сахаре ниже 2.8 ммоль/л включается Coma Guard: снуз ограничен 5 мин, сирена повторяется каждые 5 мин до подтверждения."
                     else "On glucose <3.0 mmol/L (or prolonged hypo >20m) TIRUp wakes screen over lockscreen with giant glucose, trend arrow, and SOS timer. Below 2.8 mmol/L Coma Guard caps snooze to 5 mins, repeating siren every 5 mins until confirmed."
+                )
+                flow.bullet(
+                    if (isRu) "Тактильная пульсация кружка и протокол Safety Override" else "Floating Bubble Haptics & Safety Override",
+                    if (isRu) "Плавающий кружок синхронно вибрирует при выходе за пределы нормы: темп пульсации возрастает с клинической опасностью (редкая при гипергликемии, частая при гипо). При критическом сахаре <3.0 ммоль/л тактильная тревога работает неотключаемо в целях предотвращения потери сознания (Safety Override), даже если вибрация отключена в настройках."
+                    else "Floating bubble pulses with haptic feedback when out of range: vibration frequency accelerates with clinical urgency (gentle at high glucose, frequent during hypo). Below 3.0 mmol/L, haptic alarm runs non-disableable as a coma prevention safety override even if vibration is switched off."
                 )
                 flow.callout(
                     CalloutType.CRITICAL,
@@ -754,6 +759,11 @@ class UserManualPdfGenerator(private val context: Context) {
                     if (isRu) "Quick Glance HUD 108sp, виджеты рабочего стола, учёт расходников и Zero-Lag база" else "Quick Glance HUD 108sp, desktop widgets, supplies tracking and Zero-Lag database"
                 )
                 flow.bullet(
+                    if (isRu) "Главный экран и эргономичные чипы IoB / CoB" else "Home Screen & Flanking IoB / CoB Chips",
+                    if (isRu) "В центральной карточке сахара показатели активного инсулина (IoB) и углеводов (CoB) вынесены в крупные фланкирующие чипы слева и справа от значения гликемии. Полоска бейджей выполнена в виде адаптивного FlowRow (алармы, Wi-Fi LAN, батарея мастера, Nightscout, BLE-мост, AoD) с поддержкой жестов: одиночный тап открывает статус, долгое нажатие мгновенно переносит в соответствующий раздел настроек."
+                    else "In the Hero glucose card, active insulin (IoB) and carbs (CoB) flank the central glucose readout as dedicated enlarged chips. The status badge strip uses an adaptive FlowRow (alarms, Wi-Fi LAN, master battery, Nightscout, BLE bridge, AoD) with intuitive gestures: tap opens status dialog, long-press jumps directly to specific settings."
+                )
+                flow.bullet(
                     if (isRu) "Quick Glance HUD и автоскрытие" else "Quick Glance HUD & Auto-Hiding",
                     if (isRu) "Удержание центральной кнопки 0.33 с открывает центрированный HUD: сахар 108sp, стрелка 78sp, единицы по центру, карточки инсулина/углеводов (34sp) и телеметрия в одну строку (19sp). Нижняя панель автоскрывается через 2.2 с и просыпается по тапу."
                     else "Hold center button 0.33s to summon centered HUD: 108sp glucose, 78sp arrow, centered units, 34sp insulin/carb tiles, and 19sp single-line telemetry. Navigation auto-hides after 2.2s."
@@ -774,9 +784,9 @@ class UserManualPdfGenerator(private val context: Context) {
                     else "On Dec 31 at 20:00, Year-End Digest 🥂 exports a PDF holiday card, sealing year readings into tirup_readings_YYYY.csv (Zero-Lag). Nightly auto-backup at 23:59:59 plus ZIP export."
                 )
                 flow.bullet(
-                    if (isRu) "Рекордный стрик (bestStreakDays) и Сетка активности TIR" else "Historical Best Streak & GitHub-Style TIR Grid",
-                    if (isRu) "Диалог мотивации стрика отображает золотой кубок 🏆 с лучшим историческим рекордом непрерывной компенсации. Сетка суточного контроля TIR выполнена в стиле GitHub Dark Theme с 5 уровнями и мягкой янтарной буферной зоной 67–69.9% («Почти у цели»)."
-                    else "Streak motivator features a gold trophy 🏆 showing the all-time best streak. The TIR Activity Grid follows GitHub Dark Theme aesthetics with 5 levels and an amber 67-69.9% buffer zone ('Nearly on Target')."
+                    if (isRu) "Рекордный стрик (bestStreakDays) и Сетка активности с анализом дня" else "Historical Best Streak & Interactive TIR Day Grid",
+                    if (isRu) "Диалог мотивации стрика отображает золотой кубок 🏆 с лучшим историческим рекордом непрерывной компенсации. Сетка активности выполнена в стиле GitHub Dark Theme с 5 уровнями и янтарной зоной 67–69.9%. Тап по любой ячейке дня открывает карточку суточного аудита с точным процентом TIR, средним сахаром, числом замеров и графиком зон."
+                    else "Streak motivator features a gold trophy 🏆 showing the all-time best streak. The TIR Activity Grid follows GitHub Dark Theme aesthetics with 5 levels and an amber 67-69.9% zone. Tapping any day cell reveals a detailed daily audit dialog with exact TIR %, average glucose, sample count, and zone breakdown."
                 )
                 flow.callout(
                     CalloutType.INFO,

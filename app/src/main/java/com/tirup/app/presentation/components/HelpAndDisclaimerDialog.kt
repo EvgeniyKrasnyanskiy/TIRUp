@@ -123,15 +123,19 @@ fun HelpAndDisclaimerDialog(
                     iconTint = PrimaryEmerald,
                     title = if (isRu) "Источники данных и синхронизация" else "Data Sources & Synchronization",
                     content = if (isRu) {
-                        "TIRUp поддерживает 3 уровня автономных источников данных с автоматической дедупликацией:\n" +
+                        "TIRUp поддерживает 4 уровня источников данных с автоматической дедупликацией:\n" +
                         "1. Локальный xDrip+ (высший приоритет): приём интентов и службы Broadcast Service (<0.1 с) без интернета;\n" +
-                        "2. Семейный BLE-мост (Bluetooth LE): прямая связь между смартфонами ребёнка и родителя без Wi-Fi и SIM (радиус до 25–50 м с Long Range Coded PHY, метрики качества PDR%, поиск 60 с и эко-режим);\n" +
-                        "3. Wi-Fi LAN Follower: прямой опрос локального веб-сервера xDrip+ мастера (порт 17580) в домашней сети или точке доступа."
+                        "2. Семейный BLE-мост (Bluetooth LE): прямая связь между смартфонами без Wi-Fi и SIM (до 25–50 м с Long Range Coded PHY, защита от троттлинга AOSP, метрики PDR% и радар 60 с);\n" +
+                        "3. Wi-Fi LAN Follower: опрос локального сервера xDrip+ мастера (порт 17580) в сети или точке доступа;\n" +
+                        "4. Nightscout Cloud Follower: фоновая выкачка сахара, IoB, CoB и батареи (/api/v1/current, /entries).\n" +
+                        "• Полоска бейджей на главном экране: тап открывает статус источника, долгое нажатие — переход в настройки."
                     } else {
-                        "TIRUp supports 3 stratified local data sources with automatic deduplication:\n" +
+                        "TIRUp supports 4 stratified data sources with automatic deduplication:\n" +
                         "1. Local xDrip+ (highest priority): instant local intents & Broadcast Service (<0.1s) offline;\n" +
-                        "2. Family BLE Bridge (Bluetooth LE): direct link between phones without Wi-Fi or SIM (up to 25-50m with Long Range Coded PHY, live PDR% metrics, 60s radar search and eco mode);\n" +
-                        "3. Wi-Fi LAN Follower: direct local polling of master's xDrip+ server (port 17580) over Wi-Fi/Hotspot."
+                        "2. Family BLE Bridge (Bluetooth LE): direct link without Wi-Fi or SIM (up to 25-50m with Coded PHY, AOSP rate-limit guard, live PDR% metrics, and 60s radar search);\n" +
+                        "3. Wi-Fi LAN Follower: direct local polling of master's xDrip+ server (port 17580) over Wi-Fi/Hotspot;\n" +
+                        "4. Nightscout Cloud Follower: background sync of glucose, IoB, CoB and battery (/api/v1/current, /entries).\n" +
+                        "• Home status badge strip: tap opens status dialog, long-press jumps to specific settings."
                     }
                 )
 
@@ -151,25 +155,25 @@ fun HelpAndDisclaimerDialog(
                     }
                 )
 
-                // 4. Smart 4-Tier Alarms & Emergency SMS Card
+                // 4. Smart 5-Tier Alarms & Emergency SMS Card
                 HelpSectionCard(
                     icon = Icons.Default.NotificationsActive,
                     iconTint = ColorHigh,
-                    title = if (isRu) "Умные тревоги и Экстренная безопасность" else "Smart 4-Tier Alarms & Emergency Guard",
+                    title = if (isRu) "Умные 5-уровневые тревоги и Экстренная безопасность" else "Smart 5-Tier Alarms & Emergency Guard",
                     content = if (isRu) {
-                        "• Уровни 1–4: предиктивный прогноз выхода за диапазон, тройной тон, экстренная сирена (~12 сек) и тревога при потере связи с сенсором (>20 мин).\n" +
-                        "• Независимая громкость: отдельный слайдер (20% – 100%) в настройках звука с проверкой тестовой мелодии.\n" +
+                        "• Уровни 1–5: предиктивный прогноз (Tier 1), тройной тон (Tier 2), критические сирены и WakeLock (Tier 3), скоростные тревоги резкого падения/роста (Tier 4) и потеря сигнала (Tier 5).\n" +
+                        "• Независимая громкость: раздельные слайдеры (1% – 100%, день и ночь) в настройках звука с проверкой тестовой мелодии.\n" +
                         "• Быстрая пауза всех тревог: выбор интервала («Snooze All» от 10м до 8ч, по умолчанию 1ч) прямо на экране тревог.\n" +
-                        "• Экстренные SOS SMS: если сахар упал ниже 3.0 ммоль/л и тревога не подтверждена в течение 5 мин отправляет доверенному лицу SMS (≤67 симв.) с координатами.\n" +
+                        "• Экстренные SOS SMS: отправка SMS с GPS-координатами близким при некупированной гипогликемии <3.0 ммоль/л.\n" +
                         "• Офлайн SMS-запрос: доверенный контакт может запросить текущий сахар и TIR по SMS без интернета («сахар», «?», «bg»).\n" +
-                        "• Плавающий кружок поверх окон: в норме (3.9–10.0) компактный (50%), тап открывает TIRUp. Вне нормы — тревожный режим, короткий тап глушит/снузит алерт, долгое нажатие открывает приложение."
+                        "• Плавающий кружок с тактильной вибрацией: пульсирующая виброотдача вне целевого диапазона с неотключаемым режимом Coma Guard Safety Override (<3.0 ммоль/л). Тап глушит алерт, долгое нажатие открывает TIRUp."
                     } else {
-                        "• Tiers 1–4: predictive target departure, confirmed boundary tone, critical 12s siren, and sensor signal loss (>20 min).\n" +
+                        "• Tiers 1–5: predictive departure (Tier 1), confirmed boundary tone (Tier 2), critical sirens & WakeLock (Tier 3), speed alerts (Tier 4), and signal loss (Tier 5).\n" +
                         "• Independent Volume: custom alert volume sliders (1% – 100%, day & night) with realistic preview melody.\n" +
                         "• Quick Alarm Pause: selectable interval ('Snooze All' from 10m to 8h, default 1h) on the alert screen.\n" +
-                        "• Emergency SOS SMS: sends compact SMS (≤67 chars) with GPS to trusted contact if severe hypo (<3.0) is unacknowledged for 5m.\n" +
+                        "• Emergency SOS SMS: sends SMS with GPS coordinates to trusted contacts if severe hypo (<3.0) is unacknowledged.\n" +
                         "• Offline SMS Query: trusted contact can query real-time glucose & TIR via SMS without internet ('sugar', '?', 'bg').\n" +
-                        "• Floating Bubble: in target (3.9–10.0) compact 50%, tap opens TIRUp. Out of range — alarm mode, tap silences/snoozes, hold opens the app."
+                        "• Floating Bubble with Haptics: syncs haptic vibration pulses to glucose urgency with non-disableable Coma Guard Safety Override (<3.0 mmol/L). Tap silences, hold opens TIRUp."
                     }
                 )
 

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/Version-1.0.2-brightgreen.svg)
+![Version](https://img.shields.io/badge/Version-1.0.3-brightgreen.svg)
 ![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-green.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-blue.svg)
 ![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%2F%20Material%203-blueviolet.svg)
@@ -68,13 +68,14 @@
 - Fully functional without an active internet connection (over home Wi-Fi or the master device's Hotspot).
 - **Subnet Auto-Discovery**: parallel background coroutine scan across addresses `192.168.x.1`–`254` and Hotspot gateway `192.168.43.1` completed in ~1.2 seconds. Battery protection: scanning is blocked (no-op) when Wi-Fi is disconnected.
 - **Unified Deduplication Matrix**: single ingestion point into Room DB with strict source priority (`LOCAL_XDRIP` [4] → `BLE_BRIDGE` [3] → `WIFI_LAN` [2] → `NIGHTSCOUT_CLOUD` [1]) and safe field enrichment (`iob`, `cob`, `trendArrow`).
-- **HeroGlucoseCard Status Chip Strip**: balanced row of chips `[Bell 🔔]` → `[Wi-Fi icon]` → `[Master Battery 🔋 %]` → `[IoB 💉]` → `[CoB 🍞]` → `[BLE Bridge 📡]` → `[AoD 🌙]`. Compact 28x24 dp dimensions without clutter, dynamic color shifts based on live status, and responsive layout across any screen width. Tapping the Wi-Fi chip opens a status dialog with a manual subnet scan trigger.
+- **HeroGlucoseCard Layout & FlowRow Status Strip**: Active insulin (💉 IoB) and carbs (🍞 CoB) flank the central glucose readout as dedicated enlarged chips for instant visual assessment. The status strip is arranged via an adaptive `FlowRow` (`[Bell 🔔]`, `[Wi-Fi LAN]`, `[Master Battery 🔋]`, `[Nightscout Cloud ☁️]`, `[BLE Bridge 📡]`, `[AoD 🌙]`) supporting fluid multi-line wrapping and intuitive touch gestures: single-tap opens live telemetry/quick action dialog, while long-press jumps directly to the corresponding settings section.
 
-### 3. Quick Treatments Entry & Nightscout API Cloud Sync
+### 3. Quick Treatments Entry & Nightscout Cloud Follower API
 - Convenient quick-entry sheet on the Home screen for logging bolus insulin doses 💉, carbohydrates 🍞, fingerstick calibrations 🩸, and notes 💬.
 - Background sync to the Nightscout REST API (`POST /api/v1/treatments`) with support for `api-secret` (SHA-1) or query token authorization.
+- **Nightscout Cloud Follower with `/api/v1/current`**: Ingests real-time glucose, IoB, CoB, and uploader battery status with instant fallbacks and 25s deduplication.
 - **Persistent UUID Deletion (`DELETE /api/v1/treatments/{uuid}`)**: deleting a treatment record in TIRUp cancels it on the server and purges it from the Room DB, preventing phantom entries from reappearing during xDrip+ synchronization.
-- Hidden developer menu (5 taps on the version tag): live connection latency tester and xDrip+ port 17580 acknowledgment inspector.
+- Hidden developer menu (5 taps on the version tag): live connection latency tester, Nightscout diagnostic checks, and xDrip+ port 17580 acknowledgment inspector.
 
 ### 4. Dual Measurement Units
 - Instant, seamless toggle between **mmol/L** and **mg/dL** across all app screens, graphs, home screen widgets, and exported PDF clinical reports.
@@ -131,9 +132,11 @@
   - Compact format: `SOS! [Name] - severe hypo: 2.6 mmol (↓)! Siren active 3m unacknowledged. Location: maps.google.com/?q=...`.
   - Whitelist security and auto-recheck of SMS/Overlay permissions when returning from Android system settings.
 
-### 10. Floating Glucose Bubble (AMOLED Anti-Burn-In)
+### 10. Floating Glucose Bubble with Haptics (AMOLED Anti-Burn-In)
 - Compact circular floating widget (60x60dp) overlaying all apps.
 - **Smart Visibility**: displays **only when glucose is out of target** (< 3.9 or > 10.0 mmol/L) and automatically vanishes when back in range (always-on mode also available).
+- **Dynamic Haptic Feedback**: pulsating vibration synchronized with clinical urgency — gentle, spaced-out taps for mild hyper (every 8s) up to rapid alert pulses for hypoglycemia.
+- **Coma Guard Safety Override**: at severe hypoglycemia (< 3.0 mmol/L / < 54 mg/dL), haptic pulses trigger unalterably every 1.5s as an emergency tactile alarm, even if general vibration is toggled off.
 - **AMOLED Pixel-Shift Protection**: subtle vertical drift every 60 seconds with edge alternation every 15 minutes (mirroring clinical "Rule of 15").
 - Hypoglycemia water-ripple pulsing animation.
 - Tap on bubble mutes siren, snoozes bubble for 5 minutes, and opens the app.
@@ -179,8 +182,8 @@
 - **Ultra-Stable 24/7 Radio Protocol**:
   - Adaptive broadcast pulse: 12 seconds for 1-minute sensors and 15 seconds for 5-minute sensors.
   - **Doze-Resistant Keep-Alive (AlarmManager)**: 5-minute `RTC_WAKEUP` heartbeat maintaining system `WakeLock` via `goAsync()`, ensuring continuous operation on Android 8–16 during deep CPU sleep.
-  - **AOSP 30-Minute Scan Limit & Silence Watchdog**: proactive scanner reset every 20 minutes prevents opportunistic throttling; silence watcher resets receiver under mutex if packets cease for $\ge 6$ minutes.
-  - `BleObserverService` runs as an Android Foreground Service tied to persistent notification/AOD, preventing OS termination.
+  - **AOSP Rate-Limit Guard & 30-Minute Reset**: Built-in sliding rate-limiter prevents OS scan throttling (max 5 scan starts per 30 seconds), while proactive resets every 20 minutes avert opportunistic downgrade. Deadlock-free state recovery guarantees uninterrupted scanning.
+  - **Optimized Hardware ScanFilter**: Target manufacturer ID filtering without payload masks enables instantaneous hardware matching and consistent 3-second packet reception without skipping.
   - **Self-Healing Bridge & Adaptive Eco Mode**:
     - Optional power-saving mode (`enableEcoMode`, off by default) transitioning scanner to `SCAN_MODE_LOW_POWER` after $\ge 1$ hour of silence to preserve battery, with instant self-healing restoration to `LOW_LATENCY` upon detecting the next packet.
     - Live **Radio Channel Metrics**: sliding 1-hour PDR (% Packet Delivery Rate adapting dynamically to 1-min or 5-min sensor cadence) and average RSSI dBm.
@@ -259,6 +262,15 @@ TIRUp supports all popular autonomous data sources within the Android diabetes e
    - Tap **"🔍 Search Master"** for automatic subnet discovery or enter the master device IP manually.
    - Enter `API Secret` if configured in xDrip+.
    - Works 100% offline within home Wi-Fi or the master phone's Hotspot without cellular internet.
+
+### Family BLE Bridge (Bluetooth LE):
+1. **On Master Device**: in **TIRUp** ➔ **Settings** ➔ **"Family BLE Bridge"**, toggle switch on, select **"Broadcaster"**, and set a 3-letter Family PIN.
+2. **On Follower Device**: toggle switch on, select **"Observer"**, set the matching Family PIN, and tap **"Master Search (60s)"** to link immediately.
+
+### Nightscout Cloud Follower (Advanced / Remote):
+1. In **TIRUp** ➔ **Settings**, tap the version tag 5 times to reveal advanced integrations.
+2. In **Nightscout Cloud Follower**, enter your Nightscout URL (e.g. `https://mycgm.herokuapp.com`) and API Secret or Access Token.
+3. TIRUp polls `/api/v1/current` and `/entries` for real-time BG, IoB, CoB, and battery telemetry.
 
 ### GlucoDataHandler / Juggluco:
 - Enable local broadcast forwarding of compatible `com.eveningoutpost.dexdrip.BgEstimate` intents.
@@ -346,7 +358,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 <div align="center">
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1-brightgreen.svg)
+![Версия](https://img.shields.io/badge/Версия-1.0.3-brightgreen.svg)
 ![Платформа](https://img.shields.io/badge/Платформа-Android%208.0%2B-green.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-blue.svg)
 ![Jetpack Compose](https://img.shields.io/badge/Интерфейс-Jetpack%20Compose%20%2F%20Material%203-blueviolet.svg)
@@ -412,13 +424,14 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - Работает полностью без интернета (в домашней Wi-Fi сети или через точку доступа Hotspot мастера).
 - **Автоматическое обнаружение мастера в подсети**: параллельное фоновое сканирование адресов `192.168.x.1`–`254` и шлюза Hotspot `192.168.43.1` пулом корутин за 1.2 секунды. Защита батареи: сканирование блокируется (no-op), если устройство не подключено к Wi-Fi сети.
 - **Сквозная дедупликация данных**: единая точка сохранения в Room DB с матрицей приоритетов (`LOCAL_XDRIP` [4] → `BLE_BRIDGE` [3] → `WIFI_LAN` [2] → `NIGHTSCOUT_CLOUD` [1]) и безопасным обогащением недостающих полей (`iob`, `cob`, `trendArrow`).
-- **Ряд индикаторов статуса на главном экране (HeroGlucoseCard)**: сбалансированная строка чипов `[Колокольчик 🔔]` → `[Wi-Fi пиктограмма]` → `[Батарея мастера 🔋 %]` → `[IoB 💉]` → `[CoB 🍞]` → `[BLE радиомост 📡]` → `[AoD 🌙]`. Компактный формат чипа 28x24 dp без лишнего текста со сменой цвета и иконки по статусам, гарантирующий идеальную адаптивность на экранах любой ширины. Интерактивный тап по Wi-Fi открывает диалог статуса с кнопкой ручного поиска мастера.
+- **Эргономика главного экрана (HeroGlucoseCard) и адаптивный FlowRow**: Показатели активного инсулина (💉 IoB) и углеводов (🍞 CoB) вынесены в крупные фланкирующие чипы по бокам от центрального значения сахара. Статусная полоска оформлена в виде гибкого `FlowRow` (`[Колокольчик 🔔]`, `[Wi-Fi LAN]`, `[Батарея мастера 🔋]`, `[Nightscout Cloud ☁️]`, `[BLE-мост 📡]`, `[AoD 🌙]`) с поддержкой естественного переноса и жестов: одиночный тап открывает статусное окно, а долгое нажатие мгновенно открывает экран соответствующих настроек.
 
 ### 3. Быстрый ввод лечения и облачная синхронизация Nightscout API
 - Удобная панель быстрого ввода на главном экране: шторка для внесения болюсов инсулина 💉, углеводов 🍞, контрольных замеров глюкометра 🩸 и заметок 💬.
 - Фоновая отправка в REST API Nightscout (`POST /api/v1/treatments`) с поддержкой авторизации через `api-secret` (SHA-1) или query-токен.
+- **Интеграция Nightscout Cloud Follower (/api/v1/current)**: фоновый приём сахара, тренда, активного инсулина (IoB), углеводов (CoB) и уровня заряда батареи с дедупликацией 25 с и мгновенным fallback.
 - **Сквозное удаление меток по UUID (`DELETE /api/v1/treatments/{uuid}`)**: при удалении метки с графика TIRUp она аннулируется на сервере и в базе данных, исключая «воскрешение» записей при синхронизации с xDrip+.
-- Скрытое меню разработчика (5 тапов по версии): тест соединения в реальном времени и режим ожидания подтверждения от локального сервиса xDrip+ (порт 17580).
+- Скрытое меню разработчика (5 тапов по версии): тест соединения в реальном времени, диагностика Nightscout и подтверждение от локального сервиса xDrip+ (порт 17580).
 
 ### 4. Две системы единиц измерения
 - Мгновенное переключение между **ммоль/л (mmol/L)** и **мг/дл (mg/dL)** на всех экранах приложения, графиках, виджетах и в генерируемых PDF-документах.
@@ -475,9 +488,11 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
   - Сверхкомпактный формат: `SOS! [Имя] - критич. гипо: 2.6 ммоль (↓)! Сирена 3м без реакции. Геолокация: maps.google.com/?q=...`.
   - Защита белым списком (сверка последних 10 цифр) и автоматическая перепроверка прав SMS/Overlay при возврате из настроек Android.
 
-### 10. Плавающий оверлей «Пузырёк» (Floating Bubble)
+### 10. Плавающий оверлей «Пузырёк» с тактильной отдачей (Floating Bubble)
 - Компактный круглый индикатор (60x60dp) поверх всех приложений.
 - **Умная видимость**: отображается **только когда сахар вне нормы** (< 3.9 или > 10.0 ммоль/л) и автоматически скрывается, когда гликемия возвращается в норму (также доступен режим постоянного отображения).
+- **Синхронная тактильная вибро-пульсация**: частота вибрации возрастает пропорционально клинической опасности сахара (редкая при гипергликемии, частая при гипо).
+- **Неотключаемый протокол Coma Guard Safety Override**: при критически низком сахаре (< 3.0 ммоль/л) тактильная сигнализация срабатывает каждые 1.5 сек в обязательном порядке для защиты от бессимптомной гипогликемии, даже если вибрация отключена в настройках.
 - **Защита AMOLED от выгорания (Pixel Shift)**: активный дрейф кружка по вертикали каждую 1 минуту со сменой стороны экрана каждые 15 минут (по аналогии с «правилом 15»).
 - Пульсирующий эффект «круги на воде» при гипогликемии.
 - Тап по пузырьку мгновенно глушит сирену, скрывает пузырёк на 5 минут (снуз) и открывает приложение.
@@ -523,7 +538,8 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - **Сверхстабильный радиопротокол 24/7**:
   - Адаптивный импульс вещания: 12 секунд для минутных сенсоров и 15 секунд для 5-минутных для гарантированного захвата сканером Наблюдателя.
   - **Аппаратный пульс сквозь Doze (AlarmManager Keep-Alive)**: 5-минутный таймер `RTC_WAKEUP` с удержанием системного `WakeLock` через `goAsync()`. Гарантирует бесперебойную работу в фоновом режиме на Android 8–16 даже при глубоком сне процессора и погашенном экране.
-  - **Защита от 30-минутного лимита AOSP и тишины**: проактивный сброс сканера каждые 20 минут предотвращает скрытый перевод в `SCAN_MODE_OPPORTUNISTIC`, а реактивный ватчер тишины (при отсутствии пакетов $\ge 6$ мин) моментально перезапускает приёмник под мьютексом с защитным 60-секундным кулдауном от троттлинга.
+  - **Защита от лимитов AOSP и сброс дедлоков**: встроенный скользящий ограничитель предотвращает блокировку системным сканером Android (не более 5 стартов за 30 с), устраняет состояние дедлока при ошибках и проводит превентивный перезапуск каждые 20 минут.
+  - **Оптимизированный аппаратный ScanFilter**: фильтрация по целевому Manufacturer ID без маски полезной нагрузки обеспечивает мгновенный аппаратный захват пакетов каждые 3 секунды без пропусков.
   - Фоновая служба `BleObserverService` (`Foreground Service` с привязкой к постоянному уведомлению в шторке/AOD) исключает усыпление радиомодуля системой.
   - **Self-Healing Bridge и Адаптивный эко-режим (1 час)**:
     - Настраиваемый эко-режим (`enableEcoMode`, по умолчанию выключен для 100% надёжности приёма): переход в `SCAN_MODE_LOW_POWER` только после $\ge 1$ часа тишины мастера. При первом пойманном пакете приёмник мгновенно самовосстанавливается в непрерывный `LOW_LATENCY`.
@@ -604,6 +620,15 @@ TIRUp поддерживает все популярные автономные 
    - Нажмите **«🔍 Найти мастера»** для автоматического параллельного сканирования подсети или введите IP-адрес вручную.
    - Задайте `API Secret` (если аутентификация настроена в xDrip+).
    - Приём работает полностью автономно в домашней сети Wi-Fi или через точку доступа (Hotspot) мастера без интернета.
+
+### Семейный BLE-мост (Bluetooth LE):
+1. **На смартфоне Мастера**: в **TIRUp** ➔ **Настройки** ➔ **«Семейный BLE-мост»**, включите питание, выберите **«Вещатель»** и задайте 3-буквенный Family PIN (например, `ABC`).
+2. **На смартфоне Фоловера**: включите питание, выберите **«Приёмник»**, укажите тот же Family PIN и нажмите **«Поиск вещателя (60 сек)»** для мгновенной связи.
+
+### Nightscout Cloud Follower (Облако / Удалённо):
+1. В **TIRUp** ➔ **Настройки**, коснитесь строки версии в самом низу 5 раз для открытия инженерных опций.
+2. В блоке **Nightscout Cloud Follower** укажите адрес сервера (например, `https://mycgm.herokuapp.com`) и API Secret или Access Token.
+3. TIRUp опрашивает `/api/v1/current` и `/entries` для оперативного получения сахара, активного инсулина (IoB), углеводов (CoB) и батареи.
 
 ### GlucoDataHandler / Juggluco:
 - Включите локальную трансляцию совместимых интентов `com.eveningoutpost.dexdrip.BgEstimate`.
