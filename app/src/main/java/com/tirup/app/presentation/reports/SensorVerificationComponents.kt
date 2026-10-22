@@ -341,7 +341,7 @@ fun SensorAccuracyInfoDialog(
                             "Клиническая интерпретация допуска ISO:\n" +
                             "• ≥ 95.0% — Эталон стандарта: наивысшая надёжность, болюсы можно вводить по сенсору.\n" +
                             "• 70.0% – 94.0% — Приемлемая точность для повседневного контроля трендов.\n" +
-                            "• < 70.0% (в т.ч. ~50%) — Значительная часть замеров выходит за допустимый коридор. При расчёте болюса и подозрении на гипогликемию обязательна перепроверка по пальцу."
+                            "• < 70.0% — Значительная часть замеров выходит за допустимый коридор. При расчёте болюса и подозрении на гипогликемию обязательна перепроверка по пальцу."
                         } else {
                             "International accuracy standard for glucose monitoring systems:\n" +
                             "• Glucose < 5.55 mmol/L (100 mg/dL): deviation within ±0.83 mmol/L (±15 mg/dL).\n" +
@@ -349,7 +349,7 @@ fun SensorAccuracyInfoDialog(
                             "Clinical Interpretation:\n" +
                             "• ≥ 95.0% — Gold Standard: sensor is clinically proven safe for non-adjunctive insulin dosing.\n" +
                             "• 70.0% – 94.0% — Fair accuracy for trend observation.\n" +
-                            "• < 70.0% (incl. ~50%) — Substantial deviation from reference. Fingerstick check is required before dosing or treating hypos."
+                            "• < 70.0% — Substantial deviation from reference. Fingerstick check is required before dosing or treating hypos."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
