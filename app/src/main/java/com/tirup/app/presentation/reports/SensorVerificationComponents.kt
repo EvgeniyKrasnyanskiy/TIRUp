@@ -325,7 +325,7 @@ fun SensorAccuracyInfoDialog(
                     )
                 }
 
-                // Section 3: ISO 15197:2013
+                // Section 3: ISO 15197:2013 & Interpretation
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = if (isRu) "3. Клинический стандарт ISO 15197:2013" else "3. ISO 15197:2013 Standard",
@@ -335,25 +335,56 @@ fun SensorAccuracyInfoDialog(
                     )
                     Text(
                         text = if (isRu) {
-                            "Международный стандарт точности глюкометрии:\n" +
-                            "• При сахаре < 5.55 ммоль/л (100 мг/дл): расхождение сенсора с глюкометром не должно превышать ±0.83 ммоль/л (±15 мг/дл).\n" +
-                            "• При сахаре ≥ 5.55 ммоль/л: расхождение не должно превышать ±15% от замера глюкометра.\n" +
-                            "• Норматив: сенсор считается соответствующим стандарту, если ≥ 95% парных замеров уложились в эти коридоры."
+                            "Международный стандарт точности систем мониторинга глюкозы (адаптирован для проверки CGM):\n" +
+                            "• При сахаре < 5.55 ммоль/л (100 мг/дл): расхождение сенсора с глюкометром не более ±0.83 ммоль/л (±15 мг/дл).\n" +
+                            "• При сахаре ≥ 5.55 ммоль/л: расхождение не более ±15% от замера глюкометра.\n\n" +
+                            "Клиническая интерпретация допуска ISO:\n" +
+                            "• ≥ 95.0% — Эталон стандарта: наивысшая надёжность, болюсы можно вводить по сенсору.\n" +
+                            "• 70.0% – 94.0% — Приемлемая точность для повседневного контроля трендов.\n" +
+                            "• < 70.0% (в т.ч. ~50%) — Значительная часть замеров выходит за допустимый коридор. При расчёте болюса и подозрении на гипогликемию обязательна перепроверка по пальцу."
                         } else {
-                            "International standard for blood glucose monitoring:\n" +
+                            "International accuracy standard for glucose monitoring systems:\n" +
                             "• Glucose < 5.55 mmol/L (100 mg/dL): deviation within ±0.83 mmol/L (±15 mg/dL).\n" +
-                            "• Glucose ≥ 5.55 mmol/L: deviation within ±15%.\n" +
-                            "• Requirement: sensor complies when ≥ 95% of paired points fall within these limits."
+                            "• Glucose ≥ 5.55 mmol/L: deviation within ±15%.\n\n" +
+                            "Clinical Interpretation:\n" +
+                            "• ≥ 95.0% — Gold Standard: sensor is clinically proven safe for non-adjunctive insulin dosing.\n" +
+                            "• 70.0% – 94.0% — Fair accuracy for trend observation.\n" +
+                            "• < 70.0% (incl. ~50%) — Substantial deviation from reference. Fingerstick check is required before dosing or treating hypos."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                // Section 4: Physiology & Filtering
+                // Section 4: Sample Size & Low Pair Count Impact
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = if (isRu) "4. Физиология и алгоритм фильтрации TIRUp" else "4. Physiology & TIRUp Filtration Algorithm",
+                        text = if (isRu) "4. Почему процент ISO может быть около 50%? Влияние выборки" else "4. Why is ISO ~50%? Sample Size Impact",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = if (isRu) {
+                            "• Малое количество парных замеров: при 10–15 замерах (или меньше) каждое единичное несовпадение резко роняет процент. Если из 12 пар всего 5–6 точек вышли за коридор (например, из-за скрытого лага или калибровки), показатель составит ровно 50%.\n" +
+                            "• В клинических испытаниях (FDA/CE) стандарт ISO оценивают на сотнях измерений за полный срок службы датчика. При небольшом числе домашних замеров процент ISO имеет низкую статистическую мощность.\n" +
+                            "• Погрешность самого глюкометра (Error Stacking): домашний глюкометр тоже имеет допуск ±15% по ISO 15197. Если глюкометр ошибся на +9%, а сенсор на -8%, суммарная разница составит 17% (точка не зачтётся), хотя оба прибора технически исправны.\n" +
+                            "• При малом числе замеров ориентируйтесь в первую очередь на MARD и среднее смещение (Bias)."
+                        } else {
+                            "• Low paired points count: with 10–15 pairs or fewer, single outliers drastically depress the pass percentage. In 12 pairs, just 5–6 misses drop the score to 50%.\n" +
+                            "• In official clinical trials (FDA/CE), ISO compliance is measured on hundreds of points across multiple days. A handful of home checks has low statistical power.\n" +
+                            "• Reference meter error stacking: the handheld meter itself has up to ±15% allowable error under ISO 15197. If the meter is +9% high and CGM is -8% low, their paired discrepancy is 17% (failing ISO), even though both devices are operating normally.\n" +
+                            "• For small datasets, prioritize MARD and Mean Bias as more robust metrics."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Section 5: Physiology & Filtering
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = if (isRu) "5. Физиология и алгоритм фильтрации TIRUp" else "5. Physiology & TIRUp Filtration Algorithm",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary

@@ -80,7 +80,6 @@ fun AgpSheetPreviewModal(
     val isRu = userSettings.language.equals("RU", ignoreCase = true)
     val isMmol = userSettings.unit == GlucoseUnit.MMOL_L
     val agpBins = AGPPercentilesCalculator.calculatePercentiles(readings, binsCount = 48)
-    var showAccuracyHelp by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -342,20 +341,6 @@ fun AgpSheetPreviewModal(
                         }
                     }
 
-                    // 2.5 Sensor Verification Card (if paired meter readings exist)
-                    verificationResult?.let { verif ->
-                        if (verif.pairedPointsCount >= 1) {
-                            item {
-                                SensorVerificationCard(
-                                    verification = verif,
-                                    isRu = isRu,
-                                    isLightMode = true,
-                                    onClick = { showAccuracyHelp = true }
-                                )
-                            }
-                        }
-                    }
-
                     // 3. Modal AGP Chart
                     item {
                         Surface(
@@ -532,13 +517,6 @@ fun AgpSheetPreviewModal(
                 }
             }
         }
-    }
-
-    if (showAccuracyHelp) {
-        SensorAccuracyInfoDialog(
-            onDismiss = { showAccuracyHelp = false },
-            isRu = isRu
-        )
     }
 }
 
