@@ -47,12 +47,12 @@
     <string name="agp_outer">10–90% Percentiles</string>
     <string name="agp_target_range">Target Range (%1$.1f - %2$.1f)</string>
     <string name="tir_breakdown">Time in Ranges</string>
-    <string name="range_very_low">Very Low (&lt;3.0)</string>
-    <string name="range_low">Low (3.0–3.8)</string>
-    <string name="range_in_range">Target (3.9–10.0)</string>
-    <string name="range_tight">Tight (3.9–7.8)</string>
-    <string name="range_high">High (10.1–13.9)</string>
-    <string name="range_very_high">Very High (≥14.0)</string>
+    <string name="range_very_low">Very Low</string>
+    <string name="range_low">Low</string>
+    <string name="range_in_range">In Range</string>
+    <string name="range_tight">Tight Range</string>
+    <string name="range_high">High</string>
+    <string name="range_very_high">Very High</string>
 
     <!-- Reports -->
     <string name="reports_title">Medical Reports</string>

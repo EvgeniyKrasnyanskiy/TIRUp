@@ -47,12 +47,12 @@
     <string name="agp_outer">10–90% Диапазон</string>
     <string name="agp_target_range">Целевой диапазон (%1$.1f - %2$.1f)</string>
     <string name="tir_breakdown">Распределение по диапазонам</string>
-    <string name="range_very_low">Очень низкий (&lt;3.0)</string>
-    <string name="range_low">Низкий (3.0–3.8)</string>
-    <string name="range_in_range">В диапазоне (3.9–10.0)</string>
-    <string name="range_tight">В узком диапазоне (3.9–7.8)</string>
-    <string name="range_high">Высокий (10.1–13.9)</string>
-    <string name="range_very_high">Очень высокий (≥14.0)</string>
+    <string name="range_very_low">Очень низкий</string>
+    <string name="range_low">Низкий</string>
+    <string name="range_in_range">В диапазоне</string>
+    <string name="range_tight">В узком диапазоне</string>
+    <string name="range_high">Высокий</string>
+    <string name="range_very_high">Очень высокий</string>
 
     <!-- Reports -->
     <string name="reports_title">Мед. отчёты</string>
