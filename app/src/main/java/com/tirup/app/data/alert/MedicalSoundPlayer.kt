@@ -562,7 +562,7 @@ object MedicalSoundPlayer {
      */
     fun playSignalLossAlert(volumePercent: Int = 80, customTag: String? = null) {
         playRawResource(
-            resId = R.raw.tirup_obsolete,
+            resId = R.raw.tirup_signal_loss,
             repeatCount = 1,
             volumePercent = volumePercent,
             customTag = customTag ?: AlertTier.SIGNAL_LOSS.name,
