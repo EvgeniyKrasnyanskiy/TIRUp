@@ -126,8 +126,8 @@ object BleBroadcaster {
         )
 
         val advertiseSettings = AdvertiseSettings.Builder()
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED) // ~250ms advertising interval
-            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
+            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY) // 100ms advertising interval for reliable capture
+            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
             .setConnectable(false)
             .setTimeout(0) // manual timeout control via coroutine
             .build()
@@ -203,8 +203,8 @@ object BleBroadcaster {
                         val parameters = AdvertisingSetParameters.Builder()
                             .setLegacyMode(false)
                             .setConnectable(false)
-                            .setInterval(AdvertisingSetParameters.INTERVAL_MEDIUM)
-                            .setTxPowerLevel(AdvertisingSetParameters.TX_POWER_MEDIUM)
+                            .setInterval(AdvertisingSetParameters.INTERVAL_LOW)
+                            .setTxPowerLevel(AdvertisingSetParameters.TX_POWER_HIGH)
                             .setPrimaryPhy(BluetoothDevice.PHY_LE_CODED)
                             .setSecondaryPhy(BluetoothDevice.PHY_LE_CODED)
                             .build()

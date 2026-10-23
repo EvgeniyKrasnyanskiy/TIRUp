@@ -58,7 +58,7 @@ class BleScanKeepAliveReceiver : BroadcastReceiver() {
         const val ACTION_BLE_KEEP_ALIVE = "com.tirup.app.ACTION_BLE_KEEP_ALIVE"
         private const val TAG = "BleKeepAliveReceiver"
         private const val REQUEST_CODE = 9924
-        const val KEEP_ALIVE_INTERVAL_MS = 5 * 60 * 1000L // 5 minutes hardware heartbeat
+        const val KEEP_ALIVE_INTERVAL_MS = 210_000L // 3.5 minutes hardware heartbeat (beats Oplus/ColorOS 5-min scan downgrade)
 
         fun scheduleKeepAlive(context: Context) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
