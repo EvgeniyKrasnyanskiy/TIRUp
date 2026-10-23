@@ -25,7 +25,6 @@ object PatternRecognitionEngine {
     fun analyze(
         bins: List<AGPPercentileBin>,
         stats: GlucoseStatistics,
-        @Suppress("UNUSED_PARAMETER")
         isMmol: Boolean = true,
         nightStartHour: Int = 0,
         nightEndHour: Int = 6
@@ -120,13 +119,15 @@ object PatternRecognitionEngine {
         val postMealBins = bins.filter { it.minuteOfDay in 780..1260 && it.readingsCount > 0 }
         val highPostMealCount = postMealBins.count { it.p75 > 10.5 }
         if (highPostMealCount >= 4) {
+            val highTargetRu = if (isMmol) "10.0 ммоль/л" else "180 мг/дл"
+            val highTargetEn = if (isMmol) "10.0 mmol/L" else "180 mg/dL"
             patterns.add(
                 DetectedPattern(
                     id = "postprandial_spikes",
                     titleRu = "Постпрандиальные всплески (13:00–21:00)",
                     titleEn = "Postprandial Spikes (13:00–21:00)",
-                    descriptionRu = "Повторяющийся выход выше целевых 10.0 ммоль/л после основных приёмов пищи. Может помочь увеличение паузы перед едой или пересмотр углеводного коэффициента.",
-                    descriptionEn = "Repeating glucose excursions above 10.0 mmol/L after major meals. Adjusting pre-meal bolus timing or insulin-to-carb ratios may help.",
+                    descriptionRu = "Повторяющийся выход выше целевых $highTargetRu после основных приёмов пищи. Может помочь увеличение паузы перед едой или пересмотр углеводного коэффициента.",
+                    descriptionEn = "Repeating glucose excursions above $highTargetEn after major meals. Adjusting pre-meal bolus timing or insulin-to-carb ratios may help.",
                     severity = PatternSeverity.WARNING,
                     icon = "🍽️"
                 )

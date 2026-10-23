@@ -256,7 +256,7 @@ object EmergencySmsManager {
                     lm.getCurrentLocation(
                         providerToUse,
                         cancellationSignal,
-                        java.util.concurrent.Executors.newSingleThreadExecutor()
+                        ContextCompat.getMainExecutor(context)
                     ) { loc ->
                         freshLoc = loc
                         latch.countDown()

@@ -79,9 +79,16 @@ class AlertActionReceiver : BroadcastReceiver() {
                     launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     context.startActivity(launchIntent)
                 } else {
+                    val isRu = try {
+                        val prefs = context.getSharedPreferences("tirup_user_settings", Context.MODE_PRIVATE)
+                        val lang = prefs.getString("key_language", null) ?: prefs.getString("language", null)
+                        if (lang != null) lang.equals("RU", ignoreCase = true)
+                        else java.util.Locale.getDefault().language.lowercase() in listOf("ru", "be", "kk", "uk")
+                    } catch (_: Exception) { true }
                     android.widget.Toast.makeText(
                         context,
-                        "Приложение DiaNight не установлено. Его можно скачать в Telegram-канале @diakia",
+                        if (isRu) "Приложение DiaNight не установлено. Его можно скачать в Telegram-канале @diakia"
+                        else "DiaNight app is not installed. You can download it from Telegram @diakia",
                         android.widget.Toast.LENGTH_LONG
                     ).show()
                     try {

@@ -28,6 +28,19 @@
     - Экспортируемый PDF-справочник параметров CGM переведён в просторный 2-страничный формат высокого разрешения A4 с детальным разбором точности, клинических паттернов и расширенным дисклеймером безопасности.
 
 ### 🛠 Исправлено и улучшено (Fixed & Improved)
+- **Комплексный аудит и устранение 12 дефектов v1.0.3 (Build 26)**:
+  - **Полное восстановление многолетней истории при локальном автобэкапе (`AutoBackupManager`)**: устранена критическая потеря данных за прошлые календарные годы — методы `restoreBackup()` и `restoreLatestAutoBackup()` теперь автоматически находят и импортируют все годовые архивы `tirup_readings_YYYY.csv` и `tirup_treatments_YYYY.csv` наряду с текущими файлами.
+  - **Реактивный переход через полночь 00:00 на Главном экране (`FocusViewModel`)**: границы текущих суток (`startOfDay` и `endOfDay`) вычисляются динамически внутри реактивного потока, благодаря чему инъекции инсулина, углеводы и суточные метрики после полуночи продолжают обновляться без необходимости перезапуска приложения.
+  - **Сохранение скрытых карточек метрик и защита БД на главном потоке (`SettingsRepositoryImpl`)**: добавлено сохранение ключа `KEY_HIDDEN_METRICS` (`hiddenMetrics`), а также ключей `signalLossMinutes`, `isSignalLossVibrate` и `isHeadsUpMessagingEnabled`; синхронное чтение и запись в таблицу `device_installations` Room перенесены в `Dispatchers.IO`.
+  - **Полная сериализация настроек в `settings.json` (`AutoBackupManager`)**: добавлен экспорт и импорт масштаба графика (`chartZoomHours`), всех параметров экрана Always-On Display (`aodSettings`) и флага всплывающих сообщений (`isHeadsUpMessagingEnabled`).
+  - **Учёт пользовательских целевых границ (`GlucoseRepositoryImpl`, `AutoBackupManager`)**: пересчёт суточных сводок (`recalculateDailySummaries`, `recalculateSummariesAfterRestore`) и подсчёт серии дней в цели (`calculateStreakDays`, `calculateMaxHistoricalStreak`) теперь используют персональные настройки `TargetRanges` и `tirGoalPercent`; метод `clearAllData()` очищает также таблицы исторического анализа (`historical_readings`, `historical_meter_readings`).
+  - **Паритет единиц измерения `мг/дл` (`MG_DL`) и локализация (`RU`/`EN`)**:
+    - Во всех уровнях тревог `GlucoseAlertManager` (критические, основные, предиктивные, скоростные) и в функции цветовой подсветки `formatAlertBodyWithColor()`, а также в предиктивном баннере `FocusViewModel`, BLE-баннере `MainActivity`, расчётах `GlucoseMetricsCalculator`, `PatternRecognitionEngine` и подписях оси Y PDF-отчёта `AgpPdfGenerator` добавлено корректное форматирование в `мг/дл` (`mg/dL`).
+    - Исправлено чтение ключа языка `"key_language"` в `GlucoseAlertManager` и `CaregiverSosAlarmManager`; добавлена полная английская локализация полноэкранной тревоги опекуна (`CaregiverSosActivity`), тостов удержания плавающего кружка (`FloatingBubbleService`) и запуска DiaNight (`AlertActionReceiver`).
+  - **Устранение утечки потоков и оптимизация сборки (`EmergencySmsManager`, `build.gradle.kts`, `gradle.properties`, `UserManualPdfGenerator`)**:
+    - В `EmergencySmsManager` одноразовый `Executors.newSingleThreadExecutor()` при запросе GPS заменён на `ContextCompat.getMainExecutor(context)`.
+    - В `app/build.gradle.kts` имя выходного APK учитывает тип сборки (`debug`/`release`), убран устаревший путь к ключу `DiaNight`, лимит памяти Gradle увеличен до `-Xmx4096m`.
+    - В `UserManualPdfGenerator` и `CRITICAL_ALERTS_SPEC.md` актуализировано описание MP3-сирен (`R.raw.tirup_*`).
 - **Устранение падений при открытии приложения (`CursorWindow` overflow)**:
   - На смартфонах с накопленной историей сахаров (>6 990 записей) `TirupApplication.onCreate()` и фоновые пересчёты вызывали аварийное завершение `IllegalStateException: Couldn't read row 6990 from CursorWindow` из-за 2 МБ аппаратного ограничения SQLite.
   - В `TirupApplication` настроен безопасный лимит `sCursorWindowSize` (50 МБ) при старте процесса.

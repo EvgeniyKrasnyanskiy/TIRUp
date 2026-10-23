@@ -129,10 +129,16 @@ class AgpPdfGenerator(private val context: Context) {
 
             val metaLine2 = if (verificationResult != null && verificationResult.pairedPointsCount >= 1) {
                 val sign = if (verificationResult.meanBiasMmol >= 0) "+" else ""
-                if (isRu) {
-                    "Верификация сенсора (ISO 15197): MARD ${String.format(Locale.US, "%.1f%%", verificationResult.mardPercent)} • Смещение: $sign${String.format(Locale.US, "%.2f", verificationResult.meanBiasMmol)} ммоль/л • ISO 15197: ${String.format(Locale.US, "%.1f%%", verificationResult.isoPassPercent)} (${verificationResult.pairedPointsCount} пар)"
+                val isMmolMeta = userSettings.unit == GlucoseUnit.MMOL_L
+                val biasStr = if (isMmolMeta) {
+                    "$sign${String.format(Locale.US, "%.2f", verificationResult.meanBiasMmol)} ${if (isRu) "ммоль/л" else "mmol/L"}"
                 } else {
-                    "Sensor Verification (ISO 15197): MARD ${String.format(Locale.US, "%.1f%%", verificationResult.mardPercent)} • Bias: $sign${String.format(Locale.US, "%.2f", verificationResult.meanBiasMmol)} mmol/L • ISO Pass: ${String.format(Locale.US, "%.1f%%", verificationResult.isoPassPercent)} (${verificationResult.pairedPointsCount} pairs)"
+                    "$sign${kotlin.math.round(verificationResult.meanBiasMmol * 18.0182).toInt()} ${if (isRu) "мг/дл" else "mg/dL"}"
+                }
+                if (isRu) {
+                    "Верификация сенсора (ISO 15197): MARD ${String.format(Locale.US, "%.1f%%", verificationResult.mardPercent)} • Смещение: $biasStr • ISO 15197: ${String.format(Locale.US, "%.1f%%", verificationResult.isoPassPercent)} (${verificationResult.pairedPointsCount} пар)"
+                } else {
+                    "Sensor Verification (ISO 15197): MARD ${String.format(Locale.US, "%.1f%%", verificationResult.mardPercent)} • Bias: $biasStr • ISO Pass: ${String.format(Locale.US, "%.1f%%", verificationResult.isoPassPercent)} (${verificationResult.pairedPointsCount} pairs)"
                 }
             } else {
                 if (isRu) {
@@ -248,9 +254,10 @@ class AgpPdfGenerator(private val context: Context) {
 
             var statY = panelTop + 38f
 
-            // Row 1: Mean & Min/Max
+            //Row 1: Mean & Min/Max
             val meanTitle = if (isRu) "Средний сахар (Mean) • Мин/Макс:" else "Average Glucose (Mean) • Min/Max:"
-            val meanVal = "$meanStr • Мин/Макс: $minMaxStr"
+            val minMaxPrefix = if (isRu) "Мин/Макс" else "Min/Max"
+            val meanVal = "$meanStr • $minMaxPrefix: $minMaxStr"
             canvas.drawText(meanTitle, col2Left + 12f, statY, subTextPaint)
             canvas.drawText(meanVal, col2Left + 12f, statY + 12f, textPaint)
             statY += 26f
@@ -337,8 +344,8 @@ class AgpPdfGenerator(private val context: Context) {
             }
             canvas.drawLine(graphLeft, y39, graphRight, y39, gridPaint)
             canvas.drawLine(graphLeft, y100, graphRight, y100, gridPaint)
-            canvas.drawText("10.0", margin + 6f, y100 + 4f, subTextPaint)
-            canvas.drawText("3.9", margin + 10f, y39 + 4f, subTextPaint)
+            canvas.drawText(if (isMmol) "10.0" else "180", margin + 6f, y100 + 4f, subTextPaint)
+            canvas.drawText(if (isMmol) "3.9" else "70", margin + (if (isMmol) 10f else 11f), y39 + 4f, subTextPaint)
 
             // Vertical 3-Hour Perpendiculars
             val vGridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

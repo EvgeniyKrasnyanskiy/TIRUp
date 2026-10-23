@@ -552,7 +552,12 @@ fun AppNavigationRoot(
                     else "$signalDot BLE: 📡 Range test (no sensor data)$batStr (RSSI: $rssi dBm)"
                 } else {
                     val iobStr = if (packet.iob > 0.0) ", 💉${String.format(java.util.Locale.US, "%.1f", packet.iob)}" else ""
-                    "$signalDot BLE: 🩸${String.format(java.util.Locale.US, "%.1f", packet.valueMmol)} ${packet.trendArrow}$iobStr$batStr (RSSI: $rssi dBm)"
+                    val bgStr = if (currentSettings.unit == com.tirup.app.domain.model.GlucoseUnit.MG_DL) {
+                        "${kotlin.math.round(packet.valueMmol * 18.0182).toInt()}"
+                    } else {
+                        String.format(java.util.Locale.US, "%.1f", packet.valueMmol)
+                    }
+                    "$signalDot BLE: 🩸$bgStr ${packet.trendArrow}$iobStr$batStr (RSSI: $rssi dBm)"
                 }
                 bleSignalBannerText = msg
             }

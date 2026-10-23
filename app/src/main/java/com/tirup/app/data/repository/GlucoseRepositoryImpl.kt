@@ -26,6 +26,19 @@ class GlucoseRepositoryImpl(
     private val readingDao = database.glucoseReadingDao()
     private val summaryDao = database.dailySummaryDao()
     private val treatmentDao = database.treatmentDao()
+    private val historicalReadingDao = database.historicalReadingDao()
+    private val historicalMeterReadingDao = database.historicalMeterReadingDao()
+
+    private fun currentTargetRanges(): TargetRanges {
+        return try {
+            val app = com.tirup.app.TirupApplication.instance
+            kotlinx.coroutines.runBlocking {
+                app.settingsRepository.getSettings().first().targetRanges
+            }
+        } catch (_: Exception) {
+            TargetRanges()
+        }
+    }
 
     override fun getLatestReading(): Flow<GlucoseReading?> {
         return readingDao.getLatestReading().map { it?.toDomain() }
@@ -74,7 +87,8 @@ class GlucoseRepositoryImpl(
                     } catch (_: Exception) {}
                 }
             }
-            calculateStreakDays(summaries)
+            val goalPercent = currentTargetRanges().tirGoalPercent.toDouble()
+            calculateStreakDays(summaries, tirGoalPercent = goalPercent)
         }
     }
 
@@ -167,7 +181,7 @@ class GlucoseRepositoryImpl(
         val endOfDay = getStartOfDay(endDate) + 86400000L - 1
         if (startOfDay > endOfDay) return@withContext
 
-        val defaultTargets = TargetRanges()
+        val activeTargets = currentTargetRanges()
         val summaries = mutableListOf<DailySummaryEntity>()
 
         var currentDayStart = startOfDay
@@ -176,7 +190,7 @@ class GlucoseRepositoryImpl(
             val dayEntities = readingDao.getReadingsBetweenSync(currentDayStart, currentDayEnd)
             if (dayEntities.isNotEmpty()) {
                 val domainReadings = dayEntities.map { it.toDomain() }
-                val stats = GlucoseMetricsCalculator.calculateStatistics(domainReadings, defaultTargets)
+                val stats = GlucoseMetricsCalculator.calculateStatistics(domainReadings, activeTargets)
 
                 summaries.add(
                     DailySummaryEntity(
@@ -300,6 +314,8 @@ class GlucoseRepositoryImpl(
         readingDao.clearAll()
         summaryDao.clearAll()
         treatmentDao.clearAll()
+        historicalReadingDao.clearAll()
+        historicalMeterReadingDao.clearAll()
     }
 
     override suspend fun getHistoricalBestStreak(): Int = withContext(Dispatchers.IO) {
@@ -308,13 +324,15 @@ class GlucoseRepositoryImpl(
         } catch (_: Exception) {
             emptyList()
         }
-        calculateMaxHistoricalStreak(summaries)
+        val goalPercent = currentTargetRanges().tirGoalPercent.toDouble()
+        calculateMaxHistoricalStreak(summaries, tirGoalPercent = goalPercent)
     }
 
     companion object {
         fun calculateStreakDays(
             summaries: List<DailySummaryEntity>,
-            nowTimestamp: Long = System.currentTimeMillis()
+            nowTimestamp: Long = System.currentTimeMillis(),
+            tirGoalPercent: Double = 70.0
         ): Int {
             val todayStart = getStartOfDay(nowTimestamp)
             val cal = Calendar.getInstance(TimeZone.getDefault())
@@ -331,7 +349,7 @@ class GlucoseRepositoryImpl(
 
             for (summary in completedSummaries) {
                 // Must strictly match expected consecutive calendar day (no missing days)
-                if (summary.dateTimestamp == expectedDay && summary.tir >= 70.0 && summary.count >= 10) {
+                if (summary.dateTimestamp == expectedDay && summary.tir >= tirGoalPercent && summary.count >= 10) {
                     completedStreak++
                     cal.timeInMillis = expectedDay
                     cal.add(Calendar.DAY_OF_YEAR, -1)
@@ -341,19 +359,20 @@ class GlucoseRepositoryImpl(
                 }
             }
 
-            // If today is currently meeting the target (TIR >= 70% with at least 10 readings),
+            // If today is currently meeting the target (TIR >= goal with at least 10 readings),
             // award today's bonus (+1) on top of completed streak
-            val todayBonus = if (todaySummary != null && todaySummary.tir >= 70.0 && todaySummary.count >= 10) 1 else 0
+            val todayBonus = if (todaySummary != null && todaySummary.tir >= tirGoalPercent && todaySummary.count >= 10) 1 else 0
 
             return completedStreak + todayBonus
         }
 
         fun calculateMaxHistoricalStreak(
-            summaries: List<DailySummaryEntity>
+            summaries: List<DailySummaryEntity>,
+            tirGoalPercent: Double = 70.0
         ): Int {
             if (summaries.isEmpty()) return 0
             val sorted = summaries
-                .filter { it.tir >= 70.0 && it.count >= 10 }
+                .filter { it.tir >= tirGoalPercent && it.count >= 10 }
                 .sortedBy { it.dateTimestamp }
 
             if (sorted.isEmpty()) return 0

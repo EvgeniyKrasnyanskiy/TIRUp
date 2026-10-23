@@ -180,20 +180,20 @@ class FocusViewModel(
 
     private fun observeData() {
         viewModelScope.launch {
-            val calendar = java.util.Calendar.getInstance().apply {
+            val initialCalendar = java.util.Calendar.getInstance().apply {
                 set(java.util.Calendar.HOUR_OF_DAY, 0)
                 set(java.util.Calendar.MINUTE, 0)
                 set(java.util.Calendar.SECOND, 0)
                 set(java.util.Calendar.MILLISECOND, 0)
             }
-            val startOfDay = calendar.timeInMillis
-            val endOfDay = startOfDay + 86400000L - 1
+            val queryStart = initialCalendar.timeInMillis - 2 * 86400000L
+            val queryEnd = Long.MAX_VALUE / 2
 
             val glucoseDataFlow = combine(
                 glucoseRepository.getLatestReading(),
                 glucoseRepository.getRecentReadings(2880), // up to 48h of 1-min readings (ensures full coverage of current calendar day)
-                glucoseRepository.getTreatmentsBetween(startOfDay, endOfDay + 60_000L),
-                glucoseRepository.getDailySummariesBetween(startOfDay - 30 * 86400000L, endOfDay)
+                glucoseRepository.getTreatmentsBetween(queryStart, queryEnd),
+                glucoseRepository.getDailySummariesBetween(initialCalendar.timeInMillis - 45 * 86400000L, queryEnd)
             ) { latest, recent, treatments, summaries ->
                 GlucoseDataTuple(latest, recent, treatments, summaries)
             }
@@ -204,10 +204,18 @@ class FocusViewModel(
                 settingsRepository.getSettings(),
                 GlucoseAlertManager.activeAlertBanner
             ) { tuple, streak, settings, alertBanner ->
+                val startOfDay = java.util.Calendar.getInstance().apply {
+                    set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    set(java.util.Calendar.MINUTE, 0)
+                    set(java.util.Calendar.SECOND, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                }.timeInMillis
+                val endOfDay = startOfDay + 86400000L - 1
+
                 val latest = tuple.latest
                 val recent = tuple.recent
-                val treatments = tuple.treatments
-                val summaries = tuple.summaries
+                val treatments = tuple.treatments.filter { it.timestamp in startOfDay..(endOfDay + 60_000L) }
+                val summaries = tuple.summaries.filter { it.dateTimestamp in (startOfDay - 30 * 86400000L)..endOfDay }
                 val todayReadings = recent.filter { it.timestamp >= startOfDay }
                 val effectiveReadings = if (todayReadings.isNotEmpty()) todayReadings else recent
 
@@ -249,14 +257,23 @@ class FocusViewModel(
                             useTingForHigh = settings.targetMode == TargetMode.TING
                         )
                         val isRu = settings.language.equals("RU", ignoreCase = true)
+                        val isMgDl = settings.unit == com.tirup.app.domain.model.GlucoseUnit.MG_DL
+                        val rateStr = if (isMgDl) {
+                            val rateMg = abs(prediction.rateOfChangeMmolPerMin) * 18.0182
+                            val unitLabel = if (isRu) "мг/дл/мин" else "mg/dL/min"
+                            String.format(Locale.US, "%.1f %s", rateMg, unitLabel)
+                        } else {
+                            val unitLabel = if (isRu) "ммоль/л/мин" else "mmol/L/min"
+                            String.format(Locale.US, "%.2f %s", abs(prediction.rateOfChangeMmolPerMin), unitLabel)
+                        }
                         val now = latest.timestamp
                         if (prediction.event == PredictedEvent.PREDICTED_LOW) {
                             val minutesUntil = prediction.minutesUntilCrossing ?: 15
                             val title = if (isRu) "📉 Прогноз гипогликемии (через $minutesUntil мин)" else "📉 Predicted Low (in $minutesUntil min)"
                             val message = if (isRu) {
-                                String.format(Locale.US, "Глюкоза падает (%.2f ммоль/л/мин).\nРекомендуется принять быстрые углеводы.", abs(prediction.rateOfChangeMmolPerMin))
+                                "Глюкоза падает ($rateStr).\nРекомендуется принять быстрые углеводы."
                             } else {
-                                String.format(Locale.US, "Glucose dropping (%.2f mmol/L/min).\nTake carbs now.", abs(prediction.rateOfChangeMmolPerMin))
+                                "Glucose dropping ($rateStr).\nTake carbs now."
                             }
                             ActiveAlertBanner(
                                 tier = AlertTier.PREDICTIVE,
@@ -268,9 +285,9 @@ class FocusViewModel(
                             val minutesUntil = prediction.minutesUntilCrossing ?: 15
                             val title = if (isRu) "📈 Прогноз гипергликемии (через $minutesUntil мин)" else "📈 Predicted High (in $minutesUntil min)"
                             val message = if (isRu) {
-                                String.format(Locale.US, "Глюкоза растёт (%.2f ммоль/л/мин).\nПроверьте дозу инсулина.", prediction.rateOfChangeMmolPerMin)
+                                "Глюкоза растёт ($rateStr).\nПроверьте дозу инсулина."
                             } else {
-                                String.format(Locale.US, "Glucose rising (%.2f mmol/L/min).\nCheck insulin.", prediction.rateOfChangeMmolPerMin)
+                                "Glucose rising ($rateStr).\nCheck insulin."
                             }
                             ActiveAlertBanner(
                                 tier = AlertTier.PREDICTIVE,

@@ -80,8 +80,15 @@ class CaregiverSosActivity : ComponentActivity() {
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        val patientName = intent.getStringExtra(EXTRA_PATIENT_NAME) ?: "Близкий"
-        val glucoseDisplay = intent.getStringExtra(EXTRA_GLUCOSE) ?: "Критич. гипо"
+        val isRu = try {
+            val prefs = getSharedPreferences("tirup_user_settings", MODE_PRIVATE)
+            val lang = prefs.getString("key_language", null) ?: prefs.getString("language", null)
+            if (lang != null) lang.equals("RU", ignoreCase = true)
+            else java.util.Locale.getDefault().language.lowercase() in listOf("ru", "be", "kk", "uk")
+        } catch (_: Exception) { true }
+
+        val patientName = intent.getStringExtra(EXTRA_PATIENT_NAME) ?: if (isRu) "Близкий" else "Loved One"
+        val glucoseDisplay = intent.getStringExtra(EXTRA_GLUCOSE) ?: if (isRu) "Критич. гипо" else "Critical Hypo"
         val trendArrow = intent.getStringExtra(EXTRA_TREND) ?: ""
         val delayMinutes = intent.getIntExtra(EXTRA_MINUTES, 5)
         val senderPhone = intent.getStringExtra(EXTRA_SENDER_PHONE) ?: ""
@@ -100,6 +107,7 @@ class CaregiverSosActivity : ComponentActivity() {
                 senderPhone = senderPhone,
                 mapsUrl = mapsUrl,
                 isTest = isTest,
+                isRu = isRu,
                 onCallPatient = {
                     if (senderPhone.isNotBlank()) {
                         val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${senderPhone.trim()}"))
@@ -157,6 +165,7 @@ fun CaregiverSosScreen(
     senderPhone: String,
     mapsUrl: String?,
     isTest: Boolean,
+    isRu: Boolean = true,
     onCallPatient: () -> Unit,
     onOpenMap: () -> Unit,
     onDismissAlarm: () -> Unit,
@@ -226,7 +235,11 @@ fun CaregiverSosScreen(
                 Spacer(modifier = Modifier.height(18.dp))
 
                 Text(
-                    text = if (isTest) "ТЕСТ SOS-ТРЕВОГИ" else "КРИТИЧЕСКАЯ ГИПОГЛИКЕМИЯ!",
+                    text = if (isTest) {
+                        if (isRu) "ТЕСТ SOS-ТРЕВОГИ" else "SOS ALARM TEST"
+                    } else {
+                        if (isRu) "КРИТИЧЕСКАЯ ГИПОГЛИКЕМИЯ!" else "CRITICAL HYPOGLYCEMIA!"
+                    },
                     color = Color(0xFFEF4444),
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Black,
@@ -234,7 +247,12 @@ fun CaregiverSosScreen(
                 )
 
                 Text(
-                    text = if (isTest) "Проверка экстренного канала фоловера" else "Сирена на телефоне мастера $delayMinutes мин без ответа!",
+                    text = if (isTest) {
+                        if (isRu) "Проверка экстренного канала фоловера" else "Follower emergency channel test"
+                    } else {
+                        if (isRu) "Сирена на телефоне мастера $delayMinutes мин без ответа!"
+                        else "Siren on master phone $delayMinutes min unacknowledged!"
+                    },
                     color = Color(0xFF94A3B8),
                     fontSize = 14.sp,
                     textAlign = TextAlign.Center,
@@ -286,7 +304,7 @@ fun CaregiverSosScreen(
                         if (senderPhone.isNotBlank()) {
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Телефон: $senderPhone",
+                                text = if (isRu) "Телефон: $senderPhone" else "Phone: $senderPhone",
                                 color = Color(0xFF94A3B8),
                                 fontSize = 13.sp
                             )
@@ -320,7 +338,7 @@ fun CaregiverSosScreen(
                             )
                             Spacer(modifier = Modifier.width(14.dp))
                             Text(
-                                text = "Отключить тревогу",
+                                text = if (isRu) "Отключить тревогу" else "Dismiss alarm",
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -344,7 +362,7 @@ fun CaregiverSosScreen(
                         Icon(Icons.Default.Call, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Позвонить: $patientName",
+                            text = if (isRu) "Позвонить: $patientName" else "Call: $patientName",
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -368,7 +386,7 @@ fun CaregiverSosScreen(
                         Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFF38BDF8))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Показать координаты",
+                            text = if (isRu) "Показать координаты" else "Open Location Map",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White
@@ -397,7 +415,7 @@ fun CaregiverSosScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Закрыть окно",
+                        text = if (isRu) "Закрыть окно" else "Close screen",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color.White

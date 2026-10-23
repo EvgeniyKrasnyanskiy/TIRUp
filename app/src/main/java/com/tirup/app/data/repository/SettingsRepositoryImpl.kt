@@ -12,9 +12,14 @@ import com.tirup.app.domain.model.TargetRanges
 import com.tirup.app.domain.model.ThemeMode
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.domain.repository.SettingsRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.tirup.app.data.local.AppDatabase
 import com.tirup.app.data.local.entity.DeviceInstallationEntity
 import java.util.Locale
@@ -27,6 +32,77 @@ class SettingsRepositoryImpl(
         context.getSharedPreferences("tirup_user_settings", Context.MODE_PRIVATE)
 
     private val _settingsFlow = MutableStateFlow(loadSettings())
+
+    init {
+        val initial = _settingsFlow.value
+        if (initial.sensorStatus.installedAt == 0L ||
+            initial.pumpSetStatus.installedAt == 0L ||
+            initial.lancetStatus.installedAt == 0L
+        ) {
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                try {
+                    val db = AppDatabase.getInstance(context)
+                    val dao = db.deviceInstallationDao()
+                    var current = _settingsFlow.value
+                    var changed = false
+                    val editor = prefs.edit()
+
+                    if (current.sensorStatus.installedAt == 0L) {
+                        val entity = dao.getDeviceInstallationSync("SENSOR")
+                        if (entity != null && entity.installedAt > 0L) {
+                            current = current.copy(
+                                sensorStatus = com.tirup.app.domain.model.SensorStatus(
+                                    installedAt = entity.installedAt,
+                                    durationDays = entity.durationDays,
+                                    lastUsedDurationDays = entity.lastUsedDurationDays
+                                )
+                            )
+                            editor.putLong(KEY_SENSOR_INSTALLED_AT, entity.installedAt)
+                                .putInt(KEY_SENSOR_DURATION_DAYS, entity.durationDays)
+                                .putInt(KEY_SENSOR_LAST_USED_DURATION, entity.lastUsedDurationDays)
+                            changed = true
+                        }
+                    }
+                    if (current.pumpSetStatus.installedAt == 0L) {
+                        val entity = dao.getDeviceInstallationSync("PUMP_SET")
+                        if (entity != null && entity.installedAt > 0L) {
+                            current = current.copy(
+                                pumpSetStatus = com.tirup.app.domain.model.PumpSetStatus(
+                                    installedAt = entity.installedAt,
+                                    durationDays = entity.durationDays,
+                                    lastUsedDurationDays = entity.lastUsedDurationDays
+                                )
+                            )
+                            editor.putLong(KEY_PUMP_SET_INSTALLED_AT, entity.installedAt)
+                                .putInt(KEY_PUMP_SET_DURATION_DAYS, entity.durationDays)
+                                .putInt(KEY_PUMP_SET_LAST_USED_DURATION, entity.lastUsedDurationDays)
+                            changed = true
+                        }
+                    }
+                    if (current.lancetStatus.installedAt == 0L) {
+                        val entity = dao.getDeviceInstallationSync("LANCET")
+                        if (entity != null && entity.installedAt > 0L) {
+                            current = current.copy(
+                                lancetStatus = com.tirup.app.domain.model.LancetStatus(
+                                    installedAt = entity.installedAt,
+                                    durationDays = entity.durationDays,
+                                    lastUsedDurationDays = entity.lastUsedDurationDays
+                                )
+                            )
+                            editor.putLong(KEY_LANCET_INSTALLED_AT, entity.installedAt)
+                                .putInt(KEY_LANCET_DURATION_DAYS, entity.durationDays)
+                                .putInt(KEY_LANCET_LAST_USED_DURATION, entity.lastUsedDurationDays)
+                            changed = true
+                        }
+                    }
+                    if (changed) {
+                        editor.apply()
+                        _settingsFlow.value = current
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+    }
 
     override fun getSettings(): Flow<UserSettings> = _settingsFlow.asStateFlow()
 
@@ -93,6 +169,7 @@ class SettingsRepositoryImpl(
             .putInt(KEY_LAST_STREAK_CELEBRATED_DAYS, settings.lastStreakCelebratedDays)
             .putInt(KEY_BEST_STREAK_DAYS, settings.bestStreakDays)
             .putString(KEY_METRICS_ORDER, settings.metricsOrder.joinToString(","))
+            .putString(KEY_HIDDEN_METRICS, settings.hiddenMetrics.joinToString(","))
             .putBoolean(KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED, settings.isLockscreenNotificationEnabled)
             .putInt(KEY_WIDGET_BACKGROUND_OPACITY, settings.widgetBackgroundOpacity)
             .putBoolean(KEY_IS_FLOATING_BUBBLE_ENABLED, settings.isFloatingBubbleEnabled)
@@ -135,6 +212,8 @@ class SettingsRepositoryImpl(
             .putInt(KEY_ALERT_SNOOZE_HYPO, settings.alertSettings.snoozeHypoMinutes)
             .putInt(KEY_ALERT_SNOOZE_HYPER, settings.alertSettings.snoozeHyperMinutes)
             .putBoolean(KEY_ALERT_SIGNAL_LOSS_ENABLED, settings.alertSettings.isSignalLossEnabled)
+            .putInt(KEY_ALERT_SIGNAL_LOSS_MINUTES, settings.alertSettings.signalLossMinutes)
+            .putBoolean(KEY_ALERT_SIGNAL_LOSS_VIBRATE, settings.alertSettings.isSignalLossVibrate)
             .putBoolean(KEY_ALERT_SIGNAL_LOSS_FLASH, settings.alertSettings.isSignalLossFlash)
             .putBoolean(KEY_ALERT_LAST_CHANCE_ENABLED, settings.alertSettings.isLastChanceAlertEnabled)
             .putInt(KEY_ALERT_LAST_CHANCE_BUFFER, settings.alertSettings.lastChanceBufferMinutes)
@@ -149,6 +228,7 @@ class SettingsRepositoryImpl(
             .putBoolean(KEY_ALERT_SMS_QUERY_REPLY_ENABLED, settings.alertSettings.isSmsQueryReplyEnabled)
             .putBoolean(KEY_ALERT_CAREGIVER_SOS_WAKEUP_ENABLED, settings.alertSettings.isCaregiverSosWakeupEnabled)
             .putBoolean(KEY_ALERT_EMERGENCY_IS_CAREGIVER_ROLE, settings.alertSettings.isCaregiverRole)
+            .putBoolean(KEY_ALERT_HEADS_UP_MESSAGING_ENABLED, settings.alertSettings.isHeadsUpMessagingEnabled)
             .putBoolean(KEY_ALERT_LOW_BATTERY_ENABLED, settings.alertSettings.isLowBatteryAlertEnabled)
             .putString(KEY_BLE_BRIDGE_ROLE, settings.bleBridgeSettings.role.name)
             .putBoolean(KEY_BLE_BRIDGE_IS_ENABLED, settings.bleBridgeSettings.isEnabled)
@@ -219,41 +299,43 @@ class SettingsRepositoryImpl(
             .putInt(KEY_XDRIP_LAN_POLL_INTERVAL, settings.xdripLanSettings.pollIntervalSeconds)
             .apply()
 
-        try {
-            val db = AppDatabase.getInstance(context)
-            if (settings.pumpSetStatus.installedAt > 0L) {
-                db.deviceInstallationDao().insertOrUpdate(
-                    DeviceInstallationEntity(
-                        deviceType = "PUMP_SET",
-                        installedAt = settings.pumpSetStatus.installedAt,
-                        durationDays = settings.pumpSetStatus.durationDays,
-                        lastUsedDurationDays = settings.pumpSetStatus.lastUsedDurationDays
-                    )
-                )
-            }
-            if (settings.sensorStatus.installedAt > 0L) {
-                db.deviceInstallationDao().insertOrUpdate(
-                    DeviceInstallationEntity(
-                        deviceType = "SENSOR",
-                        installedAt = settings.sensorStatus.installedAt,
-                        durationDays = settings.sensorStatus.durationDays,
-                        lastUsedDurationDays = settings.sensorStatus.lastUsedDurationDays
-                    )
-                )
-            }
-            if (settings.lancetStatus.installedAt > 0L) {
-                db.deviceInstallationDao().insertOrUpdate(
-                    DeviceInstallationEntity(
-                        deviceType = "LANCET",
-                        installedAt = settings.lancetStatus.installedAt,
-                        durationDays = settings.lancetStatus.durationDays,
-                        lastUsedDurationDays = settings.lancetStatus.lastUsedDurationDays
-                    )
-                )
-            }
-        } catch (_: Exception) {}
-
         _settingsFlow.value = settings
+
+        withContext(Dispatchers.IO) {
+            try {
+                val db = AppDatabase.getInstance(context)
+                if (settings.pumpSetStatus.installedAt > 0L) {
+                    db.deviceInstallationDao().insertOrUpdate(
+                        DeviceInstallationEntity(
+                            deviceType = "PUMP_SET",
+                            installedAt = settings.pumpSetStatus.installedAt,
+                            durationDays = settings.pumpSetStatus.durationDays,
+                            lastUsedDurationDays = settings.pumpSetStatus.lastUsedDurationDays
+                        )
+                    )
+                }
+                if (settings.sensorStatus.installedAt > 0L) {
+                    db.deviceInstallationDao().insertOrUpdate(
+                        DeviceInstallationEntity(
+                            deviceType = "SENSOR",
+                            installedAt = settings.sensorStatus.installedAt,
+                            durationDays = settings.sensorStatus.durationDays,
+                            lastUsedDurationDays = settings.sensorStatus.lastUsedDurationDays
+                        )
+                    )
+                }
+                if (settings.lancetStatus.installedAt > 0L) {
+                    db.deviceInstallationDao().insertOrUpdate(
+                        DeviceInstallationEntity(
+                            deviceType = "LANCET",
+                            installedAt = settings.lancetStatus.installedAt,
+                            durationDays = settings.lancetStatus.durationDays,
+                            lastUsedDurationDays = settings.lancetStatus.lastUsedDurationDays
+                        )
+                    )
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     private fun loadSettings(): UserSettings {
@@ -371,6 +453,8 @@ class SettingsRepositoryImpl(
                 snoozeHypoMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPO, 15),
                 snoozeHyperMinutes = prefs.getInt(KEY_ALERT_SNOOZE_HYPER, 45),
                 isSignalLossEnabled = prefs.getBoolean(KEY_ALERT_SIGNAL_LOSS_ENABLED, true),
+                signalLossMinutes = prefs.getInt(KEY_ALERT_SIGNAL_LOSS_MINUTES, 20),
+                isSignalLossVibrate = prefs.getBoolean(KEY_ALERT_SIGNAL_LOSS_VIBRATE, true),
                 isSignalLossFlash = prefs.getBoolean(KEY_ALERT_SIGNAL_LOSS_FLASH, false),
                 isLastChanceAlertEnabled = prefs.getBoolean(KEY_ALERT_LAST_CHANCE_ENABLED, true),
                 lastChanceBufferMinutes = prefs.getInt(KEY_ALERT_LAST_CHANCE_BUFFER, 120),
@@ -385,6 +469,7 @@ class SettingsRepositoryImpl(
                 isSmsQueryReplyEnabled = prefs.getBoolean(KEY_ALERT_SMS_QUERY_REPLY_ENABLED, true),
                 isCaregiverSosWakeupEnabled = prefs.getBoolean(KEY_ALERT_CAREGIVER_SOS_WAKEUP_ENABLED, true),
                 isCaregiverRole = prefs.getBoolean(KEY_ALERT_EMERGENCY_IS_CAREGIVER_ROLE, false),
+                isHeadsUpMessagingEnabled = prefs.getBoolean(KEY_ALERT_HEADS_UP_MESSAGING_ENABLED, true),
                 isLowBatteryAlertEnabled = prefs.getBoolean(KEY_ALERT_LOW_BATTERY_ENABLED, true)
             ),
             bleBridgeSettings = BleBridgeSettings(
@@ -411,72 +496,21 @@ class SettingsRepositoryImpl(
             isSensorReminderEnabled = prefs.getBoolean(KEY_SENSOR_REMINDER_ENABLED, true),
             isPumpReminderEnabled = prefs.getBoolean(KEY_PUMP_REMINDER_ENABLED, true),
             isLancetReminderEnabled = prefs.getBoolean(KEY_LANCET_REMINDER_ENABLED, true),
-            sensorStatus = run {
-                var installedAt = prefs.getLong(KEY_SENSOR_INSTALLED_AT, 0L)
-                var duration = prefs.getInt(KEY_SENSOR_DURATION_DAYS, 14)
-                var lastUsed = prefs.getInt(KEY_SENSOR_LAST_USED_DURATION, 14)
-                if (installedAt == 0L) {
-                    try {
-                        val db = AppDatabase.getInstance(context)
-                        val entity = db.deviceInstallationDao().getDeviceInstallationSync("SENSOR")
-                        if (entity != null && entity.installedAt > 0L) {
-                            installedAt = entity.installedAt
-                            duration = entity.durationDays
-                            lastUsed = entity.lastUsedDurationDays
-                            prefs.edit()
-                                .putLong(KEY_SENSOR_INSTALLED_AT, installedAt)
-                                .putInt(KEY_SENSOR_DURATION_DAYS, duration)
-                                .putInt(KEY_SENSOR_LAST_USED_DURATION, lastUsed)
-                                .apply()
-                        }
-                    } catch (_: Exception) {}
-                }
-                com.tirup.app.domain.model.SensorStatus(installedAt, duration, lastUsed)
-            },
-            pumpSetStatus = run {
-                var installedAt = prefs.getLong(KEY_PUMP_SET_INSTALLED_AT, 0L)
-                var duration = prefs.getInt(KEY_PUMP_SET_DURATION_DAYS, 3)
-                var lastUsed = prefs.getInt(KEY_PUMP_SET_LAST_USED_DURATION, 3)
-                if (installedAt == 0L) {
-                    try {
-                        val db = AppDatabase.getInstance(context)
-                        val entity = db.deviceInstallationDao().getDeviceInstallationSync("PUMP_SET")
-                        if (entity != null && entity.installedAt > 0L) {
-                            installedAt = entity.installedAt
-                            duration = entity.durationDays
-                            lastUsed = entity.lastUsedDurationDays
-                            prefs.edit()
-                                .putLong(KEY_PUMP_SET_INSTALLED_AT, installedAt)
-                                .putInt(KEY_PUMP_SET_DURATION_DAYS, duration)
-                                .putInt(KEY_PUMP_SET_LAST_USED_DURATION, lastUsed)
-                                .apply()
-                        }
-                    } catch (_: Exception) {}
-                }
-                com.tirup.app.domain.model.PumpSetStatus(installedAt, duration, lastUsed)
-            },
-            lancetStatus = run {
-                var installedAt = prefs.getLong(KEY_LANCET_INSTALLED_AT, 0L)
-                var duration = prefs.getInt(KEY_LANCET_DURATION_DAYS, 7)
-                var lastUsed = prefs.getInt(KEY_LANCET_LAST_USED_DURATION, 7)
-                if (installedAt == 0L) {
-                    try {
-                        val db = AppDatabase.getInstance(context)
-                        val entity = db.deviceInstallationDao().getDeviceInstallationSync("LANCET")
-                        if (entity != null && entity.installedAt > 0L) {
-                            installedAt = entity.installedAt
-                            duration = entity.durationDays
-                            lastUsed = entity.lastUsedDurationDays
-                            prefs.edit()
-                                .putLong(KEY_LANCET_INSTALLED_AT, installedAt)
-                                .putInt(KEY_LANCET_DURATION_DAYS, duration)
-                                .putInt(KEY_LANCET_LAST_USED_DURATION, lastUsed)
-                                .apply()
-                        }
-                    } catch (_: Exception) {}
-                }
-                com.tirup.app.domain.model.LancetStatus(installedAt, duration, lastUsed)
-            },
+            sensorStatus = com.tirup.app.domain.model.SensorStatus(
+                installedAt = prefs.getLong(KEY_SENSOR_INSTALLED_AT, 0L),
+                durationDays = prefs.getInt(KEY_SENSOR_DURATION_DAYS, 14),
+                lastUsedDurationDays = prefs.getInt(KEY_SENSOR_LAST_USED_DURATION, 14)
+            ),
+            pumpSetStatus = com.tirup.app.domain.model.PumpSetStatus(
+                installedAt = prefs.getLong(KEY_PUMP_SET_INSTALLED_AT, 0L),
+                durationDays = prefs.getInt(KEY_PUMP_SET_DURATION_DAYS, 3),
+                lastUsedDurationDays = prefs.getInt(KEY_PUMP_SET_LAST_USED_DURATION, 3)
+            ),
+            lancetStatus = com.tirup.app.domain.model.LancetStatus(
+                installedAt = prefs.getLong(KEY_LANCET_INSTALLED_AT, 0L),
+                durationDays = prefs.getInt(KEY_LANCET_DURATION_DAYS, 7),
+                lastUsedDurationDays = prefs.getInt(KEY_LANCET_LAST_USED_DURATION, 7)
+            ),
             hba1cRecords = run {
                 val raw = prefs.getString(KEY_HBA1C_RECORDS, null)
                 if (raw.isNullOrBlank()) emptyList()
@@ -646,6 +680,8 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_SNOOZE_HYPO = "key_alert_snooze_hypo"
         private const val KEY_ALERT_SNOOZE_HYPER = "key_alert_snooze_hyper"
         private const val KEY_ALERT_SIGNAL_LOSS_ENABLED = "key_alert_signal_loss_enabled"
+        private const val KEY_ALERT_SIGNAL_LOSS_MINUTES = "key_alert_signal_loss_minutes"
+        private const val KEY_ALERT_SIGNAL_LOSS_VIBRATE = "key_alert_signal_loss_vibrate"
         private const val KEY_ALERT_SIGNAL_LOSS_FLASH = "key_alert_signal_loss_flash"
         private const val KEY_ALERT_LAST_CHANCE_ENABLED = "key_alert_last_chance_enabled"
         private const val KEY_ALERT_LAST_CHANCE_BUFFER = "key_alert_last_chance_buffer"
@@ -660,6 +696,7 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_SMS_QUERY_REPLY_ENABLED = "key_alert_sms_query_reply_enabled"
         private const val KEY_ALERT_CAREGIVER_SOS_WAKEUP_ENABLED = "key_alert_caregiver_sos_wakeup_enabled"
         private const val KEY_ALERT_EMERGENCY_IS_CAREGIVER_ROLE = "key_alert_emergency_is_caregiver_role"
+        private const val KEY_ALERT_HEADS_UP_MESSAGING_ENABLED = "key_alert_heads_up_messaging_enabled"
         private const val KEY_ALERT_LOW_BATTERY_ENABLED = "key_alert_low_battery_enabled"
 
         private const val KEY_BLE_BRIDGE_ROLE = "key_ble_bridge_role"

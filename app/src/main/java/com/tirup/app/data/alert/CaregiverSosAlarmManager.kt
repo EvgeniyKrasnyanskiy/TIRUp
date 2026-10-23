@@ -174,7 +174,7 @@ object CaregiverSosAlarmManager {
 
         val isRu = try {
             val prefs = context.getSharedPreferences("tirup_user_settings", Context.MODE_PRIVATE)
-            val lang = prefs.getString("language", null)
+            val lang = prefs.getString("key_language", null) ?: prefs.getString("language", null)
             if (lang != null) lang.equals("RU", ignoreCase = true)
             else java.util.Locale.getDefault().language.lowercase() in listOf("ru", "be", "kk", "uk")
         } catch (_: Exception) { true }

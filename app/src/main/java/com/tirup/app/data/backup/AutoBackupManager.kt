@@ -12,6 +12,8 @@ import com.tirup.app.data.local.entity.GlucoseReadingEntity
 import com.tirup.app.data.local.entity.TreatmentEntity
 import com.tirup.app.domain.calculator.GlucoseMetricsCalculator
 import com.tirup.app.domain.model.AlertSettings
+import com.tirup.app.domain.model.AodDisplayMode
+import com.tirup.app.domain.model.AodSettings
 import com.tirup.app.domain.model.BleBridgeRole
 import com.tirup.app.domain.model.BleBridgeSettings
 import com.tirup.app.domain.model.GlucoseUnit
@@ -650,6 +652,7 @@ object AutoBackupManager {
         writer.name("isSmsQueryReplyEnabled").value(a.isSmsQueryReplyEnabled)
         writer.name("isCaregiverSosWakeupEnabled").value(a.isCaregiverSosWakeupEnabled)
         writer.name("isCaregiverRole").value(a.isCaregiverRole)
+        writer.name("isHeadsUpMessagingEnabled").value(a.isHeadsUpMessagingEnabled)
         writer.name("isLowBatteryAlertEnabled").value(a.isLowBatteryAlertEnabled)
         writer.endObject()
 
@@ -714,6 +717,23 @@ object AutoBackupManager {
         writer.name("lastStreakCelebratedDays").value(settings.lastStreakCelebratedDays)
         writer.name("showTreatmentsOnChart").value(settings.showTreatmentsOnChart)
         writer.name("showPredictionOnChart").value(settings.showPredictionOnChart)
+        writer.name("chartZoomHours").value(settings.chartZoomHours)
+
+        // AOD Settings
+        val aod = settings.aodSettings
+        writer.name("aodSettings")
+        writer.beginObject()
+        writer.name("isEnabled").value(aod.isEnabled)
+        writer.name("displayMode").value(aod.displayMode.name)
+        writer.name("pulseDurationSeconds").value(aod.pulseDurationSeconds)
+        writer.name("autoChargeEnabled").value(aod.autoChargeEnabled)
+        writer.name("autoChargeStartHour").value(aod.autoChargeStartHour)
+        writer.name("autoChargeStartMinute").value(aod.autoChargeStartMinute)
+        writer.name("autoChargeEndHour").value(aod.autoChargeEndHour)
+        writer.name("autoChargeEndMinute").value(aod.autoChargeEndMinute)
+        writer.name("customBrightness").value(aod.customBrightness.toDouble())
+        writer.name("launchOnScreenOff").value(aod.launchOnScreenOff)
+        writer.endObject()
 
         writer.name("metricsOrder")
         writer.beginArray()
@@ -960,21 +980,26 @@ object AutoBackupManager {
             var readingsCount = 0
             var earliest = 0L
             var latest = 0L
-            if (readingsFile.exists() && readingsFile.length() > 0L) {
-                BufferedReader(FileReader(readingsFile)).use { br ->
-                    br.readLine() // Header
-                    var isFirst = true
-                    while (true) {
-                        val line = br.readLine() ?: break
-                        if (line.isNotBlank()) {
-                            readingsCount++
-                            val ts = line.substringBefore(',').toLongOrNull()
-                            if (ts != null && ts > 0L) {
-                                if (isFirst) {
-                                    earliest = ts
-                                    isFirst = false
+            val allReadingFiles = buildList {
+                val archived = dir.listFiles { _, name ->
+                    name.matches(Regex("tirup_readings_\\d{4}\\.csv"))
+                }?.sortedBy { it.name } ?: emptyList()
+                addAll(archived)
+                if (readingsFile.exists() && readingsFile.length() > 0L) add(readingsFile)
+            }
+            for (rf in allReadingFiles) {
+                if (rf.exists() && rf.length() > 0L) {
+                    BufferedReader(FileReader(rf)).use { br ->
+                        br.readLine() // Header
+                        while (true) {
+                            val line = br.readLine() ?: break
+                            if (line.isNotBlank()) {
+                                readingsCount++
+                                val ts = line.substringBefore(',').toLongOrNull()
+                                if (ts != null && ts > 0L) {
+                                    if (earliest == 0L || ts < earliest) earliest = ts
+                                    if (ts > latest) latest = ts
                                 }
-                                latest = ts
                             }
                         }
                     }
@@ -983,11 +1008,20 @@ object AutoBackupManager {
 
             var treatmentsCount = 0
             val treatFile = File(dir, TREATMENTS_FILE_NAME)
-            if (treatFile.exists() && treatFile.length() > 0L) {
-                BufferedReader(FileReader(treatFile)).use { br ->
-                    br.readLine() // Header
-                    while (br.readLine() != null) {
-                        treatmentsCount++
+            val allTreatFiles = buildList {
+                val archived = dir.listFiles { _, name ->
+                    name.matches(Regex("tirup_treatments_\\d{4}\\.csv"))
+                }?.sortedBy { it.name } ?: emptyList()
+                addAll(archived)
+                if (treatFile.exists() && treatFile.length() > 0L) add(treatFile)
+            }
+            for (tf in allTreatFiles) {
+                if (tf.exists() && tf.length() > 0L) {
+                    BufferedReader(FileReader(tf)).use { br ->
+                        br.readLine() // Header
+                        while (br.readLine() != null) {
+                            treatmentsCount++
+                        }
                     }
                 }
             }
@@ -1378,9 +1412,16 @@ object AutoBackupManager {
                 val readingsFile = File(dir, READINGS_FILE_NAME)
                 val treatmentsFile = File(dir, TREATMENTS_FILE_NAME)
                 val legacyFile = File(dir, LEGACY_BACKUP_FILE_NAME)
+                val archivedReadingsFiles = dir.listFiles { _, name ->
+                    name.matches(Regex("tirup_readings_\\d{4}\\.csv"))
+                }?.sortedBy { it.name } ?: emptyList()
+                val archivedTreatmentsFiles = dir.listFiles { _, name ->
+                    name.matches(Regex("tirup_treatments_\\d{4}\\.csv"))
+                }?.sortedBy { it.name } ?: emptyList()
 
-                if (settingsFile.exists() || readingsFile.exists()) {
+                if (settingsFile.exists() || readingsFile.exists() || archivedReadingsFiles.isNotEmpty()) {
                     var restoredCount = 0
+                    var restoredTargetRanges: TargetRanges? = null
                     if (settingsFile.exists() && settingsFile.length() > 0L) {
                         FileReader(settingsFile).use { fr ->
                             JsonReader(fr).use { reader ->
@@ -1388,6 +1429,7 @@ object AutoBackupManager {
                                 while (reader.hasNext()) {
                                     if (reader.nextName() == "settings") {
                                         val s = parseSettings(reader)
+                                        restoredTargetRanges = s.targetRanges
                                         applySettings(s, settingsRepository)
                                     } else {
                                         reader.skipValue()
@@ -1398,12 +1440,31 @@ object AutoBackupManager {
                         }
                     }
 
+                    for (archFile in archivedReadingsFiles) {
+                        if (archFile.exists() && archFile.length() > 0L) {
+                            restoredCount += restoreReadingsFromCsvStream(FileInputStream(archFile), database)
+                        }
+                    }
+
                     if (readingsFile.exists() && readingsFile.length() > 0L) {
-                        restoredCount = restoreReadingsFromCsvStream(FileInputStream(readingsFile), database)
+                        restoredCount += restoreReadingsFromCsvStream(FileInputStream(readingsFile), database)
+                    }
+
+                    for (archTreatFile in archivedTreatmentsFiles) {
+                        if (archTreatFile.exists() && archTreatFile.length() > 0L) {
+                            restoreTreatmentsFromCsvStream(FileInputStream(archTreatFile), database)
+                        }
                     }
 
                     if (treatmentsFile.exists() && treatmentsFile.length() > 0L) {
                         restoreTreatmentsFromCsvStream(FileInputStream(treatmentsFile), database)
+                    }
+
+                    if (restoredCount > 0) {
+                        val targets = restoredTargetRanges ?: try {
+                            settingsRepository.getSettings().first().targetRanges
+                        } catch (_: Exception) { TargetRanges() }
+                        recalculateSummariesAfterRestore(database, targets)
                     }
 
                     return@withContext Result.success(restoredCount)
@@ -1441,11 +1502,18 @@ object AutoBackupManager {
                 val readingsFile = File(dir, READINGS_FILE_NAME)
                 val treatmentsFile = File(dir, TREATMENTS_FILE_NAME)
                 val legacyFile = File(dir, LEGACY_BACKUP_FILE_NAME)
+                val archivedReadingsFiles = dir.listFiles { _, name ->
+                    name.matches(Regex("tirup_readings_\\d{4}\\.csv"))
+                }?.sortedBy { it.name } ?: emptyList()
+                val archivedTreatmentsFiles = dir.listFiles { _, name ->
+                    name.matches(Regex("tirup_treatments_\\d{4}\\.csv"))
+                }?.sortedBy { it.name } ?: emptyList()
 
-                if (settingsFile.exists() || readingsFile.exists()) {
+                if (settingsFile.exists() || readingsFile.exists() || archivedReadingsFiles.isNotEmpty()) {
                     var readingsRestored = 0
                     var treatmentsRestored = 0
                     var settingsRestored = false
+                    var restoredTargetRanges: TargetRanges? = null
 
                     if (settingsFile.exists() && settingsFile.length() > 0L) {
                         try {
@@ -1455,6 +1523,7 @@ object AutoBackupManager {
                                     while (reader.hasNext()) {
                                         if (reader.nextName() == "settings") {
                                             val s = parseSettings(reader)
+                                            restoredTargetRanges = s.targetRanges
                                             applySettings(s, settingsRepository)
                                             settingsRestored = true
                                         } else {
@@ -1469,20 +1538,47 @@ object AutoBackupManager {
                         }
                     }
 
+                    for (archFile in archivedReadingsFiles) {
+                        if (archFile.exists() && archFile.length() > 0L) {
+                            try {
+                                readingsRestored += restoreReadingsFromCsvStream(FileInputStream(archFile), database)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Error restoring archived readings file ${archFile.name}: ${e.message}")
+                            }
+                        }
+                    }
+
                     if (readingsFile.exists() && readingsFile.length() > 0L) {
                         try {
-                            readingsRestored = restoreReadingsFromCsvStream(FileInputStream(readingsFile), database)
+                            readingsRestored += restoreReadingsFromCsvStream(FileInputStream(readingsFile), database)
                         } catch (e: Exception) {
                             Log.w(TAG, "Error restoring readings file: ${e.message}")
                         }
                     }
 
+                    for (archTreatFile in archivedTreatmentsFiles) {
+                        if (archTreatFile.exists() && archTreatFile.length() > 0L) {
+                            try {
+                                treatmentsRestored += restoreTreatmentsFromCsvStream(FileInputStream(archTreatFile), database)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Error restoring archived treatments file ${archTreatFile.name}: ${e.message}")
+                            }
+                        }
+                    }
+
                     if (treatmentsFile.exists() && treatmentsFile.length() > 0L) {
                         try {
-                            treatmentsRestored = restoreTreatmentsFromCsvStream(FileInputStream(treatmentsFile), database)
+                            treatmentsRestored += restoreTreatmentsFromCsvStream(FileInputStream(treatmentsFile), database)
                         } catch (e: Exception) {
                             Log.w(TAG, "Error restoring treatments file: ${e.message}")
                         }
+                    }
+
+                    if (readingsRestored > 0) {
+                        val targets = restoredTargetRanges ?: try {
+                            settingsRepository.getSettings().first().targetRanges
+                        } catch (_: Exception) { TargetRanges() }
+                        recalculateSummariesAfterRestore(database, targets)
                     }
 
                     return@withContext Result.success(
@@ -1521,7 +1617,10 @@ object AutoBackupManager {
                         database.glucoseReadingDao().insertBatch(restoredReadings.subList(i, end))
                     }
                     if (restoredReadings.isNotEmpty()) {
-                        recalculateSummariesAfterRestore(database)
+                        val targets = restoredSettings?.targetRanges ?: try {
+                            settingsRepository.getSettings().first().targetRanges
+                        } catch (_: Exception) { TargetRanges() }
+                        recalculateSummariesAfterRestore(database, targets)
                     }
                     return@withContext Result.success(
                         BackupRestoreResult(
@@ -1652,7 +1751,10 @@ object AutoBackupManager {
             }
 
             if (readingsRestored > 0) {
-                recalculateSummariesAfterRestore(database)
+                val targets = try {
+                    settingsRepository.getSettings().first().targetRanges
+                } catch (_: Exception) { TargetRanges() }
+                recalculateSummariesAfterRestore(database, targets)
             }
 
             Result.success(
@@ -1862,7 +1964,10 @@ object AutoBackupManager {
                 database.glucoseReadingDao().insertBatch(restoredReadings.subList(i, end))
             }
             if (restoredReadings.isNotEmpty()) {
-                recalculateSummariesAfterRestore(database)
+                val targets = restoredSettings?.targetRanges ?: try {
+                    settingsRepository.getSettings().first().targetRanges
+                } catch (_: Exception) { TargetRanges() }
+                recalculateSummariesAfterRestore(database, targets)
             }
             Result.success(restoredReadings.size)
         } catch (e: Exception) {
@@ -1912,6 +2017,8 @@ object AutoBackupManager {
         var lastStreakCelebrated = 0
         var showTreatments = true
         var showPrediction = true
+        var chartZoomHours = 24
+        var aodSettings = AodSettings()
         var metricsOrder = com.tirup.app.domain.model.DEFAULT_METRICS_ORDER
         var hiddenMetrics = emptyList<String>()
 
@@ -2164,6 +2271,48 @@ object AutoBackupManager {
                 "lastStreakCelebratedDays" -> lastStreakCelebrated = reader.nextInt()
                 "showTreatmentsOnChart" -> showTreatments = reader.nextBoolean()
                 "showPredictionOnChart" -> showPrediction = reader.nextBoolean()
+                "chartZoomHours" -> chartZoomHours = reader.nextInt()
+                "aodSettings" -> {
+                    var isEnabled = false
+                    var displayMode = AodDisplayMode.PULSE_ON_UPDATE
+                    var pulseDurationSeconds = 5
+                    var autoChargeEnabled = false
+                    var autoChargeStartHour = 23
+                    var autoChargeStartMinute = 0
+                    var autoChargeEndHour = 7
+                    var autoChargeEndMinute = 0
+                    var customBrightness = 0.01f
+                    var launchOnScreenOff = false
+                    reader.beginObject()
+                    while (reader.hasNext()) {
+                        when (reader.nextName()) {
+                            "isEnabled" -> isEnabled = reader.nextBoolean()
+                            "displayMode" -> displayMode = try { AodDisplayMode.valueOf(reader.nextString()) } catch (_: Exception) { AodDisplayMode.PULSE_ON_UPDATE }
+                            "pulseDurationSeconds" -> pulseDurationSeconds = reader.nextInt()
+                            "autoChargeEnabled" -> autoChargeEnabled = reader.nextBoolean()
+                            "autoChargeStartHour" -> autoChargeStartHour = reader.nextInt()
+                            "autoChargeStartMinute" -> autoChargeStartMinute = reader.nextInt()
+                            "autoChargeEndHour" -> autoChargeEndHour = reader.nextInt()
+                            "autoChargeEndMinute" -> autoChargeEndMinute = reader.nextInt()
+                            "customBrightness" -> customBrightness = reader.nextDouble().toFloat()
+                            "launchOnScreenOff" -> launchOnScreenOff = reader.nextBoolean()
+                            else -> reader.skipValue()
+                        }
+                    }
+                    reader.endObject()
+                    aodSettings = AodSettings(
+                        isEnabled = isEnabled,
+                        displayMode = displayMode,
+                        pulseDurationSeconds = pulseDurationSeconds,
+                        autoChargeEnabled = autoChargeEnabled,
+                        autoChargeStartHour = autoChargeStartHour,
+                        autoChargeStartMinute = autoChargeStartMinute,
+                        autoChargeEndHour = autoChargeEndHour,
+                        autoChargeEndMinute = autoChargeEndMinute,
+                        customBrightness = customBrightness,
+                        launchOnScreenOff = launchOnScreenOff
+                    )
+                }
                 "metricsOrder" -> {
                     val list = mutableListOf<String>()
                     reader.beginArray()
@@ -2220,6 +2369,8 @@ object AutoBackupManager {
             lastStreakCelebratedDays = lastStreakCelebrated,
             showTreatmentsOnChart = showTreatments,
             showPredictionOnChart = showPrediction,
+            chartZoomHours = chartZoomHours,
+            aodSettings = aodSettings,
             metricsOrder = metricsOrder,
             hiddenMetrics = hiddenMetrics,
             hasSeenOnboarding = true,
@@ -2228,11 +2379,13 @@ object AutoBackupManager {
         )
     }
 
-    private suspend fun recalculateSummariesAfterRestore(database: AppDatabase) = withContext(Dispatchers.IO) {
+    private suspend fun recalculateSummariesAfterRestore(
+        database: AppDatabase,
+        targetRanges: TargetRanges = TargetRanges()
+    ) = withContext(Dispatchers.IO) {
         try {
             val earliest = database.glucoseReadingDao().getEarliestTimestamp() ?: return@withContext
             val latest = database.glucoseReadingDao().getLatestTimestamp() ?: return@withContext
-            val defaultTargets = TargetRanges()
             val summaries = mutableListOf<DailySummaryEntity>()
 
             var currentDayStart = getStartOfDay(earliest)
@@ -2243,7 +2396,7 @@ object AutoBackupManager {
                 val dayEntities = database.glucoseReadingDao().getReadingsBetweenSync(currentDayStart, currentDayEnd)
                 if (dayEntities.isNotEmpty()) {
                     val domainReadings = dayEntities.map { it.toDomain() }
-                    val stats = GlucoseMetricsCalculator.calculateStatistics(domainReadings, defaultTargets)
+                    val stats = GlucoseMetricsCalculator.calculateStatistics(domainReadings, targetRanges)
                     summaries.add(
                         DailySummaryEntity(
                             dateTimestamp = currentDayStart,
@@ -2330,6 +2483,7 @@ object AutoBackupManager {
         var smsQueryReply = true
         var caregiverSosWakeup = true
         var isCaregiverRole = false
+        var isHeadsUpMessaging = true
         var lowBatEnabled = true
 
         reader.beginObject()
@@ -2382,6 +2536,7 @@ object AutoBackupManager {
                 "isSmsQueryReplyEnabled" -> smsQueryReply = reader.nextBoolean()
                 "isCaregiverSosWakeupEnabled" -> caregiverSosWakeup = reader.nextBoolean()
                 "isCaregiverRole" -> isCaregiverRole = reader.nextBoolean()
+                "isHeadsUpMessagingEnabled" -> isHeadsUpMessaging = reader.nextBoolean()
                 "isLowBatteryAlertEnabled" -> lowBatEnabled = reader.nextBoolean()
                 else -> reader.skipValue()
             }
@@ -2436,6 +2591,7 @@ object AutoBackupManager {
             isSmsQueryReplyEnabled = smsQueryReply,
             isCaregiverSosWakeupEnabled = caregiverSosWakeup,
             isCaregiverRole = isCaregiverRole,
+            isHeadsUpMessagingEnabled = isHeadsUpMessaging,
             isLowBatteryAlertEnabled = lowBatEnabled
         )
     }

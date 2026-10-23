@@ -577,8 +577,8 @@ class UserManualPdfGenerator(private val context: Context) {
                 )
                 flow.bullet(
                     if (isRu) "Уровень 3: Опасные и критические тревоги" else "Tier 3: Dangerous & Critical Alerts",
-                    if (isRu) "Затяжные тревоги (>20 мин гипо или >90 мин гипер) звучат 12-сек. медицинским сигналом. При критических порогах (<3.0 или >13.9 ммоль/л) включаются мощные сирены, экран принудительно загорается поверх блокировки (WakeLock), обходится режим «Не беспокоить» (DND bypass) на 100% громкости USAGE_ALARM и пульсирует вспышка камеры. Настройка порогов и прослушивание сирен объединены в единую плашку «🚨 Критические тревоги»."
-                    else "Prolonged alerts (>20m hypo or >90m hyper) sound a 12s medical chime. Critical thresholds (<3.0 or >13.9 mmol/L) trigger powerful emergency sirens over lockscreen (WakeLock), bypass DND at 100% volume, and pulse camera flash. Configured via the unified '🚨 Critical Alerts' dialog."
+                    if (isRu) "Затяжные тревоги (>20 мин гипо или >90 мин гипер) звучат 15-сек. медицинским сигналом (5 повторов). При критических порогах (<3.0 или >13.9 ммоль/л) включаются мощные сирены (60 сек для гипо и 35 сек для гипер), экран принудительно загорается поверх блокировки (WakeLock), обходится режим «Не беспокоить» (DND bypass) на 100% громкости USAGE_ALARM и пульсирует вспышка камеры. Настройка порогов и прослушивание сирен объединены в единую плашку «🚨 Критические тревоги»."
+                    else "Prolonged alerts (>20m hypo or >90m hyper) sound a 15s medical chime (5 repeats). Critical thresholds (<3.0 or >13.9 mmol/L) trigger powerful emergency sirens (60s for hypo and 35s for hyper) over lockscreen (WakeLock), bypass DND at 100% volume, and pulse camera flash. Configured via the unified '🚨 Critical Alerts' dialog."
                 )
                 flow.bullet(
                     if (isRu) "Уровень 4: Скоростные тревоги (резкое падение и рост)" else "Tier 4: Speed Alerts (Rapid Fall & Rise)",
@@ -592,23 +592,23 @@ class UserManualPdfGenerator(private val context: Context) {
                 )
                 flow.section(if (isRu) "3.2. Градация сирен и аудиосистема MP3" else "3.2. Siren Escalation & MP3 Audio System")
                 flow.paragraph(
-                    if (isRu) "В TIRUp тревоги воспроизводятся через откалиброванную аудиосистему на базе MP3 и синтезированных сирен, обеспечивая одинаковый и мощный уровень громкости на любых смартфонах (диапазон настройки 1–100% для дневного и ночного режимов):"
-                    else "In TIRUp alerts utilize a calibrated audio engine combining dedicated MP3 chimes and synthesized sirens for uniform acoustic performance across all Android devices (1-100% volume sliders for day and night):"
+                    if (isRu) "В TIRUp тревоги воспроизводятся через откалиброванную аудиосистему на базе выделенных MP3-сигналов в потоке будильника (USAGE_ALARM), обеспечивая одинаковый и мощный уровень громкости на любых смартфонах (диапазон настройки 1–100% для дневного и ночного режимов):"
+                    else "In TIRUp alerts utilize a calibrated MP3 audio engine over the USAGE_ALARM stream for uniform acoustic performance across all Android devices (1-100% volume sliders for day and night):"
                 )
                 flow.bullet(
-                    if (isRu) "🚨 Крит. ГИПО (<3.0 ммоль/л или настроенный порог) — 50-секундная сирена ГО" else "🚨 Crit. HYPO (<3.0 mmol/L) — 50-Second GDH Siren",
-                    if (isRu) "Непрерывная мощная сирена гражданской обороны с частотной модуляцией 520–980 Гц, добавлением 2-й, 3-й (1.5–3 кГц) и 4-й гармоник с аналоговым насыщением для максимальной акустической громкости на динамиках смартфона. Срабатывает мгновенно без ожидания повторных точек. Предназначена для гарантированного пробуждения из самого глубокого сна как самого пациента, так и фоловера при поступлении SOS."
-                    else "Continuous 50s civil defense air-raid siren sweeping smoothly between 520 Hz and 980 Hz with piercing harmonics and tanh overdrive for maximum phone speaker loudness. Triggers instantly without multi-point delay to awaken patient or follower."
+                    if (isRu) "🚨 Крит. ГИПО (<3.0 ммоль/л или настроенный порог) — 60-секундная сирена (20 повторов)" else "🚨 Crit. HYPO (<3.0 mmol/L) — 60-Second Emergency Siren (20 Repeats)",
+                    if (isRu) "Непрерывная серия из 20 повторов экстренной сирены критической гипогликемии (tirup_very_low, ~60 секунд) на 100% громкости будильника. Срабатывает мгновенно без ожидания повторных точек. Предназначена для гарантированного пробуждения из глубокого сна как самого пациента, так и фоловера при поступлении SOS."
+                    else "Continuous 20-repeat emergency low siren (tirup_very_low, ~60 seconds) at 100% alarm volume. Triggers instantly without multi-point delay to awaken patient or follower."
                 )
                 flow.bullet(
-                    if (isRu) "⚠️ Крит. ГИПЕР (>13.9 ммоль/л или настроенный порог) — 16-секундный резкий пульс" else "⚠️ Crit. HYPER (>13.9 mmol/L) — 16-Second Piercing Pulse",
-                    if (isRu) "Серия высокочастотных резких пульсирующих сигналов (1760/2349 Гц), резко контрастирующая с сиреной гипогликемии. Предупреждает о критической гипергликемии и необходимости контроля подколки/кетонов."
-                    else "High-urgency alternating chime bursts (1760 Hz & 2349 Hz) lasting 16 seconds. Clearly distinguishes extreme hyperglycemia from hypo alarms."
+                    if (isRu) "⚠️ Крит. ГИПЕР (>13.9 ммоль/л или настроенный порог) — 35-секундная тревога (10 повторов)" else "⚠️ Crit. HYPER (>13.9 mmol/L) — 35-Second Urgent Alarm (10 Repeats)",
+                    if (isRu) "Серия из 10 повторов высокоприоритетного сигнала критической гипергликемии (tirup_very_high, ~35 секунд), отчётливо отличающаяся от сирены гипогликемии. Предупреждает о критическом росте сахара и необходимости контроля подколки/кетонов."
+                    else "10-repeat high-urgency hyperglycemia alarm (tirup_very_high, ~35 seconds). Clearly distinguishes extreme hyperglycemia from hypo alarms."
                 )
                 flow.bullet(
-                    if (isRu) "🔔 Затяжные опасные тревоги (ГИПО >20 мин или ГИПЕР >90 мин)" else "🔔 Prolonged Dangerous Alerts (Hypo >20m or Hyper >90m)",
-                    if (isRu) "Воспроизводят стандартную 12-секундную медицинскую сирену. При затяжной гипергликемии сигнал глушится, если есть активный болюс (IoB) и зафиксирована динамика падения сахара."
-                    else "Standard 12s medical alarm series. Automatically mutes during prolonged hyper if corrective bolus (IoB) is active and glucose is declining."
+                    if (isRu) "🔔 Затяжные опасные тревоги (ГИПО >20 мин или ГИПЕР >90 мин) — 15 секунд (5 повторов)" else "🔔 Prolonged Dangerous Alerts (Hypo >20m or Hyper >90m) — 15 Seconds (5 Repeats)",
+                    if (isRu) "Воспроизводят 5-кратную серию медицинского сигнала (~15 секунд). При затяжной гипергликемии сигнал автоматически глушится, если есть активный болюс (IoB) и зафиксирована динамика падения сахара."
+                    else "5-repeat medical alarm series (~15 seconds). Automatically mutes during prolonged hyper if corrective bolus (IoB) is active and glucose is declining."
                 )
                 flow.section(if (isRu) "3.3. Экран спасения и защита от комы (Coma Guard <2.8 ммоль/л)" else "3.3. Patient Rescue Screen & Coma Guard (<2.8 mmol/L)")
                 flow.paragraph(

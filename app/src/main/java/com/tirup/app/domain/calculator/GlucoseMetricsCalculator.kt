@@ -600,6 +600,11 @@ object GlucoseMetricsCalculator {
             String.format(Locale.US, "%d %s", (nightSd * MGDL_FACTOR).roundToInt(), if (isRu) "мг/дл" else "mg/dL")
         }
         val nightSdTargetFormatted = if (isMmol) "SD ≤1.5" else "SD ≤27"
+        val nightMaxFormatted = if (isMmol) {
+            String.format(Locale.US, "%.1f", nightStability.maxMmol)
+        } else {
+            String.format(Locale.US, "%d", (nightStability.maxMmol * MGDL_FACTOR).roundToInt())
+        }
 
         val (nightValRu, nightTargetRu) = when {
             !hasNightData -> Pair(
@@ -607,7 +612,7 @@ object GlucoseMetricsCalculator {
                 "цель TIR ≥70%, $nightSdTargetFormatted"
             )
             nightStability.isGrowthHormoneSpike -> Pair(
-                String.format(Locale.US, "Всплеск сна (СТГ): max %.1f, SD %s", nightStability.maxMmol, nightSdFormatted),
+                String.format(Locale.US, "Всплеск сна (СТГ): max %s, SD %s", nightMaxFormatted, nightSdFormatted),
                 "цель TIR ≥70%, $nightSdTargetFormatted"
             )
             nightStability.isStable -> Pair(
@@ -638,7 +643,7 @@ object GlucoseMetricsCalculator {
                 "target TIR ≥70%, $nightSdTargetFormatted"
             )
             nightStability.isGrowthHormoneSpike -> Pair(
-                String.format(Locale.US, "Deep-sleep surge (GH): max %.1f, SD %s", nightStability.maxMmol, nightSdFormatted),
+                String.format(Locale.US, "Deep-sleep surge (GH): max %s, SD %s", nightMaxFormatted, nightSdFormatted),
                 "target TIR ≥70%, $nightSdTargetFormatted"
             )
             nightStability.isStable -> Pair(

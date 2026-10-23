@@ -1443,7 +1443,7 @@ object GlucoseAlertManager {
         // ----------------------------------------------------
         // TIER 3: CRITICAL HYPER
         // ----------------------------------------------------
-        if (evaluateCriticalHyper(context, latest, sorted, alerts, tirHigh, now, isRu)) {
+        if (evaluateCriticalHyper(context, latest, sorted, alerts, settings, tirHigh, now, isRu)) {
             return
         }
 
@@ -1452,14 +1452,14 @@ object GlucoseAlertManager {
         // ----------------------------------------------------
         // SPEED ALERTS: RAPID CHANGE (FALLING / RISING FAST)
         // ----------------------------------------------------
-        if (evaluateRapidChangeAlert(context, latest, sorted, alerts, now, isRu, effectiveVolume)) {
+        if (evaluateRapidChangeAlert(context, latest, sorted, alerts, settings, now, isRu, effectiveVolume)) {
             return
         }
 
         // ----------------------------------------------------
         // TIER 2: MAIN (CONFIRMED OUT OF RANGE)
         // ----------------------------------------------------
-        if (evaluateMainAlert(context, latest, sorted, alerts, targetRanges, now, isRu, effectiveVolume)) {
+        if (evaluateMainAlert(context, latest, sorted, alerts, settings, targetRanges, now, isRu, effectiveVolume)) {
             return
         }
 
@@ -1518,13 +1518,12 @@ object GlucoseAlertManager {
             val iobText = if (latest.iob != null && latest.iob > 0.0) {
                 String.format(Locale.US, if (isRu) " (IoB: %.1f Ед)" else " (IoB: %.1f U)", latest.iob)
             } else ""
-            val text = String.format(
-                Locale.US,
-                if (isRu) "Текущий сахар: %.1f ммоль/л%s. Срочно примите быстрые углеводы!"
-                else "Current glucose: %.1f mmol/L%s. Take fast-acting carbs now!",
-                latest.valueMmol,
-                iobText
-            )
+            val bgDisp = formatBgWithUnit(latest.valueMmol, settings.unit, isRu)
+            val text = if (isRu) {
+                "Текущий сахар: $bgDisp$iobText. Срочно примите быстрые углеводы!"
+            } else {
+                "Current glucose: $bgDisp$iobText. Take fast-acting carbs now!"
+            }
             val toneType = if (isExtremeLow) MedicalSoundPlayer.CriticalToneType.EXTRA_HYPO else MedicalSoundPlayer.CriticalToneType.STANDARD
             sendNotification(
                 context = context,
@@ -1536,7 +1535,7 @@ object GlucoseAlertManager {
                 vibrate = alerts.isCriticalVibrate,
                 flash = alerts.isCriticalFlash,
                 volumePercent = 100,
-                glucoseDisplay = String.format(Locale.US, "%.1f", latest.valueMmol),
+                glucoseDisplay = formatBgValue(latest.valueMmol, settings.unit),
                 trendArrow = latest.trendArrow ?: "→",
                 primaryContactPhone = alerts.emergencyContactPhone,
                 primaryContactName = alerts.emergencyContactName,
@@ -1553,6 +1552,7 @@ object GlucoseAlertManager {
         latest: GlucoseReading,
         sorted: List<GlucoseReading>,
         alerts: AlertSettings,
+        settings: UserSettings,
         tirHigh: Double,
         now: Long,
         isRu: Boolean
@@ -1593,13 +1593,12 @@ object GlucoseAlertManager {
             val iobText = if (latest.iob != null && latest.iob > 0.0) {
                 String.format(Locale.US, if (isRu) " (IoB: %.1f Ед)" else " (IoB: %.1f U)", latest.iob)
             } else ""
-            val text = String.format(
-                Locale.US,
-                if (isRu) "Текущий сахар: %.1f ммоль/л%s. Проверьте помпу/подколку и кетоны."
-                else "Current glucose: %.1f mmol/L%s. Check insulin delivery and ketones.",
-                latest.valueMmol,
-                iobText
-            )
+            val bgDisp = formatBgWithUnit(latest.valueMmol, settings.unit, isRu)
+            val text = if (isRu) {
+                "Текущий сахар: $bgDisp$iobText. Проверьте помпу/подколку и кетоны."
+            } else {
+                "Current glucose: $bgDisp$iobText. Check insulin delivery and ketones."
+            }
             val toneType = if (isExtremeHigh) MedicalSoundPlayer.CriticalToneType.EXTRA_HYPER else MedicalSoundPlayer.CriticalToneType.STANDARD
             sendNotification(
                 context = context,
@@ -1611,7 +1610,7 @@ object GlucoseAlertManager {
                 vibrate = alerts.isCriticalVibrate,
                 flash = alerts.isCriticalFlash,
                 volumePercent = 100,
-                glucoseDisplay = String.format(Locale.US, "%.1f", latest.valueMmol),
+                glucoseDisplay = formatBgValue(latest.valueMmol, settings.unit),
                 trendArrow = "↑",
                 primaryContactPhone = alerts.emergencyContactPhone,
                 primaryContactName = alerts.emergencyContactName,
@@ -1627,6 +1626,7 @@ object GlucoseAlertManager {
         latest: GlucoseReading,
         sorted: List<GlucoseReading>,
         alerts: AlertSettings,
+        settings: UserSettings,
         targetRanges: com.tirup.app.domain.model.TargetRanges,
         now: Long,
         isRu: Boolean,
@@ -1657,13 +1657,13 @@ object GlucoseAlertManager {
         if (isLowConfirmed && now - lastHypoAlertTimestamp.get() >= alerts.snoozeHypoMinutes * 60000L) {
             lastHypoAlertTimestamp.set(now)
             val title = if (isRu) "🔻 Низкий сахар" else "🔻 Low Glucose"
-            val text = String.format(
-                Locale.US,
-                if (isRu) "Глюкоза: %.1f ммоль/л ниже порога %.1f."
-                else "Glucose: %.1f mmol/L below threshold %.1f.",
-                latest.valueMmol,
-                mainLow
-            )
+            val bgDisp = formatBgWithUnit(latest.valueMmol, settings.unit, isRu)
+            val threshDisp = formatBgValue(mainLow, settings.unit)
+            val text = if (isRu) {
+                "Глюкоза: $bgDisp ниже порога $threshDisp."
+            } else {
+                "Glucose: $bgDisp below threshold $threshDisp."
+            }
             sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash, effectiveVolume)
             return true
         } else if (isHighConfirmed) {
@@ -1678,15 +1678,16 @@ object GlucoseAlertManager {
 
             if (hasActiveBolus && isFalling) {
                 Log.i(TAG, "Suppressed High Glucose alert: glucose is falling (${latest.valueMmol} mmol/L) with active IoB (${latest.iob} U)")
+                val bgVal = formatBgValue(latest.valueMmol, settings.unit)
                 _activeAlertBanner.value = ActiveAlertBanner(
                     tier = AlertTier.MAIN,
                     title = if (isRu) "🔺 Сахар высокий, но снижается"
                             else "🔺 High but dropping",
                     message = String.format(
                         Locale.US,
-                        if (isRu) "Глюкоза %.1f %s. Активный болюс (%.1f Ед) снижает сахар. Сигнал без звука."
-                        else "Glucose %.1f %s. Active bolus (%.1f U) is lowering glucose. Alert muted.",
-                        latest.valueMmol,
+                        if (isRu) "Глюкоза %s %s. Активный болюс (%.1f Ед) снижает сахар. Сигнал без звука."
+                        else "Glucose %s %s. Active bolus (%.1f U) is lowering glucose. Alert muted.",
+                        bgVal,
                         latest.trendArrow ?: "↘",
                         latest.iob
                     )
@@ -1697,13 +1698,13 @@ object GlucoseAlertManager {
             if (now - lastHyperAlertTimestamp.get() >= hyperRepeatInterval) {
                 lastHyperAlertTimestamp.set(now)
                 val title = if (isRu) "🔺 Высокий сахар" else "🔺 High Glucose"
-                val text = String.format(
-                    Locale.US,
-                    if (isRu) "Глюкоза: %.1f ммоль/л выше порога %.1f."
-                    else "Glucose: %.1f mmol/L above threshold %.1f.",
-                    latest.valueMmol,
-                    mainHigh
-                )
+                val bgDisp = formatBgWithUnit(latest.valueMmol, settings.unit, isRu)
+                val threshDisp = formatBgValue(mainHigh, settings.unit)
+                val text = if (isRu) {
+                    "Глюкоза: $bgDisp выше порога $threshDisp."
+                } else {
+                    "Glucose: $bgDisp above threshold $threshDisp."
+                }
                 sendNotification(context, CHANNEL_MAIN, NOTIFICATION_ID_MAIN, title, text, AlertTier.MAIN, alerts.isMainVibrate, alerts.isMainFlash, effectiveVolume)
                 return true
             }
@@ -1752,15 +1753,13 @@ object GlucoseAlertManager {
                 String.format(Locale.US, if (isRu) " (IoB: %.1f Ед)" else " (IoB: %.1f U)", latest.iob)
             } else ""
 
-            val text = String.format(
-                Locale.US,
-                if (isRu) "Сахар %.1f ммоль/л %s%s падает со скоростью %.2f ммоль/л/мин."
-                else "Glucose %.1f mmol/L %s%s dropping at %.2f mmol/L/min.",
-                latest.valueMmol,
-                arrow,
-                iobNotice,
-                kotlin.math.abs(prediction.rateOfChangeMmolPerMin)
-            )
+            val bgDisp = formatBgWithUnit(latest.valueMmol, settings.unit, isRu)
+            val rateDisp = formatRateWithUnit(kotlin.math.abs(prediction.rateOfChangeMmolPerMin), settings.unit, isRu)
+            val text = if (isRu) {
+                "Сахар $bgDisp $arrow$iobNotice падает со скоростью $rateDisp."
+            } else {
+                "Glucose $bgDisp $arrow$iobNotice dropping at $rateDisp."
+            }
             sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash, effectiveVolume)
             return true
         } else if (prediction.event == PredictedEvent.PREDICTED_HIGH && now - lastPredictive >= 30 * 60000L) {
@@ -1775,14 +1774,13 @@ object GlucoseAlertManager {
                 else -> "↗"
             }
 
-            val text = String.format(
-                Locale.US,
-                if (isRu) "Сахар %.1f ммоль/л %s растёт со скоростью %.2f ммоль/л/мин."
-                else "Glucose %.1f mmol/L %s rising at %.2f mmol/L/min.",
-                latest.valueMmol,
-                arrow,
-                prediction.rateOfChangeMmolPerMin
-            )
+            val bgDisp = formatBgWithUnit(latest.valueMmol, settings.unit, isRu)
+            val rateDisp = formatRateWithUnit(prediction.rateOfChangeMmolPerMin, settings.unit, isRu)
+            val text = if (isRu) {
+                "Сахар $bgDisp $arrow растёт со скоростью $rateDisp."
+            } else {
+                "Glucose $bgDisp $arrow rising at $rateDisp."
+            }
             sendNotification(context, CHANNEL_PREDICTIVE, NOTIFICATION_ID_PREDICTIVE, title, text, AlertTier.PREDICTIVE, alerts.isPredictiveVibrate, alerts.isPredictiveFlash, effectiveVolume)
             return true
         }
@@ -1794,6 +1792,7 @@ object GlucoseAlertManager {
         latest: GlucoseReading,
         sorted: List<GlucoseReading>,
         alerts: AlertSettings,
+        settings: UserSettings,
         now: Long,
         isRu: Boolean,
         effectiveVolume: Int = alerts.alertVolumePercent
@@ -1844,14 +1843,13 @@ object GlucoseAlertManager {
             if (isRu) "🔺 Резкий рост сахара $arrow" else "🔺 Rapid Glucose Rise $arrow"
         }
 
-        val text = String.format(
-            Locale.US,
-            if (isRu) "Сахар: %.1f ммоль/л (%s), скорость: %.2f ммоль/л/мин."
-            else "Glucose: %.1f mmol/L (%s), rate: %.2f mmol/L/min.",
-            latest.valueMmol,
-            arrow,
-            kotlin.math.abs(rate)
-        )
+        val bgDisp = formatBgWithUnit(latest.valueMmol, settings.unit, isRu)
+        val rateDisp = formatRateWithUnit(kotlin.math.abs(rate), settings.unit, isRu)
+        val text = if (isRu) {
+            "Сахар: $bgDisp ($arrow), скорость: $rateDisp."
+        } else {
+            "Glucose: $bgDisp ($arrow), rate: $rateDisp."
+        }
 
         sendNotification(
             context = context,
@@ -1863,7 +1861,7 @@ object GlucoseAlertManager {
             vibrate = alerts.isRapidChangeVibrate,
             flash = alerts.isRapidChangeFlash,
             volumePercent = effectiveVolume,
-            glucoseDisplay = String.format(Locale.US, "%.1f", latest.valueMmol),
+            glucoseDisplay = formatBgValue(latest.valueMmol, settings.unit),
             trendArrow = arrow,
             isRu = isRu
         )
@@ -1892,17 +1890,66 @@ object GlucoseAlertManager {
         }
     }
 
+    private fun formatBgValue(valueMmol: Double, unit: com.tirup.app.domain.model.GlucoseUnit): String {
+        return if (unit == com.tirup.app.domain.model.GlucoseUnit.MG_DL) {
+            kotlin.math.round(valueMmol * 18.0182).toInt().toString()
+        } else {
+            String.format(Locale.US, "%.1f", valueMmol)
+        }
+    }
+
+    private fun formatBgWithUnit(valueMmol: Double, unit: com.tirup.app.domain.model.GlucoseUnit, isRu: Boolean): String {
+        val valStr = formatBgValue(valueMmol, unit)
+        val unitLabel = if (unit == com.tirup.app.domain.model.GlucoseUnit.MG_DL) {
+            if (isRu) "мг/дл" else "mg/dL"
+        } else {
+            if (isRu) "ммоль/л" else "mmol/L"
+        }
+        return "$valStr $unitLabel"
+    }
+
+    private fun formatRateWithUnit(rateMmolPerMin: Double, unit: com.tirup.app.domain.model.GlucoseUnit, isRu: Boolean): String {
+        return if (unit == com.tirup.app.domain.model.GlucoseUnit.MG_DL) {
+            val rateMg = rateMmolPerMin * 18.0182
+            val unitLabel = if (isRu) "мг/дл/мин" else "mg/dL/min"
+            String.format(Locale.US, "%.1f %s", rateMg, unitLabel)
+        } else {
+            val unitLabel = if (isRu) "ммоль/л/мин" else "mmol/L/min"
+            String.format(Locale.US, "%.2f %s", rateMmolPerMin, unitLabel)
+        }
+    }
+
     private fun formatAlertBodyWithColor(text: String): CharSequence {
-        val regex = Regex("""(\d{1,2}[.,]\d+)\s*(ммоль/л|mmol/L|mg/dL)?""")
-        val match = regex.find(text) ?: return text
+        val regex = Regex("""(\d{1,3}(?:[.,]\d+)?)\s*(ммоль/л|mmol/L|мг/дл|mg/dL)""")
+        val match = regex.find(text) ?: run {
+            val fallbackRegex = Regex("""(\d{1,2}[.,]\d+)""")
+            val fbMatch = fallbackRegex.find(text) ?: return text
+            val numStr = fbMatch.groupValues[1].replace(',', '.')
+            val value = numStr.toDoubleOrNull() ?: return text
+            val colorHex = when {
+                value < 3.9 -> "#EF4444"
+                value <= 7.8 -> "#4ADE80"
+                value <= 10.0 -> "#10B981"
+                value <= 13.9 -> "#F59E0B"
+                else -> "#EF4444"
+            }
+            val matchedStr = fbMatch.value
+            val replacement = "<font color='$colorHex'><b>$matchedStr</b></font>"
+            val htmlText = text.replaceFirst(matchedStr, replacement)
+            return HtmlCompat.fromHtml(htmlText, HtmlCompat.FROM_HTML_MODE_LEGACY)
+        }
+
         val numStr = match.groupValues[1].replace(',', '.')
-        val value = numStr.toDoubleOrNull() ?: return text
+        val unitStr = match.groupValues[2]
+        val rawValue = numStr.toDoubleOrNull() ?: return text
+        val isMgDl = unitStr.equals("mg/dL", ignoreCase = true) || unitStr.equals("мг/дл", ignoreCase = true)
+        val valueMmol = if (isMgDl) rawValue / 18.0182 else rawValue
 
         val colorHex = when {
-            value < 3.9 -> "#EF4444"
-            value <= 7.8 -> "#4ADE80"
-            value <= 10.0 -> "#10B981"
-            value <= 13.9 -> "#F59E0B"
+            valueMmol < 3.9 -> "#EF4444"
+            valueMmol <= 7.8 -> "#4ADE80"
+            valueMmol <= 10.0 -> "#10B981"
+            valueMmol <= 13.9 -> "#F59E0B"
             else -> "#EF4444"
         }
 
@@ -2549,7 +2596,7 @@ object GlucoseAlertManager {
 
         val isRu = try {
             val prefs = context.getSharedPreferences("tirup_user_settings", Context.MODE_PRIVATE)
-            val lang = prefs.getString("language", null)
+            val lang = prefs.getString("key_language", null) ?: prefs.getString("language", null)
             if (lang != null) lang.equals("RU", ignoreCase = true)
             else java.util.Locale.getDefault().language.lowercase() in listOf("ru", "be", "kk", "uk")
         } catch (_: Exception) { true }

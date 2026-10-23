@@ -21,7 +21,6 @@ android {
     signingConfigs {
         create("release") {
             val keystoreFile = rootProject.file("tirup.jks").takeIf { it.exists() }
-                ?: rootProject.file("../DiaNight/dianight.jks").takeIf { it.exists() }
             val storePass = localProperties.getProperty("RELEASE_STORE_PASSWORD")
             val keyPass = localProperties.getProperty("RELEASE_KEY_PASSWORD")
             val alias = localProperties.getProperty("RELEASE_KEY_ALIAS") ?: "tirup"
@@ -95,9 +94,10 @@ android {
     }
 
     applicationVariants.all {
+        val variantName = buildType.name
         outputs.all {
             (this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl)?.outputFileName =
-                "TIRUp-v${versionName}-release.apk"
+                "TIRUp-v${versionName}-${variantName}.apk"
         }
     }
 }

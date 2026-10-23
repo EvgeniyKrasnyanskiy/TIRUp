@@ -210,19 +210,21 @@ class FloatingBubbleService : Service() {
                         miniCountdownJob = serviceScope.launch {
                             delay(450)
                             isCountdownActive = true
+                            val isRu = lastKnownSettings?.language?.equals("RU", ignoreCase = true)
+                                ?: (java.util.Locale.getDefault().language.lowercase() in listOf("ru", "be", "kk", "uk"))
 
                             // 3 seconds left
-                            showCountdownToast("⏳ Удерживайте ещё 3 сек. для отключения")
+                            showCountdownToast(if (isRu) "⏳ Удерживайте ещё 3 сек. для отключения" else "⏳ Hold 3 more sec to disable")
                             vibrateTick()
                             delay(1000)
 
                             // 2 seconds left
-                            showCountdownToast("⏳ Удерживайте ещё 2 сек. для отключения")
+                            showCountdownToast(if (isRu) "⏳ Удерживайте ещё 2 сек. для отключения" else "⏳ Hold 2 more sec to disable")
                             vibrateTick()
                             delay(1000)
 
                             // 1 second left
-                            showCountdownToast("⏳ Удерживайте ещё 1 сек. для отключения")
+                            showCountdownToast(if (isRu) "⏳ Удерживайте ещё 1 сек. для отключения" else "⏳ Hold 1 more sec to disable")
                             vibrateTick()
                             delay(1000)
 
@@ -230,7 +232,11 @@ class FloatingBubbleService : Service() {
                             isDisableTriggered = true
                             vibrateSuccess()
                             cancelCountdownToast()
-                            Toast.makeText(applicationContext, "Постоянный кружок отключён", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                applicationContext,
+                                if (isRu) "Постоянный кружок отключён" else "Always-on bubble disabled",
+                                Toast.LENGTH_SHORT
+                            ).show()
 
                             // Disable isFloatingBubbleAlwaysVisible in repository
                             try {
