@@ -186,6 +186,40 @@ fun BleBridgeHelpDialog(
                         )
                     }
                 }
+
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = if (isRu) "🛡️ Надёжность в фоне и правила Android:" else "🛡️ Background Reliability & Android Rules:",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = if (isRu)
+                                "• Геолокация (GPS) обязательна: на телефоне Приёмника должны быть включены системный тумблер Геолокации и разрешение «Точная геопозиция» (даже на Android 12–15). Без этого прошивки Xiaomi (HyperOS/MIUI), Samsung и Honor блокируют приём BLE-пакетов при выключенном экране.\n\n" +
+                                "• Обход 30-минутного лимита Android: система Android скрытно усыпляет любой непрерывный BLE-сканер через 30 минут. TIRUp будит радиомодуль каждые 5 минут через точный будильник и на 27-й минуте делает превентивный бесшовный перезапуск сканера.\n\n" +
+                                "• Защита слотов Bluetooth: встроенный анти-спам фильтр (кулдаун 60 сек) и автоочистка слотов GattService предотвращают зависание системного Bluetooth-драйвера.\n\n" +
+                                "• Эко-режим и автопробуждение (Self-Healing): после 1 часа полной радиотишины Приёмник переходит в сверхэкономичный режим, а при первом же пойманном пакете мгновенно включает максимальную чувствительность.\n\n" +
+                                "• Поведение в режиме сна (Doze) и приоритет: при приходе свежего замера от датчика Вещатель удерживает аппаратный WakeLock на всё время импульса (5–10 сек). Если связь самого телефона-источника с датчиком потеряна и экран выключен, холостые повторы старой точки в глубоком сне замедляются для экономии батареи. На Приёмнике пакеты BLE имеют приоритет над облаком Nightscout и защищены от дублей."
+                            else
+                                "• Location (GPS) Required: keep the system Location toggle ON and grant 'Precise Location' on the Observer phone (even on Android 12–15). Otherwise OEMs like Xiaomi (HyperOS/MIUI), Samsung, and Honor block background BLE packets when the screen is off.\n\n" +
+                                "• 27-Min AOSP Throttling Guard: Android silently demotes continuous BLE scans after 30 minutes. TIRUp runs a 5-minute exact alarm watchdog and performs a clean proactive scanner reset at the 27-minute mark.\n\n" +
+                                "• Bluetooth Slot Protection: a 60s anti-spam cooldown and explicit GattService slot cleanup prevent system Bluetooth stack deadlocks.\n\n" +
+                                "• Adaptive Eco Mode & Self-Healing: after 1 hour of radio silence, Observer enters low-power scanning and instantly restores low-latency mode upon detecting the very first packet.\n\n" +
+                                "• Doze Behavior & Source Priority: each new sensor reading triggers a WakeLock-protected broadcast burst (5–10s). If the broadcaster phone loses sensor connection while in deep Doze, idle repeat heartbeats are throttled to save battery. On the Observer, BLE packets take priority over Nightscout cloud without duplicates.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
             }
         },
         confirmButton = {

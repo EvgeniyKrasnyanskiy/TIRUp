@@ -472,13 +472,13 @@ class UserManualPdfGenerator(private val context: Context) {
                 )
                 flow.bullet(
                     if (isRu) "Семейный BLE-мост (Вещатель — Приёмник)" else "Family BLE Bridge",
-                    if (isRu) "Передача сахара ребёнка родителю по Bluetooth LE без Wi-Fi и SIM. Блок оснащён общим тумблером питания (зелёный индикатор для приёмника, синий для вещателя) и кнопками выбора режима («Вещатель» / «Приёмник»). Телефон ребёнка настраивается как «Вещатель» (импульс 15 с на замер, микропотребление <0.8% батареи/сутки), телефон родителя — как «Приёмник». Пакет шифруется 3-буквенным кодом семьи (Family PIN, A–Z)."
-                    else "Stream patient glucose to parent over BLE without Wi-Fi or SIM. Features a master header switch (green indicator for observer, blue for broadcaster) and dedicated mode buttons ('Broadcaster' / 'Observer'). Broadcaster pulses 15s bursts (<0.8% battery/day), Observer receives. Secured with 3-letter uppercase Family PIN (A–Z)."
+                    if (isRu) "Передача сахара ребёнка родителю по Bluetooth LE без Wi-Fi и SIM. Блок оснащён общим тумблером питания (зелёный индикатор для приёмника, синий для вещателя) и кнопками выбора режима («Вещатель» / «Приёмник»). Телефон ребёнка работает как «Вещатель» с адаптивным импульсом под защитой WakeLock (5 с для 1-минутных датчиков, 10 с для 5-минутных, расход <0.5% батареи/сутки), телефон родителя — как «Приёмник». Компактный 16-байтный пакет защищён 3-буквенным кодом семьи (Family PIN, A–Z) и контрольной суммой CRC-8."
+                    else "Stream patient glucose to parent over BLE without Wi-Fi or SIM. Features a master header switch (green indicator for observer, blue for broadcaster) and mode buttons ('Broadcaster' / 'Observer'). Broadcaster pulses adaptive WakeLock bursts (5s for 1-min sensors, 10s for 5-min sensors, <0.5% battery/day), Observer receives. Compact 16-byte packets are protected with a 3-letter Family PIN (A–Z) and CRC-8 checksum."
                 )
                 flow.bullet(
                     if (isRu) "Режим Long Range (LE Coded PHY)" else "Long Range Mode (LE Coded PHY)",
                     if (isRu) "На чипсетах Bluetooth 5.0+ режим Coded PHY (S=8) повышает потенциал радиолинии на 8–10 dBm, расширяя дальность в 2–4 раза (до 30–50 м сквозь стены). При отсутствии поддержки аппаратно откатывается на Legacy 1M. Сканер приёмника слушает оба диапазона автоматически."
-                    else "On Bluetooth 5.0+, Coded PHY (S=8) boosts link budget by 8-10 dBm, extending range 2-4x (up to 30-50m through walls). Observer operates in dual-mode automatically."
+                    else "On Bluetooth 5.0+, Coded PHY (S=8) boosts link budget by 8-10 dBm, extending range 2-4x (up to 30-50m through walls). Observer operates in dual-mode automatically with seamless fallback to Legacy 1M."
                 )
                 flow.bullet(
                     if (isRu) "Wi-Fi LAN Follower (локальный веб-сервер xDrip+)" else "Wi-Fi LAN Follower (Local xDrip+ Server)",
@@ -491,9 +491,9 @@ class UserManualPdfGenerator(private val context: Context) {
                     else "Hidden feature (available only via developer settings): background ingestion of glucose, IoB, CoB and master battery via Nightscout REST API (/api/v1/current, /entries, /pebble, /devicestatus). Features instantaneous status polling, unified battery source priority (BLE -> Wi-Fi LAN -> Nightscout), and 25s deduplication."
                 )
                 flow.bullet(
-                    if (isRu) "Метрики радиоканала, защита AOSP и Адаптивный эко-режим (1 час)" else "Radio Metrics, AOSP Rate-Limit Guard & Adaptive Eco Mode (1h)",
-                    if (isRu) "Приёмник BLE оснащён защитой от троттлинга AOSP (не более 5 стартов сканирования за 30 с) и оптимизированными фильтрами ScanFilter для стабильного приёма каждые 3 с. Рассчитывает скользящий 1-часовой PDR (% успешно доставленных пакетов) и средний RSSI. При паузе в вещании >1 часа доступен опциональный эко-режим. Кнопка «Поиск вещателя (60 сек)» запускает радарную анимацию сканирования."
-                    else "BLE Observer incorporates AOSP scan rate-limit protection (max 5 scan starts per 30s) and optimized ScanFilter rules for reliable delivery every 3s. Tracks 1-hour PDR (% delivery with sensor cadence adaptation) and average RSSI. Includes optional Eco Mode after >1h silence. 'Master Search (60s)' triggers live radar sweep."
+                    if (isRu) "Защита сканера AOSP (27 мин), слоты GattService и Адаптивный эко-режим" else "AOSP 27-Min Throttling Guard, GattService Slots & Adaptive Eco Mode",
+                    if (isRu) "В Android встроены 2 жёстких ограничения BLE: лимит 5 запусков за 30 с и скрытое усыпление любого сканера через 30 мин непрерывной работы. Приёмник TIRUp защищён 60-сек анти-спам кулдауном, автоочисткой аппаратных слотов GattService при ошибках, 5-минутным точным будильником Keep-Alive и превентивным перезапуском сканера на 27-й минуте. После 1 часа радиотишины включается эко-режим (LOW_POWER) с мгновенным возвратом чувствительности (Self-Healing) при первом же пойманном пакете. Записи BLE имеют приоритет над облаком Nightscout без дублей в БД."
+                    else "Android enforces two strict BLE limits: max 5 starts per 30s and silent demotion of continuous scans after 30 minutes. TIRUp protects the Observer with a 60s cooldown, explicit GattService slot cleanup on error, a 5-min exact Keep-Alive alarm, and a proactive scanner reset at the 27-minute mark. After 1h of silence, Eco Mode (LOW_POWER) activates with instant Self-Healing back to LOW_LATENCY upon the first received packet. BLE readings take priority over Nightscout cloud without DB duplicates."
                 )
                 flow.bullet(
                     if (isRu) "Разница технологий: BLE-мост TIRUp vs Зеркало Juggluco" else "TIRUp BLE vs Juggluco Mirroring",
@@ -502,9 +502,9 @@ class UserManualPdfGenerator(private val context: Context) {
                 )
                 flow.callout(
                     CalloutType.INFO,
-                    if (isRu) "📡 ДИАГНОСТИКА СИГНАЛА И БАТАРЕИ ПЕРЕДАТЧИКА:" else "📡 TRANSMITTER SIGNAL & BATTERY:",
-                    if (isRu) "В шторке уведомлений и в HUD приёмника отображаются уровень радиосигнала (RSSI dBm) и процент заряда батареи подопечного. Для быстрой проверки используйте «Тест дальности (5с)»."
-                    else "Notification and HUD widget display real-time transmitter RSSI (dBm) and battery %. Use 'Range Test (5s)' in Observer settings for immediate verification."
+                    if (isRu) "📡 ГЕОЛОКАЦИЯ НА ПРИЁМНИКЕ, РЕЖИМ DOZE И ДИАГНОСТИКА СИГНАЛА:" else "📡 OBSERVER LOCATION RULE, DOZE BEHAVIOR & SIGNAL DIAGNOSTICS:",
+                    if (isRu) "На телефоне Приёмника обязательно держите включённым системный тумблер Геолокации (GPS) и разрешение «Точная геопозиция» даже на Android 12–15 — без этого прошивки Xiaomi/Samsung/Honor блокируют приём BLE-пакетов при погашенном экране. Если у самого Вещателя пропала связь с датчиком в глубоком сне (Doze), холостые повторы старой точки замедляются для экономии батареи, а Приёмник штатно поднимет тревогу устаревания данных."
+                    else "Keep system Location (GPS) ON and grant 'Precise Location' on the Observer phone even on Android 12–15, otherwise Xiaomi/Samsung/Honor firmwares block BLE packets when the screen is off. If the Broadcaster loses sensor connection while in deep Doze, idle repeat heartbeats throttle down to save battery while the Observer reliably triggers the stale-data alarm."
                 )
 
                 // =========================================================================
