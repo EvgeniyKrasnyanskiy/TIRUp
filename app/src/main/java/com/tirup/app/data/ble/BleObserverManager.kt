@@ -50,7 +50,15 @@ data class BleRadioChannelMetrics(
     val isEcoMode: Boolean = false
 )
 
+data class BleLiveTelemetry(
+    val lastRadioContactMs: Long = 0L,
+    val lastRssi: Int? = null,
+    val lastMasterBattery: Int = -1
+)
+
 object BleObserverManager {
+    private val _liveTelemetryFlow = MutableStateFlow(BleLiveTelemetry())
+    val liveTelemetryFlow: StateFlow<BleLiveTelemetry> = _liveTelemetryFlow.asStateFlow()
 
     private const val TAG = "BleObserverManager"
     const val ECO_SILENCE_TIMEOUT_MS = 3_600_000L // 1 hour (60 minutes without transmitter packet)
@@ -410,7 +418,8 @@ object BleObserverManager {
             val ble = userSettings.bleBridgeSettings
             if (!ble.isEnabled || ble.role != BleBridgeRole.OBSERVER) return@launch
 
-            val lastContact = ble.lastRadioContactMs.coerceAtLeast(ble.lastPacketTimestamp)
+            val liveContact = _liveTelemetryFlow.value.lastRadioContactMs
+            val lastContact = maxOf(ble.lastRadioContactMs, ble.lastPacketTimestamp, liveContact)
             val silenceMs = if (lastContact > 0L) now - lastContact else Long.MAX_VALUE
             val cadence = detectedCadenceIntervalMs.coerceAtLeast(60_000L)
             // If cadence is 1m, 75s silence means 1-2 missed readings. If 5m, 330s silence means missed reading.
@@ -1007,52 +1016,45 @@ object BleObserverManager {
 
         // Check if this is a repeat packet from the same burst or a fallback heartbeat with the same reading timestamp
         if (packet.timestamp == 0L || packet.valueMmol <= 0.1) {
-            // Pure range test ping without real sensor reading: update radio contact and emit event without inserting into Room DB
+            // Pure range test ping without real sensor reading: update in-memory radio contact and emit event without inserting into Room DB or disk I/O
             Log.i(TAG, "Test ping packet received: ts=${packet.timestamp}, rssi=$rssi (no sensor reading)")
+            _liveTelemetryFlow.value = BleLiveTelemetry(
+                lastRadioContactMs = now,
+                lastRssi = rssi,
+                lastMasterBattery = if (packet.batteryPercent in 0..100) packet.batteryPercent else _liveTelemetryFlow.value.lastMasterBattery
+            )
             _packetReceivedEvent.tryEmit(Pair(packet, rssi))
             onPacketReceivedGracefullyCompleteBoost()
-            scope.launch {
-                try {
-                    val currentSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
-                    val updatedBle = currentSettings.bleBridgeSettings.copy(
-                        lastRadioContactMs = now,
-                        lastRssi = rssi,
-                        lastMasterBattery = if (packet.batteryPercent in 0..100) packet.batteryPercent else currentSettings.bleBridgeSettings.lastMasterBattery
-                    )
-                    settingsRepository.updateSettings(currentSettings.copy(bleBridgeSettings = updatedBle))
-                } catch (_: Exception) {}
-            }
             return
         }
 
         if (packet.timestamp <= lastHandledTimestamp) {
-            // Heartbeat or repeat packet within burst: keeps watchdog alive without cluttering Room DB
-            if (now - lastHeartbeatLogMs >= 3000L) {
+            // Heartbeat or repeat packet within burst: update lightweight in-memory telemetry without disk I/O or settings churn
+            if (now - lastHeartbeatLogMs >= 5000L) {
                 lastHeartbeatLogMs = now
-                Log.i(TAG, "Heartbeat received: ts=${packet.timestamp}, bg=${packet.valueMmol}, rssi=$rssi (duplicate, connection alive)")
+                Log.d(TAG, "Heartbeat received: ts=${packet.timestamp}, bg=${packet.valueMmol}, rssi=$rssi (duplicate, connection alive)")
             }
-            scope.launch {
-                try {
-                    val currentSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
-                    val updatedBle = currentSettings.bleBridgeSettings.copy(
-                        lastRadioContactMs = now,
-                        lastRssi = rssi,
-                        lastMasterBattery = if (packet.batteryPercent in 0..100) packet.batteryPercent else currentSettings.bleBridgeSettings.lastMasterBattery
-                    )
-                    settingsRepository.updateSettings(currentSettings.copy(bleBridgeSettings = updatedBle))
-                } catch (_: Exception) {}
-            }
+            _liveTelemetryFlow.value = BleLiveTelemetry(
+                lastRadioContactMs = now,
+                lastRssi = rssi,
+                lastMasterBattery = if (packet.batteryPercent in 0..100) packet.batteryPercent else _liveTelemetryFlow.value.lastMasterBattery
+            )
             return
         }
 
         lastHandledTimestamp = packet.timestamp
         Log.i(TAG, "Received valid BLE glucose packet: ts=${packet.timestamp}, bg=${packet.valueMmol}, rssi=$rssi, bat=${packet.batteryPercent}%")
+        _liveTelemetryFlow.value = BleLiveTelemetry(
+            lastRadioContactMs = now,
+            lastRssi = rssi,
+            lastMasterBattery = if (packet.batteryPercent in 0..100) packet.batteryPercent else _liveTelemetryFlow.value.lastMasterBattery
+        )
         _packetReceivedEvent.tryEmit(Pair(packet, rssi))
         onPacketReceivedGracefullyCompleteBoost()
 
         scope.launch {
             try {
-                // Update diagnostic info in settings
+                // Update diagnostic info in settings on real new readings only
                 val currentSettings = settingsRepository.getSettings().firstOrNull() ?: return@launch
                 val updatedBle = currentSettings.bleBridgeSettings.copy(
                     lastPacketTimestamp = packet.timestamp,

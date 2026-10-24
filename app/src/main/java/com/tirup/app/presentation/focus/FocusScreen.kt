@@ -2532,8 +2532,9 @@ private fun BleBridgeBadge(
         } else {
             // Observer Idle: Bluetooth icon + age of last radio contact / glucose reading
             val isEcoMode by BleObserverManager.isEcoModeFlow.collectAsState()
+            val liveTelemetry by BleObserverManager.liveTelemetryFlow.collectAsState()
             val readingTs = bleSettings.lastPacketTimestamp
-            val contactTs = bleSettings.lastRadioContactMs
+            val contactTs = if (liveTelemetry.lastRadioContactMs > 0L) liveTelemetry.lastRadioContactMs else bleSettings.lastRadioContactMs
             val nowMs = System.currentTimeMillis()
             val readingAgeMin = if (readingTs > 0L) ((nowMs - readingTs) / 60_000L).toInt() else -1
             val contactAgeMin = if (contactTs > 0L) ((nowMs - contactTs) / 60_000L).toInt() else -1
@@ -2688,8 +2689,11 @@ private fun BleStatusDialog(
         }
         else -> {
             // Observer
+            val liveTelemetry by BleObserverManager.liveTelemetryFlow.collectAsState()
             val readingTs = bleSettings.lastPacketTimestamp
-            val contactTs = if (bleSettings.lastRadioContactMs > 0L) bleSettings.lastRadioContactMs else bleSettings.lastPacketTimestamp
+            val contactTs = if (liveTelemetry.lastRadioContactMs > 0L) liveTelemetry.lastRadioContactMs else (if (bleSettings.lastRadioContactMs > 0L) bleSettings.lastRadioContactMs else bleSettings.lastPacketTimestamp)
+            val effectiveRssi = liveTelemetry.lastRssi ?: bleSettings.lastRssi
+            val effectiveBat = if (liveTelemetry.lastMasterBattery in 0..100) liveTelemetry.lastMasterBattery else bleSettings.lastMasterBattery
             val nowMs = System.currentTimeMillis()
 
             val readingAgeMins = if (readingTs > 0L) (nowMs - readingTs) / 60000L else null
@@ -2710,15 +2714,15 @@ private fun BleStatusDialog(
                 }
             } else if (isRu) "нет данных" else "no data"
 
-            val signalQuality = if (bleSettings.lastRssi != 0) {
+            val signalQuality = if (effectiveRssi != 0) {
                 when {
-                    bleSettings.lastRssi >= -70 -> if (isRu) "отличный (${bleSettings.lastRssi} dBm)" else "excellent (${bleSettings.lastRssi} dBm)"
-                    bleSettings.lastRssi >= -85 -> if (isRu) "хороший (${bleSettings.lastRssi} dBm)" else "good (${bleSettings.lastRssi} dBm)"
-                    else -> if (isRu) "слабый (${bleSettings.lastRssi} dBm)" else "weak (${bleSettings.lastRssi} dBm)"
+                    effectiveRssi >= -70 -> if (isRu) "отличный (${effectiveRssi} dBm)" else "excellent (${effectiveRssi} dBm)"
+                    effectiveRssi >= -85 -> if (isRu) "хороший (${effectiveRssi} dBm)" else "good (${effectiveRssi} dBm)"
+                    else -> if (isRu) "слабый (${effectiveRssi} dBm)" else "weak (${effectiveRssi} dBm)"
                 }
             } else if (isRu) "нет" else "none"
 
-            val batStr = if (bleSettings.lastMasterBattery in 0..100) "${bleSettings.lastMasterBattery}%" else if (isRu) "нет данных" else "no data"
+            val batStr = if (effectiveBat in 0..100) "${effectiveBat}%" else if (isRu) "нет данных" else "no data"
 
             val isObserverLongRangeActive by BleObserverManager.isLongRangeScanActive.collectAsState()
             val channelMetrics by BleObserverManager.channelMetricsFlow.collectAsState()
