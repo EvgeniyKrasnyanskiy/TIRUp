@@ -900,6 +900,7 @@ fun CompactPeriodSelector(
     ) {
         primaryPeriods.forEach { period ->
             val isSelected = selectedPeriod == period
+            val isAgpPeriod = period == TrendPeriod.PERIOD_14D
             Surface(
                 shape = RoundedCornerShape(10.dp),
                 color = if (isSelected) ActionBlue else MaterialTheme.colorScheme.surfaceVariant,
@@ -908,11 +909,14 @@ fun CompactPeriodSelector(
                     if (isSelected) ActionBlue else MaterialTheme.colorScheme.outline
                 ),
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(if (isAgpPeriod) 1.35f else 0.93f)
                     .clickable { onPeriodSelected(period) }
             ) {
                 Box(
-                    modifier = Modifier.padding(vertical = 7.dp, horizontal = 2.dp),
+                    modifier = Modifier.padding(
+                        vertical = 7.dp,
+                        horizontal = if (isAgpPeriod) 1.dp else 2.dp
+                    ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -920,7 +924,8 @@ fun CompactPeriodSelector(
                         style = MaterialTheme.typography.labelSmall,
                         color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        fontSize = 10.5.sp,
+                        fontSize = if (isAgpPeriod) 9.5.sp else 10.5.sp,
+                        softWrap = false,
                         maxLines = 1
                     )
                 }
@@ -928,7 +933,7 @@ fun CompactPeriodSelector(
         }
 
         // Dropdown Menu Button (Gear / Custom / 1Y / All)
-        Box(modifier = Modifier.weight(1f)) {
+        Box(modifier = Modifier.weight(0.93f)) {
             Surface(
                 shape = RoundedCornerShape(10.dp),
                 color = if (isDropdownSelected) ActionBlue else MaterialTheme.colorScheme.surfaceVariant,
