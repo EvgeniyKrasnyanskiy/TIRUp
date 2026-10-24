@@ -715,6 +715,7 @@ object AutoBackupManager {
         writer.name("dismissedWeeklyDigestTimestamp").value(settings.dismissedWeeklyDigestTimestamp)
         writer.name("bestStreakDays").value(settings.bestStreakDays)
         writer.name("lastStreakCelebratedDays").value(settings.lastStreakCelebratedDays)
+        writer.name("lastStreakCelebratedDate").value(settings.lastStreakCelebratedDate)
         writer.name("showTreatmentsOnChart").value(settings.showTreatmentsOnChart)
         writer.name("showPredictionOnChart").value(settings.showPredictionOnChart)
         writer.name("chartZoomHours").value(settings.chartZoomHours)
@@ -2015,6 +2016,7 @@ object AutoBackupManager {
         var dismissedWeeklyDigest = 0L
         var bestStreak = 0
         var lastStreakCelebrated = 0
+        var lastStreakCelebratedDate = 0L
         var showTreatments = true
         var showPrediction = true
         var chartZoomHours = 24
@@ -2269,6 +2271,7 @@ object AutoBackupManager {
                 "dismissedWeeklyDigestTimestamp" -> dismissedWeeklyDigest = reader.nextLong()
                 "bestStreakDays" -> bestStreak = reader.nextInt()
                 "lastStreakCelebratedDays" -> lastStreakCelebrated = reader.nextInt()
+                "lastStreakCelebratedDate" -> lastStreakCelebratedDate = reader.nextLong()
                 "showTreatmentsOnChart" -> showTreatments = reader.nextBoolean()
                 "showPredictionOnChart" -> showPrediction = reader.nextBoolean()
                 "chartZoomHours" -> chartZoomHours = reader.nextInt()
@@ -2367,6 +2370,7 @@ object AutoBackupManager {
             dismissedWeeklyDigestTimestamp = dismissedWeeklyDigest,
             bestStreakDays = bestStreak,
             lastStreakCelebratedDays = lastStreakCelebrated,
+            lastStreakCelebratedDate = lastStreakCelebratedDate,
             showTreatmentsOnChart = showTreatments,
             showPredictionOnChart = showPrediction,
             chartZoomHours = chartZoomHours,

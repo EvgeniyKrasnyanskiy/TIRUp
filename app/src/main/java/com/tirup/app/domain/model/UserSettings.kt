@@ -158,6 +158,7 @@ data class UserSettings(
     val lastBackupTimestamp: Long = 0L,
     val hasSeenOnboarding: Boolean = false,
     val lastStreakCelebratedDays: Int = 0,
+    val lastStreakCelebratedDate: Long = 0L,
     val bestStreakDays: Int = 0,
     val metricsOrder: List<String> = DEFAULT_METRICS_ORDER,
     val hiddenMetrics: List<String> = emptyList(),

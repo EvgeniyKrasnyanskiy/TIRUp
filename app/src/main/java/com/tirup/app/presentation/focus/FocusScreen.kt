@@ -243,8 +243,25 @@ fun FocusScreen(
     val showExpiredLancetDialog = remember(lancetStatus.installedAt, lancetStatus.durationDays, userSettings.isLancetReminderEnabled) { userSettings.isLancetReminderEnabled && lancetStatus.isExpired }
     var lancetExpiredDismissed by rememberSaveable { mutableStateOf(false) }
 
-    val shouldCelebrateStreak = state.streakDays >= 2 && state.streakDays > userSettings.lastStreakCelebratedDays
-    var showStreakDialog by remember(shouldCelebrateStreak) { mutableStateOf(shouldCelebrateStreak) }
+    val todayStart = remember {
+        java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+    var streakCelebratedInCurrentSession by rememberSaveable { mutableStateOf(false) }
+    val shouldCelebrateStreak = state.streakDays >= 2 &&
+            !streakCelebratedInCurrentSession &&
+            userSettings.lastStreakCelebratedDate != todayStart &&
+            state.streakDays > userSettings.lastStreakCelebratedDays
+    var showStreakDialog by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(shouldCelebrateStreak) {
+        if (shouldCelebrateStreak) {
+            showStreakDialog = true
+        }
+    }
 
     val blePacketReceivedAt by viewModel.blePacketReceivedAt.collectAsState()
     var showBleStatusDialog by rememberSaveable { mutableStateOf(false) }
@@ -1367,6 +1384,7 @@ fun FocusScreen(
             unit = userSettings.unit,
             onDismiss = {
                 showStreakDialog = false
+                streakCelebratedInCurrentSession = true
                 viewModel.markStreakCelebrated(state.streakDays)
             }
         )

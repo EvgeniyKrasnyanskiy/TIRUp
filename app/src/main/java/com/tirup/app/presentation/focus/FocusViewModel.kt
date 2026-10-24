@@ -372,9 +372,20 @@ class FocusViewModel(
     }
 
     fun markStreakCelebrated(days: Int) {
-        val currentSettings = _uiState.value.userSettings
+        val todayStart = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
         viewModelScope.launch {
-            settingsRepository.updateSettings(currentSettings.copy(lastStreakCelebratedDays = days))
+            val freshSettings = settingsRepository.getSettings().firstOrNull() ?: _uiState.value.userSettings
+            settingsRepository.updateSettings(
+                freshSettings.copy(
+                    lastStreakCelebratedDays = days,
+                    lastStreakCelebratedDate = todayStart
+                )
+            )
         }
     }
 
