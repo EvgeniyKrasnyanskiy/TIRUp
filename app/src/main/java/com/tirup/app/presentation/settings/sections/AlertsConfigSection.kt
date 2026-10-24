@@ -37,6 +37,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -259,6 +260,8 @@ fun AlertsConfigSection(
                     var nightToneIndex by remember { mutableIntStateOf(0) }
                     var lastDayTestClickTime by remember { mutableLongStateOf(0L) }
                     var lastNightTestClickTime by remember { mutableLongStateOf(0L) }
+                    var dayVolume by remember(alerts.alertVolumePercent) { mutableFloatStateOf(alerts.alertVolumePercent.toFloat()) }
+                    var nightVolume by remember(alerts.nightAlertVolumePercent) { mutableFloatStateOf(alerts.nightAlertVolumePercent.toFloat()) }
 
                     LaunchedEffect(lastDayTestClickTime) {
                         if (lastDayTestClickTime > 0L) {
@@ -343,9 +346,10 @@ fun AlertsConfigSection(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Slider(
-                                    value = alerts.alertVolumePercent.toFloat(),
-                                    onValueChange = { newVal ->
-                                        val stepped = newVal.roundToInt().coerceIn(1, 100)
+                                    value = dayVolume,
+                                    onValueChange = { dayVolume = it },
+                                    onValueChangeFinished = {
+                                        val stepped = dayVolume.roundToInt().coerceIn(1, 100)
                                         if (stepped != alerts.alertVolumePercent) {
                                             onUpdateAlertSettings(alerts.copy(alertVolumePercent = stepped))
                                         }
@@ -359,7 +363,7 @@ fun AlertsConfigSection(
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = "${alerts.alertVolumePercent}%",
+                                    text = "${dayVolume.roundToInt()}%",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = ActionBlue,
@@ -467,9 +471,10 @@ fun AlertsConfigSection(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Slider(
-                                    value = alerts.nightAlertVolumePercent.toFloat(),
-                                    onValueChange = { newVal ->
-                                        val stepped = newVal.roundToInt().coerceIn(1, 100)
+                                    value = nightVolume,
+                                    onValueChange = { nightVolume = it },
+                                    onValueChangeFinished = {
+                                        val stepped = nightVolume.roundToInt().coerceIn(1, 100)
                                         if (stepped != alerts.nightAlertVolumePercent) {
                                             onUpdateAlertSettings(alerts.copy(nightAlertVolumePercent = stepped))
                                         }
@@ -483,7 +488,7 @@ fun AlertsConfigSection(
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = "${alerts.nightAlertVolumePercent}%",
+                                    text = "${nightVolume.roundToInt()}%",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = ActionBlue,

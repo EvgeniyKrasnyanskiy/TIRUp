@@ -47,6 +47,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -1257,6 +1258,7 @@ fun WidgetPreviewCard(
 
             AnimatedVisibility(visible = isExpanded) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    var localWidgetOpacity by remember(settings.widgetBackgroundOpacity) { mutableFloatStateOf(settings.widgetBackgroundOpacity.toFloat()) }
 
             // Live Interactive Preview Box on simulated wallpaper (5x1 Strip Widget)
             Box(
@@ -1278,10 +1280,10 @@ fun WidgetPreviewCard(
             ) {
                 Surface(
                     shape = RoundedCornerShape(14.dp),
-                    color = Color(0xFF0F172A).copy(alpha = settings.widgetBackgroundOpacity / 100f),
+                    color = Color(0xFF0F172A).copy(alpha = localWidgetOpacity / 100f),
                     border = BorderStroke(
                         1.dp,
-                        Color.White.copy(alpha = (settings.widgetBackgroundOpacity / 100f) * 0.22f)
+                        Color.White.copy(alpha = (localWidgetOpacity / 100f) * 0.22f)
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1427,9 +1429,10 @@ fun WidgetPreviewCard(
 
             // Slider from 0 to 100%
             Slider(
-                value = settings.widgetBackgroundOpacity.toFloat(),
-                onValueChange = { newVal ->
-                    onUpdateWidgetBackgroundOpacity(newVal.toInt())
+                value = localWidgetOpacity,
+                onValueChange = { localWidgetOpacity = it },
+                onValueChangeFinished = {
+                    onUpdateWidgetBackgroundOpacity(localWidgetOpacity.toInt())
                 },
                 valueRange = 0f..100f,
                 steps = 19,
