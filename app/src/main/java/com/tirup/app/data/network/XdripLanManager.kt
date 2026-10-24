@@ -465,7 +465,7 @@ object XdripLanManager {
                     // Update widgets, lockscreen notification and evaluate alerts if reading is fresh (< 15 min)
                     if (readingNow - latest.timestamp < 15 * 60_000L) {
                         GlucoseAlertManager.refreshLockscreenNotificationAndWidgets(ctx, userSettings, latest)
-                        val recent = glucoseRepo.getRecentReadings(30).firstOrNull() ?: listOf(latest)
+                        val recent = glucoseRepo.getRecentReadings(150).firstOrNull() ?: listOf(latest)
                         GlucoseAlertManager.checkAndAlert(
                             context = ctx,
                             recentReadings = recent,

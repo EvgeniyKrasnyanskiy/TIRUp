@@ -1875,19 +1875,29 @@ object GlucoseAlertManager {
         minutes: Int
     ): Boolean {
         if (readings.isEmpty()) return false
-        val windowMs = minutes * 60 * 1000L
-        val now = readings.last().timestamp
-        val windowReadings = readings.filter { now - it.timestamp <= windowMs }
+        val latest = readings.last()
+        val isLatestOutOfRange = if (isLow) latest.valueMmol < threshold else latest.valueMmol > threshold
+        if (!isLatestOutOfRange) return false
 
-        if (windowReadings.size < 3) return false
-        val spanMs = windowReadings.last().timestamp - windowReadings.first().timestamp
-        if (spanMs < (minutes - 3) * 60 * 1000L) return false
-
-        return if (isLow) {
-            windowReadings.all { it.valueMmol < threshold }
-        } else {
-            windowReadings.all { it.valueMmol > threshold }
+        // Take continuous out-of-range readings ending at latest reading
+        val outOfRangeReadings = readings.takeLastWhile {
+            if (isLow) it.valueMmol < threshold else it.valueMmol > threshold
         }
+        val minPoints = if (minutes >= 60) 5 else 3
+        if (outOfRangeReadings.size < minPoints) return false
+
+        // Ensure no unrealistic gaps between consecutive points (max 15 min gap allowed)
+        for (i in 1 until outOfRangeReadings.size) {
+            val gapMs = kotlin.math.abs(outOfRangeReadings[i].timestamp - outOfRangeReadings[i - 1].timestamp)
+            if (gapMs > 15 * 60_000L) {
+                return false
+            }
+        }
+
+        val durationMs = latest.timestamp - outOfRangeReadings.first().timestamp
+        // Allow a small grace margin of 90s for CGM sampling jitter (e.g. 5m05s vs 5m00s)
+        val requiredDurationMs = (minutes * 60_000L) - 90_000L
+        return durationMs >= requiredDurationMs
     }
 
     private fun formatBgValue(valueMmol: Double, unit: com.tirup.app.domain.model.GlucoseUnit): String {

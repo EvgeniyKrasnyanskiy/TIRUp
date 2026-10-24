@@ -614,7 +614,7 @@ object NightscoutStatusManager {
                 appContext?.let { ctx ->
                     val userSettings = cachedSettingsRepo?.getSettings()?.firstOrNull() ?: return@let
                     GlucoseAlertManager.refreshLockscreenNotificationAndWidgets(ctx, userSettings, latest)
-                    val recent = repo.getRecentReadings(30).firstOrNull() ?: listOf(latest)
+                    val recent = repo.getRecentReadings(150).firstOrNull() ?: listOf(latest)
                     GlucoseAlertManager.checkAndAlert(
                         context = ctx,
                         recentReadings = recent,

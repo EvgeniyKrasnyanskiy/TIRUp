@@ -1402,7 +1402,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             repository.insertReading(reading)
             Log.i(TAG, "Successfully persisted reading: ${reading.valueMmol} mmol/L at ${reading.timestamp}")
 
-            val recentEntities = app.database.glucoseReadingDao().getRecentReadingsSync(25)
+            val recentEntities = app.database.glucoseReadingDao().getRecentReadingsSync(150)
             val recentDomain = recentEntities.map { it.toDomain() }
             val userSettings = app.settingsRepository.getSettings().first()
             com.tirup.app.data.alert.GlucoseAlertManager.checkAndAlert(

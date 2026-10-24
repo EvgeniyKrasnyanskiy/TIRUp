@@ -1075,7 +1075,7 @@ object BleObserverManager {
                 // Update widgets, lockscreen notification and clinical evaluations
                 GlucoseAlertManager.refreshLockscreenNotificationAndWidgets(context, currentSettings, newReading)
 
-                val recent = glucoseRepository.getRecentReadings(30).firstOrNull() ?: listOf(newReading)
+                val recent = glucoseRepository.getRecentReadings(150).firstOrNull() ?: listOf(newReading)
                 if (recent.size >= 2) {
                     val dt = Math.abs(recent[0].timestamp - recent[1].timestamp)
                     if (dt in 30_000L..150_000L) {
