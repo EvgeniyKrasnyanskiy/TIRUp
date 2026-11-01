@@ -184,6 +184,37 @@ class SettingsViewModel(
         }
     }
 
+    fun setShowGlucoseInStatusBar(enabled: Boolean) {
+        viewModelScope.launch {
+            val updated = _uiState.value.userSettings.copy(showGlucoseInStatusBar = enabled)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+            if (updated.isLockscreenNotificationEnabled) {
+                val latest = glucoseRepository.getLatestReading().firstOrNull()
+                val calendar = java.util.Calendar.getInstance().apply {
+                    set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    set(java.util.Calendar.MINUTE, 0)
+                    set(java.util.Calendar.SECOND, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                }
+                val todayDomain = withContext(Dispatchers.IO) {
+                    val todayEntities = database.glucoseReadingDao().getReadingsBetweenSync(
+                        calendar.timeInMillis,
+                        System.currentTimeMillis() + 60_000L
+                    )
+                    todayEntities.map { it.toDomain() }
+                }
+                com.tirup.app.data.alert.GlucoseAlertManager.updateLockscreenNotification(
+                    context = context,
+                    latestReading = latest,
+                    todayReadings = todayDomain,
+                    settings = updated,
+                    streakDays = glucoseRepository.getStreakDays().firstOrNull() ?: 0
+                )
+            }
+        }
+    }
+
     fun setHasSeenOnboarding(hasSeen: Boolean) {
         viewModelScope.launch {
             val updated = _uiState.value.userSettings.copy(hasSeenOnboarding = hasSeen)

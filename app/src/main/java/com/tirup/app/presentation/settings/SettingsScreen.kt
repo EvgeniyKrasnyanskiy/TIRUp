@@ -298,17 +298,6 @@ fun SettingsScreen(
         }
     }
 
-    val highlightAnim = rememberInfiniteTransition(label = "ble_highlight")
-    val highlightBorderAlpha by highlightAnim.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "ble_border"
-    )
-
     var hasSendSmsPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
@@ -698,7 +687,6 @@ fun SettingsScreen(
                                 isLanCardExpanded = isLanCardExpanded,
                                 onToggleExpanded = { isLanCardExpanded = !isLanCardExpanded },
                                 highlightLan = highlightLan,
-                                highlightBorderAlpha = highlightBorderAlpha,
                                 onUpdateLanSettings = { viewModel.updateXdripLanSettings(it) },
                                 onShowLanSettingsDialog = { showXdripLanDialog = true }
                             )
@@ -709,7 +697,6 @@ fun SettingsScreen(
                                 isBleCardExpanded = isBleCardExpanded,
                                 onToggleExpanded = { isBleCardExpanded = !isBleCardExpanded },
                                 highlightBle = highlightBle,
-                                highlightBorderAlpha = highlightBorderAlpha,
                                 latestReading = latestReading,
                                 blePermissionsLauncher = blePermissionLauncher,
                                 onUpdateBleSettings = { viewModel.updateBleBridgeSettings(it) },
@@ -785,7 +772,8 @@ fun SettingsScreen(
                             LockscreenNotificationCard(
                                 settings = settings,
                                 isRu = isRu,
-                                onSetLockscreenNotificationEnabled = { viewModel.setLockscreenNotificationEnabled(it) }
+                                onSetLockscreenNotificationEnabled = { viewModel.setLockscreenNotificationEnabled(it) },
+                                onToggleShowGlucoseInStatusBar = { viewModel.setShowGlucoseInStatusBar(it) }
                             )
 
                             FloatingGlucoseBubbleCard(

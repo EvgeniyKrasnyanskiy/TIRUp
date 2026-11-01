@@ -2,7 +2,9 @@ package com.tirup.app.data.backup
 
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
+import java.util.Calendar
 import android.util.JsonReader
 import android.util.JsonWriter
 import android.util.Log
@@ -516,13 +518,32 @@ object AutoBackupManager {
 
     private fun safeReplaceFile(tmp: File, target: File) {
         if (!tmp.exists()) return
-        val renamed = try {
-            if (target.exists()) target.delete()
-            tmp.renameTo(target)
+        val replaced = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                try {
+                    java.nio.file.Files.move(
+                        tmp.toPath(),
+                        target.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE
+                    )
+                    true
+                } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                    java.nio.file.Files.move(
+                        tmp.toPath(),
+                        target.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                    )
+                    true
+                }
+            } else {
+                if (target.exists()) target.delete()
+                tmp.renameTo(target)
+            }
         } catch (_: Exception) {
             false
         }
-        if (!renamed && tmp.exists()) {
+        if (!replaced && tmp.exists()) {
             try {
                 tmp.copyTo(target, overwrite = true)
                 tmp.delete()
@@ -570,6 +591,7 @@ object AutoBackupManager {
 
         writer.name("isAutoBackupEnabled").value(settings.isAutoBackupEnabled)
         writer.name("isLockscreenNotificationEnabled").value(settings.isLockscreenNotificationEnabled)
+        writer.name("showGlucoseInStatusBar").value(settings.showGlucoseInStatusBar)
         writer.name("widgetBackgroundOpacity").value(settings.widgetBackgroundOpacity)
         writer.name("isFloatingBubbleEnabled").value(settings.isFloatingBubbleEnabled)
         writer.name("isFloatingBubbleAlwaysVisible").value(settings.isFloatingBubbleAlwaysVisible)
@@ -1990,6 +2012,7 @@ object AutoBackupManager {
 
         var isAutoBackupEnabled = true
         var isLockscreenEnabled = true
+        var showGlucoseInStatusBar = true
         var widgetOpacity = 85
         var isFloatingBubble = false
         var isFloatingBubbleAlwaysVisible = false
@@ -2036,6 +2059,7 @@ object AutoBackupManager {
                 "themeMode" -> themeMode = try { ThemeMode.valueOf(reader.nextString()) } catch (_: Exception) { ThemeMode.DARK }
                 "isAutoBackupEnabled" -> isAutoBackupEnabled = reader.nextBoolean()
                 "isLockscreenNotificationEnabled" -> isLockscreenEnabled = reader.nextBoolean()
+                "showGlucoseInStatusBar" -> showGlucoseInStatusBar = reader.nextBoolean()
                 "widgetBackgroundOpacity" -> widgetOpacity = reader.nextInt()
                 "isFloatingBubbleEnabled" -> isFloatingBubble = reader.nextBoolean()
                 "isFloatingBubbleAlwaysVisible" -> isFloatingBubbleAlwaysVisible = reader.nextBoolean()
@@ -2347,6 +2371,7 @@ object AutoBackupManager {
             patientProfile = profile,
             isAutoBackupEnabled = isAutoBackupEnabled,
             isLockscreenNotificationEnabled = isLockscreenEnabled,
+            showGlucoseInStatusBar = showGlucoseInStatusBar,
             widgetBackgroundOpacity = widgetOpacity,
             isFloatingBubbleEnabled = isFloatingBubble,
             isFloatingBubbleAlwaysVisible = isFloatingBubbleAlwaysVisible,
@@ -2395,8 +2420,13 @@ object AutoBackupManager {
             var currentDayStart = getStartOfDay(earliest)
             val endDayStart = getStartOfDay(latest)
 
+            val dstCal = Calendar.getInstance()
             while (currentDayStart <= endDayStart) {
-                val currentDayEnd = currentDayStart + 86400000L - 1
+                dstCal.timeInMillis = currentDayStart
+                dstCal.add(Calendar.DAY_OF_YEAR, 1)
+                val nextDayStart = dstCal.timeInMillis
+                val currentDayEnd = nextDayStart - 1
+
                 val dayEntities = database.glucoseReadingDao().getReadingsBetweenSync(currentDayStart, currentDayEnd)
                 if (dayEntities.isNotEmpty()) {
                     val domainReadings = dayEntities.map { it.toDomain() }
@@ -2417,7 +2447,7 @@ object AutoBackupManager {
                         )
                     )
                 }
-                currentDayStart += 86400000L
+                currentDayStart = nextDayStart
             }
 
             if (summaries.isNotEmpty()) {

@@ -172,6 +172,7 @@ class SettingsRepositoryImpl(
             .putString(KEY_METRICS_ORDER, settings.metricsOrder.joinToString(","))
             .putString(KEY_HIDDEN_METRICS, settings.hiddenMetrics.joinToString(","))
             .putBoolean(KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED, settings.isLockscreenNotificationEnabled)
+            .putBoolean(KEY_SHOW_GLUCOSE_IN_STATUS_BAR, settings.showGlucoseInStatusBar)
             .putInt(KEY_WIDGET_BACKGROUND_OPACITY, settings.widgetBackgroundOpacity)
             .putBoolean(KEY_IS_FLOATING_BUBBLE_ENABLED, settings.isFloatingBubbleEnabled)
             .putBoolean(KEY_IS_FLOATING_BUBBLE_ALWAYS_VISIBLE, settings.isFloatingBubbleAlwaysVisible)
@@ -414,6 +415,7 @@ class SettingsRepositoryImpl(
             hiddenMetrics = prefs.getString(KEY_HIDDEN_METRICS, null)?.split(",")?.filter { it.isNotBlank() }
                 ?: emptyList(),
             isLockscreenNotificationEnabled = prefs.getBoolean(KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED, true),
+            showGlucoseInStatusBar = prefs.getBoolean(KEY_SHOW_GLUCOSE_IN_STATUS_BAR, true),
             widgetBackgroundOpacity = prefs.getInt(KEY_WIDGET_BACKGROUND_OPACITY, 85),
             isFloatingBubbleEnabled = prefs.getBoolean(KEY_IS_FLOATING_BUBBLE_ENABLED, false),
             isFloatingBubbleAlwaysVisible = prefs.getBoolean(KEY_IS_FLOATING_BUBBLE_ALWAYS_VISIBLE, false),
@@ -642,6 +644,7 @@ class SettingsRepositoryImpl(
         private const val KEY_METRICS_ORDER = "key_metrics_order"
         private const val KEY_HIDDEN_METRICS = "key_hidden_metrics"
         private const val KEY_IS_LOCKSCREEN_NOTIFICATION_ENABLED = "key_is_lockscreen_notification_enabled"
+        private const val KEY_SHOW_GLUCOSE_IN_STATUS_BAR = "key_show_glucose_in_status_bar"
         private const val KEY_WIDGET_BACKGROUND_OPACITY = "key_widget_background_opacity"
         private const val KEY_IS_FLOATING_BUBBLE_ENABLED = "key_is_floating_bubble_enabled"
         private const val KEY_IS_FLOATING_BUBBLE_ALWAYS_VISIBLE = "key_is_floating_bubble_always_visible"

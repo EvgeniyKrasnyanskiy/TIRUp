@@ -100,7 +100,7 @@ fun BleBridgeCard(
     isBleCardExpanded: Boolean,
     onToggleExpanded: () -> Unit,
     highlightBle: Boolean,
-    highlightBorderAlpha: Float,
+    highlightBorderAlpha: Float = 1f,
     latestReading: GlucoseReading?,
     blePermissionsLauncher: ManagedActivityResultLauncher<Array<String>, Map<String, Boolean>>,
     onUpdateBleSettings: (BleBridgeSettings) -> Unit,
@@ -147,11 +147,27 @@ fun BleBridgeCard(
         }
     }
 
+    val currentHighlightAlpha: Float = if (highlightBle) {
+        val anim = rememberInfiniteTransition(label = "ble_highlight")
+        val alpha by anim.animateFloat(
+            initialValue = 0.25f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(400, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "ble_border"
+        )
+        alpha
+    } else {
+        highlightBorderAlpha
+    }
+
     BentoCard(
         modifier = modifier.fillMaxWidth(),
-        borderColor = if (highlightBle) ActionBlue.copy(alpha = highlightBorderAlpha) else MaterialTheme.colorScheme.outline,
+        borderColor = if (highlightBle) ActionBlue.copy(alpha = currentHighlightAlpha) else MaterialTheme.colorScheme.outline,
         borderWidth = if (highlightBle) 2.2.dp else 1.dp,
-        backgroundColor = if (highlightBle) ActionBlue.copy(alpha = 0.08f * highlightBorderAlpha) else MaterialTheme.colorScheme.surface
+        backgroundColor = if (highlightBle) ActionBlue.copy(alpha = 0.08f * currentHighlightAlpha) else MaterialTheme.colorScheme.surface
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
@@ -670,11 +686,27 @@ fun XdripLanFollowerCard(
     var isLanTestSuccess by remember { mutableStateOf(false) }
     val lanScope = rememberCoroutineScope()
 
+    val currentLanHighlightAlpha: Float = if (highlightLan) {
+        val anim = rememberInfiniteTransition(label = "lan_highlight")
+        val alpha by anim.animateFloat(
+            initialValue = 0.25f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(400, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "lan_border"
+        )
+        alpha
+    } else {
+        highlightBorderAlpha
+    }
+
     BentoCard(
         modifier = modifier.fillMaxWidth(),
-        borderColor = if (highlightLan) PrimaryEmerald.copy(alpha = highlightBorderAlpha) else MaterialTheme.colorScheme.outline,
+        borderColor = if (highlightLan) PrimaryEmerald.copy(alpha = currentLanHighlightAlpha) else MaterialTheme.colorScheme.outline,
         borderWidth = if (highlightLan) 2.2.dp else 1.dp,
-        backgroundColor = if (highlightLan) PrimaryEmerald.copy(alpha = 0.08f * highlightBorderAlpha) else MaterialTheme.colorScheme.surface
+        backgroundColor = if (highlightLan) PrimaryEmerald.copy(alpha = 0.08f * currentLanHighlightAlpha) else MaterialTheme.colorScheme.surface
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -46,6 +47,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -745,6 +747,7 @@ fun LockscreenNotificationCard(
     settings: UserSettings,
     isRu: Boolean,
     onSetLockscreenNotificationEnabled: (Boolean) -> Unit,
+    onToggleShowGlucoseInStatusBar: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BentoCard(modifier = modifier.fillMaxWidth()) {
@@ -778,6 +781,43 @@ fun LockscreenNotificationCard(
                         checkedTrackColor = ActionBlue
                     )
                 )
+            }
+
+            if (settings.isLockscreenNotificationEnabled) {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (isRu) "Сахар в строке состояния (вверху)" else "Glucose in status bar (top)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (isRu) "Отображать текущее число сахара в строке состояния вверху экрана вместо иконки приложения"
+                            else "Show current glucose number on the top status bar instead of app icon",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Switch(
+                        checked = settings.showGlucoseInStatusBar,
+                        onCheckedChange = { onToggleShowGlucoseInStatusBar(it) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = ActionBlue
+                        )
+                    )
+                }
             }
         }
     }
@@ -1208,8 +1248,11 @@ fun WidgetPreviewCard(
     modifier: Modifier = Modifier
 ) {
     var isExpanded by rememberSaveable { mutableStateOf(false) }
-    var localWidgetOpacity by remember(settings.widgetBackgroundOpacity) {
+    var localWidgetOpacity by rememberSaveable {
         mutableFloatStateOf(settings.widgetBackgroundOpacity.toFloat())
+    }
+    LaunchedEffect(settings.widgetBackgroundOpacity) {
+        localWidgetOpacity = settings.widgetBackgroundOpacity.toFloat()
     }
 
     BentoCard(modifier = modifier.fillMaxWidth()) {
@@ -1430,11 +1473,34 @@ fun WidgetPreviewCard(
                 }
             }
 
-            // Slider from 0 to 100%
+            // Slider with quick minus / plus buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Minus 5% button
+                Surface(
+                    onClick = {
+                        val stepped = (localWidgetOpacity - 5f).coerceIn(0f, 100f).roundToInt()
+                        localWidgetOpacity = stepped.toFloat()
+                        onUpdateWidgetBackgroundOpacity(stepped)
+                    },
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "−",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
                 Slider(
                     value = localWidgetOpacity,
                     onValueChange = { localWidgetOpacity = it },
@@ -1452,35 +1518,78 @@ fun WidgetPreviewCard(
                         inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 )
-                Spacer(modifier = Modifier.width(10.dp))
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // Plus 5% button
+                Surface(
+                    onClick = {
+                        val stepped = (localWidgetOpacity + 5f).coerceIn(0f, 100f).roundToInt()
+                        localWidgetOpacity = stepped.toFloat()
+                        onUpdateWidgetBackgroundOpacity(stepped)
+                    },
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "+",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
                 Text(
                     text = "${localWidgetOpacity.roundToInt()}%",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = ActionBlue,
-                    modifier = Modifier.width(44.dp)
+                    modifier = Modifier.width(42.dp)
                 )
             }
 
+            // Quick clickable preset chips
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = if (isRu) "0% (Текст)" else "0% (Text)",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                val presets = listOf(
+                    Pair(0, if (isRu) "0% Текст" else "0% Text"),
+                    Pair(30, "30%"),
+                    Pair(50, "50%"),
+                    Pair(70, "70%"),
+                    Pair(85, if (isRu) "85% Норма" else "85% Std"),
+                    Pair(100, if (isRu) "100% Фон" else "100% Solid")
                 )
-                Text(
-                    text = if (isRu) "85% (Стандарт)" else "85% (Default)",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = if (isRu) "100% (Глубокий)" else "100% (Solid)",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                presets.forEach { (presetVal, label) ->
+                    val isSelected = localWidgetOpacity.roundToInt() == presetVal
+                    Surface(
+                        onClick = {
+                            localWidgetOpacity = presetVal.toFloat()
+                            onUpdateWidgetBackgroundOpacity(presetVal)
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSelected) ActionBlue else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isSelected) ActionBlue else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                        )
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 5.dp)
+                        )
+                    }
+                }
             }
                 }
             }

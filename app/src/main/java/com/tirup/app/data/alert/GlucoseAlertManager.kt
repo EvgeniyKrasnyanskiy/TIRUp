@@ -16,7 +16,12 @@ import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
+import androidx.core.graphics.drawable.IconCompat
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.StrikethroughSpan
@@ -851,7 +856,9 @@ object GlucoseAlertManager {
 
         try {
             if (rescueWakeLock?.isHeld == true) {
-                rescueWakeLock?.release()
+                if (rescueWakeLock?.isHeld == true) {
+                try { rescueWakeLock?.release() } catch (_: Exception) {}
+            }
             }
         } catch (_: Exception) {}
         rescueWakeLock = null
@@ -1058,7 +1065,9 @@ object GlucoseAlertManager {
         // 1. Force screen on via WakeLock with ACQUIRE_CAUSES_WAKEUP
         try {
             val pm = appContext.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
-            rescueWakeLock?.release()
+            if (rescueWakeLock?.isHeld == true) {
+                try { rescueWakeLock?.release() } catch (_: Exception) {}
+            }
             @Suppress("DEPRECATION")
             rescueWakeLock = pm?.newWakeLock(
                 android.os.PowerManager.PARTIAL_WAKE_LOCK or android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP,
@@ -2070,7 +2079,9 @@ object GlucoseAlertManager {
                 // Wake up screen and hold CPU
                 try {
                     val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
-                    rescueWakeLock?.release()
+                    if (rescueWakeLock?.isHeld == true) {
+                try { rescueWakeLock?.release() } catch (_: Exception) {}
+            }
                     @Suppress("DEPRECATION")
                     rescueWakeLock = pm?.newWakeLock(
                         PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
@@ -2290,6 +2301,31 @@ object GlucoseAlertManager {
             val cameraId = cameraManager.cameraIdList.firstOrNull() ?: return
             cameraManager.setTorchMode(cameraId, false)
         } catch (e: Exception) {}
+    }
+
+    fun createGlucoseStatusIcon(text: String): IconCompat {
+        val size = 96
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
+        }
+
+        var textSize = 54f
+        paint.textSize = textSize
+        val targetWidth = size * 0.92f
+        val measured = paint.measureText(text)
+        if (measured > targetWidth) {
+            textSize *= (targetWidth / measured)
+            paint.textSize = textSize
+        }
+
+        val x = size / 2f
+        val y = (size / 2f) - ((paint.descent() + paint.ascent()) / 2f)
+        canvas.drawText(text, x, y, paint)
+        return IconCompat.createWithBitmap(bitmap)
     }
 
     /**
@@ -2563,8 +2599,15 @@ object GlucoseAlertManager {
             }
         }
 
+        val statusIcon = if (settings.showGlucoseInStatusBar) {
+            val statusText = if (isSignalLost) "--" else glucoseStr
+            createGlucoseStatusIcon(statusText)
+        } else {
+            IconCompat.createWithResource(context, R.mipmap.ic_launcher)
+        }
+
         val notification = NotificationCompat.Builder(context, CHANNEL_LOCKSCREEN)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(statusIcon)
             .setColor(if (isExpired) grayColor else Color.parseColor(hexColor))
             .setCustomContentView(lockViews)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())

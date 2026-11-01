@@ -163,6 +163,7 @@ data class UserSettings(
     val metricsOrder: List<String> = DEFAULT_METRICS_ORDER,
     val hiddenMetrics: List<String> = emptyList(),
     val isLockscreenNotificationEnabled: Boolean = true,
+    val showGlucoseInStatusBar: Boolean = true,
     val widgetBackgroundOpacity: Int = 85,
     val isFloatingBubbleEnabled: Boolean = false,
     val isFloatingBubbleAlwaysVisible: Boolean = false,

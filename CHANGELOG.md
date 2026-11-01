@@ -8,6 +8,20 @@
 ## [1.0.3] - 2026-10-24
 
 ### 🛠 Исправлено и оптимизировано (Fixed & Optimized)
+- **Отображение сахара в строке состояния Android (Status Bar Dynamic Glucose Icon)**:
+  - Создание динамической монохромной иконки (96x96 px) с крупным числом сахара (`sans-serif-condensed bold`) для уведомления на экране блокировки (`CHANNEL_LOCKSCREEN`).
+  - Текущий уровень сахара отображается прямо в верхней строке состояния телефона (рядом со значками Wi-Fi/часов), без необходимости открывать шторку уведомлений.
+  - Добавлен переключатель «Сахар в строке состояния (вверху)» в настройках блокировки с автобэкапом параметра `showGlucoseInStatusBar`.
+- **Исправление и оптимизация регулировки прозрачности фона виджетов (`SystemDisplaySection`, `SettingsScreen`)**:
+  - Локализована бесконечная анимация подсветки BLE/LAN карточек, устранена постоянная рекомпозиция всего дерева настроек со сбросом состояний.
+  - Состояние ползунка защищено через `rememberSaveable` с синхронизацией `LaunchedEffect(settings.widgetBackgroundOpacity)`.
+  - Добавлены кнопки точного шага `[−]` и `[+]` (шаг 5%) и чипы быстрых пресетов (`0% Текст`, `30%`, `50%`, `70%`, `85% Норма`, `100% Фон`) с мгновенным откликом и подсветкой активного значения.
+- **Устранение дефектов по результатам тотального аудита (Audit Remediations)**:
+  - **`GlucoseAlertManager` & `CaregiverSosAlarmManager`**: безопасное освобождение `WakeLock` (`isHeld` + `try-catch`) с защитой от гонок потоков и `RuntimeException`.
+  - **`BleObserverManager`**: обёртка `stopScan` в `try-catch (SecurityException)` и аннотация `@SuppressLint("MissingPermission")` для фонового сканирования.
+  - **`EmergencySmsManager`**: безопасное получение `SmsManager` через `context.getSystemService(SmsManager::class.java)` с фоллбэком на `SmsManager.getDefault()`.
+  - **`GlucoseRepositoryImpl`**: исправление сдвига пагинации при очистке дубликатов трансляции в Room (пакетное удаление ID).
+  - **`AutoBackupManager`**: атомарная замена файлов бэкапа через `java.nio.file.Files.move` с `ATOMIC_MOVE` и корректный учёт границ суток при переходе на летнее/зимнее время (DST) через `Calendar.add(DAY_OF_YEAR, 1)`.
 - **Устранение микрофризов и лагов интерфейса (`BleObserverManager`, `FocusScreen`)**:
   - Радио-телеметрия BLE (`lastRadioContactMs`, `lastRssi`, `lastMasterBattery`) вынесена в легковесный in-memory `StateFlow` (`liveTelemetryFlow`).
   - Устранена непрерывная запись настроек в `SharedPreferences` на каждый 3-секундный heartbeat-пакет, которая приводила к I/O блокировкам, постоянной рекомпозиции экранов и избыточному спаму IPC-вызовов `AppWidgetManager`.
