@@ -73,6 +73,7 @@ import com.tirup.app.presentation.components.BentoCard
 import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.PrimaryEmerald
+import kotlin.math.roundToInt
 
 @Composable
 fun LanguageChip(
@@ -1207,6 +1208,9 @@ fun WidgetPreviewCard(
     modifier: Modifier = Modifier
 ) {
     var isExpanded by rememberSaveable { mutableStateOf(false) }
+    var localWidgetOpacity by remember(settings.widgetBackgroundOpacity) {
+        mutableFloatStateOf(settings.widgetBackgroundOpacity.toFloat())
+    }
 
     BentoCard(modifier = modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1226,8 +1230,8 @@ fun WidgetPreviewCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = if (isRu) "Плавная регулировка прозрачности под ваши обои (${settings.widgetBackgroundOpacity}%)"
-                        else "Adjust transparency to match your home wallpaper (${settings.widgetBackgroundOpacity}%)",
+                        text = if (isRu) "Плавная регулировка прозрачности под ваши обои (${localWidgetOpacity.roundToInt()}%)"
+                        else "Adjust transparency to match your home wallpaper (${localWidgetOpacity.roundToInt()}%)",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1239,7 +1243,7 @@ fun WidgetPreviewCard(
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                     ) {
                         Text(
-                            text = "${settings.widgetBackgroundOpacity}%",
+                            text = "${localWidgetOpacity.roundToInt()}%",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -1258,7 +1262,6 @@ fun WidgetPreviewCard(
 
             AnimatedVisibility(visible = isExpanded) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    var localWidgetOpacity by remember(settings.widgetBackgroundOpacity) { mutableFloatStateOf(settings.widgetBackgroundOpacity.toFloat()) }
 
             // Live Interactive Preview Box on simulated wallpaper (5x1 Strip Widget)
             Box(
@@ -1428,20 +1431,36 @@ fun WidgetPreviewCard(
             }
 
             // Slider from 0 to 100%
-            Slider(
-                value = localWidgetOpacity,
-                onValueChange = { localWidgetOpacity = it },
-                onValueChangeFinished = {
-                    onUpdateWidgetBackgroundOpacity(localWidgetOpacity.toInt())
-                },
-                valueRange = 0f..100f,
-                steps = 19,
-                colors = SliderDefaults.colors(
-                    thumbColor = ActionBlue,
-                    activeTrackColor = ActionBlue,
-                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Slider(
+                    value = localWidgetOpacity,
+                    onValueChange = { localWidgetOpacity = it },
+                    onValueChangeFinished = {
+                        val stepped = localWidgetOpacity.roundToInt().coerceIn(0, 100)
+                        if (stepped != settings.widgetBackgroundOpacity) {
+                            onUpdateWidgetBackgroundOpacity(stepped)
+                        }
+                    },
+                    valueRange = 0f..100f,
+                    modifier = Modifier.weight(1f),
+                    colors = SliderDefaults.colors(
+                        thumbColor = ActionBlue,
+                        activeTrackColor = ActionBlue,
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 )
-            )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "${localWidgetOpacity.roundToInt()}%",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = ActionBlue,
+                    modifier = Modifier.width(44.dp)
+                )
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
