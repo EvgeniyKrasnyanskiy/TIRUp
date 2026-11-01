@@ -181,7 +181,7 @@ object EmergencySmsManager {
 
     private fun sendSmsInternal(context: Context, phone: String, message: String) {
         val smsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            context.getSystemService(SmsManager::class.java)
+            context.getSystemService(SmsManager::class.java) ?: @Suppress("DEPRECATION") SmsManager.getDefault()
         } else {
             @Suppress("DEPRECATION")
             SmsManager.getDefault()

@@ -60,7 +60,9 @@ object CaregiverSosAlarmManager {
         // 1. Acquire WakeLock to turn on / keep CPU awake
         try {
             val pm = appContext.getSystemService(Context.POWER_SERVICE) as? PowerManager
-            wakeLock?.release()
+            if (wakeLock?.isHeld == true) {
+                try { wakeLock?.release() } catch (_: Exception) {}
+            }
             @Suppress("DEPRECATION")
             wakeLock = pm?.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
@@ -135,7 +137,9 @@ object CaregiverSosAlarmManager {
         // Release WakeLock
         try {
             if (wakeLock?.isHeld == true) {
-                wakeLock?.release()
+                if (wakeLock?.isHeld == true) {
+                try { wakeLock?.release() } catch (_: Exception) {}
+            }
             }
         } catch (_: Exception) {}
         wakeLock = null

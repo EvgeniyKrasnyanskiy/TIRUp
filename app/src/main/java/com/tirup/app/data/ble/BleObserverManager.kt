@@ -667,6 +667,7 @@ object BleObserverManager {
         startScanningInternalLocked(context, familyPin, settingsRepository, glucoseRepository, boost, useLongRange)
     }
 
+    @android.annotation.SuppressLint("MissingPermission")
     private fun startScanningInternalLocked(
         context: Context,
         familyPin: String,
@@ -704,6 +705,8 @@ object BleObserverManager {
                 if (hasScanPermission(context)) {
                     leScanner.stopScan(activeCallback)
                 }
+            } catch (e: SecurityException) {
+                Log.w(TAG, "SecurityException stopping stale scan: ${e.message}")
             } catch (_: Exception) {}
             activeCallback = null
         }
@@ -774,6 +777,8 @@ object BleObserverManager {
                     if (hasScanPermission(context)) {
                         leScanner.stopScan(this)
                     }
+                } catch (e: SecurityException) {
+                    Log.w(TAG, "SecurityException on failure cleanup stopScan: ${e.message}")
                 } catch (e: Exception) {
                     Log.d(TAG, "Cleanup stopScan on failure: ${e.message}")
                 }

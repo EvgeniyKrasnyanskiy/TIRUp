@@ -257,10 +257,10 @@ class GlucoseRepositoryImpl(
 
         var offset = 0
         val batchSize = 1000
-        var deletedCount = 0
         var lastKeptEntity: GlucoseReadingEntity? = null
         var earliestModifiedTs: Long? = null
         var latestModifiedTs: Long? = null
+        val toDeleteIds = mutableListOf<Long>()
 
         while (true) {
             val page = readingDao.getReadingsPaginated(batchSize, offset)
@@ -278,8 +278,7 @@ class GlucoseRepositoryImpl(
                     } else {
                         current.id
                     }
-                    readingDao.deleteById(toDeleteId)
-                    deletedCount++
+                    toDeleteIds.add(toDeleteId)
 
                     if (earliestModifiedTs == null || current.timestamp < earliestModifiedTs) earliestModifiedTs = current.timestamp
                     if (latestModifiedTs == null || current.timestamp > latestModifiedTs) latestModifiedTs = current.timestamp
@@ -291,11 +290,18 @@ class GlucoseRepositoryImpl(
             offset += batchSize
         }
 
-        if (deletedCount > 0 && earliestModifiedTs != null && latestModifiedTs != null) {
+        // Batch delete collected duplicate IDs without shifting pagination cursor
+        for (chunk in toDeleteIds.chunked(500)) {
+            for (id in chunk) {
+                readingDao.deleteById(id)
+            }
+        }
+
+        if (toDeleteIds.isNotEmpty() && earliestModifiedTs != null && latestModifiedTs != null) {
             recalculateDailySummaries(earliestModifiedTs, latestModifiedTs)
         }
 
-        deletedCount
+        toDeleteIds.size
     }
 
     override suspend fun getTreatmentById(id: Long): Treatment? = withContext(Dispatchers.IO) {
