@@ -56,6 +56,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
@@ -1241,6 +1253,108 @@ fun AlwaysOnDisplayCard(
 }
 
 @Composable
+fun SmoothTouchSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    onValueChangeFinished: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var isDragging by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
+    val thumbRadius = 12.dp
+    val thumbRadiusPx = with(density) { thumbRadius.toPx() }
+
+    BoxWithConstraints(
+        modifier = modifier.height(44.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        val totalWidthPx = constraints.maxWidth.toFloat()
+        val usableWidthPx = (totalWidthPx - 2 * thumbRadiusPx).coerceAtLeast(1f)
+        val fraction = (value / 100f).coerceIn(0f, 1f)
+        val thumbOffsetXPx = thumbRadiusPx + fraction * usableWidthPx
+
+        val activeColor = ActionBlue
+        val inactiveColor = MaterialTheme.colorScheme.surfaceVariant
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(usableWidthPx) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { offset ->
+                            isDragging = true
+                            val f = ((offset.x - thumbRadiusPx) / usableWidthPx).coerceIn(0f, 1f)
+                            onValueChange(f * 100f)
+                        },
+                        onDragEnd = {
+                            isDragging = false
+                            onValueChangeFinished()
+                        },
+                        onDragCancel = {
+                            isDragging = false
+                            onValueChangeFinished()
+                        },
+                        onHorizontalDrag = { change, _ ->
+                            change.consume()
+                            val f = ((change.position.x - thumbRadiusPx) / usableWidthPx).coerceIn(0f, 1f)
+                            onValueChange(f * 100f)
+                        }
+                    )
+                }
+                .pointerInput(usableWidthPx) {
+                    detectTapGestures { offset ->
+                        val f = ((offset.x - thumbRadiusPx) / usableWidthPx).coerceIn(0f, 1f)
+                        onValueChange(f * 100f)
+                        onValueChangeFinished()
+                    }
+                },
+            contentAlignment = Alignment.CenterStart
+        ) {
+            // Background & Active Track
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .padding(horizontal = thumbRadius)
+            ) {
+                val h = size.height
+                val w = size.width
+                val activeW = (fraction * w).coerceIn(0f, w)
+
+                drawRoundRect(
+                    color = inactiveColor,
+                    size = Size(w, h),
+                    cornerRadius = CornerRadius(h / 2, h / 2)
+                )
+
+                if (activeW > 0f) {
+                    drawRoundRect(
+                        color = activeColor,
+                        size = Size(activeW, h),
+                        cornerRadius = CornerRadius(h / 2, h / 2)
+                    )
+                }
+            }
+
+            // High-visibility Glowing Thumb
+            Box(
+                modifier = Modifier
+                    .offset {
+                        IntOffset(
+                            x = (thumbOffsetXPx - thumbRadiusPx).roundToInt(),
+                            y = 0
+                        )
+                    }
+                    .size(24.dp)
+                    .shadow(if (isDragging) 6.dp else 2.dp, CircleShape)
+                    .background(activeColor, CircleShape)
+                    .border(2.5.dp, Color.White, CircleShape)
+            )
+        }
+    }
+}
+
+@Composable
 fun WidgetPreviewCard(
     settings: UserSettings,
     isRu: Boolean,
@@ -1501,7 +1615,7 @@ fun WidgetPreviewCard(
 
                 Spacer(modifier = Modifier.width(4.dp))
 
-                Slider(
+                SmoothTouchSlider(
                     value = localWidgetOpacity,
                     onValueChange = { localWidgetOpacity = it },
                     onValueChangeFinished = {
@@ -1510,13 +1624,7 @@ fun WidgetPreviewCard(
                             onUpdateWidgetBackgroundOpacity(stepped)
                         }
                     },
-                    valueRange = 0f..100f,
-                    modifier = Modifier.weight(1f),
-                    colors = SliderDefaults.colors(
-                        thumbColor = ActionBlue,
-                        activeTrackColor = ActionBlue,
-                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
+                    modifier = Modifier.weight(1f)
                 )
 
                 Spacer(modifier = Modifier.width(4.dp))
