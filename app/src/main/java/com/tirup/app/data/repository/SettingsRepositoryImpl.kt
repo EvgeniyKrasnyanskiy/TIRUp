@@ -299,6 +299,7 @@ class SettingsRepositoryImpl(
             .putInt(KEY_XDRIP_LAN_PORT, settings.xdripLanSettings.port)
             .putString(KEY_XDRIP_LAN_API_SECRET, settings.xdripLanSettings.apiSecret)
             .putInt(KEY_XDRIP_LAN_POLL_INTERVAL, settings.xdripLanSettings.pollIntervalSeconds)
+            .putBoolean(KEY_IS_AI_ASSISTANT_ENABLED, settings.isAiAssistantEnabled)
             .apply()
 
         _settingsFlow.value = settings
@@ -590,7 +591,8 @@ class SettingsRepositoryImpl(
                 port = prefs.getInt(KEY_XDRIP_LAN_PORT, 17580),
                 apiSecret = prefs.getString(KEY_XDRIP_LAN_API_SECRET, "") ?: "",
                 pollIntervalSeconds = prefs.getInt(KEY_XDRIP_LAN_POLL_INTERVAL, 60)
-            )
+            ),
+            isAiAssistantEnabled = prefs.getBoolean(KEY_IS_AI_ASSISTANT_ENABLED, false)
         )
     }
 
@@ -654,6 +656,7 @@ class SettingsRepositoryImpl(
         private const val KEY_SHOW_TREATMENTS_ON_CHART = "key_show_treatments_on_chart"
         private const val KEY_SHOW_PREDICTION_ON_CHART = "key_show_prediction_on_chart"
         private const val KEY_CHART_ZOOM_HOURS = "key_chart_zoom_hours"
+        private const val KEY_IS_AI_ASSISTANT_ENABLED = "key_is_ai_assistant_enabled"
 
         private const val KEY_ALERT_MASTER_ENABLED = "key_alert_master_enabled"
         private const val KEY_ALERT_MUTE_UNTIL = "key_alert_mute_until"

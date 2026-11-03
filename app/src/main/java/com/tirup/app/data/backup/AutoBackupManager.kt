@@ -741,6 +741,7 @@ object AutoBackupManager {
         writer.name("showTreatmentsOnChart").value(settings.showTreatmentsOnChart)
         writer.name("showPredictionOnChart").value(settings.showPredictionOnChart)
         writer.name("chartZoomHours").value(settings.chartZoomHours)
+        writer.name("isAiAssistantEnabled").value(settings.isAiAssistantEnabled)
 
         // AOD Settings
         val aod = settings.aodSettings
@@ -2043,6 +2044,7 @@ object AutoBackupManager {
         var showTreatments = true
         var showPrediction = true
         var chartZoomHours = 24
+        var isAiAssistantEnabled = false
         var aodSettings = AodSettings()
         var metricsOrder = com.tirup.app.domain.model.DEFAULT_METRICS_ORDER
         var hiddenMetrics = emptyList<String>()
@@ -2299,6 +2301,7 @@ object AutoBackupManager {
                 "showTreatmentsOnChart" -> showTreatments = reader.nextBoolean()
                 "showPredictionOnChart" -> showPrediction = reader.nextBoolean()
                 "chartZoomHours" -> chartZoomHours = reader.nextInt()
+                "isAiAssistantEnabled" -> isAiAssistantEnabled = reader.nextBoolean()
                 "aodSettings" -> {
                     var isEnabled = false
                     var displayMode = AodDisplayMode.PULSE_ON_UPDATE
@@ -2404,7 +2407,8 @@ object AutoBackupManager {
             hiddenMetrics = hiddenMetrics,
             hasSeenOnboarding = true,
             nightscoutSettings = nightscoutSettings,
-            xdripLanSettings = xdripLanSettings
+            xdripLanSettings = xdripLanSettings,
+            isAiAssistantEnabled = isAiAssistantEnabled
         )
     }
 

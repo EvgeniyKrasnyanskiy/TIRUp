@@ -38,8 +38,8 @@ android {
         applicationId = "com.tirup.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 26
-        versionName = "1.0.3"
+        versionCode = 27
+        versionName = "1.0.4"
 
         resourceConfigurations += listOf("ru", "en")
 

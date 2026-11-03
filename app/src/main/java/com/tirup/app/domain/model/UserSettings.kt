@@ -191,7 +191,8 @@ data class UserSettings(
     val aodSettings: AodSettings = AodSettings(),
     val lastImportantMessage: LastImportantMessage? = null,
     val nightscoutSettings: NightscoutSettings = NightscoutSettings(),
-    val xdripLanSettings: XdripLanSettings = XdripLanSettings()
+    val xdripLanSettings: XdripLanSettings = XdripLanSettings(),
+    val isAiAssistantEnabled: Boolean = false
 ) {
     val latestHba1cRecord: LabHba1cRecord?
         get() = hba1cRecords.maxByOrNull { it.timestamp }
