@@ -535,6 +535,15 @@ class SettingsViewModel(
         }
     }
 
+    fun setAiAssistantEnabled(enabled: Boolean) {
+        val current = _uiState.value.userSettings
+        viewModelScope.launch {
+            val updated = current.copy(isAiAssistantEnabled = enabled)
+            settingsRepository.updateSettings(updated)
+            _uiState.update { it.copy(userSettings = updated) }
+        }
+    }
+
     fun updateXdripLanSettings(settings: com.tirup.app.domain.model.XdripLanSettings) {
         val current = _uiState.value.userSettings
         viewModelScope.launch {

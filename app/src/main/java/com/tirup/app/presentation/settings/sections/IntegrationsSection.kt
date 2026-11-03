@@ -32,12 +32,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
@@ -1279,4 +1281,103 @@ private fun BleCountdownText(
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
+}
+
+
+@Composable
+fun AiAssistantCard(
+    settings: com.tirup.app.domain.model.UserSettings,
+    isRu: Boolean,
+    onToggleAiEnabled: (Boolean) -> Unit,
+    onOpenAiSettings: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
+
+    BentoCard(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(horizontal = 2.dp, vertical = 2.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
+                ) {
+                    Text(text = "✨", fontSize = 18.sp)
+                    Column {
+                        Text(
+                            text = if (isRu) "ИИ-ассистент (Gemini)" else "AI Assistant (Gemini)",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = ActionBlue
+                        )
+                        Text(
+                            text = if (isRu) "Анализ сахара, трендов и фото еды" else "Glycemia analytics & food estimation",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(
+                        checked = settings.isAiAssistantEnabled,
+                        onCheckedChange = onToggleAiEnabled,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = ActionBlue
+                        )
+                    )
+                    IconButton(onClick = { isExpanded = !isExpanded }) {
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
+                            tint = ActionBlue
+                        )
+                    }
+                }
+            }
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = if (isRu)
+                            "Круглая кнопка AI появляется на основных экранах. Ассистент анализирует агрегированные тренды гликемии и рассчитывает БЖУ по фото порций с возможностью добавления на график."
+                        else
+                            "Circular AI button appears on main screens. Assistant analyzes aggregated glycemic trends and estimates macros from food photos.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedButton(
+                        onClick = onOpenAiSettings,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Key,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = ActionBlue
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isRu) "Настроить API-ключ и модели" else "Configure API Key & Models",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = ActionBlue
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

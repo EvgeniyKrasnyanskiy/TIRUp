@@ -212,6 +212,7 @@ import java.util.Locale
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     target: String? = null,
+    onOpenAiAssistant: () -> Unit = {},
     onNavigateBack: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -840,6 +841,16 @@ fun SettingsScreen(
                     isRu = isRu,
                     onUpdateNightscoutSettings = { viewModel.updateNightscoutSettings(it) },
                     onShowNightscoutDialog = { showNightscoutDialog = true }
+                )
+            }
+
+            // AI assistant: hidden until dev-unlocked OR already enabled by user.
+            if (isDevTestsUnlocked || settings.isAiAssistantEnabled) {
+                com.tirup.app.presentation.settings.sections.AiAssistantCard(
+                    settings = settings,
+                    isRu = isRu,
+                    onToggleAiEnabled = { viewModel.setAiAssistantEnabled(it) },
+                    onOpenAiSettings = onOpenAiAssistant
                 )
             }
 

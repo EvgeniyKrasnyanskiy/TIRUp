@@ -122,6 +122,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -199,6 +200,16 @@ class MainActivity : ComponentActivity() {
             }
         )[SettingsViewModel::class.java]
 
+        val aiAssistantViewModel = androidx.lifecycle.ViewModelProvider(
+            this,
+            object : androidx.lifecycle.ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                    return com.tirup.app.presentation.ai.AiAssistantViewModel(application, glucoseRepo, settingsRepo) as T
+                }
+            }
+        )[com.tirup.app.presentation.ai.AiAssistantViewModel::class.java]
+
         // Proactively clean up any historical duplicates (<60s jitter between xDrip and BLE)
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -233,7 +244,8 @@ class MainActivity : ComponentActivity() {
                             focusViewModel = focusViewModel,
                             trendsViewModel = trendsViewModel,
                             reportsViewModel = reportsViewModel,
-                            settingsViewModel = settingsViewModel
+                            settingsViewModel = settingsViewModel,
+                            aiAssistantViewModel = aiAssistantViewModel
                         )
                     }
                 }
@@ -359,9 +371,11 @@ fun AppNavigationRoot(
     focusViewModel: FocusViewModel,
     trendsViewModel: TrendsViewModel,
     reportsViewModel: ReportsViewModel,
-    settingsViewModel: SettingsViewModel
+    settingsViewModel: SettingsViewModel,
+    aiAssistantViewModel: com.tirup.app.presentation.ai.AiAssistantViewModel
 ) {
     val navController = rememberNavController()
+    var showAiAssistantDialog by rememberSaveable { mutableStateOf(false) }
     val settingsState by settingsViewModel.uiState.collectAsState()
     var backupSummary by remember { mutableStateOf<BackupSummary?>(null) }
     var hasCheckedBackup by remember { mutableStateOf(false) }
@@ -575,6 +589,7 @@ fun AppNavigationRoot(
                     trendsViewModel = trendsViewModel,
                     reportsViewModel = reportsViewModel,
                     settingsViewModel = settingsViewModel,
+                    onOpenAiAssistant = { showAiAssistantDialog = true },
                     onOpenSettings = { target ->
                         if (!target.isNullOrBlank()) {
                             navController.navigate("settings?target=$target")
@@ -599,9 +614,18 @@ fun AppNavigationRoot(
                 SettingsScreen(
                     viewModel = settingsViewModel,
                     target = target,
+                    onOpenAiAssistant = { showAiAssistantDialog = true },
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
+        }
+
+        if (showAiAssistantDialog) {
+            com.tirup.app.presentation.ai.AiAssistantDialog(
+                viewModel = aiAssistantViewModel,
+                isRu = isAppRu,
+                onDismiss = { showAiAssistantDialog = false }
+            )
         }
 
         // Global Floating BLE Range Signal Banner (Visible on any screen in app)
@@ -645,6 +669,7 @@ fun MainPagerScaffold(
     trendsViewModel: TrendsViewModel,
     reportsViewModel: ReportsViewModel,
     settingsViewModel: SettingsViewModel,
+    onOpenAiAssistant: () -> Unit = {},
     onOpenSettings: (String?) -> Unit
 ) {
     val pagerState = rememberPagerState(initialPage = 1, pageCount = { 3 })
@@ -940,6 +965,31 @@ fun MainPagerScaffold(
                         onOpenSettings = { onOpenSettings(null) },
                         onOpenHba1c = { showHba1cDialog = true }
                     )
+                }
+            }
+
+            // Floating Circular AI Assistant Button (Visible on all 3 main screens when enabled)
+            if (userSettings.isAiAssistantEnabled) {
+                androidx.compose.material3.FloatingActionButton(
+                    onClick = onOpenAiAssistant,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = if (isBottomBarVisible) 68.dp else 24.dp)
+                        .size(52.dp)
+                        .zIndex(90f),
+                    shape = CircleShape,
+                    containerColor = ActionBlue,
+                    contentColor = Color.White,
+                    elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "AI",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White
+                        )
+                    }
                 }
             }
 
