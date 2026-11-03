@@ -191,6 +191,78 @@ fun AiKeyOnboardingSheet(
                     }
                 }
 
+                // Regional VPN Warning
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    color = ColorHigh.copy(alpha = 0.10f),
+                    border = BorderStroke(1.dp, ColorHigh.copy(alpha = 0.35f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(text = "🛡️", fontSize = 18.sp)
+                        Text(
+                            text = if (isRu)
+                                "Внимание: доступ к Google AI Studio из РФ заблокирован Google (код 400). Для получения ключа и работы ассистента требуется активный VPN/прокси."
+                            else
+                                "Notice: Google restricts AI Studio access in some regions (HTTP 400). An active VPN/proxy may be required to reach the API.",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+
+                // Quota summary card
+                val quota = state.dailyQuotaUsage
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (isRu) "📊 Суточный лимит (Free tier)" else "📊 Daily Quota (Free tier)",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "${quota.remainingRequests} / ${quota.maxRequests}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (quota.isQuotaExhausted) MaterialTheme.colorScheme.error else PrimaryEmerald
+                            )
+                        }
+                        val tokensK = if (quota.tokensUsed >= 1000) {
+                            String.format(java.util.Locale.US, "%.1fk", quota.tokensUsed / 1000.0)
+                        } else {
+                            "${quota.tokensUsed}"
+                        }
+                        Text(
+                            text = if (isRu)
+                                "Использовано сегодня: ${quota.requestsUsed} запросов ($tokensK токенов). Сброс в 00:00."
+                            else
+                                "Used today: ${quota.requestsUsed} requests ($tokensK tokens). Resets at 00:00.",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
                 // API Key Input Field
                 OutlinedTextField(
                     value = state.draftApiKey,

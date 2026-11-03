@@ -13,6 +13,7 @@ import com.tirup.app.data.network.NightscoutUploadManager
 import com.tirup.app.domain.ai.AiContextPeriod
 import com.tirup.app.domain.ai.AiGlycemicContextBuilder
 import com.tirup.app.domain.model.AiChatMessage
+import com.tirup.app.domain.model.AiDailyQuotaUsage
 import com.tirup.app.domain.model.AiFoodEstimation
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.domain.repository.GlucoseRepository
@@ -42,6 +43,7 @@ data class AiAssistantUiState(
     val attachedPhotoUri: Uri? = null,
     val attachedPhotoBase64: String? = null,
     val activeModelBadge: String? = null,
+    val dailyQuotaUsage: AiDailyQuotaUsage = AiDailyQuotaUsage(),
     val showKeyOnboarding: Boolean = false,
     val showDatePicker: Boolean = false,
     val snackbarMessage: String? = null
@@ -69,6 +71,7 @@ class AiAssistantViewModel(
         val cachedMessages = aiPrefs.loadChatMessages()
         val statuses = aiPrefs.getModelStatuses()
         val lastModel = aiPrefs.getLastSuccessfulModel()
+        val quotaUsage = aiPrefs.getDailyQuotaUsage()
 
         _uiState.update {
             it.copy(
@@ -77,6 +80,7 @@ class AiAssistantViewModel(
                 modelStatuses = statuses,
                 activeModelBadge = lastModel,
                 messages = cachedMessages,
+                dailyQuotaUsage = quotaUsage,
                 showKeyOnboarding = !hasKey
             )
         }
@@ -265,6 +269,7 @@ class AiAssistantViewModel(
                         foodEstimation = response.foodEstimation
                     )
                     val newHistory = updatedMessages + assistantMsg
+                    val updatedQuota = aiPrefs.recordRequestUsage(response.totalTokens)
                     aiPrefs.saveChatMessages(newHistory)
                     aiPrefs.saveLastSuccessfulModel(response.modelUsed)
 
@@ -272,7 +277,8 @@ class AiAssistantViewModel(
                         it.copy(
                             messages = newHistory,
                             isGenerating = false,
-                            activeModelBadge = response.modelUsed
+                            activeModelBadge = response.modelUsed,
+                            dailyQuotaUsage = updatedQuota
                         )
                     }
                 },
@@ -283,12 +289,15 @@ class AiAssistantViewModel(
                     )
                     val newHistory = updatedMessages + errorMsg
                     aiPrefs.saveChatMessages(newHistory)
+                    val is429 = error is GeminiClient.QuotaExceededException || (error.message?.contains("429") == true)
+                    val updatedQuota = if (is429) aiPrefs.markQuotaExhausted(true) else aiPrefs.getDailyQuotaUsage()
 
                     _uiState.update {
                         it.copy(
                             messages = newHistory,
                             isGenerating = false,
-                            snackbarMessage = error.message
+                            snackbarMessage = error.message,
+                            dailyQuotaUsage = updatedQuota
                         )
                     }
                 }

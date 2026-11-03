@@ -49,6 +49,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import com.tirup.app.domain.model.AiDailyQuotaUsage
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -478,6 +480,12 @@ fun AiAssistantDialog(
                     }
                 }
 
+                // Daily Quota & Usage Progress Bar
+                DailyQuotaProgressBar(
+                    quota = state.dailyQuotaUsage,
+                    isRu = isRu
+                )
+
                 // Chat Messages LazyColumn
                 if (state.messages.isEmpty()) {
                     // Empty state with quick suggestions
@@ -891,3 +899,71 @@ fun MacroBadge(label: String, value: String, color: Color) {
     }
 }
 
+
+@Composable
+private fun DailyQuotaProgressBar(
+    quota: AiDailyQuotaUsage,
+    isRu: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val progress = quota.progressFraction
+    val barColor = when {
+        quota.isQuotaExhausted -> MaterialTheme.colorScheme.error
+        progress > 0.85f -> ColorLow
+        progress > 0.60f -> ColorHigh
+        else -> PrimaryEmerald
+    }
+
+    val statusText = if (quota.isQuotaExhausted) {
+        if (isRu) "⚠️ Суточный лимит исчерпан (сброс в 00:00)" else "⚠️ Daily quota exhausted (resets at 00:00)"
+    } else {
+        val tokensFormatted = if (quota.tokensUsed >= 1000) {
+            String.format(Locale.US, "%.1fk", quota.tokensUsed / 1000.0)
+        } else {
+            "${quota.tokensUsed}"
+        }
+        if (isRu) {
+            "⚡ Лимит сегодня: ${quota.remainingRequests} / ${quota.maxRequests} запр. ($tokensFormatted токенов)"
+        } else {
+            "⚡ Daily quota: ${quota.remainingRequests} / ${quota.maxRequests} reqs ($tokensFormatted tokens)"
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (quota.isQuotaExhausted) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp
+            )
+            if (!quota.isQuotaExhausted) {
+                Text(
+                    text = "${(progress * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = barColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(2.dp))
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .clip(RoundedCornerShape(2.dp)),
+            color = barColor,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    }
+}
