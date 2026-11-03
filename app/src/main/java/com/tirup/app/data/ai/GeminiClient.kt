@@ -26,10 +26,17 @@ object GeminiClient {
     private const val CONNECT_TIMEOUT_MS = 15_000
     private const val READ_TIMEOUT_MS = 45_000
 
+    class QuotaExceededException(
+        message: String = "Суточный лимит запросов Gemini исчерпан (HTTP 429). Попробуйте позже или смените ключ."
+    ) : RuntimeException(message)
+
     data class GeminiResponse(
         val text: String,
         val modelUsed: String,
-        val foodEstimation: AiFoodEstimation? = null
+        val foodEstimation: AiFoodEstimation? = null,
+        val promptTokens: Int = 0,
+        val candidatesTokens: Int = 0,
+        val totalTokens: Int = 0
     )
 
     suspend fun testModels(
@@ -102,6 +109,7 @@ object GeminiClient {
 
         val jsonBody = buildRequestBody(systemPrompt, userPrompt, imageBase64, imageMimeType)
         var lastError: Exception? = null
+        var hadQuotaExceeded = false
 
         for (model in orderedModels) {
             try {
@@ -125,11 +133,15 @@ object GeminiClient {
 
                     val rawCandidateText = parseCandidateText(responseStr)
                     val (cleanText, food) = extractFoodEstimation(rawCandidateText)
+                    val (pTokens, cTokens, tTokens) = parseUsageMetadata(responseStr)
                     return@withContext Result.success(
                         GeminiResponse(
                             text = cleanText,
                             modelUsed = model,
-                            foodEstimation = food
+                            foodEstimation = food,
+                            promptTokens = pTokens,
+                            candidatesTokens = cTokens,
+                            totalTokens = tTokens
                         )
                     )
                 } else {
@@ -151,6 +163,9 @@ object GeminiClient {
                         )
                     }
 
+                    if (responseCode == 429) {
+                        hadQuotaExceeded = true
+                    }
                     // For fallback HTTP codes (404, 429, 500, 503), log and try next model
                     val message = "Model $model returned HTTP $responseCode: $errorBody"
                     lastError = RuntimeException(message)
@@ -162,7 +177,23 @@ object GeminiClient {
             }
         }
 
+        if (hadQuotaExceeded) {
+            return@withContext Result.failure(QuotaExceededException())
+        }
         Result.failure(lastError ?: RuntimeException("All Gemini models failed to respond"))
+    }
+
+    internal fun parseUsageMetadata(responseJson: String): Triple<Int, Int, Int> {
+        return try {
+            val root = JSONObject(responseJson)
+            val usage = root.optJSONObject("usageMetadata") ?: return Triple(0, 0, 0)
+            val prompt = usage.optInt("promptTokenCount", 0)
+            val candidates = usage.optInt("candidatesTokenCount", 0)
+            val total = usage.optInt("totalTokenCount", prompt + candidates)
+            Triple(prompt, candidates, total)
+        } catch (_: Exception) {
+            Triple(0, 0, 0)
+        }
     }
 
     fun buildRequestBody(

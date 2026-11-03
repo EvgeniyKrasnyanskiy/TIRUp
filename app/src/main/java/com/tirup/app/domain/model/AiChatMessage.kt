@@ -2,6 +2,16 @@ package com.tirup.app.domain.model
 
 import java.util.UUID
 
+data class AiDailyQuotaUsage(
+    val requestsUsed: Int = 0,
+    val maxRequests: Int = 1500,
+    val tokensUsed: Int = 0,
+    val isQuotaExhausted: Boolean = false
+) {
+    val remainingRequests: Int get() = (maxRequests - requestsUsed).coerceAtLeast(0)
+    val progressFraction: Float get() = if (isQuotaExhausted) 1.0f else if (maxRequests > 0) (requestsUsed.toFloat() / maxRequests).coerceIn(0f, 1f) else 0f
+}
+
 data class AiFoodEstimation(
     val title: String = "",
     val carbsGrams: Double = 0.0,

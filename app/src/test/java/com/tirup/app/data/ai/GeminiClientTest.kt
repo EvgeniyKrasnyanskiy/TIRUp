@@ -125,6 +125,31 @@ class GeminiClientTest {
     }
 
     @Test
+    fun testParseUsageMetadata() {
+        val jsonWithUsage = """
+            {
+              "candidates": [],
+              "usageMetadata": {
+                "promptTokenCount": 150,
+                "candidatesTokenCount": 75,
+                "totalTokenCount": 225
+              }
+            }
+        """.trimIndent()
+
+        val (prompt, candidates, total) = GeminiClient.parseUsageMetadata(jsonWithUsage)
+        assertEquals(150, prompt)
+        assertEquals(75, candidates)
+        assertEquals(225, total)
+
+        val jsonWithoutUsage = "{}"
+        val (p0, c0, t0) = GeminiClient.parseUsageMetadata(jsonWithoutUsage)
+        assertEquals(0, p0)
+        assertEquals(0, c0)
+        assertEquals(0, t0)
+    }
+
+    @Test
     fun testExtractFoodEstimationWhenNoFood() {
         val nonFoodMessage = "Это фотография кота, здесь нет еды."
         val (cleanText, estimation) = GeminiClient.extractFoodEstimation(nonFoodMessage)

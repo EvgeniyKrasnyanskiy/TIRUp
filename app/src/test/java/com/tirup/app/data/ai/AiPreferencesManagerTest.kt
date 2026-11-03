@@ -50,6 +50,28 @@ class AiPreferencesManagerTest {
             val default = secondArg<String?>()
             (memoryStore[key] as? String) ?: default
         }
+        every { editor.putInt(any(), any()) } answers {
+            val key = firstArg<String>()
+            val value = secondArg<Int>()
+            memoryStore[key] = value
+            editor
+        }
+        every { prefs.getInt(any(), any()) } answers {
+            val key = firstArg<String>()
+            val default = secondArg<Int>()
+            (memoryStore[key] as? Int) ?: default
+        }
+        every { editor.putBoolean(any(), any()) } answers {
+            val key = firstArg<String>()
+            val value = secondArg<Boolean>()
+            memoryStore[key] = value
+            editor
+        }
+        every { prefs.getBoolean(any(), any()) } answers {
+            val key = firstArg<String>()
+            val default = secondArg<Boolean>()
+            (memoryStore[key] as? Boolean) ?: default
+        }
     }
 
     @Test
@@ -136,5 +158,28 @@ class AiPreferencesManagerTest {
         assertFalse(manager.hasApiKey())
         assertEquals("", manager.getApiKey())
     }
-}
 
+    @Test
+    fun testDailyQuotaUsageTracking() {
+        val manager = AiPreferencesManager(context)
+        val initial = manager.getDailyQuotaUsage()
+        assertEquals(0, initial.requestsUsed)
+        assertEquals(0, initial.tokensUsed)
+        assertFalse(initial.isQuotaExhausted)
+
+        val updated = manager.recordRequestUsage(350)
+        assertEquals(1, updated.requestsUsed)
+        assertEquals(350, updated.tokensUsed)
+        assertEquals(1499, updated.remainingRequests)
+
+        manager.recordRequestUsage(150)
+        val state2 = manager.getDailyQuotaUsage()
+        assertEquals(2, state2.requestsUsed)
+        assertEquals(500, state2.tokensUsed)
+
+        manager.markQuotaExhausted(true)
+        val exhaustedState = manager.getDailyQuotaUsage()
+        assertTrue(exhaustedState.isQuotaExhausted)
+        assertEquals(1.0f, exhaustedState.progressFraction, 0.001f)
+    }
+}

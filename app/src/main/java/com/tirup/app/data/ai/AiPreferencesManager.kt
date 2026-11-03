@@ -7,7 +7,11 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import java.util.Base64
 import com.tirup.app.domain.model.AiChatMessage
+import com.tirup.app.domain.model.AiDailyQuotaUsage
 import com.tirup.app.domain.model.AiFoodEstimation
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -168,6 +172,72 @@ class AiPreferencesManager(private val context: Context) {
     }
     // endregion
 
+    // region Daily Quota & Usage Tracking
+    private fun getTodayDateString(): String {
+        return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+    }
+
+    @Synchronized
+    fun getDailyQuotaUsage(): AiDailyQuotaUsage {
+        val today = getTodayDateString()
+        val savedDate = prefs.getString(KEY_DAILY_USAGE_DATE, "") ?: ""
+        if (savedDate != today) {
+            prefs.edit()
+                .putString(KEY_DAILY_USAGE_DATE, today)
+                .putInt(KEY_DAILY_REQUESTS_COUNT, 0)
+                .putInt(KEY_DAILY_TOKENS_COUNT, 0)
+                .putBoolean(KEY_DAILY_QUOTA_EXHAUSTED, false)
+                .apply()
+            return AiDailyQuotaUsage(requestsUsed = 0, tokensUsed = 0, isQuotaExhausted = false)
+        }
+
+        val requests = prefs.getInt(KEY_DAILY_REQUESTS_COUNT, 0)
+        val tokens = prefs.getInt(KEY_DAILY_TOKENS_COUNT, 0)
+        val exhausted = prefs.getBoolean(KEY_DAILY_QUOTA_EXHAUSTED, false)
+        return AiDailyQuotaUsage(
+            requestsUsed = requests,
+            tokensUsed = tokens,
+            isQuotaExhausted = exhausted
+        )
+    }
+
+    @Synchronized
+    fun recordRequestUsage(tokensCount: Int): AiDailyQuotaUsage {
+        val today = getTodayDateString()
+        val savedDate = prefs.getString(KEY_DAILY_USAGE_DATE, "") ?: ""
+        val (currentRequests, currentTokens) = if (savedDate != today) {
+            Pair(0, 0)
+        } else {
+            Pair(prefs.getInt(KEY_DAILY_REQUESTS_COUNT, 0), prefs.getInt(KEY_DAILY_TOKENS_COUNT, 0))
+        }
+
+        val newRequests = currentRequests + 1
+        val newTokens = currentTokens + tokensCount.coerceAtLeast(0)
+
+        prefs.edit()
+            .putString(KEY_DAILY_USAGE_DATE, today)
+            .putInt(KEY_DAILY_REQUESTS_COUNT, newRequests)
+            .putInt(KEY_DAILY_TOKENS_COUNT, newTokens)
+            .apply()
+
+        return AiDailyQuotaUsage(
+            requestsUsed = newRequests,
+            tokensUsed = newTokens,
+            isQuotaExhausted = prefs.getBoolean(KEY_DAILY_QUOTA_EXHAUSTED, false)
+        )
+    }
+
+    @Synchronized
+    fun markQuotaExhausted(isExhausted: Boolean = true): AiDailyQuotaUsage {
+        val today = getTodayDateString()
+        prefs.edit()
+            .putString(KEY_DAILY_USAGE_DATE, today)
+            .putBoolean(KEY_DAILY_QUOTA_EXHAUSTED, isExhausted)
+            .apply()
+        return getDailyQuotaUsage()
+    }
+    // endregion
+
     // region Chat Cache (Max 30 messages in cacheDir/ai_chat_cache.json)
     private fun getChatCacheFile(): File = File(context.cacheDir, CHAT_CACHE_FILE_NAME)
 
@@ -262,6 +332,11 @@ class AiPreferencesManager(private val context: Context) {
         private const val KEY_FALLBACK_API_KEY = "key_fallback_gemini_api_key"
         private const val KEY_MODEL_STATUSES = "key_gemini_model_statuses"
         private const val KEY_LAST_SUCCESSFUL_MODEL = "key_last_successful_gemini_model"
+        private const val KEY_DAILY_USAGE_DATE = "key_ai_daily_usage_date"
+        private const val KEY_DAILY_REQUESTS_COUNT = "key_ai_daily_requests_count"
+        private const val KEY_DAILY_TOKENS_COUNT = "key_ai_daily_tokens_count"
+        private const val KEY_DAILY_QUOTA_EXHAUSTED = "key_ai_daily_quota_exhausted"
+
 
         private const val CHAT_CACHE_FILE_NAME = "ai_chat_cache.json"
         const val MAX_CHAT_CACHE_MESSAGES = 30
