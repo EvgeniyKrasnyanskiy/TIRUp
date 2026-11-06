@@ -11,7 +11,7 @@ import java.util.Date
 import java.util.Locale
 
 enum class AiContextPeriod(val titleRu: String, val titleEn: String) {
-    NO_DATA("Без данных", "No data"),
+    NO_DATA("Без контекста", "No context"),
     TODAY("Сегодня", "Today"),
     YESTERDAY("Вчера", "Yesterday"),
     CUSTOM_DAY("Выбрать день", "Select day"),

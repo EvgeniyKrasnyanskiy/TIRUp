@@ -3338,41 +3338,28 @@ private fun HeroGlucoseCard(
                     .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left Flank: Active Insulin (IoB)
+                // Left Flank: Active Insulin (IoB) - Compact single-line pill
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.CenterStart
                 ) {
                     if (showIob && rawIob != null) {
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(8.dp),
                             color = ActionBlue.copy(alpha = 0.14f),
                             border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.4f)),
                             modifier = Modifier.clickable { onIobClick() }
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                            ) {
-                                Text("💉", fontSize = 14.5.sp)
-                                Column {
-                                    Text(
-                                        text = String.format(Locale.US, if (isRu) "%.2f Ед" else "%.2f U", rawIob),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = ActionBlue,
-                                        fontSize = 13.sp
-                                    )
-                                    Text(
-                                        text = "IoB",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = ActionBlue.copy(alpha = 0.75f),
-                                        fontSize = 9.5.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                            }
+                            Text(
+                                text = String.format(Locale.US, "%.2f U", rawIob),
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.5.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = ActionBlue,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                softWrap = false
+                            )
                         }
                     }
                 }
@@ -3467,41 +3454,28 @@ private fun HeroGlucoseCard(
                     }
                 }
 
-                // Right Flank: Active Carbs (CoB)
+                // Right Flank: Active Carbs (CoB) - Compact single-line pill
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.CenterEnd
                 ) {
                     if (showCob && rawCob != null) {
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(8.dp),
                             color = ColorHigh.copy(alpha = 0.14f),
                             border = BorderStroke(1.dp, ColorHigh.copy(alpha = 0.4f)),
                             modifier = Modifier.clickable { onCobClick() }
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                            ) {
-                                Text("🍞", fontSize = 14.5.sp)
-                                Column {
-                                    Text(
-                                        text = String.format(Locale.US, if (isRu) "%.0f г" else "%.0f g", rawCob),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = ColorHigh,
-                                        fontSize = 13.sp
-                                    )
-                                    Text(
-                                        text = "CoB",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = ColorHigh.copy(alpha = 0.75f),
-                                        fontSize = 9.5.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                            }
+                            Text(
+                                text = String.format(Locale.US, "%.0f C", rawCob),
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.5.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = ColorHigh,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                softWrap = false
+                            )
                         }
                     }
                 }

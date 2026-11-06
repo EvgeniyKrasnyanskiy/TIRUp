@@ -694,11 +694,19 @@ fun AiMessageBubble(
                     }
                 }
 
-                // Message Text
+                // Message Text with Markdown Rendering
+                val textColor = if (isUser) Color.White else MaterialTheme.colorScheme.onSurface
+                val parsedText = remember(message.text, textColor) {
+                    if (isUser) {
+                        androidx.compose.ui.text.AnnotatedString(message.text)
+                    } else {
+                        MarkdownRenderer.parse(message.text, textColor)
+                    }
+                }
                 Text(
-                    text = message.text,
+                    text = parsedText,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (isUser) Color.White else MaterialTheme.colorScheme.onSurface,
+                    color = textColor,
                     lineHeight = 20.sp
                 )
 

@@ -810,6 +810,14 @@ fun SettingsScreen(
                 onShowClearConfirm = { viewModel.showClearConfirm(true) }
             )
 
+            // AI Assistant: General user access in Advanced Settings
+            com.tirup.app.presentation.settings.sections.AiAssistantCard(
+                settings = settings,
+                isRu = isRu,
+                onToggleAiEnabled = { viewModel.setAiAssistantEnabled(it) },
+                onOpenAiSettings = onOpenAiAssistant
+            )
+
             DeveloperTestingCard(
                 settings = settings,
                 isRu = isRu,
@@ -841,16 +849,6 @@ fun SettingsScreen(
                     isRu = isRu,
                     onUpdateNightscoutSettings = { viewModel.updateNightscoutSettings(it) },
                     onShowNightscoutDialog = { showNightscoutDialog = true }
-                )
-            }
-
-            // AI assistant: hidden until dev-unlocked OR already enabled by user.
-            if (isDevTestsUnlocked || settings.isAiAssistantEnabled) {
-                com.tirup.app.presentation.settings.sections.AiAssistantCard(
-                    settings = settings,
-                    isRu = isRu,
-                    onToggleAiEnabled = { viewModel.setAiAssistantEnabled(it) },
-                    onOpenAiSettings = onOpenAiAssistant
                 )
             }
 
