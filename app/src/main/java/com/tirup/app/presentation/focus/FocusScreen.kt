@@ -484,7 +484,7 @@ fun FocusScreen(
                         isLanSyncing = true
                         coroutineScope.launch {
                             try {
-                                val res = XdripLanManager.pollNow()
+                                val res = XdripLanManager.pollNow(force = true)
                                 if (res.isSuccess) {
                                     Toast.makeText(context, if (isRu) "Данные Wi-Fi LAN обновлены" else "Wi-Fi LAN data synced", Toast.LENGTH_SHORT).show()
                                 } else {

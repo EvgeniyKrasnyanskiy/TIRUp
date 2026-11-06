@@ -51,6 +51,7 @@ object NightscoutStatusManager {
     private var pollJob: Job? = null
     private var activeNsSettings: NightscoutSettings? = null
     private var lastPollTime = 0L
+    private var lastTelemetryPollTime = 0L
 
     private val _statusFlow = MutableStateFlow(NightscoutStatus())
     val statusFlow: StateFlow<NightscoutStatus> = _statusFlow.asStateFlow()
@@ -170,7 +171,7 @@ object NightscoutStatusManager {
         Log.i(TAG, "Stopped Nightscout telemetry & sync polling")
     }
 
-    suspend fun pollNow(): Result<NightscoutStatus> = withContext(Dispatchers.IO) {
+    suspend fun pollNow(force: Boolean = false): Result<NightscoutStatus> = withContext(Dispatchers.IO) {
         val repo = cachedSettingsRepo ?: return@withContext Result.failure(IllegalStateException("Репозиторий недоступен"))
         val settings = repo.getSettings().firstOrNull()?.nightscoutSettings ?: return@withContext Result.failure(IllegalStateException("Настройки недоступны"))
         if (!settings.isEnabled || !settings.isValidUrl) return@withContext Result.failure(IllegalStateException("Nightscout не настроен"))
@@ -181,8 +182,16 @@ object NightscoutStatusManager {
             return@withContext Result.success(_statusFlow.value)
         }
 
+        if (!force) {
+            val latestInDb = cachedGlucoseRepo?.getLatestReading()?.firstOrNull()
+            if (latestInDb != null && (now - latestInDb.timestamp < 240_000L)) {
+                Log.d(TAG, "Nightscout pollNow: fresh reading already exists in DB (${(now - latestInDb.timestamp) / 1000}s old). Skipping cloud request.")
+                return@withContext Result.success(_statusFlow.value)
+            }
+        }
+
         try {
-            executeFetchCycle(settings)
+            executeFetchCycle(settings, force)
             val current = _statusFlow.value
             if (current.isConnected) {
                 Result.success(current)
@@ -194,9 +203,21 @@ object NightscoutStatusManager {
         }
     }
 
-    private suspend fun executeFetchCycle(settings: NightscoutSettings) = withContext(Dispatchers.IO) {
-        lastPollTime = System.currentTimeMillis()
+    private suspend fun executeFetchCycle(settings: NightscoutSettings, force: Boolean = false) = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        lastPollTime = now
         val cleanUrl = settings.getCleanBaseUrl()
+
+        val latestInDb = cachedGlucoseRepo?.getLatestReading()?.firstOrNull()
+        val hasFreshReading = latestInDb != null && (now - latestInDb.timestamp < 240_000L)
+
+        // If fresh glucose exists from higher-priority source (Broadcast / Wi-Fi LAN),
+        // and telemetry was fetched recently (< 5 min), skip network calls completely to save power.
+        if (latestInDb != null && !force && hasFreshReading && (now - lastTelemetryPollTime < 300_000L)) {
+            Log.d(TAG, "Nightscout: fresh reading exists (${(now - latestInDb.timestamp) / 1000}s old) and telemetry recent. Skipping fetch cycle.")
+            return@withContext
+        }
+        lastTelemetryPollTime = now
 
         var batteryFound = false
         var isConnected = false
@@ -562,8 +583,8 @@ object NightscoutStatusManager {
         val now = System.currentTimeMillis()
         val latestInDb = repo.getLatestReading().firstOrNull()
 
-        // If we already have fresh data (< 2.5 min old from higher-priority source), skip remote batch fetch
-        val hasVeryFreshReading = latestInDb != null && (now - latestInDb.timestamp < 150_000L)
+        // If we already have fresh data (< 4 min old from higher-priority source), skip remote batch fetch
+        val hasVeryFreshReading = latestInDb != null && (now - latestInDb.timestamp < 240_000L)
 
         val readings = mutableListOf<GlucoseReading>()
 

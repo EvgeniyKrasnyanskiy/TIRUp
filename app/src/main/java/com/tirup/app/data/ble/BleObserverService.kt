@@ -78,18 +78,8 @@ class BleObserverService : Service() {
             Log.w(TAG, "startForeground error: ${e.message}")
         }
 
-        val pm = getSystemService(POWER_SERVICE) as? PowerManager
-        try {
-            if (wakeLock == null) {
-                wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TIRUp:BleObserverWakeLock")
-                wakeLock?.setReferenceCounted(false)
-            }
-            if (wakeLock?.isHeld == false) {
-                wakeLock?.acquire(24 * 60 * 60 * 1000L)
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to acquire observer WakeLock: ${e.message}")
-        }
+        // Power optimization: Do not hold permanent 24h WakeLock in foreground service.
+        // BLE hardware controller filters packets and wakes CPU via ScanCallback when packets arrive.
 
         BleObserverManager.startScanningFromService(applicationContext, settingsRepo, glucoseRepo)
         BleScanKeepAliveReceiver.scheduleKeepAlive(applicationContext)

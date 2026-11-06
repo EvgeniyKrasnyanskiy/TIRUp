@@ -13,12 +13,13 @@ class XdripLanClientTest {
 
     @Test
     fun dataSourcePriority_ordersCorrectly() {
-        assertTrue(DataSourcePriority.LOCAL_XDRIP.rank > DataSourcePriority.BLE_BRIDGE.rank)
-        assertTrue(DataSourcePriority.BLE_BRIDGE.rank > DataSourcePriority.WIFI_LAN.rank)
+        assertTrue(DataSourcePriority.LOCAL_XDRIP.rank > DataSourcePriority.WIFI_LAN.rank)
         assertTrue(DataSourcePriority.WIFI_LAN.rank > DataSourcePriority.NIGHTSCOUT_CLOUD.rank)
+        assertTrue(DataSourcePriority.NIGHTSCOUT_CLOUD.rank > DataSourcePriority.BLE_BRIDGE.rank)
 
         assertTrue(DataSourcePriority.isHigherOrEqual(DataSourcePriority.LOCAL_XDRIP, DataSourcePriority.WIFI_LAN))
         assertTrue(DataSourcePriority.isHigherOrEqual(DataSourcePriority.WIFI_LAN, DataSourcePriority.NIGHTSCOUT_CLOUD))
+        assertTrue(DataSourcePriority.isHigherOrEqual(DataSourcePriority.NIGHTSCOUT_CLOUD, DataSourcePriority.BLE_BRIDGE))
     }
 
     @Test

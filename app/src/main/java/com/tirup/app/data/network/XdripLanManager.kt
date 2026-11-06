@@ -107,7 +107,24 @@ object XdripLanManager {
                 caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
     }
 
+    fun onNewReadingReceived(timestamp: Long) {
+        lastReadingTimestamp = maxOf(lastReadingTimestamp, timestamp)
+        val ctx = appContext ?: return
+        val settings = activeLanSettings ?: return
+        if (!settings.isEnabled || !settings.isConfigured) return
+        if (!isWifiOrHotspotConnected(ctx)) return
+
+        val nextDelay = calculateNextPollIntervalMs(lastReadingTimestamp, settings.pollIntervalSeconds)
+        scheduleNextPollAlarm(ctx, nextDelay)
+        Log.d(TAG, "New reading received ($timestamp). Rescheduled next LAN poll alarm to +${nextDelay / 1000}s")
+    }
+
     fun scheduleNextPollAlarm(context: Context, delayMs: Long) {
+        if (!isWifiOrHotspotConnected(context)) {
+            Log.d(TAG, "Wi-Fi is not connected. Cancelling LAN poll alarm to save battery.")
+            cancelPollAlarm(context)
+            return
+        }
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val intent = Intent(context, AlertActionReceiver::class.java).apply {
             action = AlertActionReceiver.ACTION_POLL_XDRIP_LAN
@@ -293,7 +310,7 @@ object XdripLanManager {
                             state = LanConnectionState.DISCONNECTED,
                             errorMessage = "Ожидание Wi-Fi подключения"
                         )
-                        delay(15_000L)
+                        delay(120_000L)
                         continue
                     }
 
@@ -307,8 +324,12 @@ object XdripLanManager {
                     )
                 }
 
+                val latestDbTs = try {
+                    cachedDb?.glucoseReadingDao()?.getLatestTimestamp() ?: 0L
+                } catch (_: Exception) { 0L }
+                val effectiveTs = maxOf(lastReadingTimestamp, latestDbTs)
                 val currentInterval = calculateNextPollIntervalMs(
-                    lastReadingTimestamp,
+                    effectiveTs,
                     settings.pollIntervalSeconds
                 )
                 delay(currentInterval)
@@ -332,7 +353,7 @@ object XdripLanManager {
         Log.i(TAG, "Stopped xDrip LAN follower polling")
     }
 
-    suspend fun pollNow(): Result<XdripLanStatus> = withContext(Dispatchers.IO) {
+    suspend fun pollNow(force: Boolean = false): Result<XdripLanStatus> = withContext(Dispatchers.IO) {
         val repo = cachedSettingsRepo ?: return@withContext Result.failure(IllegalStateException("Репозиторий недоступен"))
         val settings = repo.getSettings().firstOrNull() ?: return@withContext Result.failure(IllegalStateException("Настройки недоступны"))
         val lan = settings.xdripLanSettings
@@ -346,8 +367,22 @@ object XdripLanManager {
             return@withContext Result.success(_statusFlow.value)
         }
 
+        if (!force) {
+            val latestDbTs = try {
+                cachedDb?.glucoseReadingDao()?.getLatestTimestamp() ?: 0L
+            } catch (_: Exception) { 0L }
+            val effectiveTs = maxOf(lastReadingTimestamp, latestDbTs)
+            if (effectiveTs > 0L && (now - effectiveTs < 240_000L)) {
+                val ageSec = (now - effectiveTs) / 1000L
+                Log.d(TAG, "pollNow: Fresh reading already available in DB ($ageSec s old, rank >= LAN). Skipping LAN request.")
+                val nextDelay = (300_000L - (now - effectiveTs)).coerceAtLeast(30_000L)
+                scheduleNextPollAlarm(ctx, nextDelay)
+                return@withContext Result.success(_statusFlow.value)
+            }
+        }
+
         try {
-            executePollCycle(lan, settings)
+            executePollCycle(lan, settings, force)
             val current = _statusFlow.value
             if (current.state == LanConnectionState.CONNECTED) {
                 Result.success(current)
@@ -401,7 +436,7 @@ object XdripLanManager {
         }
     }
 
-    private suspend fun executePollCycle(settings: XdripLanSettings, userSettings: UserSettings) {
+    private suspend fun executePollCycle(settings: XdripLanSettings, userSettings: UserSettings, force: Boolean = false) {
         val ctx = appContext ?: return
         val glucoseRepo = cachedGlucoseRepo ?: return
         val db = cachedDb ?: return
@@ -412,6 +447,21 @@ object XdripLanManager {
             return
         }
         lastPollExecutionTime = now
+
+        // Check if fresh reading already exists from higher-priority source (e.g. Broadcast)
+        val latestDbTs = try {
+            db.glucoseReadingDao().getLatestTimestamp() ?: 0L
+        } catch (_: Exception) { 0L }
+        val effectiveTs = maxOf(lastReadingTimestamp, latestDbTs)
+        if (!force && effectiveTs > 0L) {
+            val ageMs = now - effectiveTs
+            if (ageMs < 240_000L) {
+                Log.i(TAG, "Skipping LAN poll cycle: fresh reading exists (${ageMs / 1000}s old)")
+                val nextDelay = (300_000L - ageMs).coerceAtLeast(30_000L)
+                scheduleNextPollAlarm(ctx, nextDelay)
+                return
+            }
+        }
 
         try {
             var activeLan = settings
@@ -527,7 +577,11 @@ object XdripLanManager {
                 }
             }
         } finally {
-            val nextDelay = calculateNextPollIntervalMs(lastReadingTimestamp, settings.pollIntervalSeconds)
+            val finalDbTs = try {
+                cachedDb?.glucoseReadingDao()?.getLatestTimestamp() ?: 0L
+            } catch (_: Exception) { 0L }
+            val finalEffectiveTs = maxOf(lastReadingTimestamp, finalDbTs)
+            val nextDelay = calculateNextPollIntervalMs(finalEffectiveTs, settings.pollIntervalSeconds)
             scheduleNextPollAlarm(ctx, nextDelay)
         }
     }
