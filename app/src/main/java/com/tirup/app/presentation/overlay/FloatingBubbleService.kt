@@ -144,6 +144,7 @@ class FloatingBubbleService : Service() {
         }
 
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        isServiceRunning = true
         createAndAttachBubble()
         observeData()
         startBurnInProtection()
@@ -404,6 +405,10 @@ class FloatingBubbleService : Service() {
                     val bv = bubbleView ?: continue
                     val params = windowLayoutParams ?: continue
                     if (!bv.isAttachedToWindow || bv.visibility != View.VISIBLE || isUserInteracting) {
+                        continue
+                    }
+                    val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                    if (pm != null && !pm.isInteractive) {
                         continue
                     }
 
@@ -917,6 +922,7 @@ class FloatingBubbleService : Service() {
     }
 
     override fun onDestroy() {
+        isServiceRunning = false
         super.onDestroy()
         miniCountdownJob?.cancel()
         cancelCountdownToast()
@@ -958,7 +964,12 @@ class FloatingBubbleService : Service() {
     companion object {
         private const val TAG = "FloatingBubbleService"
 
+        @Volatile
+        var isServiceRunning: Boolean = false
+            private set
+
         fun start(context: Context) {
+            if (isServiceRunning) return
             if (Settings.canDrawOverlays(context)) {
                 try {
                     val intent = Intent(context, FloatingBubbleService::class.java)

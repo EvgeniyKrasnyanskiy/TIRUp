@@ -15,13 +15,17 @@ import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.domain.model.WeeklyDigest
 import com.tirup.app.domain.repository.GlucoseRepository
 import com.tirup.app.domain.repository.SettingsRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
@@ -73,9 +77,36 @@ class TrendsViewModel(
     private val _uiState = MutableStateFlow(TrendsUiState(isLoading = true))
     val uiState: StateFlow<TrendsUiState> = _uiState.asStateFlow()
 
+    private var observeDataJob: Job? = null
+    private var backgroundPauseJob: Job? = null
+    private var isForegroundActive: Boolean = false
+
     init {
         loadDismissedItems()
         observeData()
+    }
+
+    /**
+     * Pauses multi-day Room queries and AGP/heatmap/digest calculations while MainActivity is stopped.
+     */
+    fun setForegroundActive(active: Boolean) {
+        isForegroundActive = active
+        if (active) {
+            backgroundPauseJob?.cancel()
+            backgroundPauseJob = null
+            if (observeDataJob?.isActive != true) {
+                observeData()
+            }
+        } else {
+            backgroundPauseJob?.cancel()
+            backgroundPauseJob = viewModelScope.launch {
+                delay(5_000L)
+                if (!isForegroundActive) {
+                    observeDataJob?.cancel()
+                    observeDataJob = null
+                }
+            }
+        }
     }
 
     private fun loadDismissedItems() {
@@ -217,7 +248,8 @@ class TrendsViewModel(
     }
 
     private fun observeData() {
-        viewModelScope.launch {
+        observeDataJob?.cancel()
+        observeDataJob = viewModelScope.launch {
             combine(
                 _selectedPeriod,
                 _customDays,
@@ -264,7 +296,7 @@ class TrendsViewModel(
                         allReadings
                     }
 
-                    _weeklyDigest.value = WeeklyDigestCalculator.calculateForReferenceTimestamp(
+                    val digest = WeeklyDigestCalculator.calculateForReferenceTimestamp(
                         allReadings = allReadings,
                         referenceTime = referenceTime,
                         settings = latestSettings
@@ -302,19 +334,23 @@ class TrendsViewModel(
                         }.distinct().size
                     } else 0
 
-                    TrendsUiState(
-                        selectedPeriod = period,
-                        customDays = customDays,
-                        statistics = stats,
-                        compensatorGoal = compensator,
-                        percentileBins = agpBins,
-                        heatmapData = heatmap,
-                        userSettings = latestSettings,
-                        actualDaysCount = actualDaysCount,
-                        isLoading = false
+                    Pair(
+                        TrendsUiState(
+                            selectedPeriod = period,
+                            customDays = customDays,
+                            statistics = stats,
+                            compensatorGoal = compensator,
+                            percentileBins = agpBins,
+                            heatmapData = heatmap,
+                            userSettings = latestSettings,
+                            actualDaysCount = actualDaysCount,
+                            isLoading = false
+                        ),
+                        digest
                     )
                 }
-            }.collect { state ->
+            }.flowOn(Dispatchers.Default).collect { (state, digest) ->
+                _weeklyDigest.value = digest
                 _uiState.value = state
             }
         }

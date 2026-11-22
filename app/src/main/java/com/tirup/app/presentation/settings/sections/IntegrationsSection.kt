@@ -86,6 +86,7 @@ import com.tirup.app.domain.model.NightscoutSettings
 import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.domain.model.XdripLanSettings
 import com.tirup.app.presentation.components.BentoCard
+import com.tirup.app.presentation.components.collectAsStateWhenStarted
 import com.tirup.app.presentation.settings.dialogs.BleLongRangeConfirmDialog
 import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.PrimaryEmerald
@@ -115,10 +116,10 @@ fun BleBridgeCard(
     val context = LocalContext.current
     val ble = settings.bleBridgeSettings
     val isBridgeActive = ble.isEnabled && ble.role != BleBridgeRole.DISABLED
-    val isBroadcasting by BleBroadcaster.isBroadcasting.collectAsState()
-    val broadcastRemaining by BleBroadcaster.broadcastRemainingSec.collectAsState()
-    val boostRemaining by BleObserverManager.boostRemainingSec.collectAsState()
-    val isScanning by BleObserverManager.isScanningFlow.collectAsState()
+    val isBroadcasting by BleBroadcaster.isBroadcasting.collectAsStateWhenStarted()
+    val broadcastRemaining by BleBroadcaster.broadcastRemainingSec.collectAsStateWhenStarted()
+    val boostRemaining by BleObserverManager.boostRemainingSec.collectAsStateWhenStarted()
+    val isScanning by BleObserverManager.isScanningFlow.collectAsStateWhenStarted()
 
     val bluetoothManager = remember { context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager }
     val isBtOn = remember(bluetoothManager) { bluetoothManager?.adapter?.isEnabled == true }

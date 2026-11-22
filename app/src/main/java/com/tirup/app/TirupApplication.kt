@@ -41,6 +41,7 @@ class TirupApplication : Application() {
         streamingImporter = StreamingGlucoseImporter(this, database)
 
         registerDynamicReceivers()
+        registerScreenOnWidgetRefresh()
 
         com.tirup.app.data.alert.GlucoseAlertManager.initChannels(this)
         com.tirup.app.data.backup.AutoBackupManager.scheduleNextDailyBackup(this)
@@ -105,6 +106,36 @@ class TirupApplication : Application() {
             )
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    private val screenOnReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+            if (context == null) return
+            if (intent?.action == android.content.Intent.ACTION_SCREEN_ON ||
+                intent?.action == android.content.Intent.ACTION_USER_PRESENT
+            ) {
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                    com.tirup.app.presentation.widget.TirupWidgetUpdater.flushPendingScreenOffUpdate(context.applicationContext)
+                }
+            }
+        }
+    }
+
+    private fun registerScreenOnWidgetRefresh() {
+        try {
+            val filter = IntentFilter().apply {
+                addAction(android.content.Intent.ACTION_SCREEN_ON)
+                addAction(android.content.Intent.ACTION_USER_PRESENT)
+            }
+            ContextCompat.registerReceiver(
+                this,
+                screenOnReceiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+        } catch (e: Exception) {
+            android.util.Log.w("TirupApplication", "Failed to register screen-on widget receiver: ${e.message}")
         }
     }
 

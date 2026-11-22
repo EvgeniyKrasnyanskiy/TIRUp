@@ -153,13 +153,14 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                 // If IoB or CoB not provided in intent extras, query local xDrip service (port 17580)
                 if (iob == null || cob == null) {
                     try {
+                        lastPebbleDirectFetchMs = System.currentTimeMillis()
                         val pebbleData = fetchIobCobFromLocalPebbleService()
                         if (pebbleData != null) {
                             if (iob == null && pebbleData.first != null && pebbleData.first!! > 0.05) {
                                 iob = pebbleData.first
                                 setCachedIob(iob, System.currentTimeMillis())
                             }
-                            if (cob == null && pebbleData.second != null && pebbleData.second!! > 0.5) {
+                            if (cob == null && pebbleData.second != null && pebbleData.second!! >= 0.5) {
                                 cob = pebbleData.second
                                 setCachedCob(cob, System.currentTimeMillis())
                             }
@@ -176,8 +177,10 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                         val recentTreatments = appInst?.database?.treatmentDao()?.getRecentTreatmentsSync(50)
                         if (!recentTreatments.isNullOrEmpty()) {
                             val activeCob = calculateActiveCob(recentTreatments.map { it.toDomain() }, now)
-                            cob = activeCob
-                            setCachedCob(cob, now)
+                            if (activeCob >= 0.5) {
+                                cob = activeCob
+                                setCachedCob(cob, now)
+                            }
                         }
                     } catch (_: Exception) {}
                 }
@@ -192,7 +195,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                                 iob = lastInDb.iob
                                 setCachedIob(iob, lastInDb.timestamp)
                             }
-                            if (cob == null && lastInDb.cob != null && lastInDb.cob >= 0.0) {
+                            if (cob == null && lastInDb.cob != null && lastInDb.cob >= 0.5) {
                                 cob = lastInDb.cob
                                 setCachedCob(cob, lastInDb.timestamp)
                             }
@@ -1203,62 +1206,84 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
             return parseTreatmentsJson(json)
         }
 
-        fun syncIobCobFromPebble(context: Context) {
+        private val isSyncingIobCob = java.util.concurrent.atomic.AtomicBoolean(false)
+        @Volatile
+        private var lastPebbleDirectFetchMs: Long = 0L
+        @Volatile
+        private var lastTreatmentsHttpSyncMs: Long = 0L
+        private const val TREATMENTS_HTTP_INTERVAL_MS = 5 * 60_000L
+        private const val PEBBLE_MIN_INTERVAL_MS = 30_000L
+
+        fun syncIobCobFromPebble(context: Context, force: Boolean = false) {
+            val nowStart = System.currentTimeMillis()
+            val treatmentsDue = force || (nowStart - lastTreatmentsHttpSyncMs >= TREATMENTS_HTTP_INTERVAL_MS)
+            val pebbleDue = force || (nowStart - lastPebbleDirectFetchMs >= PEBBLE_MIN_INTERVAL_MS)
+            if (!treatmentsDue && !pebbleDue) return
+            if (!isSyncingIobCob.compareAndSet(false, true)) return
+
             companionScope.launch {
                 try {
                     val app = context.applicationContext as? TirupApplication ?: return@launch
                     val db = app.database
                     val now = System.currentTimeMillis()
 
-                    // 1. Fetch treatments from xDrip local web server (port 17580)
+                    // 1. Fetch treatments from xDrip local web server (port 17580) at most every 5 min (unless forced)
                     var computedCob: Double? = null
-                    val treatments = fetchTreatmentsFromLocalService()
-                    if (treatments.isNotEmpty()) {
-                        // Reconcile deletions: remove any local treatments that were deleted in xDrip
-                        try {
-                            val oldestXdripTs = treatments.minOf { it.timestamp }
-                            val recentLocal = db.treatmentDao().getRecentTreatmentsSync(100)
-                            for (local in recentLocal) {
-                                if (local.source == "XDRIP" && local.timestamp >= oldestXdripTs) {
-                                    val stillExistsInXdrip = treatments.any { xt ->
-                                        kotlin.math.abs(xt.timestamp - local.timestamp) < 5 * 60_000L
-                                    }
-                                    if (!stillExistsInXdrip) {
-                                        db.treatmentDao().deleteById(local.id)
-                                        Log.i(TAG, "Reconciled deleted treatment from xDrip: ${local.id} at ${local.timestamp}")
+                    if (treatmentsDue) {
+                        lastTreatmentsHttpSyncMs = now
+                        val treatments = fetchTreatmentsFromLocalService()
+                        if (treatments.isNotEmpty()) {
+                            // Reconcile deletions: remove any local treatments that were deleted in xDrip
+                            try {
+                                val oldestXdripTs = treatments.minOf { it.timestamp }
+                                val recentLocal = db.treatmentDao().getRecentTreatmentsSync(100)
+                                for (local in recentLocal) {
+                                    if (local.source == "XDRIP" && local.timestamp >= oldestXdripTs) {
+                                        val stillExistsInXdrip = treatments.any { xt ->
+                                            kotlin.math.abs(xt.timestamp - local.timestamp) < 5 * 60_000L
+                                        }
+                                        if (!stillExistsInXdrip) {
+                                            db.treatmentDao().deleteById(local.id)
+                                            Log.i(TAG, "Reconciled deleted treatment from xDrip: ${local.id} at ${local.timestamp}")
+                                        }
                                     }
                                 }
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Error reconciling treatments deletion: ${e.message}")
                             }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Error reconciling treatments deletion: ${e.message}")
-                        }
 
-                        for (t in treatments) {
-                            saveTreatmentIfNew(db, t)
-                        }
-
-                        // Purge any duplicate records in DB
-                        purgeDuplicateTreatments(db)
-
-                        // Process device renewals from fetched xDrip treatments
-                        processDeviceRenewals(context, treatments)
-
-                        // Calculate active CoB
-                        computedCob = calculateActiveCob(treatments, now)
-                    } else {
-                        // Fallback: process device renewals from recent treatments in local DB
-                        try {
-                            val recentLocal = db.treatmentDao().getRecentTreatmentsSync(50).map { it.toDomain() }
-                            if (recentLocal.isNotEmpty()) {
-                                processDeviceRenewals(context, recentLocal)
+                            for (t in treatments) {
+                                saveTreatmentIfNew(db, t)
                             }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Fallback device renewals from DB failed: ${e.message}")
+
+                            // Purge any duplicate records in DB
+                            purgeDuplicateTreatments(db)
+
+                            // Process device renewals from fetched xDrip treatments
+                            processDeviceRenewals(context, treatments)
+
+                            // Calculate active CoB
+                            computedCob = calculateActiveCob(treatments, now)
+                        } else {
+                            // Fallback: process device renewals from recent treatments in local DB
+                            try {
+                                val recentLocal = db.treatmentDao().getRecentTreatmentsSync(50).map { it.toDomain() }
+                                if (recentLocal.isNotEmpty()) {
+                                    processDeviceRenewals(context, recentLocal)
+                                }
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Fallback device renewals from DB failed: ${e.message}")
+                            }
                         }
                     }
 
-                    // 2. Fetch IoB/CoB from pebble / status endpoints
-                    val pebbleData = fetchIobCobFromLocalPebbleService()
+                    // 2. Fetch IoB/CoB from pebble / status endpoints only if not freshly fetched by onReceive
+                    val pebbleData = if (pebbleDue) {
+                        lastPebbleDirectFetchMs = System.currentTimeMillis()
+                        fetchIobCobFromLocalPebbleService()
+                    } else {
+                        null
+                    }
                     val pebbleIob = pebbleData?.first
                     val pebbleCob = pebbleData?.second
 
@@ -1269,8 +1294,16 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
 
                     val latestEntity = db.glucoseReadingDao().getRecentReadingsSync(1).firstOrNull() ?: return@launch
                     if (now - latestEntity.timestamp <= IOB_COB_EXPIRY_MS) {
-                        val newIob = if (resolvedIob != null && resolvedIob >= 0.0) resolvedIob else latestEntity.iob
-                        val newCob = if (resolvedCob != null && resolvedCob >= 0.0) resolvedCob else latestEntity.cob
+                        val newIob = if (resolvedIob != null) {
+                            if (resolvedIob > 0.05) resolvedIob else null
+                        } else {
+                            latestEntity.iob
+                        }
+                        val newCob = if (resolvedCob != null) {
+                            if (resolvedCob >= 0.5) resolvedCob else null
+                        } else {
+                            latestEntity.cob
+                        }
                         if (newIob != latestEntity.iob || newCob != latestEntity.cob) {
                             db.glucoseReadingDao().updateIobCob(latestEntity.id, newIob, newCob)
                             if (newIob != null) {
@@ -1285,6 +1318,8 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "syncIobCobFromPebble failed: ${e.message}")
+                } finally {
+                    isSyncingIobCob.set(false)
                 }
             }
         }
@@ -1508,6 +1543,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                     val app = context.applicationContext as? TirupApplication ?: return@launch
 
                     // 1. Fetch /pebble endpoint (instant live reading with iob/cob)
+                    lastPebbleDirectFetchMs = System.currentTimeMillis()
                     val pebbleJsonStr = queryLocalEndpoint("pebble")
                     var latestReadingFromPebble: GlucoseReading? = null
 
@@ -1638,7 +1674,7 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
                     }
 
                     // 5. Also sync treatments and notes from treatments.json
-                    syncIobCobFromPebble(context)
+                    syncIobCobFromPebble(context, force = force)
                 } catch (e: Exception) {
                     Log.w(TAG, "syncFromLocalXdrip error: ${e.message}")
                 } finally {

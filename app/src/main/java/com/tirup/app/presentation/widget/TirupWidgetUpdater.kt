@@ -12,6 +12,7 @@ import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
 import android.os.Bundle
+import android.os.PowerManager
 import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
@@ -30,22 +31,60 @@ import com.tirup.app.presentation.MainActivity
 import com.tirup.app.presentation.theme.getGlucoseColorInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.StrikethroughSpan
 import java.util.Calendar
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
 object TirupWidgetUpdater {
 
     private const val TAG = "TirupWidgetUpdater"
+    private const val MIN_UPDATE_INTERVAL_MS = 1_500L
 
-    suspend fun updateAllWidgets(context: Context) = withContext(Dispatchers.IO) {
+    private val updateMutex = Mutex()
+    private val hasPendingScreenOffUpdate = AtomicBoolean(false)
+    @Volatile
+    private var lastWidgetUpdateMs: Long = 0L
+
+    suspend fun flushPendingScreenOffUpdate(context: Context) {
+        if (hasPendingScreenOffUpdate.getAndSet(false)) {
+            updateAllWidgets(context, force = true)
+        }
+    }
+
+    suspend fun updateAllWidgets(context: Context, force: Boolean = false) = withContext(Dispatchers.IO) {
         try {
-            val appWidgetManager = AppWidgetManager.getInstance(context) ?: return@withContext
+            // Home-screen widgets are invisible while the display is off; defer until ACTION_SCREEN_ON
+            val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            if (!force && pm != null && !pm.isInteractive) {
+                hasPendingScreenOffUpdate.set(true)
+                return@withContext
+            }
+
+            updateMutex.withLock {
+                val now = System.currentTimeMillis()
+                if (!force && now - lastWidgetUpdateMs < MIN_UPDATE_INTERVAL_MS) {
+                    return@withContext
+                }
+                lastWidgetUpdateMs = now
+                hasPendingScreenOffUpdate.set(false)
+                updateAllWidgetsLocked(context)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating TIRUp homescreen widgets", e)
+        }
+    }
+
+    private suspend fun updateAllWidgetsLocked(context: Context) {
+        try {
+            val appWidgetManager = AppWidgetManager.getInstance(context) ?: return
 
             val stripIds = appWidgetManager.getAppWidgetIds(ComponentName(context, TirupStripWidgetProvider::class.java))
             val dashboardIds = appWidgetManager.getAppWidgetIds(ComponentName(context, TirupDashboardWidgetProvider::class.java))
@@ -58,10 +97,10 @@ object TirupWidgetUpdater {
 
             if (stripIds.isEmpty() && dashboardIds.isEmpty() && compactIds.isEmpty() && minimalIds.isEmpty() &&
                 verticalIds.isEmpty() && mediumIds.isEmpty() && widget2x1Ids.isEmpty() && widget3x1Ids.isEmpty()) {
-                return@withContext
+                return
             }
 
-            val app = context.applicationContext as? TirupApplication ?: return@withContext
+            val app = context.applicationContext as? TirupApplication ?: return
             val settings = app.settingsRepository.getSettings().first()
             val latest = app.glucoseRepository.getLatestReading().first()
             val recent = app.glucoseRepository.getRecentReadings(280).first() // 4+ hours of 1-min readings

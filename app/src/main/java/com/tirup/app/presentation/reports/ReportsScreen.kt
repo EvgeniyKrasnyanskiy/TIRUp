@@ -82,6 +82,7 @@ import com.tirup.app.domain.calculator.SensorVerificationResult
 import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorTargetSoft
+import com.tirup.app.presentation.components.collectAsStateWhenStarted
 import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.presentation.theme.ColorVeryHigh
 import com.tirup.app.presentation.theme.ColorVeryLow
@@ -99,7 +100,7 @@ fun ReportsScreen(
     onOpenSettings: () -> Unit = {},
     onOpenHba1c: () -> Unit = {}
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWhenStarted()
     val context = LocalContext.current
     var showGuidebookModal by remember { mutableStateOf(false) }
     var showXdripExportHelp by remember { mutableStateOf(false) }

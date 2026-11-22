@@ -131,9 +131,14 @@ import java.util.Date
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import androidx.lifecycle.lifecycleScope
+import com.tirup.app.presentation.components.collectAsStateWhenStarted
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
+
+    private var activeFocusViewModel: FocusViewModel? = null
+    private var activeTrendsViewModel: TrendsViewModel? = null
+    private var activeReportsViewModel: ReportsViewModel? = null
 
     private val screenOffReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -189,6 +194,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         )[ReportsViewModel::class.java]
+
+        activeFocusViewModel = focusViewModel
+        activeTrendsViewModel = trendsViewModel
+        activeReportsViewModel = reportsViewModel
 
         val settingsViewModel = androidx.lifecycle.ViewModelProvider(
             this,
@@ -288,6 +297,20 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleNotificationIntent(intent)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        activeFocusViewModel?.setForegroundActive(true)
+        activeTrendsViewModel?.setForegroundActive(true)
+        activeReportsViewModel?.setForegroundActive(true)
+    }
+
+    override fun onStop() {
+        activeFocusViewModel?.setForegroundActive(false)
+        activeTrendsViewModel?.setForegroundActive(false)
+        activeReportsViewModel?.setForegroundActive(false)
+        super.onStop()
     }
 
     override fun onResume() {
@@ -680,8 +703,8 @@ fun MainPagerScaffold(
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val haptic = LocalHapticFeedback.current
 
-    val focusState by focusViewModel.uiState.collectAsState()
-    val settingsState by settingsViewModel.uiState.collectAsState()
+    val focusState by focusViewModel.uiState.collectAsStateWhenStarted()
+    val settingsState by settingsViewModel.uiState.collectAsStateWhenStarted()
     val userSettings = settingsState.userSettings
     val isRu = userSettings.language.equals("RU", ignoreCase = true)
     val isMmol = userSettings.unit == GlucoseUnit.MMOL_L

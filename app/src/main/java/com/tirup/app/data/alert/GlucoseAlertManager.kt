@@ -328,26 +328,36 @@ object GlucoseAlertManager {
     private var emergencySmsJob: Job? = null
     private var rescueWakeLock: android.os.PowerManager.WakeLock? = null
 
-    fun initChannels(context: Context) {
+    @Volatile
+    private var initializedChannelsLocale: String? = null
+    private val channelInitLock = Any()
+
+    fun initChannels(context: Context, force: Boolean = false) {
         appContext = context.applicationContext
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
-        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        val localeTag = context.resources.configuration.locales[0].language
+        if (!force && initializedChannelsLocale == localeTag) return
 
-        // Delete old v1/v2 channels that had system sound attached, didn't bypass DND, or need title refresh
-        listOf(
-            "channel_caregiver_sos_v1",
-            "tirup_alert_predictive",
-            "tirup_alert_predictive_v2",
-            "tirup_alert_main",
-            "tirup_alert_critical",
-            "tirup_alert_signal_loss_v2"
-        ).forEach { id ->
-            try { nm.deleteNotificationChannel(id) } catch (_: Exception) {}
-        }
+        synchronized(channelInitLock) {
+            if (!force && initializedChannelsLocale == localeTag) return
 
-        // Register Notification Channel Groups for clean categorized layout in Android settings
-        val isRu = context.resources.configuration.locales[0].language.startsWith("ru")
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+
+            // Delete old v1/v2 channels that had system sound attached, didn't bypass DND, or need title refresh
+            listOf(
+                "channel_caregiver_sos_v1",
+                "tirup_alert_predictive",
+                "tirup_alert_predictive_v2",
+                "tirup_alert_main",
+                "tirup_alert_critical",
+                "tirup_alert_signal_loss_v2"
+            ).forEach { id ->
+                try { nm.deleteNotificationChannel(id) } catch (_: Exception) {}
+            }
+
+            // Register Notification Channel Groups for clean categorized layout in Android settings
+            val isRu = localeTag.startsWith("ru")
         nm.createNotificationChannelGroup(
             NotificationChannelGroup(
                 GROUP_ALERTS,
@@ -521,6 +531,9 @@ object GlucoseAlertManager {
             enableLights(true)
             lightColor = Color.parseColor("#10B981")
         }.also { nm.createNotificationChannel(it) }
+
+            initializedChannelsLocale = localeTag
+        }
     }
 
     /**

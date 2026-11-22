@@ -22,7 +22,10 @@ import com.tirup.app.domain.model.UserSettings
 import com.tirup.app.domain.repository.GlucoseRepository
 import com.tirup.app.domain.repository.SettingsRepository
 import com.tirup.app.presentation.trends.TrendPeriod
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -31,6 +34,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
@@ -98,13 +102,47 @@ class ReportsViewModel(
     private val pdfGenerator = AgpPdfGenerator(appContext)
     private val guidebookPdfGenerator = GuidebookPdfGenerator(appContext)
 
+    private var liveReportJob: Job? = null
+    private var historicalReportJob: Job? = null
+    private var backgroundPauseJob: Job? = null
+    private var isForegroundActive: Boolean = false
+
     init {
         observeLiveReport()
         observeHistoricalReport()
     }
 
+    /**
+     * Pauses live and historical Room observers while MainActivity is stopped.
+     */
+    fun setForegroundActive(active: Boolean) {
+        isForegroundActive = active
+        if (active) {
+            backgroundPauseJob?.cancel()
+            backgroundPauseJob = null
+            if (liveReportJob?.isActive != true) {
+                observeLiveReport()
+            }
+            if (historicalReportJob?.isActive != true) {
+                observeHistoricalReport()
+            }
+        } else {
+            backgroundPauseJob?.cancel()
+            backgroundPauseJob = viewModelScope.launch {
+                delay(5_000L)
+                if (!isForegroundActive) {
+                    liveReportJob?.cancel()
+                    liveReportJob = null
+                    historicalReportJob?.cancel()
+                    historicalReportJob = null
+                }
+            }
+        }
+    }
+
     private fun observeLiveReport() {
-        viewModelScope.launch {
+        liveReportJob?.cancel()
+        liveReportJob = viewModelScope.launch {
             combine(
                 _livePeriod,
                 _customDays,
@@ -144,7 +182,7 @@ class ReportsViewModel(
                     )
                     Triple(readings, stats, latestSettings)
                 }
-            }.collect { (readings, stats, latestSettings) ->
+            }.flowOn(Dispatchers.Default).collect { (readings, stats, latestSettings) ->
                 _uiState.value = _uiState.value.copy(
                     livePeriod = _livePeriod.value,
                     customDays = _customDays.value,
@@ -157,7 +195,8 @@ class ReportsViewModel(
     }
 
     private fun observeHistoricalReport() {
-        viewModelScope.launch {
+        historicalReportJob?.cancel()
+        historicalReportJob = viewModelScope.launch {
             combine(
                 database.historicalReadingDao().getAllReadings().map { entities ->
                     entities.map { it.toDomain() }.distinctBy { it.timestamp }
@@ -165,9 +204,7 @@ class ReportsViewModel(
                 database.historicalMeterReadingDao().getAllReadings(),
                 settingsRepository.getSettings()
             ) { readings, meterEntities, settings ->
-                _uiState.value = _uiState.value.copy(userSettings = settings)
-
-                if (readings.isEmpty()) {
+                val histData = if (readings.isEmpty()) {
                     HistoricalReportData(hasData = false)
                 } else {
                     val stats = GlucoseMetricsCalculator.calculateStatistics(
@@ -194,8 +231,12 @@ class ReportsViewModel(
                         verification = verification
                     )
                 }
-            }.collect { histData ->
-                _uiState.value = _uiState.value.copy(historicalReport = histData)
+                Pair(histData, settings)
+            }.flowOn(Dispatchers.Default).collect { (histData, settings) ->
+                _uiState.value = _uiState.value.copy(
+                    historicalReport = histData,
+                    userSettings = settings
+                )
             }
         }
     }

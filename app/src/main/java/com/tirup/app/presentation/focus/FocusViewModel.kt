@@ -21,12 +21,15 @@ import com.tirup.app.domain.model.Treatment
 import com.tirup.app.domain.model.withUpdatedBestStreak
 import com.tirup.app.domain.repository.GlucoseRepository
 import com.tirup.app.domain.repository.SettingsRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -62,12 +65,16 @@ class FocusViewModel(
     private var lastNotifiedLockscreenEnabled: Boolean? = null
     private var lastSubmittedTreatmentTimestamp = 0L
 
+    private var observeDataJob: Job? = null
+    private var foregroundSyncJob: Job? = null
+    private var backgroundPauseJob: Job? = null
+    private var isForegroundActive: Boolean = false
+
     init {
         observeData()
         observeBlePackets()
         checkAndRefreshIobCob()
         com.tirup.app.data.receiver.DexdripBroadcastReceiver.syncFromLocalXdrip(context, force = true)
-        startPeriodicForegroundSync()
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             (context.applicationContext as? com.tirup.app.TirupApplication)?.database?.let { db ->
                 com.tirup.app.data.receiver.DexdripBroadcastReceiver.purgeDuplicateTreatments(db)
@@ -75,8 +82,38 @@ class FocusViewModel(
         }
     }
 
+    /**
+     * Pauses heavy Room/statistics recomputation and 60s foreground polling while MainActivity is stopped.
+     * Background alerts, lockscreen notifications, and BLE broadcasting run independently in DexdripBroadcastReceiver.
+     */
+    fun setForegroundActive(active: Boolean) {
+        isForegroundActive = active
+        if (active) {
+            backgroundPauseJob?.cancel()
+            backgroundPauseJob = null
+            if (observeDataJob?.isActive != true) {
+                observeData()
+            }
+            if (foregroundSyncJob?.isActive != true) {
+                startPeriodicForegroundSync()
+            }
+        } else {
+            backgroundPauseJob?.cancel()
+            backgroundPauseJob = viewModelScope.launch {
+                kotlinx.coroutines.delay(5_000L)
+                if (!isForegroundActive) {
+                    observeDataJob?.cancel()
+                    observeDataJob = null
+                    foregroundSyncJob?.cancel()
+                    foregroundSyncJob = null
+                }
+            }
+        }
+    }
+
     private fun startPeriodicForegroundSync() {
-        viewModelScope.launch {
+        foregroundSyncJob?.cancel()
+        foregroundSyncJob = viewModelScope.launch {
             while (true) {
                 kotlinx.coroutines.delay(60_000L)
                 com.tirup.app.data.receiver.DexdripBroadcastReceiver.syncFromLocalXdrip(context)
@@ -94,10 +131,9 @@ class FocusViewModel(
 
     private fun checkAndRefreshIobCob() {
         val now = System.currentTimeMillis()
-        if (now - lastPebbleSyncTime < 30_000L) return
+        if (now - lastPebbleSyncTime < 120_000L) return
         lastPebbleSyncTime = now
         com.tirup.app.data.receiver.DexdripBroadcastReceiver.syncIobCobFromPebble(context)
-        refreshLastImportantSmsIfPermitted()
     }
 
     fun refreshLastImportantSmsIfPermitted() {
@@ -179,7 +215,8 @@ class FocusViewModel(
     }
 
     private fun observeData() {
-        viewModelScope.launch {
+        observeDataJob?.cancel()
+        observeDataJob = viewModelScope.launch {
             val initialCalendar = java.util.Calendar.getInstance().apply {
                 set(java.util.Calendar.HOUR_OF_DAY, 0)
                 set(java.util.Calendar.MINUTE, 0)
@@ -314,7 +351,7 @@ class FocusViewModel(
                     recentDailySummaries = summaries,
                     isLoading = false
                 )
-            }.collect { newState ->
+            }.flowOn(Dispatchers.Default).collect { newState ->
                 _uiState.value = newState
 
                 // If latest reading is missing IoB, perform a quick Pebble sync

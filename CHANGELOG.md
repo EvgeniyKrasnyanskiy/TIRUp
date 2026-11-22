@@ -5,6 +5,30 @@
 
 ---
 
+## [1.0.6] - 2026-11-23
+
+### ⚡ Глубокая оптимизация энергопотребления и фоновой нагрузки (Power, BLE & CPU)
+- **Аппаратный таймер BLE-вещания и короткий WakeLock (`BleBroadcaster`)**:
+  - Длительность рекламной пачки передаётся напрямую в контроллер Bluetooth (`setTimeout` для Legacy, `duration` в единицах 10 мс для `startAdvertisingSet` + обработка `onAdvertisingEnabled(..., enable=false)`).
+  - `TIRUp:BleBroadcasterWakeLock` теперь освобождается сразу после подтверждения старта вещания контроллером (~50–150 мс, страховочный лимит 2,5 с вместо 17–20 с).
+  - Длительность пачки для 1-минутных сенсоров (`BURST_1MIN_MS`) сокращена с 12 с до 6 с (перекрывает даже ECO-цикл приёмника ~5,1 с).
+  - Удалён круглосуточный цикл `ensureTickerRunning()` (`delay(500L)`); обратный отсчёт (`broadcastRemainingSec`, `nextHeartbeatRemainingSec`) переведён на ленивый `SharingStarted.WhileSubscribed(0L)` и работает только при открытом UI.
+- **Остановка фоновых пересчётов и перерисовок UI (`MainActivity`, `FocusViewModel`, `TrendsViewModel`, `ReportsViewModel`, `LifecycleFlowExt`)**:
+  - Добавлен lifecycle-aware хелпер `collectAsStateWhenStarted()` (на базе `repeatOnLifecycle(STARTED)`) и управление `setForegroundActive(Boolean)` в `onStart`/`onStop` (с задержкой паузы 5 с).
+  - Тяжёлые расчёты статистики, AGP, heatmap и дайджестов перенесены на `Dispatchers.Default` (`flowOn(Dispatchers.Default)`) и полностью останавливаются, пока приложение в фоне или экран выключен.
+  - Фоновый 60-секундный цикл `startPeriodicForegroundSync()` работает только при активном экране приложения.
+- **Снижение Binder IPC и нагрузки на локальный веб-сервер xDrip+ (`GlucoseAlertManager`, `DexdripBroadcastReceiver`, `TirupWidgetUpdater`, `FloatingBubbleService`)**:
+  - `GlucoseAlertManager.initChannels()` кешируется по текущей локали — 21+ Binder-вызовов пересоздания/удаления каналов выполняются 1 раз вместо 2 раз в минуту.
+  - `DexdripBroadcastReceiver.syncIobCobFromPebble()` защищён `AtomicBoolean` от параллельных гонок; опрос `treatments.json` ограничен интервалом 5 мин, исключён дубль `/pebble` сразу после `onReceive` (снижает расход как TIRUp, так и `webservice-handler` в xDrip+).
+  - `TirupWidgetUpdater` откладывает перерисовку виджетов рабочего стола при выключенном экране и мгновенно обновляет их по `ACTION_SCREEN_ON` (уведомления и тревоги работают без задержек).
+  - `FloatingBubbleService` пропускает повторные `startService()` при уже запущенном сервисе и не анимирует сдвиг при выключенном экране.
+
+### 🎨 Интерфейс (UI)
+- **Скрытие нулевой плашки углеводов (`CoB`) на главном экране (`FocusScreen`)**:
+  - Жёлтая плашка активных углеводов справа отображается только при `CoB >= 0.5 г` (от `1 C`), а синяя плашка `IoB` слева — только при `IoB >= 0.01 U`; нулевые значения больше не выводятся.
+
+---
+
 ## [1.0.5] - 2026-11-07
 
 ### ⚡ Оптимизация энергопотребления и приоритизация источников (Power Optimization & Source Hierarchy)

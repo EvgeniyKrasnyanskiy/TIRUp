@@ -152,6 +152,7 @@ import com.tirup.app.presentation.theme.ColorTargetSoft
 import com.tirup.app.presentation.theme.ColorTight
 import com.tirup.app.domain.model.TargetRanges
 import com.tirup.app.presentation.theme.ColorVeryHigh
+import com.tirup.app.presentation.components.collectAsStateWhenStarted
 import com.tirup.app.presentation.theme.ColorVeryLow
 import com.tirup.app.presentation.theme.PrimaryEmerald
 import com.tirup.app.presentation.theme.getGlucoseColor
@@ -164,15 +165,15 @@ fun FocusScreen(
     viewModel: FocusViewModel,
     onOpenSettings: (String?) -> Unit = {}
 ) {
-    val state by viewModel.uiState.collectAsState()
-    val dailyAlertLogs by GlucoseAlertManager.dailyAlertLogs.collectAsState()
-    val isBleBroadcasting by BleBroadcaster.isBroadcasting.collectAsState()
-    val broadcastRemainingSec by BleBroadcaster.broadcastRemainingSec.collectAsState()
-    val nextHeartbeatRemainingSec by BleBroadcaster.nextHeartbeatRemainingSec.collectAsState()
-    val boostRemainingSec by BleObserverManager.boostRemainingSec.collectAsState()
-    val lanStatus by XdripLanManager.statusFlow.collectAsState()
-    val isLanDiscovering by XdripLanManager.isDiscoveringFlow.collectAsState()
-    val nightscoutStatus by com.tirup.app.data.network.NightscoutStatusManager.statusFlow.collectAsState()
+    val state by viewModel.uiState.collectAsStateWhenStarted()
+    val dailyAlertLogs by GlucoseAlertManager.dailyAlertLogs.collectAsStateWhenStarted()
+    val isBleBroadcasting by BleBroadcaster.isBroadcasting.collectAsStateWhenStarted()
+    val broadcastRemainingSec by BleBroadcaster.broadcastRemainingSec.collectAsStateWhenStarted()
+    val nextHeartbeatRemainingSec by BleBroadcaster.nextHeartbeatRemainingSec.collectAsStateWhenStarted()
+    val boostRemainingSec by BleObserverManager.boostRemainingSec.collectAsStateWhenStarted()
+    val lanStatus by XdripLanManager.statusFlow.collectAsStateWhenStarted()
+    val isLanDiscovering by XdripLanManager.isDiscoveringFlow.collectAsStateWhenStarted()
+    val nightscoutStatus by com.tirup.app.data.network.NightscoutStatusManager.statusFlow.collectAsStateWhenStarted()
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -3136,10 +3137,8 @@ private fun HeroGlucoseCard(
         ) {
             val rawIob = latestReading?.iob
             val rawCob = latestReading?.cob
-            val hasIobActive = (rawIob != null && rawIob > 0.0)
-            val hasCobActive = (rawCob != null && rawCob > 0.0)
-            val showIob = hasIobActive || (hasCobActive && rawIob != null)
-            val showCob = hasCobActive || (hasIobActive && rawCob != null)
+            val showIob = rawIob != null && rawIob >= 0.01
+            val showCob = rawCob != null && rawCob >= 0.5
             val hasBattery = masterBatteryPct != null && masterBatteryPct in 0..100 && !isMasterBatteryStale
 
             // Header Row: Symmetrical status chips [ Bell + Nightscout + Wi-Fi LAN + Battery + BLE Bridge + AoD ]

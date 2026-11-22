@@ -67,6 +67,7 @@ import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorTargetSoft
 import com.tirup.app.presentation.theme.ColorTight
+import com.tirup.app.presentation.components.collectAsStateWhenStarted
 import com.tirup.app.presentation.theme.ColorVeryHigh
 import com.tirup.app.presentation.theme.ColorVeryLow
 import com.tirup.app.presentation.theme.PrimaryEmerald
@@ -78,9 +79,9 @@ fun TrendsScreen(
     viewModel: TrendsViewModel,
     onOpenSettings: () -> Unit = {}
 ) {
-    val state by viewModel.uiState.collectAsState()
-    val selectedPeriod by viewModel.selectedPeriod.collectAsState()
-    val weeklyDigest by viewModel.weeklyDigest.collectAsState()
+    val state by viewModel.uiState.collectAsStateWhenStarted()
+    val selectedPeriod by viewModel.selectedPeriod.collectAsStateWhenStarted()
+    val weeklyDigest by viewModel.weeklyDigest.collectAsStateWhenStarted()
     val isDigestBannerDismissed by viewModel.isDigestBannerDismissed.collectAsState()
     val isDigestSheetOpen by viewModel.isDigestSheetOpen.collectAsState()
     var detailDialogInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
