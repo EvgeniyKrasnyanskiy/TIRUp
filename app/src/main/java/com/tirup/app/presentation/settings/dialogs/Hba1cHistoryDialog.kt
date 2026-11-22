@@ -1,6 +1,8 @@
 package com.tirup.app.presentation.settings.dialogs
 
 import android.app.DatePickerDialog
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,10 +21,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -41,6 +47,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,6 +63,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import com.tirup.app.data.ble.BleJournalTransferManager
+import com.tirup.app.data.ble.Hba1cMergeResult
+import com.tirup.app.data.ble.JournalTransferState
 import com.tirup.app.domain.model.LabHba1cRecord
 import com.tirup.app.presentation.reports.openSavedFileFolder
 import com.tirup.app.presentation.theme.ActionBlue
@@ -81,6 +92,7 @@ fun Hba1cHistoryDialog(
     onDeleteRecord: (id: Long) -> Unit,
     onSkipQuarter: () -> Unit,
     onExportPdf: (((String) -> Unit) -> Unit)? = null,
+    onImportRecords: ((List<LabHba1cRecord>) -> Hba1cMergeResult)? = null,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -95,6 +107,38 @@ fun Hba1cHistoryDialog(
     val coroutineScope = rememberCoroutineScope()
     var isExporting by remember { mutableStateOf(false) }
     var lastExportedPath by remember { mutableStateOf<String?>(null) }
+
+    val btTransferState by BleJournalTransferManager.state.collectAsState()
+    var pendingBtAction by remember { mutableStateOf<String?>(null) } // "send" or "receive"
+
+    DisposableEffect(Unit) {
+        BleJournalTransferManager.resetState()
+        onDispose {
+            BleJournalTransferManager.cancel()
+        }
+    }
+
+    val btPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        val allGranted = results.values.all { it }
+        val action = pendingBtAction
+        pendingBtAction = null
+        if (allGranted) {
+            if (action == "send") {
+                BleJournalTransferManager.startSending(context, records)
+            } else if (action == "receive" && onImportRecords != null) {
+                BleJournalTransferManager.startReceiving(context, onImportRecords)
+            }
+        } else {
+            coroutineScope.launch {
+                localSnackbarHostState.showSnackbar(
+                    message = if (isRu) "Для обмена нужны разрешения Bluetooth" else "Bluetooth permissions are required for transfer",
+                    duration = SnackbarDuration.Short
+                )
+            }
+        }
+    }
 
     val openDatePicker = {
         val calendar = Calendar.getInstance()
@@ -541,6 +585,215 @@ fun Hba1cHistoryDialog(
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+
+                // 4. Direct Peer-to-Peer Bluetooth Transfer (HbA1c Journal Only, No Full DB Overwrite)
+                if (onImportRecords != null) {
+                    val isBtBusy = btTransferState is JournalTransferState.SendingWaiting ||
+                        btTransferState is JournalTransferState.SendingProgress ||
+                        btTransferState is JournalTransferState.ReceivingScanning ||
+                        btTransferState is JournalTransferState.ReceivingProgress
+
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = ActionBlue.copy(alpha = 0.07f),
+                        border = BorderStroke(1.dp, ActionBlue.copy(alpha = 0.25f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Bluetooth,
+                                    contentDescription = null,
+                                    tint = ActionBlue,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = if (isRu) "Обмен журналом по Bluetooth" else "Bluetooth Journal Transfer",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            Text(
+                                text = if (isRu)
+                                    "Передаёт только записи HbA1c между двумя телефонами с TIRUp (без перезаписи истории сахаров). Откройте это окно на обоих телефонах."
+                                else
+                                    "Transfers only HbA1c records between two TIRUp phones without overwriting glucose history. Open this dialog on both devices.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.5.sp,
+                                lineHeight = 15.sp
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        val perms = BleJournalTransferManager.requiredSenderPermissions()
+                                        if (BleJournalTransferManager.hasPermissions(context, perms)) {
+                                            BleJournalTransferManager.startSending(context, records)
+                                        } else {
+                                            pendingBtAction = "send"
+                                            btPermissionLauncher.launch(perms)
+                                        }
+                                    },
+                                    enabled = !isBtBusy && records.isNotEmpty(),
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (!isBtBusy && records.isNotEmpty()) ActionBlue else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Upload,
+                                        contentDescription = null,
+                                        tint = if (!isBtBusy && records.isNotEmpty()) ActionBlue else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (isRu) "Отправить" else "Send",
+                                        fontSize = 12.5.sp,
+                                        color = if (!isBtBusy && records.isNotEmpty()) ActionBlue else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                    )
+                                }
+
+                                Button(
+                                    onClick = {
+                                        val perms = BleJournalTransferManager.requiredReceiverPermissions()
+                                        if (BleJournalTransferManager.hasPermissions(context, perms)) {
+                                            BleJournalTransferManager.startReceiving(context, onImportRecords)
+                                        } else {
+                                            pendingBtAction = "receive"
+                                            btPermissionLauncher.launch(perms)
+                                        }
+                                    },
+                                    enabled = !isBtBusy,
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryEmerald)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Download,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (isRu) "Принять" else "Receive",
+                                        fontSize = 12.5.sp
+                                    )
+                                }
+                            }
+
+                            when (val st = btTransferState) {
+                                is JournalTransferState.SendingWaiting -> {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = ActionBlue)
+                                            Text(
+                                                text = if (isRu) "Ожидание получателя (${st.remainingSec} с)…" else "Waiting for receiver (${st.remainingSec}s)…",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = ActionBlue,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                        IconButton(onClick = { BleJournalTransferManager.cancel() }, modifier = Modifier.size(28.dp)) {
+                                            Icon(Icons.Default.Close, contentDescription = "Cancel", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                }
+                                is JournalTransferState.SendingProgress -> {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = ActionBlue)
+                                        Text(
+                                            text = if (isRu) "Передача журнала… ${st.percent}%" else "Sending journal… ${st.percent}%",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = ActionBlue,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                                is JournalTransferState.ReceivingScanning -> {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = PrimaryEmerald)
+                                            Text(
+                                                text = if (isRu) "Поиск отправителя (${st.remainingSec} с)…" else "Searching for sender (${st.remainingSec}s)…",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = PrimaryEmerald,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                        IconButton(onClick = { BleJournalTransferManager.cancel() }, modifier = Modifier.size(28.dp)) {
+                                            Icon(Icons.Default.Close, contentDescription = "Cancel", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                }
+                                is JournalTransferState.ReceivingProgress -> {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = PrimaryEmerald)
+                                        Text(
+                                            text = if (isRu) "Приём журнала… ${st.percent}%" else "Receiving journal… ${st.percent}%",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = PrimaryEmerald,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                                is JournalTransferState.Success -> {
+                                    Text(
+                                        text = "✅ " + if (isRu) st.messageRu else st.messageEn,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = PrimaryEmerald,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                                is JournalTransferState.Error -> {
+                                    Text(
+                                        text = "⚠️ " + if (isRu) st.messageRu else st.messageEn,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                JournalTransferState.Idle -> {}
                             }
                         }
                     }

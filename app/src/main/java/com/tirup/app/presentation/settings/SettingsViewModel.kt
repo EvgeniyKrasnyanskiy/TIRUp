@@ -1041,6 +1041,32 @@ class SettingsViewModel(
         }
     }
 
+    /**
+     * Merges HbA1c records received via direct Bluetooth transfer into user settings
+     * without overwriting existing records or touching any other app data.
+     */
+    fun mergeImportedHba1cRecords(
+        incoming: List<LabHba1cRecord>
+    ): com.tirup.app.data.ble.Hba1cMergeResult {
+        val current = _uiState.value.userSettings
+        val mergeResult = com.tirup.app.data.ble.Hba1cJournalCodec.mergeRecords(
+            existing = current.hba1cRecords,
+            incoming = incoming
+        )
+        if (mergeResult.mergedRecords != current.hba1cRecords) {
+            val updatedSettings = current.copy(
+                hba1cRecords = mergeResult.mergedRecords,
+                hba1cRemindersCountInCycle = 0,
+                lastHba1cReminderTimestamp = 0L
+            )
+            _uiState.update { it.copy(userSettings = updatedSettings) }
+            viewModelScope.launch {
+                settingsRepository.updateSettings(updatedSettings)
+            }
+        }
+        return mergeResult
+    }
+
     fun setHba1cReminderEnabled(enabled: Boolean) {
         viewModelScope.launch {
             val current = _uiState.value.userSettings

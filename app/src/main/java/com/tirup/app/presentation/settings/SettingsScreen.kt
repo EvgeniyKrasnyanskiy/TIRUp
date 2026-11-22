@@ -1208,6 +1208,9 @@ fun SettingsScreen(
             onExportPdf = { onSaved ->
                 viewModel.exportHba1cReportToPdf(onSaved)
             },
+            onImportRecords = { incoming ->
+                viewModel.mergeImportedHba1cRecords(incoming)
+            },
             onDismiss = { viewModel.toggleHba1cDialog(false) }
         )
     }
