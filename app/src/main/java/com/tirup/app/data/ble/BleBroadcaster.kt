@@ -23,35 +23,42 @@ import com.tirup.app.domain.model.BleBridgeSettings
 import com.tirup.app.domain.model.GlucoseReading
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import com.tirup.app.TirupApplication
 
+@OptIn(ExperimentalCoroutinesApi::class)
 object BleBroadcaster {
 
     private const val TAG = "BleBroadcaster"
-    const val BURST_1MIN_MS = 12_000L  // 12 seconds for 1-minute CGM sensors (Libre 3, Dexcom G7)
+    const val BURST_1MIN_MS = 6_000L  // 6 seconds for 1-minute CGM sensors (covers even ~5.1s ECO scan window)
     const val BURST_5MIN_MS = 15_000L  // 15 seconds for 5-minute CGM sensors (Libre 1/2, Dexcom G6)
     const val HEARTBEAT_BURST_MS = 15_000L // 15 seconds for 5-minute fallback heartbeat timer for max reliability
     const val TEST_PING_BURST_MS = 30_000L // 30 seconds for manual diagnostic test ping
+    const val WAKE_LOCK_START_TIMEOUT_MS = 2_500L // Short safety cap; released as soon as BT controller confirms start
 
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutex = Mutex()
+    private val wakeLockSync = Any()
     private var appContext: Context? = null
 
     private var currentAdvertiser: BluetoothLeAdvertiser? = null
     private var activeCallback: AdvertiseCallback? = null
     private var activeSetCallback: AdvertisingSetCallback? = null
-    private var stopBurstJob: Job? = null
-    private var countdownJob: Job? = null
-    private var heartbeatTickerJob: Job? = null
-    private var nextHeartbeatTargetMs: Long = 0L
+    private var cleanupBurstJob: Job? = null
+    private var heartbeatJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
     private var lastReadingCache: GlucoseReading? = null
@@ -61,11 +68,80 @@ object BleBroadcaster {
     private val _isBroadcasting = MutableStateFlow(false)
     val isBroadcasting: StateFlow<Boolean> = _isBroadcasting.asStateFlow()
 
-    private val _broadcastRemainingSec = MutableStateFlow(0)
-    val broadcastRemainingSec: StateFlow<Int> = _broadcastRemainingSec.asStateFlow()
+    private val _broadcastEndTargetMs = MutableStateFlow(0L)
+    private val _nextHeartbeatTargetMs = MutableStateFlow(0L)
 
-    private val _nextHeartbeatRemainingSec = MutableStateFlow(300)
-    val nextHeartbeatRemainingSec: StateFlow<Int> = _nextHeartbeatRemainingSec.asStateFlow()
+    /**
+     * Lazy UI countdowns: tick only while a lifecycle-aware screen actively observes them.
+     * Zero background CPU wakeups when the app is stopped or the screen is off.
+     */
+    val broadcastRemainingSec: StateFlow<Int> = _broadcastEndTargetMs
+        .flatMapLatest { endMs ->
+            flow {
+                if (endMs <= 0L) {
+                    emit(0)
+                } else {
+                    while (true) {
+                        val rem = ((endMs - System.currentTimeMillis() + 999L) / 1000L).toInt().coerceAtLeast(0)
+                        emit(rem)
+                        if (rem <= 0) break
+                        delay(1000L)
+                    }
+                }
+            }
+        }
+        .stateIn(scope, SharingStarted.WhileSubscribed(0L), 0)
+
+    val nextHeartbeatRemainingSec: StateFlow<Int> = _nextHeartbeatTargetMs
+        .flatMapLatest { targetMs ->
+            flow {
+                if (targetMs <= 0L) {
+                    emit(300)
+                } else {
+                    while (true) {
+                        val rem = ((targetMs - System.currentTimeMillis()) / 1000L).toInt().coerceAtLeast(0)
+                        emit(rem)
+                        if (rem <= 0) break
+                        delay(1000L)
+                    }
+                }
+            }
+        }
+        .stateIn(scope, SharingStarted.WhileSubscribed(0L), 300)
+
+    internal fun computeLegacyTimeoutMs(burstDurationMs: Long): Int =
+        burstDurationMs.coerceIn(1_000L, 180_000L).toInt()
+
+    internal fun computeAdvertisingSetDurationTenMs(burstDurationMs: Long): Int =
+        ((burstDurationMs + 9L) / 10L).coerceIn(100L, 65_535L).toInt()
+
+    private fun acquireShortStartWakeLock(context: Context) {
+        synchronized(wakeLockSync) {
+            try {
+                if (wakeLock?.isHeld == true) {
+                    wakeLock?.release()
+                }
+                val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+                wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TIRUp:BleBroadcasterWakeLock")?.apply {
+                    setReferenceCounted(false)
+                    acquire(WAKE_LOCK_START_TIMEOUT_MS)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to acquire short WakeLock: ${e.message}")
+            }
+        }
+    }
+
+    private fun releaseStartWakeLock() {
+        synchronized(wakeLockSync) {
+            try {
+                if (wakeLock?.isHeld == true) {
+                    wakeLock?.release()
+                }
+            } catch (_: Exception) {}
+            wakeLock = null
+        }
+    }
 
     /**
      * Broadcasts a telemetry packet over BLE advertising if BLE Bridge is in BROADCASTER mode.
@@ -125,11 +201,14 @@ object BleBroadcaster {
             cob = cob
         )
 
+        val legacyTimeoutMs = computeLegacyTimeoutMs(burstDurationMs)
+        val durationTenMs = computeAdvertisingSetDurationTenMs(burstDurationMs)
+
         val advertiseSettings = AdvertiseSettings.Builder()
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY) // 100ms advertising interval for reliable capture
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
             .setConnectable(false)
-            .setTimeout(0) // manual timeout control via coroutine
+            .setTimeout(legacyTimeoutMs) // hardware controller timeout; AP CPU can sleep immediately
             .build()
 
         val advertiseData = AdvertiseData.Builder()
@@ -144,26 +223,22 @@ object BleBroadcaster {
                     // Stop any previous active burst without wiping the heartbeat target
                     stopAdvertisingInternal(cancelHeartbeat = false)
 
-                    // Acquire partial WakeLock to prevent CPU sleep during burst
-                    val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
-                    try {
-                        wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TIRUp:BleBroadcasterWakeLock")?.apply {
-                            setReferenceCounted(false)
-                            acquire(burstDurationMs + 5_000L)
-                        }
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Failed to acquire WakeLock: ${e.message}")
-                    }
+                    // Hold WakeLock ONLY until the BT controller confirms advertising start (~50-150ms),
+                    // then release immediately so CPU enters deep sleep while controller runs the timed burst.
+                    acquireShortStartWakeLock(context)
 
                     val durationSec = (burstDurationMs / 1000L).toInt()
                     val callback = object : AdvertiseCallback() {
                         override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
-                            Log.i(TAG, "BLE broadcast started successfully for reading ts=${reading.timestamp}")
+                            releaseStartWakeLock()
+                            Log.i(TAG, "BLE broadcast started (${durationSec}s hardware timeout) for reading ts=${reading.timestamp}")
                             _isBroadcasting.value = true
+                            _broadcastEndTargetMs.value = System.currentTimeMillis() + burstDurationMs
                             onStatus?.invoke(true, if (isRu) "Передача запущена ($durationSec сек)" else "Broadcast started ($durationSec s)")
                         }
 
                         override fun onStartFailure(errorCode: Int) {
+                            releaseStartWakeLock()
                             Log.w(TAG, "BLE broadcast start failed with code: $errorCode")
                             scope.launch {
                                 mutex.withLock { stopAdvertisingInternal(cancelHeartbeat = false) }
@@ -185,15 +260,32 @@ object BleBroadcaster {
                         val setCallback = object : AdvertisingSetCallback() {
                             override fun onAdvertisingSetStarted(advertisingSet: AdvertisingSet?, txPower: Int, status: Int) {
                                 if (status == AdvertisingSetCallback.ADVERTISE_SUCCESS) {
-                                    Log.i(TAG, "BLE Long Range (Coded PHY) broadcast started successfully for reading ts=${reading.timestamp}")
+                                    releaseStartWakeLock()
+                                    Log.i(TAG, "BLE Long Range (Coded PHY) broadcast started (${durationSec}s hw timeout) for reading ts=${reading.timestamp}")
                                     _isBroadcasting.value = true
+                                    _broadcastEndTargetMs.value = System.currentTimeMillis() + burstDurationMs
                                     onStatus?.invoke(true, if (isRu) "Long Range запущен ($durationSec сек)" else "Long Range started ($durationSec s)")
                                 } else {
                                     Log.w(TAG, "BLE Long Range advertising set failed with status: $status. Falling back to Legacy 1M...")
                                     scope.launch {
                                         mutex.withLock {
                                             stopAdvertisingInternal(cancelHeartbeat = false)
+                                            acquireShortStartWakeLock(context)
                                             startLegacyAdvertising(advertiser, advertiseSettings, advertiseData, callback, isRu, onStatus)
+                                        }
+                                    }
+                                }
+                            }
+
+                            override fun onAdvertisingEnabled(advertisingSet: AdvertisingSet?, enable: Boolean, status: Int) {
+                                if (!enable) {
+                                    Log.d(TAG, "BLE Long Range hardware burst timer completed")
+                                    val completedCallback = this
+                                    scope.launch {
+                                        mutex.withLock {
+                                            if (activeSetCallback === completedCallback) {
+                                                stopAdvertisingInternal(cancelHeartbeat = false)
+                                            }
                                         }
                                     }
                                 }
@@ -212,7 +304,7 @@ object BleBroadcaster {
                         activeSetCallback = setCallback
                         currentAdvertiser = advertiser
                         try {
-                            advertiser.startAdvertisingSet(parameters, advertiseData, null, null, null, setCallback)
+                            advertiser.startAdvertisingSet(parameters, advertiseData, null, null, null, durationTenMs, 0, setCallback)
                         } catch (e: Exception) {
                             Log.w(TAG, "Exception starting AdvertisingSet, falling back to legacy: ${e.message}")
                             startLegacyAdvertising(advertiser, advertiseSettings, advertiseData, callback, isRu, onStatus)
@@ -221,26 +313,21 @@ object BleBroadcaster {
                         startLegacyAdvertising(advertiser, advertiseSettings, advertiseData, callback, isRu, onStatus)
                     }
 
-                    _broadcastRemainingSec.value = durationSec
+                    _broadcastEndTargetMs.value = System.currentTimeMillis() + burstDurationMs
 
-                    countdownJob?.cancel()
-                    countdownJob = launch {
-                        while (_broadcastRemainingSec.value > 0) {
-                            delay(1000L)
-                            _broadcastRemainingSec.value = (_broadcastRemainingSec.value - 1).coerceAtLeast(0)
-                        }
-                    }
-
-                    stopBurstJob?.cancel()
-                    stopBurstJob = launch {
-                        delay(burstDurationMs)
+                    // Lightweight state cleanup without WakeLock (hardware timer stops radio even during deep sleep)
+                    cleanupBurstJob?.cancel()
+                    cleanupBurstJob = launch {
+                        delay(burstDurationMs + 300L)
                         mutex.withLock {
-                            stopAdvertisingInternal(cancelHeartbeat = false)
-                            Log.d(TAG, "BLE broadcast pulse burst completed ($burstDurationMs ms)")
+                            if (_isBroadcasting.value || activeCallback != null || activeSetCallback != null) {
+                                stopAdvertisingInternal(cancelHeartbeat = false)
+                                Log.d(TAG, "BLE broadcast state cleaned up after ${burstDurationMs}ms burst")
+                            }
                         }
                     }
 
-                    // Reset 5-minute countdown right away starting cleanly at 5:00 (300 seconds)
+                    // Reset 5-minute fallback heartbeat without a 500ms polling ticker
                     scheduleHeartbeat(300_000L)
 
                 } catch (e: SecurityException) {
@@ -257,24 +344,12 @@ object BleBroadcaster {
     }
 
     private fun scheduleHeartbeat(delayMs: Long) {
-        nextHeartbeatTargetMs = System.currentTimeMillis() + delayMs
-        _nextHeartbeatRemainingSec.value = (delayMs / 1000L).toInt()
-        ensureTickerRunning()
-    }
-
-    private fun ensureTickerRunning() {
-        if (heartbeatTickerJob?.isActive == true) return
-        heartbeatTickerJob = scope.launch {
-            while (true) {
-                val now = System.currentTimeMillis()
-                if (nextHeartbeatTargetMs > 0L) {
-                    val remSec = ((nextHeartbeatTargetMs - now) / 1000L).toInt().coerceAtLeast(0)
-                    _nextHeartbeatRemainingSec.value = remSec
-                    if (remSec == 0 && !_isBroadcasting.value) {
-                        triggerFallbackHeartbeat()
-                    }
-                }
-                delay(500L)
+        _nextHeartbeatTargetMs.value = System.currentTimeMillis() + delayMs
+        heartbeatJob?.cancel()
+        heartbeatJob = scope.launch {
+            delay(delayMs)
+            if (!_isBroadcasting.value) {
+                triggerFallbackHeartbeat()
             }
         }
     }
@@ -412,23 +487,15 @@ object BleBroadcaster {
         activeSetCallback = null
         currentAdvertiser = null
         _isBroadcasting.value = false
-        _broadcastRemainingSec.value = 0
-        countdownJob?.cancel()
-        countdownJob = null
-        stopBurstJob?.cancel()
-        stopBurstJob = null
+        _broadcastEndTargetMs.value = 0L
+        cleanupBurstJob?.cancel()
+        cleanupBurstJob = null
         if (cancelHeartbeat) {
-            heartbeatTickerJob?.cancel()
-            heartbeatTickerJob = null
-            nextHeartbeatTargetMs = 0L
-            _nextHeartbeatRemainingSec.value = 300
+            heartbeatJob?.cancel()
+            heartbeatJob = null
+            _nextHeartbeatTargetMs.value = 0L
         }
-        try {
-            if (wakeLock?.isHeld == true) {
-                wakeLock?.release()
-            }
-        } catch (_: Exception) {}
-        wakeLock = null
+        releaseStartWakeLock()
     }
 
     fun isBluetoothEnabled(context: Context): Boolean {

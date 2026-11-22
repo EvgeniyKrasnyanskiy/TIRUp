@@ -67,4 +67,24 @@ class BleBroadcasterTest {
         val supported = BleBroadcaster.isLongRangeSupported(adapter)
         assertFalse(supported)
     }
+
+    @Test
+    fun testBurstAndHardwareTimeoutCalculations() {
+        assertEquals(6_000L, BleBroadcaster.BURST_1MIN_MS)
+        assertEquals(15_000L, BleBroadcaster.BURST_5MIN_MS)
+        assertEquals(2_500L, BleBroadcaster.WAKE_LOCK_START_TIMEOUT_MS)
+
+        // Legacy setTimeout: clamped to [1000..180000] ms
+        assertEquals(6_000, BleBroadcaster.computeLegacyTimeoutMs(BleBroadcaster.BURST_1MIN_MS))
+        assertEquals(15_000, BleBroadcaster.computeLegacyTimeoutMs(BleBroadcaster.BURST_5MIN_MS))
+        assertEquals(1_000, BleBroadcaster.computeLegacyTimeoutMs(200L))
+        assertEquals(180_000, BleBroadcaster.computeLegacyTimeoutMs(500_000L))
+
+        // AdvertisingSet duration: in 10ms units, clamped to [100..65535]
+        assertEquals(600, BleBroadcaster.computeAdvertisingSetDurationTenMs(BleBroadcaster.BURST_1MIN_MS))
+        assertEquals(1_500, BleBroadcaster.computeAdvertisingSetDurationTenMs(BleBroadcaster.BURST_5MIN_MS))
+        assertEquals(3_000, BleBroadcaster.computeAdvertisingSetDurationTenMs(BleBroadcaster.TEST_PING_BURST_MS))
+        assertEquals(100, BleBroadcaster.computeAdvertisingSetDurationTenMs(500L))
+        assertEquals(65_535, BleBroadcaster.computeAdvertisingSetDurationTenMs(900_000L))
+    }
 }
