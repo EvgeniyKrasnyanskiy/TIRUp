@@ -232,6 +232,8 @@ class SettingsRepositoryImpl(
             .putBoolean(KEY_ALERT_EMERGENCY_IS_CAREGIVER_ROLE, settings.alertSettings.isCaregiverRole)
             .putBoolean(KEY_ALERT_HEADS_UP_MESSAGING_ENABLED, settings.alertSettings.isHeadsUpMessagingEnabled)
             .putBoolean(KEY_ALERT_LOW_BATTERY_ENABLED, settings.alertSettings.isLowBatteryAlertEnabled)
+            .putBoolean(KEY_ALERT_SYNC_ENABLED, settings.alertSettings.isAlarmSyncEnabled)
+            .putBoolean(KEY_ALERT_ALLOW_REMOTE_CRITICAL_HYPO, settings.alertSettings.allowRemoteCriticalHypoDismissal)
             .putString(KEY_BLE_BRIDGE_ROLE, settings.bleBridgeSettings.role.name)
             .putBoolean(KEY_BLE_BRIDGE_IS_ENABLED, settings.bleBridgeSettings.isEnabled)
             .putString(KEY_BLE_BRIDGE_PIN, settings.bleBridgeSettings.familyPin)
@@ -475,7 +477,9 @@ class SettingsRepositoryImpl(
                 isCaregiverSosWakeupEnabled = prefs.getBoolean(KEY_ALERT_CAREGIVER_SOS_WAKEUP_ENABLED, true),
                 isCaregiverRole = prefs.getBoolean(KEY_ALERT_EMERGENCY_IS_CAREGIVER_ROLE, false),
                 isHeadsUpMessagingEnabled = prefs.getBoolean(KEY_ALERT_HEADS_UP_MESSAGING_ENABLED, true),
-                isLowBatteryAlertEnabled = prefs.getBoolean(KEY_ALERT_LOW_BATTERY_ENABLED, true)
+                isLowBatteryAlertEnabled = prefs.getBoolean(KEY_ALERT_LOW_BATTERY_ENABLED, true),
+                isAlarmSyncEnabled = prefs.getBoolean(KEY_ALERT_SYNC_ENABLED, true),
+                allowRemoteCriticalHypoDismissal = prefs.getBoolean(KEY_ALERT_ALLOW_REMOTE_CRITICAL_HYPO, false)
             ),
             bleBridgeSettings = BleBridgeSettings(
                 role = try {
@@ -707,6 +711,8 @@ class SettingsRepositoryImpl(
         private const val KEY_ALERT_EMERGENCY_IS_CAREGIVER_ROLE = "key_alert_emergency_is_caregiver_role"
         private const val KEY_ALERT_HEADS_UP_MESSAGING_ENABLED = "key_alert_heads_up_messaging_enabled"
         private const val KEY_ALERT_LOW_BATTERY_ENABLED = "key_alert_low_battery_enabled"
+        private const val KEY_ALERT_SYNC_ENABLED = "key_alert_sync_enabled"
+        private const val KEY_ALERT_ALLOW_REMOTE_CRITICAL_HYPO = "key_alert_allow_remote_critical_hypo"
 
         private const val KEY_BLE_BRIDGE_ROLE = "key_ble_bridge_role"
         private const val KEY_BLE_BRIDGE_IS_ENABLED = "key_ble_bridge_is_enabled"

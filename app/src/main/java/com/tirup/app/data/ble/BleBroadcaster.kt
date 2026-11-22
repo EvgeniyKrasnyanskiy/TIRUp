@@ -47,6 +47,7 @@ object BleBroadcaster {
     const val BURST_5MIN_MS = 15_000L  // 15 seconds for 5-minute CGM sensors (Libre 1/2, Dexcom G6)
     const val HEARTBEAT_BURST_MS = 15_000L // 15 seconds for 5-minute fallback heartbeat timer for max reliability
     const val TEST_PING_BURST_MS = 30_000L // 30 seconds for manual diagnostic test ping
+    const val ALARM_ACK_BURST_MS = 8_000L  // 8 seconds hardware-timed alarm ACK burst (reaches both LOW_LATENCY and ECO scanners)
     const val WAKE_LOCK_START_TIMEOUT_MS = 2_500L // Short safety cap; released as soon as BT controller confirms start
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -60,6 +61,11 @@ object BleBroadcaster {
     private var cleanupBurstJob: Job? = null
     private var heartbeatJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
+
+    private var alarmAckAdvertiser: BluetoothLeAdvertiser? = null
+    private var alarmAckCallback: AdvertiseCallback? = null
+    private var alarmAckCleanupJob: Job? = null
+    private val alarmAckMutex = Mutex()
 
     private var lastReadingCache: GlucoseReading? = null
     private var lastRateCache: Double = 0.0
@@ -438,6 +444,93 @@ object BleBroadcaster {
             isRu = isRu,
             onStatus = onStatus
         )
+    }
+
+    /**
+     * Broadcasts a compact 14-byte Alarm ACK control packet over BLE Legacy 1M PHY so BOTH
+     * Legacy and Extended (PHY_LE_ALL_SUPPORTED) scanners catch it reliably on Master and Followers.
+     * Works regardless of BleBridgeRole (BROADCASTER or OBSERVER) and uses a dedicated hardware-timed slot
+     * so it never disrupts glucose telemetry heartbeats.
+     */
+    @android.annotation.SuppressLint("MissingPermission")
+    fun broadcastAlarmAck(
+        context: Context,
+        payload: ByteArray,
+        burstDurationMs: Long = ALARM_ACK_BURST_MS
+    ) {
+        if (!hasAdvertisePermission(context)) {
+            Log.d(TAG, "Cannot broadcast alarm ACK: BLUETOOTH_ADVERTISE permission not granted")
+            return
+        }
+        val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        val adapter = bm?.adapter
+        if (adapter == null || !adapter.isEnabled) return
+        val advertiser = adapter.bluetoothLeAdvertiser ?: return
+
+        val timeoutMs = computeLegacyTimeoutMs(burstDurationMs)
+        val advertiseSettings = AdvertiseSettings.Builder()
+            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
+            .setConnectable(false)
+            .setTimeout(timeoutMs)
+            .build()
+
+        val advertiseData = AdvertiseData.Builder()
+            .addManufacturerData(BlePacketCodec.MANUFACTURER_ID, payload)
+            .setIncludeDeviceName(false)
+            .setIncludeTxPowerLevel(false)
+            .build()
+
+        scope.launch {
+            alarmAckMutex.withLock {
+                stopAlarmAckInternal()
+                val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+                val ackWakeLock = try {
+                    pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TIRUp:BleAlarmAckWakeLock")?.apply {
+                        setReferenceCounted(false)
+                        acquire(WAKE_LOCK_START_TIMEOUT_MS)
+                    }
+                } catch (_: Exception) { null }
+
+                val cb = object : AdvertiseCallback() {
+                    override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
+                        try { if (ackWakeLock?.isHeld == true) ackWakeLock.release() } catch (_: Exception) {}
+                        Log.i(TAG, "BLE alarm ACK broadcast started (${timeoutMs}ms hardware timeout)")
+                    }
+
+                    override fun onStartFailure(errorCode: Int) {
+                        try { if (ackWakeLock?.isHeld == true) ackWakeLock.release() } catch (_: Exception) {}
+                        Log.w(TAG, "BLE alarm ACK broadcast failed with code=$errorCode")
+                        scope.launch { alarmAckMutex.withLock { stopAlarmAckInternal() } }
+                    }
+                }
+
+                try {
+                    alarmAckAdvertiser = advertiser
+                    alarmAckCallback = cb
+                    advertiser.startAdvertising(advertiseSettings, advertiseData, cb)
+                    alarmAckCleanupJob = launch {
+                        delay(burstDurationMs + 300L)
+                        alarmAckMutex.withLock { stopAlarmAckInternal() }
+                    }
+                } catch (e: Exception) {
+                    try { if (ackWakeLock?.isHeld == true) ackWakeLock.release() } catch (_: Exception) {}
+                    Log.w(TAG, "Failed to start BLE alarm ACK broadcast: ${e.message}")
+                    stopAlarmAckInternal()
+                }
+            }
+        }
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
+    private fun stopAlarmAckInternal() {
+        try {
+            alarmAckCallback?.let { cb -> alarmAckAdvertiser?.stopAdvertising(cb) }
+        } catch (_: Exception) {}
+        alarmAckCallback = null
+        alarmAckAdvertiser = null
+        alarmAckCleanupJob?.cancel()
+        alarmAckCleanupJob = null
     }
 
     fun stopAdvertising() {

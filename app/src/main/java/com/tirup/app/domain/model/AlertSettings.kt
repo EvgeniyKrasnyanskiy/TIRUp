@@ -76,5 +76,11 @@ data class AlertSettings(
     val isHeadsUpMessagingEnabled: Boolean = true,
 
     // Critical Low Battery Alert (<15%, <10%, <5%) to prevent monitoring cutoff
-    val isLowBatteryAlertEnabled: Boolean = true
+    val isLowBatteryAlertEnabled: Boolean = true,
+
+    // Synchronized alarm snooze/dismissal across Master & Followers (BLE / Wi-Fi LAN / Nightscout)
+    val isAlarmSyncEnabled: Boolean = true,
+
+    // Optional safety toggle: allow remote follower dismissal to silence Critical Hypo (<3.0) & cancel Emergency SMS on Master
+    val allowRemoteCriticalHypoDismissal: Boolean = false
 )

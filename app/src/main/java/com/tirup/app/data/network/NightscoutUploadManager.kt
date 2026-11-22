@@ -92,7 +92,8 @@ object NightscoutUploadManager {
         glucose: Double? = null,
         unit: GlucoseUnit = GlucoseUnit.MMOL_L,
         notes: String? = null,
-        timestamp: Long = System.currentTimeMillis()
+        timestamp: Long = System.currentTimeMillis(),
+        customEventType: String? = null
     ): Result<String> = withContext(Dispatchers.IO) {
         if (!settings.isEnabled || !settings.isValidUrl) {
             return@withContext Result.failure(IllegalStateException("Синхронизация с сервером выключена или URL не задан"))
@@ -102,7 +103,7 @@ object NightscoutUploadManager {
         val targetUrl = "$cleanUrl/api/v1/treatments"
         val itemUuid = UUID.randomUUID().toString()
 
-        val eventType = when {
+        val eventType = customEventType?.takeIf { it.isNotBlank() } ?: when {
             insulin != null && insulin > 0.0 && carbs != null && carbs > 0.0 -> "Meal Bolus"
             insulin != null && insulin > 0.0 -> "Correction Bolus"
             carbs != null && carbs > 0.0 -> "Carb Intake"
@@ -213,6 +214,59 @@ object NightscoutUploadManager {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to delete treatment $cleanUuid from $targetUrl: ${e.message}", e)
+            Result.failure(e)
+        } finally {
+            conn?.disconnect()
+        }
+    }
+
+    /**
+     * Fetches recent treatment notes from Nightscout (/api/v1/treatments.json) to detect
+     * remote TIRUp alarm ACK announcements without requiring any server plugin or update.
+     */
+    suspend fun fetchRecentAckNotes(
+        settings: NightscoutSettings,
+        count: Int = 8
+    ): Result<List<String>> = withContext(Dispatchers.IO) {
+        if (!settings.isEnabled || !settings.isValidUrl) {
+            return@withContext Result.success(emptyList())
+        }
+        val cleanUrl = settings.getCleanBaseUrl()
+        val tokenParam = if (settings.apiSecret.isNotBlank()) {
+            "&token=${java.net.URLEncoder.encode(settings.apiSecret, "UTF-8")}"
+        } else ""
+        val targetUrl = "$cleanUrl/api/v1/treatments.json?count=$count$tokenParam"
+
+        var conn: HttpURLConnection? = null
+        try {
+            val url = URL(targetUrl)
+            conn = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = TIMEOUT_MS
+                readTimeout = TIMEOUT_MS
+                requestMethod = "GET"
+                setRequestProperty("Accept", "application/json")
+                if (settings.apiSecret.isNotBlank()) {
+                    setRequestProperty("api-secret", sha1(settings.apiSecret))
+                }
+            }
+
+            val code = conn.responseCode
+            if (code in 200..299) {
+                val body = conn.inputStream.bufferedReader().use { it.readText() }
+                val arr = org.json.JSONArray(body)
+                val notesList = mutableListOf<String>()
+                for (i in 0 until arr.length()) {
+                    val obj = arr.optJSONObject(i) ?: continue
+                    val note = obj.optString("notes", "")
+                    if (note.contains(com.tirup.app.data.alert.AlarmSyncProtocol.NOTE_PREFIX)) {
+                        notesList.add(note)
+                    }
+                }
+                Result.success(notesList)
+            } else {
+                Result.failure(IllegalStateException("HTTP $code"))
+            }
+        } catch (e: Exception) {
             Result.failure(e)
         } finally {
             conn?.disconnect()
