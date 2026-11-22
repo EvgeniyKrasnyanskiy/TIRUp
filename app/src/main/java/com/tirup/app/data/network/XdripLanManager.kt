@@ -368,14 +368,12 @@ object XdripLanManager {
         }
 
         if (!force) {
-            val latestDbTs = try {
-                cachedDb?.glucoseReadingDao()?.getLatestTimestamp() ?: 0L
-            } catch (_: Exception) { 0L }
-            val effectiveTs = maxOf(lastReadingTimestamp, latestDbTs)
-            if (effectiveTs > 0L && (now - effectiveTs < 240_000L)) {
-                val ageSec = (now - effectiveTs) / 1000L
-                Log.d(TAG, "pollNow: Fresh reading already available in DB ($ageSec s old, rank >= LAN). Skipping LAN request.")
-                val nextDelay = (300_000L - (now - effectiveTs)).coerceAtLeast(30_000L)
+            val higherPriorityTs = com.tirup.app.domain.model.DataSourceFreshnessTracker
+                .latestHigherPriorityTimestamp(DataSourcePriority.WIFI_LAN)
+            if (higherPriorityTs > 0L && (now - higherPriorityTs < 240_000L)) {
+                val ageSec = (now - higherPriorityTs) / 1000L
+                Log.d(TAG, "pollNow: Fresh reading from higher-priority source ($ageSec s old). Skipping LAN request.")
+                val nextDelay = (300_000L - (now - higherPriorityTs)).coerceAtLeast(30_000L)
                 scheduleNextPollAlarm(ctx, nextDelay)
                 return@withContext Result.success(_statusFlow.value)
             }
@@ -448,15 +446,14 @@ object XdripLanManager {
         }
         lastPollExecutionTime = now
 
-        // Check if fresh reading already exists from higher-priority source (e.g. Broadcast)
-        val latestDbTs = try {
-            db.glucoseReadingDao().getLatestTimestamp() ?: 0L
-        } catch (_: Exception) { 0L }
-        val effectiveTs = maxOf(lastReadingTimestamp, latestDbTs)
-        if (!force && effectiveTs > 0L) {
-            val ageMs = now - effectiveTs
+        // Skip LAN poll only if a strictly higher-priority source (LOCAL_XDRIP) delivered a fresh reading.
+        // Lower-priority sources (e.g. BLE_BRIDGE, NIGHTSCOUT_CLOUD) must never block WIFI_LAN or stall it in CONNECTING.
+        val higherPriorityTs = com.tirup.app.domain.model.DataSourceFreshnessTracker
+            .latestHigherPriorityTimestamp(DataSourcePriority.WIFI_LAN)
+        if (!force && higherPriorityTs > 0L) {
+            val ageMs = now - higherPriorityTs
             if (ageMs < 240_000L) {
-                Log.i(TAG, "Skipping LAN poll cycle: fresh reading exists (${ageMs / 1000}s old)")
+                Log.i(TAG, "Skipping LAN poll cycle: fresh higher-priority reading exists (${ageMs / 1000}s old)")
                 val nextDelay = (300_000L - ageMs).coerceAtLeast(30_000L)
                 scheduleNextPollAlarm(ctx, nextDelay)
                 return

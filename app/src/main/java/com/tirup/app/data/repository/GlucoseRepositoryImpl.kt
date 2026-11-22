@@ -104,6 +104,7 @@ class GlucoseRepositoryImpl(
         reading: GlucoseReading,
         priority: com.tirup.app.domain.model.DataSourcePriority
     ) = withContext(Dispatchers.IO) {
+        com.tirup.app.domain.model.DataSourceFreshnessTracker.recordReading(priority, reading.timestamp)
         val windowMs = 25_000L // 25s window: safe for 1-min CGM cadence, still absorbs duplicate echoes from xDrip broadcast
         val existing = readingDao.getReadingsBetweenSync(
             reading.timestamp - windowMs,
@@ -142,6 +143,9 @@ class GlucoseRepositoryImpl(
         priority: com.tirup.app.domain.model.DataSourcePriority
     ) = withContext(Dispatchers.IO) {
         if (readings.isEmpty()) return@withContext
+        readings.maxOfOrNull { it.timestamp }?.let { newestTs ->
+            com.tirup.app.domain.model.DataSourceFreshnessTracker.recordReading(priority, newestTs)
+        }
         val windowMs = 25_000L // 25s window prevents false deduplication of 1-minute CGM readings while eliminating duplicate echoes
         val toInsert = mutableListOf<GlucoseReading>()
         

@@ -105,4 +105,61 @@ class XdripLanClientTest {
         val signalLost = now - 15 * 60_000L
         assertEquals(60_000L, XdripLanManager.calculateNextPollIntervalMs(signalLost, configuredSec))
     }
+
+    @Test
+    fun dataSourceFreshnessTracker_lowerPriorityDoesNotBlockHigherPriority() {
+        com.tirup.app.domain.model.DataSourceFreshnessTracker.resetForTest()
+        val now = 1_800_000_000_000L
+
+        // Fresh BLE reading (rank 1) must NOT block WIFI_LAN (rank 3) or NIGHTSCOUT_CLOUD (rank 2)
+        com.tirup.app.domain.model.DataSourceFreshnessTracker.recordReading(
+            DataSourcePriority.BLE_BRIDGE,
+            now - 10_000L
+        )
+        assertFalse(
+            com.tirup.app.domain.model.DataSourceFreshnessTracker.hasFreshHigherPriorityReading(
+                DataSourcePriority.WIFI_LAN, now, 240_000L
+            )
+        )
+        assertFalse(
+            com.tirup.app.domain.model.DataSourceFreshnessTracker.hasFreshHigherPriorityReading(
+                DataSourcePriority.NIGHTSCOUT_CLOUD, now, 240_000L
+            )
+        )
+
+        // Fresh WIFI_LAN reading (rank 3) MUST block NIGHTSCOUT_CLOUD (rank 2), but NOT WIFI_LAN itself
+        com.tirup.app.domain.model.DataSourceFreshnessTracker.recordReading(
+            DataSourcePriority.WIFI_LAN,
+            now - 30_000L
+        )
+        assertTrue(
+            com.tirup.app.domain.model.DataSourceFreshnessTracker.hasFreshHigherPriorityReading(
+                DataSourcePriority.NIGHTSCOUT_CLOUD, now, 240_000L
+            )
+        )
+        assertFalse(
+            com.tirup.app.domain.model.DataSourceFreshnessTracker.hasFreshHigherPriorityReading(
+                DataSourcePriority.WIFI_LAN, now, 240_000L
+            )
+        )
+
+        // Fresh LOCAL_XDRIP reading (rank 4) MUST block WIFI_LAN (rank 3)
+        com.tirup.app.domain.model.DataSourceFreshnessTracker.recordReading(
+            DataSourcePriority.LOCAL_XDRIP,
+            now - 20_000L
+        )
+        assertTrue(
+            com.tirup.app.domain.model.DataSourceFreshnessTracker.hasFreshHigherPriorityReading(
+                DataSourcePriority.WIFI_LAN, now, 240_000L
+            )
+        )
+
+        // Stale LOCAL_XDRIP (> 4 min) must NOT block WIFI_LAN
+        assertFalse(
+            com.tirup.app.domain.model.DataSourceFreshnessTracker.hasFreshHigherPriorityReading(
+                DataSourcePriority.WIFI_LAN, now + 300_000L, 240_000L
+            )
+        )
+        com.tirup.app.domain.model.DataSourceFreshnessTracker.resetForTest()
+    }
 }

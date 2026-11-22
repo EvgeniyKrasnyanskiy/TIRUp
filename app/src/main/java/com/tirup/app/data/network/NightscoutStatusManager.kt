@@ -208,13 +208,13 @@ object NightscoutStatusManager {
         lastPollTime = now
         val cleanUrl = settings.getCleanBaseUrl()
 
-        val latestInDb = cachedGlucoseRepo?.getLatestReading()?.firstOrNull()
-        val hasFreshReading = latestInDb != null && (now - latestInDb.timestamp < 240_000L)
+        val hasFreshHigherPriority = com.tirup.app.domain.model.DataSourceFreshnessTracker
+            .hasFreshHigherPriorityReading(DataSourcePriority.NIGHTSCOUT_CLOUD, now, 240_000L)
 
-        // If fresh glucose exists from higher-priority source (Broadcast / Wi-Fi LAN),
+        // If fresh glucose exists from higher-priority source (LOCAL_XDRIP / WIFI_LAN),
         // and telemetry was fetched recently (< 5 min), skip network calls completely to save power.
-        if (latestInDb != null && !force && hasFreshReading && (now - lastTelemetryPollTime < 300_000L)) {
-            Log.d(TAG, "Nightscout: fresh reading exists (${(now - latestInDb.timestamp) / 1000}s old) and telemetry recent. Skipping fetch cycle.")
+        if (!force && hasFreshHigherPriority && (now - lastTelemetryPollTime < 300_000L)) {
+            Log.d(TAG, "Nightscout: fresh higher-priority reading exists and telemetry recent. Skipping fetch cycle.")
             return@withContext
         }
         lastTelemetryPollTime = now
@@ -583,8 +583,9 @@ object NightscoutStatusManager {
         val now = System.currentTimeMillis()
         val latestInDb = repo.getLatestReading().firstOrNull()
 
-        // If we already have fresh data (< 4 min old from higher-priority source), skip remote batch fetch
-        val hasVeryFreshReading = latestInDb != null && (now - latestInDb.timestamp < 240_000L)
+        // If we already have fresh data (< 4 min old from strictly higher-priority source: Broadcast / Wi-Fi LAN), skip remote batch fetch
+        val hasVeryFreshReading = com.tirup.app.domain.model.DataSourceFreshnessTracker
+            .hasFreshHigherPriorityReading(DataSourcePriority.NIGHTSCOUT_CLOUD, now, 240_000L)
 
         val readings = mutableListOf<GlucoseReading>()
 
