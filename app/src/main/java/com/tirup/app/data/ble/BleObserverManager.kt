@@ -1021,6 +1021,17 @@ object BleObserverManager {
         val record = result.scanRecord ?: return
         val rawData = record.getManufacturerSpecificData(BlePacketCodec.MANUFACTURER_ID) ?: return
 
+        // Intercept bidirectional Alarm ACK control packets (14-byte "TU" + bit15 PIN) before telemetry parsing
+        val alarmAck = com.tirup.app.data.alert.AlarmSyncProtocol.decodeBleAckPacket(rawData, expectedPin)
+        if (alarmAck != null) {
+            com.tirup.app.data.alert.AlarmSyncManager.onIncomingAck(
+                context,
+                alarmAck,
+                com.tirup.app.data.alert.AlarmSyncTransport.BLE
+            )
+            return
+        }
+
         val packet = BlePacketCodec.decodePacket(rawData, expectedPin) ?: return
 
         val rssi = result.rssi

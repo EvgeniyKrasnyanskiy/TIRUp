@@ -92,6 +92,16 @@ class PatientCriticalHypoActivity : ComponentActivity() {
         val primaryContactName = intent.getStringExtra(EXTRA_PRIMARY_CONTACT_NAME) ?: ""
 
         setContent {
+            LaunchedEffect(Unit) {
+                var sawActive = GlucoseAlertManager.criticalAlarmActiveFlow.value
+                GlucoseAlertManager.criticalAlarmActiveFlow.collect { active ->
+                    if (active) {
+                        sawActive = true
+                    } else if (sawActive) {
+                        finish()
+                    }
+                }
+            }
             PatientCriticalHypoScreen(
                 glucoseDisplay = glucoseDisplay,
                 trendArrow = trendArrow,
@@ -100,7 +110,13 @@ class PatientCriticalHypoActivity : ComponentActivity() {
                 primaryContactName = primaryContactName,
                 onConfirmCarbs = {
                     GlucoseAlertManager.silenceCurrentSoundOnly()
-                    GlucoseAlertManager.dismissCriticalAlarm(this, fromUser = true)
+                    GlucoseAlertManager.acknowledgeAndSnoozeAlert(
+                        context = this,
+                        scopeMask = com.tirup.app.data.alert.AlarmSyncScope.HYPO,
+                        snoozeMinutes = 0,
+                        fromUser = true,
+                        fromRemote = false
+                    )
                 },
                 onCallContact = { phone ->
                     if (phone.isNotBlank()) {

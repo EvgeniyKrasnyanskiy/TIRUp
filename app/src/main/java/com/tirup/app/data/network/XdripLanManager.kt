@@ -564,6 +564,12 @@ object XdripLanManager {
                     val treatments = treatmentsResult.getOrNull()
                     if (!treatments.isNullOrEmpty()) {
                         for (t in treatments) {
+                            com.tirup.app.data.alert.AlarmSyncManager.processTreatmentNote(
+                                ctx,
+                                t.notes,
+                                userSettings,
+                                com.tirup.app.data.alert.AlarmSyncTransport.WIFI_LAN_TREATMENT
+                            )
                             DexdripBroadcastReceiver.saveTreatmentIfNew(db, t)
                         }
                         DexdripBroadcastReceiver.purgeDuplicateTreatments(db)

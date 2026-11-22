@@ -150,6 +150,7 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.tirup.app.ACTION_DISMISS_CRITICAL" />
+                <action android:name="com.tirup.app.ACTION_SNOOZE_ALERT" />
                 <action android:name="com.tirup.app.ACTION_LAUNCH_DIANIGHT" />
                 <action android:name="com.tirup.app.ACTION_CHECK_SIGNAL_LOSS" />
                 <action android:name="com.tirup.app.ACTION_POLL_XDRIP_LAN" />

@@ -22,18 +22,34 @@ class AlertActionReceiver : BroadcastReceiver() {
         when (intent.action) {
             ACTION_DISMISS_CRITICAL -> {
                 val notifId = intent.getIntExtra("notification_id", -1)
+                val scopeMask = intent.getIntExtra(EXTRA_SCOPE_MASK, com.tirup.app.data.alert.AlarmSyncScope.ALL)
                 val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
                 if (notifId != -1) {
                     nm?.cancel(notifId)
                 }
-                nm?.cancel(GlucoseAlertManager.NOTIFICATION_ID_CRITICAL)
-                nm?.cancel(GlucoseAlertManager.NOTIFICATION_ID_MAIN)
-                nm?.cancel(GlucoseAlertManager.NOTIFICATION_ID_PREDICTIVE)
-                nm?.cancel(GlucoseAlertManager.NOTIFICATION_ID_SIGNAL_LOSS)
-                nm?.cancel(GlucoseAlertManager.NOTIFICATION_ID_LOW_BATTERY)
-                GlucoseAlertManager.silenceCurrentSoundOnly()
-                GlucoseAlertManager.dismissCriticalAlarm(context, fromUser = true)
-                GlucoseAlertManager.clearActiveAlertBanner()
+                GlucoseAlertManager.acknowledgeAndSnoozeAlert(
+                    context = context,
+                    scopeMask = scopeMask,
+                    snoozeMinutes = 0,
+                    fromUser = true,
+                    fromRemote = false
+                )
+            }
+            ACTION_SNOOZE_ALERT -> {
+                val notifId = intent.getIntExtra("notification_id", -1)
+                val scopeMask = intent.getIntExtra(EXTRA_SCOPE_MASK, com.tirup.app.data.alert.AlarmSyncScope.ALL)
+                val snoozeMin = intent.getIntExtra(EXTRA_SNOOZE_MINUTES, 15).coerceIn(5, 240)
+                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                if (notifId != -1) {
+                    nm?.cancel(notifId)
+                }
+                GlucoseAlertManager.acknowledgeAndSnoozeAlert(
+                    context = context,
+                    scopeMask = scopeMask,
+                    snoozeMinutes = snoozeMin,
+                    fromUser = true,
+                    fromRemote = false
+                )
             }
             ACTION_CONFIRM_SENSOR_RESTART -> {
                 val ts = intent.getLongExtra("timestamp", 0L)
@@ -217,6 +233,9 @@ class AlertActionReceiver : BroadcastReceiver() {
         private const val TAG = "AlertActionReceiver"
         private val receiverScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         const val ACTION_DISMISS_CRITICAL = "com.tirup.app.ACTION_DISMISS_CRITICAL"
+        const val ACTION_SNOOZE_ALERT = "com.tirup.app.ACTION_SNOOZE_ALERT"
+        const val EXTRA_SCOPE_MASK = "extra_scope_mask"
+        const val EXTRA_SNOOZE_MINUTES = "extra_snooze_minutes"
         const val ACTION_CONFIRM_SENSOR_RESTART = "com.tirup.app.ACTION_CONFIRM_SENSOR_RESTART"
         const val ACTION_DISMISS_SENSOR_RESTART = "com.tirup.app.ACTION_DISMISS_SENSOR_RESTART"
         const val ACTION_LAUNCH_DIANIGHT = "com.tirup.app.ACTION_LAUNCH_DIANIGHT"

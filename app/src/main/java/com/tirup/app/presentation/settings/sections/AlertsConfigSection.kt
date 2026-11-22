@@ -58,6 +58,7 @@ import com.tirup.app.presentation.components.BentoCard
 import com.tirup.app.presentation.theme.ActionBlue
 import com.tirup.app.presentation.theme.ColorHigh
 import com.tirup.app.presentation.theme.ColorVeryLow
+import com.tirup.app.presentation.theme.PrimaryEmerald
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -885,6 +886,92 @@ fun AlertsConfigSection(
                                 }
                             )
                         }
+                    }
+                }
+            }
+        }
+
+        // Synchronized Alarm Dismissal / Snooze BentoCard (Master <-> Followers)
+        BentoCard(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(horizontal = 2.dp, vertical = 2.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = if (isRu) "🔄 Синхронизация сброса тревог" else "🔄 Synced Alarm Snooze",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (isRu) "Сброс или отложение тревоги на любом телефоне (Мастер или Фолловер) автоматически отключает её у всей группы по BLE, Wi-Fi LAN и Nightscout"
+                            else "Dismissing or snoozing an alert on any phone (Master or Follower) automatically silences all group devices via BLE, Wi-Fi LAN, and Nightscout",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 16.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Switch(
+                        checked = alerts.isAlarmSyncEnabled,
+                        onCheckedChange = { isChecked ->
+                            onUpdateAlertSettings(alerts.copy(isAlarmSyncEnabled = isChecked))
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = PrimaryEmerald
+                        )
+                    )
+                }
+
+                if (alerts.isAlarmSyncEnabled) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp)
+                        ) {
+                            Text(
+                                text = if (isRu) "🚨 Сброс критической гипо (<3.0) на мастере" else "🚨 Remote Critical Hypo Dismiss on Master",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isRu) "Если выключено (безопаснее), фолловер не сможет отключить сирену экстремальной гипо и таймер SOS-SMS на телефоне пациента"
+                                else "When off (safer), followers cannot cancel severe hypo siren or emergency SMS countdown on the patient's Master phone",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 15.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Switch(
+                            checked = alerts.allowRemoteCriticalHypoDismissal,
+                            onCheckedChange = { isChecked ->
+                                onUpdateAlertSettings(alerts.copy(allowRemoteCriticalHypoDismissal = isChecked))
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFFEF4444)
+                            )
+                        )
                     }
                 }
             }

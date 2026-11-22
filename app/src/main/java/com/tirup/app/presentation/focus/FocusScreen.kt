@@ -217,6 +217,7 @@ fun FocusScreen(
     }
 
     var detailDialogInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var activeAlertDetailScope by remember { mutableStateOf<Int?>(null) }
     var showMetricsOrderDialog by remember { mutableStateOf(false) }
     var showDailyAlertLogsDialog by rememberSaveable { mutableStateOf(false) }
     var focusCardMode by rememberSaveable { mutableStateOf(0) }
@@ -428,6 +429,7 @@ fun FocusScreen(
                                 }
                             }
                         }
+                        activeAlertDetailScope = GlucoseAlertManager.resolveScopeMask(alert.tier, -1, alert.title)
                         detailDialogInfo = Pair(title, desc)
                     }
                 },
@@ -1198,8 +1200,12 @@ fun FocusScreen(
 
     // Detail Popups
     if (detailDialogInfo != null) {
+        val alertScope = activeAlertDetailScope
         AlertDialog(
-            onDismissRequest = { detailDialogInfo = null },
+            onDismissRequest = {
+                detailDialogInfo = null
+                activeAlertDetailScope = null
+            },
             title = {
                 Text(
                     text = detailDialogInfo!!.first,
@@ -1214,8 +1220,39 @@ fun FocusScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
+            dismissButton = if (alertScope != null) {
+                {
+                    val snoozeMin = if ((alertScope and com.tirup.app.data.alert.AlarmSyncScope.HYPO) != 0) 15 else 30
+                    TextButton(onClick = {
+                        GlucoseAlertManager.acknowledgeAndSnoozeAlert(
+                            context = context,
+                            scopeMask = alertScope,
+                            snoozeMinutes = snoozeMin,
+                            fromUser = true,
+                            fromRemote = false
+                        )
+                        Toast.makeText(
+                            context,
+                            if (isRu) "Тревога отложена на $snoozeMin мин на всех устройствах"
+                            else "Alarm snoozed for ${snoozeMin}m across synced devices",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        detailDialogInfo = null
+                        activeAlertDetailScope = null
+                    }) {
+                        Text(
+                            text = if (isRu) "Отложить (${snoozeMin}м)" else "Snooze (${snoozeMin}m)",
+                            color = PrimaryEmerald,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            } else null,
             confirmButton = {
-                TextButton(onClick = { detailDialogInfo = null }) {
+                TextButton(onClick = {
+                    detailDialogInfo = null
+                    activeAlertDetailScope = null
+                }) {
                     Text(text = if (isRu) "Понятно" else "OK", color = ActionBlue, fontWeight = FontWeight.Bold)
                 }
             }

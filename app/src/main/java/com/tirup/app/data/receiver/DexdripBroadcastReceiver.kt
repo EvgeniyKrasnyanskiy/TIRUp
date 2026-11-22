@@ -753,6 +753,9 @@ class DexdripBroadcastReceiver : BroadcastReceiver() {
         }
 
         suspend fun saveTreatmentIfNew(database: AppDatabase, treatment: Treatment) {
+            if (treatment.notes?.contains(com.tirup.app.data.alert.AlarmSyncProtocol.NOTE_PREFIX) == true) {
+                return
+            }
             val dao = database.treatmentDao()
 
             // 1. Check exact UUID match if available (e.g. from Nightscout Cloud / xDrip sync)

@@ -44,6 +44,9 @@ class TirupApplication : Application() {
         registerScreenOnWidgetRefresh()
 
         com.tirup.app.data.alert.GlucoseAlertManager.initChannels(this)
+        com.tirup.app.data.alert.AlarmSyncManager.remoteAckHandler = { ctx, packet, transport ->
+            com.tirup.app.data.alert.GlucoseAlertManager.applyRemoteAlarmAck(ctx, packet, transport)
+        }
         com.tirup.app.data.backup.AutoBackupManager.scheduleNextDailyBackup(this)
         com.tirup.app.data.worker.WeeklyDigestWorker.schedule(this)
         com.tirup.app.data.worker.DeviceStatusReminderWorker.schedule(this)

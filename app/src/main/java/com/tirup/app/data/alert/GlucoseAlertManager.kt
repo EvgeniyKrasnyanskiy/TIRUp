@@ -317,6 +317,20 @@ object GlucoseAlertManager {
     private val userAcknowledgedHypoTimestamp = AtomicLong(0L)
     private val userAcknowledgedHyperTimestamp = AtomicLong(0L)
 
+    // Universal explicit snooze-until timestamps (local + remote synced across Master & Followers)
+    private val snoozedHypoUntilMs = AtomicLong(0L)
+    private val snoozedHyperUntilMs = AtomicLong(0L)
+    private val snoozedPredictiveUntilMs = AtomicLong(0L)
+    private val snoozedRapidChangeUntilMs = AtomicLong(0L)
+    private val snoozedSignalLossUntilMs = AtomicLong(0L)
+    private val snoozedLowBatteryUntilMs = AtomicLong(0L)
+
+    private val activeAlertScopeMask = AtomicInteger(0)
+    private val isCriticalHypoAlarmActive = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    private val _criticalAlarmActiveFlow = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val criticalAlarmActiveFlow: kotlinx.coroutines.flow.StateFlow<Boolean> = _criticalAlarmActiveFlow
+
     @Volatile
     var isCriticalAlarmActive: Boolean = false
         private set
@@ -842,13 +856,35 @@ object GlucoseAlertManager {
      * Dismisses the screaming critical alarm immediately (stops siren, vibration, torch, cancels notification).
      * If [fromUser] is true, records user reaction for adaptive snooze.
      */
+    fun resolveScopeMask(tier: AlertTier, notificationId: Int, title: String): Int {
+        if (notificationId == NOTIFICATION_ID_LOW_BATTERY) return AlarmSyncScope.LOW_BATTERY
+        return when (tier) {
+            AlertTier.SIGNAL_LOSS -> AlarmSyncScope.SIGNAL_LOSS
+            AlertTier.PREDICTIVE -> AlarmSyncScope.PREDICTIVE
+            AlertTier.RAPID_CHANGE -> AlarmSyncScope.RAPID_CHANGE
+            AlertTier.CRITICAL, AlertTier.MAIN -> {
+                val isLow = title.contains("гипо", true) ||
+                    title.contains("низк", true) ||
+                    title.contains("low", true) ||
+                    title.contains("hypo", true)
+                if (isLow) AlarmSyncScope.HYPO else AlarmSyncScope.HYPER
+            }
+        }
+    }
+
     @Synchronized
     fun dismissCriticalAlarm(context: Context, fromUser: Boolean) {
+        val wasActive = isCriticalAlarmActive || _activeAlertBanner.value != null || MedicalSoundPlayer.isPlaying.value
+        val wasCritHypo = isCriticalHypoAlarmActive.get()
+        val prevScope = activeAlertScopeMask.get().takeIf { it != 0 } ?: AlarmSyncScope.ALL
         if (!isCriticalAlarmActive && !fromUser) return
-        Log.i(TAG, "dismissCriticalAlarm fromUser=$fromUser")
+        Log.i(TAG, "dismissCriticalAlarm fromUser=$fromUser wasActive=$wasActive")
 
         cancelEmergencySmsTimer(context)
         isCriticalAlarmActive = false
+        isCriticalHypoAlarmActive.set(false)
+        _criticalAlarmActiveFlow.value = false
+        activeAlertScopeMask.set(0)
         MedicalSoundPlayer.stopAll()
 
         try {
@@ -869,9 +905,7 @@ object GlucoseAlertManager {
 
         try {
             if (rescueWakeLock?.isHeld == true) {
-                if (rescueWakeLock?.isHeld == true) {
                 try { rescueWakeLock?.release() } catch (_: Exception) {}
-            }
             }
         } catch (_: Exception) {}
         rescueWakeLock = null
@@ -881,7 +915,169 @@ object GlucoseAlertManager {
             userAcknowledgedHypoTimestamp.set(now)
             userAcknowledgedHyperTimestamp.set(now)
             _activeAlertBanner.value = null
+            if (wasActive) {
+                AlarmSyncManager.onLocalAlarmDismissed(
+                    context = context,
+                    scopeMask = prevScope,
+                    snoozeMinutes = 0,
+                    isCriticalHypo = wasCritHypo
+                )
+            }
+        } else {
+            AlarmSyncManager.stopActiveAlarmListeners()
         }
+    }
+
+    /**
+     * Universal alarm acknowledgment & snooze entry point for all tiers (local or remote synced).
+     * Silences sound, vibration, flashlight, clears notifications & active banner, applies category snooze,
+     * and propagates to Master/Followers over BLE, Wi-Fi LAN UDP, and Nightscout when triggered locally.
+     */
+    @Synchronized
+    fun acknowledgeAndSnoozeAlert(
+        context: Context,
+        scopeMask: Int = AlarmSyncScope.ALL,
+        snoozeMinutes: Int = 0,
+        fromUser: Boolean = true,
+        fromRemote: Boolean = false
+    ) {
+        val effectiveMask = if (scopeMask == 0) AlarmSyncScope.ALL else scopeMask
+        val wasCritHypo = isCriticalHypoAlarmActive.get()
+        Log.i(TAG, "acknowledgeAndSnoozeAlert scope=$effectiveMask snoozeMin=$snoozeMinutes fromUser=$fromUser fromRemote=$fromRemote")
+
+        cancelEmergencySmsTimer(context)
+        isCriticalAlarmActive = false
+        isCriticalHypoAlarmActive.set(false)
+        _criticalAlarmActiveFlow.value = false
+        activeAlertScopeMask.set(0)
+        MedicalSoundPlayer.stopAll()
+
+        try {
+            flashJob?.cancel()
+            flashJob = null
+            turnOffFlashlight(context)
+        } catch (_: Exception) {}
+
+        try {
+            val vibrator = getVibrator(context)
+            vibrator?.cancel()
+        } catch (_: Exception) {}
+
+        try {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            if ((effectiveMask and (AlarmSyncScope.HYPO or AlarmSyncScope.HYPER)) != 0) {
+                nm?.cancel(NOTIFICATION_ID_CRITICAL)
+                nm?.cancel(NOTIFICATION_ID_MAIN)
+            }
+            if ((effectiveMask and AlarmSyncScope.PREDICTIVE) != 0) {
+                nm?.cancel(NOTIFICATION_ID_PREDICTIVE)
+            }
+            if ((effectiveMask and AlarmSyncScope.RAPID_CHANGE) != 0) {
+                nm?.cancel(NOTIFICATION_ID_RAPID_CHANGE)
+            }
+            if ((effectiveMask and AlarmSyncScope.SIGNAL_LOSS) != 0) {
+                nm?.cancel(NOTIFICATION_ID_SIGNAL_LOSS)
+            }
+            if ((effectiveMask and AlarmSyncScope.LOW_BATTERY) != 0) {
+                nm?.cancel(NOTIFICATION_ID_LOW_BATTERY)
+            }
+        } catch (_: Exception) {}
+
+        try {
+            if (rescueWakeLock?.isHeld == true) {
+                try { rescueWakeLock?.release() } catch (_: Exception) {}
+            }
+        } catch (_: Exception) {}
+        rescueWakeLock = null
+
+        val now = System.currentTimeMillis()
+        val explicitDurationMs = if (snoozeMinutes > 0) snoozeMinutes * 60_000L else 0L
+
+        if ((effectiveMask and AlarmSyncScope.HYPO) != 0) {
+            userAcknowledgedHypoTimestamp.set(now)
+            lastHypoAlertTimestamp.set(now)
+            if (explicitDurationMs > 0L) snoozedHypoUntilMs.set(now + explicitDurationMs)
+        }
+        if ((effectiveMask and AlarmSyncScope.HYPER) != 0) {
+            userAcknowledgedHyperTimestamp.set(now)
+            lastHyperAlertTimestamp.set(now)
+            if (explicitDurationMs > 0L) snoozedHyperUntilMs.set(now + explicitDurationMs)
+        }
+        if ((effectiveMask and AlarmSyncScope.PREDICTIVE) != 0) {
+            lastPredictiveAlertTimestamp.set(now)
+            if (explicitDurationMs > 0L) snoozedPredictiveUntilMs.set(now + explicitDurationMs)
+        }
+        if ((effectiveMask and AlarmSyncScope.RAPID_CHANGE) != 0) {
+            lastRapidChangeAlertTimestamp.set(now)
+            if (explicitDurationMs > 0L) snoozedRapidChangeUntilMs.set(now + explicitDurationMs)
+        }
+        if ((effectiveMask and AlarmSyncScope.SIGNAL_LOSS) != 0) {
+            lastSignalLossAlertTimestamp.set(now)
+            if (explicitDurationMs > 0L) snoozedSignalLossUntilMs.set(now + explicitDurationMs)
+        }
+        if ((effectiveMask and AlarmSyncScope.LOW_BATTERY) != 0) {
+            snoozedLowBatteryUntilMs.set(now + maxOf(explicitDurationMs, 30 * 60_000L))
+        }
+
+        _activeAlertBanner.value = null
+
+        if (fromUser && !fromRemote) {
+            AlarmSyncManager.onLocalAlarmDismissed(
+                context = context,
+                scopeMask = effectiveMask,
+                snoozeMinutes = snoozeMinutes,
+                isCriticalHypo = wasCritHypo || ((effectiveMask and AlarmSyncScope.HYPO) != 0)
+            )
+        } else {
+            AlarmSyncManager.stopActiveAlarmListeners()
+        }
+    }
+
+    /**
+     * Applies an authenticated remote ACK received from Master or another Follower,
+     * honoring the optional Master Critical Hypo clinical safety guardrail.
+     */
+    fun applyRemoteAlarmAck(
+        context: Context,
+        packet: AlarmAckPacket,
+        transport: AlarmSyncTransport
+    ) {
+        val app = context.applicationContext as? com.tirup.app.TirupApplication
+        val settings = try {
+            kotlinx.coroutines.runBlocking {
+                app?.settingsRepository?.getSettings()?.firstOrNull()
+            }
+        } catch (_: Exception) {
+            null
+        } ?: return
+
+        val alerts = settings.alertSettings
+        if (!alerts.isAlarmSyncEnabled) return
+
+        val ble = settings.bleBridgeSettings
+        val isDeviceMaster = ble.role == com.tirup.app.domain.model.BleBridgeRole.BROADCASTER ||
+            (ble.role != com.tirup.app.domain.model.BleBridgeRole.OBSERVER && !alerts.isCaregiverRole)
+
+        if (AlarmSyncProtocol.shouldProtectMasterCriticalHypo(
+                isDeviceMaster = isDeviceMaster,
+                isLocalCriticalHypoActive = isCriticalHypoAlarmActive.get(),
+                allowRemoteCriticalHypoDismissal = alerts.allowRemoteCriticalHypoDismissal
+            )
+        ) {
+            Log.w(
+                TAG,
+                "Blocked remote critical hypo dismissal on Master via $transport (safety protection enabled; patient must confirm locally)"
+            )
+            return
+        }
+
+        acknowledgeAndSnoozeAlert(
+            context = context,
+            scopeMask = packet.scopeMask,
+            snoozeMinutes = packet.snoozeMinutes,
+            fromUser = true,
+            fromRemote = true
+        )
     }
 
     /**
@@ -1293,7 +1489,7 @@ object GlucoseAlertManager {
         if (!alerts.isLowBatteryAlertEnabled) return
 
         val now = System.currentTimeMillis()
-        if (alerts.alertsMuteUntilTimestamp > now) return
+        if (alerts.alertsMuteUntilTimestamp > now || now < snoozedLowBatteryUntilMs.get()) return
 
         try {
             val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
@@ -1511,7 +1707,8 @@ object GlucoseAlertManager {
 
         val ackTimestamp = userAcknowledgedHypoTimestamp.get()
         val timeSinceAck = now - ackTimestamp
-        val isUnderSnooze = ackTimestamp > 0 && timeSinceAck < alerts.snoozeHypoMinutes * 60000L
+        val isUnderSnooze = (ackTimestamp > 0 && timeSinceAck < alerts.snoozeHypoMinutes * 60000L) ||
+            (now < snoozedHypoUntilMs.get())
 
         // Safety override: if under snooze, break early only if plummeting (drop rate <= -0.3 mmol/L)
         // or if critically low (< 2.8) AND continuing to drop / stagnant.
@@ -1588,7 +1785,8 @@ object GlucoseAlertManager {
 
         val ackTimestamp = userAcknowledgedHyperTimestamp.get()
         val timeSinceAck = now - ackTimestamp
-        val isUnderInitialSnooze = ackTimestamp > 0 && timeSinceAck < 30 * 60000L
+        val isUnderInitialSnooze = (ackTimestamp > 0 && timeSinceAck < 30 * 60000L) ||
+            (now < snoozedHyperUntilMs.get())
         val isBetween30And45 = ackTimestamp > 0 && timeSinceAck in (30 * 60000L)..(45 * 60000L)
 
         // Check trend & active bolus: is glucose falling or is there active bolus IoB >= threshold?
@@ -1676,7 +1874,7 @@ object GlucoseAlertManager {
             highPoints.size >= 2 && (latest.timestamp - highPoints.first().timestamp >= 15 * 60_000L)
         }
 
-        if (isLowConfirmed && now - lastHypoAlertTimestamp.get() >= alerts.snoozeHypoMinutes * 60000L) {
+        if (isLowConfirmed && now >= snoozedHypoUntilMs.get() && now - lastHypoAlertTimestamp.get() >= alerts.snoozeHypoMinutes * 60000L) {
             lastHypoAlertTimestamp.set(now)
             val title = if (isRu) "🔻 Низкий сахар" else "🔻 Low Glucose"
             val bgDisp = formatBgWithUnit(latest.valueMmol, settings.unit, isRu)
@@ -1717,7 +1915,7 @@ object GlucoseAlertManager {
                 return true
             }
 
-            if (now - lastHyperAlertTimestamp.get() >= hyperRepeatInterval) {
+            if (now >= snoozedHyperUntilMs.get() && now - lastHyperAlertTimestamp.get() >= hyperRepeatInterval) {
                 lastHyperAlertTimestamp.set(now)
                 val title = if (isRu) "🔺 Высокий сахар" else "🔺 High Glucose"
                 val bgDisp = formatBgWithUnit(latest.valueMmol, settings.unit, isRu)
@@ -1758,6 +1956,7 @@ object GlucoseAlertManager {
         val hasHighIobRisk = (latest.iob != null && latest.iob >= 1.0 && latest.valueMmol <= 6.5 &&
                 prediction.rateOfChangeMmolPerMin < -0.01)
 
+        if (now < snoozedPredictiveUntilMs.get()) return false
         val lastPredictive = lastPredictiveAlertTimestamp.get()
         if ((isPredictedLow || hasHighIobRisk) && now - lastPredictive >= 20 * 60000L) {
             lastPredictiveAlertTimestamp.set(now)
@@ -1821,6 +2020,7 @@ object GlucoseAlertManager {
     ): Boolean {
         if (!alerts.isRapidChangeEnabled || sorted.size < 2) return false
 
+        if (now < snoozedRapidChangeUntilMs.get()) return false
         val lastAlert = lastRapidChangeAlertTimestamp.get()
         if (now - lastAlert < 15 * 60000L) return false
 
@@ -2041,15 +2241,33 @@ object GlucoseAlertManager {
 
         val alertColor = Color.parseColor(alertHex)
 
-        // Add direct native OK button to dismiss/silence notification right from shade
+        val scopeMask = resolveScopeMask(tier, notificationId, title)
+        activeAlertScopeMask.set(scopeMask)
+        val defaultSnoozeMin = if ((scopeMask and AlarmSyncScope.HYPO) != 0) 15 else 30
+
+        // Add direct native OK + universal Snooze buttons right in the notification shade
         val dismissIntent = Intent(context, AlertActionReceiver::class.java).apply {
             action = AlertActionReceiver.ACTION_DISMISS_CRITICAL
             putExtra("notification_id", notificationId)
+            putExtra(AlertActionReceiver.EXTRA_SCOPE_MASK, scopeMask)
         }
         val dismissPendingIntent = PendingIntent.getBroadcast(
             context,
             notificationId + 1000,
             dismissIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val snoozeIntent = Intent(context, AlertActionReceiver::class.java).apply {
+            action = AlertActionReceiver.ACTION_SNOOZE_ALERT
+            putExtra("notification_id", notificationId)
+            putExtra(AlertActionReceiver.EXTRA_SCOPE_MASK, scopeMask)
+            putExtra(AlertActionReceiver.EXTRA_SNOOZE_MINUTES, defaultSnoozeMin)
+        }
+        val snoozePendingIntent = PendingIntent.getBroadcast(
+            context,
+            notificationId + 2000,
+            snoozeIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -2067,6 +2285,11 @@ object GlucoseAlertManager {
             .setSound(null)
             .setAutoCancel(true)
             .addAction(0, if (isRu) "ОК" else "OK", dismissPendingIntent)
+            .addAction(
+                0,
+                if (isRu) "Отложить (${defaultSnoozeMin}м)" else "Snooze (${defaultSnoozeMin}m)",
+                snoozePendingIntent
+            )
 
         if (tier == AlertTier.PREDICTIVE || tier == AlertTier.RAPID_CHANGE) {
             // Unread predictive/rapid alert is only valid for 20 minutes
@@ -2080,8 +2303,10 @@ object GlucoseAlertManager {
             builder.setCategory(NotificationCompat.CATEGORY_ALARM)
         }
 
+        var isCritHypoTriggered = false
         if (tier == AlertTier.CRITICAL && notificationId != NOTIFICATION_ID_LOW_BATTERY) {
             isCriticalAlarmActive = true
+            _criticalAlarmActiveFlow.value = true
 
             val isHypo = (title.contains("гипо", true) ||
                     title.contains("низкий", true) ||
@@ -2089,6 +2314,8 @@ object GlucoseAlertManager {
                     title.contains("Тест", true) ||
                     title.contains("Test", true)) && !title.contains("батаре", true) && !title.contains("battery", true)
             if (isHypo) {
+                isCritHypoTriggered = true
+                isCriticalHypoAlarmActive.set(true)
                 // Wake up screen and hold CPU
                 try {
                     val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
@@ -2190,6 +2417,14 @@ object GlucoseAlertManager {
 
         val isTestAlert = title.contains("Тест", ignoreCase = true) || title.contains("Test", ignoreCase = true)
         logAlert(tier = tier, title = title, text = text, titleEn = titleEn, textEn = textEn, isTest = isTestAlert)
+
+        if (!isTestAlert) {
+            AlarmSyncManager.onLocalAlarmTriggered(
+                context = context,
+                scopeMask = scopeMask,
+                isCriticalHypo = isCritHypoTriggered
+            )
+        }
 
         try {
             nm.notify(notificationId, builder.build())
@@ -2883,7 +3118,7 @@ object GlucoseAlertManager {
                     getNextSignalLossIntervalMs(count, isNight)
                 }
 
-                if (now - lastSignalLossAlertTimestamp.get() >= requiredIntervalMs) {
+                if (now >= snoozedSignalLossUntilMs.get() && now - lastSignalLossAlertTimestamp.get() >= requiredIntervalMs) {
                     signalLossAlertCount.incrementAndGet()
                     lastSignalLossAlertTimestamp.set(now)
                     val elapsedMin = (elapsedSinceLatest / 60000L).toInt()

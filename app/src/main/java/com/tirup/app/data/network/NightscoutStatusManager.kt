@@ -319,6 +319,27 @@ object NightscoutStatusManager {
                 Log.w(TAG, "Error processing Nightscout glucose readings: ${e.message}")
             }
         }
+
+        // 6. Check recent Nightscout Announcement notes for remote alarm ACKs
+        if (isConnected) {
+            try {
+                val ctx = appContext
+                val userSettings = cachedSettingsRepo?.getSettings()?.firstOrNull()
+                if (ctx != null && userSettings != null && userSettings.alertSettings.isAlarmSyncEnabled) {
+                    val ackNotes = NightscoutUploadManager.fetchRecentAckNotes(settings, count = 8).getOrNull()
+                    ackNotes?.forEach { note ->
+                        com.tirup.app.data.alert.AlarmSyncManager.processTreatmentNote(
+                            ctx,
+                            note,
+                            userSettings,
+                            com.tirup.app.data.alert.AlarmSyncTransport.NIGHTSCOUT
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Nightscout alarm ACK check skipped: ${e.message}")
+            }
+        }
     }
 
     private suspend fun updateSuccess(status: NightscoutStatus) {
