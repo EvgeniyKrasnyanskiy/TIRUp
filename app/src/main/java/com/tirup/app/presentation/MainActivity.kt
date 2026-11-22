@@ -84,6 +84,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -700,7 +701,14 @@ fun MainPagerScaffold(
     var isBottomBarVisible by remember { mutableStateOf(true) }
     var showHba1cDialog by remember { mutableStateOf(false) }
     var showQuickHud by remember { mutableStateOf(false) }
-    var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    // Plain non-State activity timestamp + signal flow so touch/scroll NEVER recomposes MainPagerScaffold
+    val lastActivityMs = remember { java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis()) }
+    val activitySignals = remember {
+        kotlinx.coroutines.flow.MutableSharedFlow<Unit>(
+            extraBufferCapacity = 1,
+            onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST
+        )
+    }
     val haptic = LocalHapticFeedback.current
 
     val focusState by focusViewModel.uiState.collectAsStateWhenStarted()
@@ -710,21 +718,33 @@ fun MainPagerScaffold(
     val isMmol = userSettings.unit == GlucoseUnit.MMOL_L
 
     fun markUserActivity() {
-        lastInteractionTime = System.currentTimeMillis()
+        lastActivityMs.set(System.currentTimeMillis())
+        activitySignals.tryEmit(Unit)
         if (!isBottomBarVisible) {
             isBottomBarVisible = true
         }
     }
 
-    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
-        markUserActivity()
+    LaunchedEffect(pagerState) {
+        androidx.compose.runtime.snapshotFlow { Pair(pagerState.currentPage, pagerState.isScrollInProgress) }
+            .collect { markUserActivity() }
     }
 
-    LaunchedEffect(lastInteractionTime, isBottomBarVisible, showQuickHud) {
-        if (isBottomBarVisible && !showQuickHud) {
-            delay(2200L)
-            if (!showQuickHud) {
-                isBottomBarVisible = false
+    LaunchedEffect(Unit) {
+        val hideDelayMs = 2200L
+        while (true) {
+            if (isBottomBarVisible && !showQuickHud) {
+                val remaining = hideDelayMs - (System.currentTimeMillis() - lastActivityMs.get())
+                if (remaining <= 0L) {
+                    if (!showQuickHud && !pagerState.isScrollInProgress) {
+                        isBottomBarVisible = false
+                    }
+                    activitySignals.first()
+                } else {
+                    delay(remaining.coerceAtMost(hideDelayMs))
+                }
+            } else {
+                activitySignals.first()
             }
         }
     }
@@ -833,12 +853,50 @@ fun MainPagerScaffold(
     )
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
+        containerColor = MaterialTheme.colorScheme.background
+    ) { _ ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        markUserActivity()
+                    }
+                }
+                .nestedScroll(nestedScrollConnection)
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                beyondBoundsPageCount = 2,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                // Hardware RenderNode layer per page avoids re-issuing chart/card draw commands on every scroll frame
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {}
+                ) {
+                    when (page) {
+                        0 -> TrendsScreen(viewModel = trendsViewModel, onOpenSettings = { onOpenSettings(null) })
+                        1 -> FocusScreen(viewModel = focusViewModel, onOpenSettings = onOpenSettings)
+                        2 -> ReportsScreen(
+                            viewModel = reportsViewModel,
+                            onOpenSettings = { onOpenSettings(null) },
+                            onOpenHba1c = { showHba1cDialog = true }
+                        )
+                    }
+                }
+            }
+
+            // Floating overlay bottom navigation bar (zero HorizontalPager resize / relayout on show/hide)
             AnimatedVisibility(
                 visible = isBottomBarVisible,
                 enter = slideInVertically { it },
-                exit = slideOutVertically { it }
+                exit = slideOutVertically { it },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .zIndex(80f)
             ) {
                 Surface(
                     modifier = Modifier
@@ -960,34 +1018,6 @@ fun MainPagerScaffold(
                             )
                         }
                     }
-                }
-            }
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        awaitFirstDown(requireUnconsumed = false)
-                        markUserActivity()
-                    }
-                }
-                .nestedScroll(nestedScrollConnection)
-                .padding(bottom = if (isBottomBarVisible) innerPadding.calculateBottomPadding() else 0.dp)
-        ) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize()
-            ) { page ->
-                when (page) {
-                    0 -> TrendsScreen(viewModel = trendsViewModel, onOpenSettings = { onOpenSettings(null) })
-                    1 -> FocusScreen(viewModel = focusViewModel, onOpenSettings = onOpenSettings)
-                    2 -> ReportsScreen(
-                        viewModel = reportsViewModel,
-                        onOpenSettings = { onOpenSettings(null) },
-                        onOpenHba1c = { showHba1cDialog = true }
-                    )
                 }
             }
 
@@ -1259,6 +1289,9 @@ fun MainPagerScaffold(
             },
             onExportPdf = { onSaved ->
                 settingsViewModel.exportHba1cReportToPdf(onSaved)
+            },
+            onImportRecords = { incoming ->
+                settingsViewModel.mergeImportedHba1cRecords(incoming)
             },
             onDismiss = { showHba1cDialog = false }
         )

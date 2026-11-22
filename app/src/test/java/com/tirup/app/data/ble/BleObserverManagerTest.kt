@@ -91,4 +91,27 @@ class BleObserverManagerTest {
         org.junit.Assert.assertEquals(75, metrics.pdrPercent)
         org.junit.Assert.assertEquals(-80, metrics.avgRssi)
     }
+
+    @Test
+    fun testStaleReadingPacketRejection() {
+        val now = 1_795_387_500_000L
+        val lastHandled = now - 60_000L // 1 minute ago
+
+        // Older packet than lastHandled (e.g. zombie advertiser from 2 days ago or 5 minutes ago) -> stale
+        assertTrue(BleObserverManager.isStaleReadingPacket(now - 2 * 86_400_000L, lastHandled, now))
+        assertTrue(BleObserverManager.isStaleReadingPacket(lastHandled - 1_000L, lastHandled, now))
+
+        // Repeat packet from current burst / fallback heartbeat (same timestamp) -> NOT stale
+        assertFalse(BleObserverManager.isStaleReadingPacket(lastHandled, lastHandled, now))
+
+        // Newer reading -> NOT stale
+        assertFalse(BleObserverManager.isStaleReadingPacket(now, lastHandled, now))
+
+        // Cold start (lastHandled == 0L): reject multi-hour zombie packet, accept fresh packet
+        assertTrue(BleObserverManager.isStaleReadingPacket(now - 3 * 3_600_000L, 0L, now))
+        assertFalse(BleObserverManager.isStaleReadingPacket(now - 5 * 60_000L, 0L, now))
+
+        // Pure range test ping (timestamp == 0L) -> NOT stale
+        assertFalse(BleObserverManager.isStaleReadingPacket(0L, lastHandled, now))
+    }
 }

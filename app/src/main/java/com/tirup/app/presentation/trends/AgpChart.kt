@@ -15,6 +15,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Fill
@@ -52,7 +53,11 @@ fun AgpChart(
             .background(bgCol)
             .padding(top = 12.dp, bottom = 10.dp, start = 12.dp, end = 12.dp)
     ) {
-        Canvas(modifier = Modifier.matchParentSize()) {
+        Canvas(
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer {}
+        ) {
             val width = size.width
             val height = size.height
             val chartBottom = height - 22f

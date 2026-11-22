@@ -167,10 +167,6 @@ fun FocusScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWhenStarted()
     val dailyAlertLogs by GlucoseAlertManager.dailyAlertLogs.collectAsStateWhenStarted()
-    val isBleBroadcasting by BleBroadcaster.isBroadcasting.collectAsStateWhenStarted()
-    val broadcastRemainingSec by BleBroadcaster.broadcastRemainingSec.collectAsStateWhenStarted()
-    val nextHeartbeatRemainingSec by BleBroadcaster.nextHeartbeatRemainingSec.collectAsStateWhenStarted()
-    val boostRemainingSec by BleObserverManager.boostRemainingSec.collectAsStateWhenStarted()
     val lanStatus by XdripLanManager.statusFlow.collectAsStateWhenStarted()
     val isLanDiscovering by XdripLanManager.isDiscoveringFlow.collectAsStateWhenStarted()
     val nightscoutStatus by com.tirup.app.data.network.NightscoutStatusManager.statusFlow.collectAsStateWhenStarted()
@@ -438,10 +434,6 @@ fun FocusScreen(
                 masterBatteryPct = masterBattery,
                 isMasterBatteryStale = isMasterBatteryStale,
                 bleBridgeSettings = heroBleSettings,
-                isBleBroadcasting = isBleBroadcasting,
-                broadcastRemainingSec = broadcastRemainingSec,
-                nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
-                boostRemainingSec = boostRemainingSec,
                 blePacketReceivedAt = blePacketReceivedAt,
                 xdripLanSettings = userSettings.xdripLanSettings,
                 lanStatus = lanStatus,
@@ -1465,10 +1457,6 @@ fun FocusScreen(
 
         BleStatusDialog(
             bleSettings = userSettings.bleBridgeSettings,
-            isBleBroadcasting = isBleBroadcasting,
-            broadcastRemainingSec = broadcastRemainingSec,
-            nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
-            boostRemainingSec = boostRemainingSec,
             isRu = isRu,
             onTestPingClick = {
                 if (!isBtOn) {
@@ -2122,10 +2110,6 @@ private fun LanStatusDialog(
 @Composable
 private fun BleBridgeBadge(
     bleSettings: com.tirup.app.domain.model.BleBridgeSettings,
-    isBleBroadcasting: Boolean,
-    broadcastRemainingSec: Int,
-    nextHeartbeatRemainingSec: Int,
-    boostRemainingSec: Int = 0,
     blePacketReceivedAt: Long,
     isRu: Boolean,
     onClick: () -> Unit = {},
@@ -2161,6 +2145,7 @@ private fun BleBridgeBadge(
             }
         }
     } else if (bleSettings.role == BleBridgeRole.BROADCASTER) {
+        val isBleBroadcasting by BleBroadcaster.isBroadcasting.collectAsStateWhenStarted()
         var broadcastAnimActive by remember { mutableStateOf(false) }
         LaunchedEffect(isBleBroadcasting) {
             if (isBleBroadcasting) {
@@ -2254,14 +2239,15 @@ private fun BleBridgeBadge(
                     }
                     Icon(
                         imageVector = Icons.Default.Bluetooth,
-                        contentDescription = if (broadcastRemainingSec > 0) "Broadcasting ($broadcastRemainingSec s)" else "Broadcasting",
+                        contentDescription = "Broadcasting",
                         tint = ActionBlue,
                         modifier = Modifier.size(15.dp)
                     )
                 }
             }
         } else {
-            // Idle state: Bluetooth icon + countdown mm:ss to next periodic heartbeat
+            // Idle state: Bluetooth icon + countdown mm:ss to next periodic heartbeat (scoped to badge only!)
+            val nextHeartbeatRemainingSec by BleBroadcaster.nextHeartbeatRemainingSec.collectAsStateWhenStarted()
             val minutes = (nextHeartbeatRemainingSec / 60).coerceAtLeast(0)
             val seconds = (nextHeartbeatRemainingSec % 60).coerceAtLeast(0)
             val countdownText = String.format(Locale.US, "%d:%02d", minutes, seconds)
@@ -2424,7 +2410,9 @@ private fun BleBridgeBadge(
                     )
                 }
             }
-        } else if (boostRemainingSec > 0) {
+        } else {
+            val boostRemainingSec by BleObserverManager.boostRemainingSec.collectAsStateWhenStarted()
+            if (boostRemainingSec > 0) {
             // Active Contour Droplet Search Animation (60s countdown)
             val transition = rememberInfiniteTransition(label = "BleContourDropletSearch")
             val dropletProgress by transition.animateFloat(
@@ -2550,8 +2538,8 @@ private fun BleBridgeBadge(
             }
         } else {
             // Observer Idle: Bluetooth icon + age of last radio contact / glucose reading
-            val isEcoMode by BleObserverManager.isEcoModeFlow.collectAsState()
-            val liveTelemetry by BleObserverManager.liveTelemetryFlow.collectAsState()
+            val isEcoMode by BleObserverManager.isEcoModeFlow.collectAsStateWhenStarted()
+            val liveTelemetry by BleObserverManager.liveTelemetryFlow.collectAsStateWhenStarted()
             val readingTs = bleSettings.lastPacketTimestamp
             val contactTs = if (liveTelemetry.lastRadioContactMs > 0L) liveTelemetry.lastRadioContactMs else bleSettings.lastRadioContactMs
             val nowMs = System.currentTimeMillis()
@@ -2605,6 +2593,7 @@ private fun BleBridgeBadge(
                     )
                 }
             }
+            }
         }
     }
 }
@@ -2651,10 +2640,6 @@ fun SpoilerPinBadge(
 @Composable
 private fun BleStatusDialog(
     bleSettings: com.tirup.app.domain.model.BleBridgeSettings,
-    isBleBroadcasting: Boolean,
-    broadcastRemainingSec: Int,
-    nextHeartbeatRemainingSec: Int,
-    boostRemainingSec: Int,
     isRu: Boolean,
     onTestPingClick: () -> Unit,
     onBoostScanClick: () -> Unit,
@@ -2662,6 +2647,10 @@ private fun BleStatusDialog(
     onOpenSettings: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val isBleBroadcasting by BleBroadcaster.isBroadcasting.collectAsStateWhenStarted()
+    val broadcastRemainingSec by BleBroadcaster.broadcastRemainingSec.collectAsStateWhenStarted()
+    val nextHeartbeatRemainingSec by BleBroadcaster.nextHeartbeatRemainingSec.collectAsStateWhenStarted()
+    val boostRemainingSec by BleObserverManager.boostRemainingSec.collectAsStateWhenStarted()
     val isBridgeActive = bleSettings.isEnabled && bleSettings.role != BleBridgeRole.DISABLED
     val isBroadcaster = bleSettings.role == BleBridgeRole.BROADCASTER
 
@@ -2708,7 +2697,7 @@ private fun BleStatusDialog(
         }
         else -> {
             // Observer
-            val liveTelemetry by BleObserverManager.liveTelemetryFlow.collectAsState()
+            val liveTelemetry by BleObserverManager.liveTelemetryFlow.collectAsStateWhenStarted()
             val readingTs = bleSettings.lastPacketTimestamp
             val contactTs = if (liveTelemetry.lastRadioContactMs > 0L) liveTelemetry.lastRadioContactMs else (if (bleSettings.lastRadioContactMs > 0L) bleSettings.lastRadioContactMs else bleSettings.lastPacketTimestamp)
             val effectiveRssi = liveTelemetry.lastRssi ?: bleSettings.lastRssi
@@ -2743,8 +2732,8 @@ private fun BleStatusDialog(
 
             val batStr = if (effectiveBat in 0..100) "${effectiveBat}%" else if (isRu) "нет данных" else "no data"
 
-            val isObserverLongRangeActive by BleObserverManager.isLongRangeScanActive.collectAsState()
-            val channelMetrics by BleObserverManager.channelMetricsFlow.collectAsState()
+            val isObserverLongRangeActive by BleObserverManager.isLongRangeScanActive.collectAsStateWhenStarted()
+            val channelMetrics by BleObserverManager.channelMetricsFlow.collectAsStateWhenStarted()
 
             val scanModeStr = if (isObserverLongRangeActive) {
                 if (isRu) "\n• Сканер: Dual (1M + Long Range)" else "\n• Scanner: Dual (1M + Long Range)"
@@ -2965,10 +2954,6 @@ private fun HeroGlucoseCard(
     masterBatteryPct: Int? = null,
     isMasterBatteryStale: Boolean = false,
     bleBridgeSettings: com.tirup.app.domain.model.BleBridgeSettings? = null,
-    isBleBroadcasting: Boolean = false,
-    broadcastRemainingSec: Int = 0,
-    nextHeartbeatRemainingSec: Int = 300,
-    boostRemainingSec: Int = 0,
     blePacketReceivedAt: Long = 0L,
     nightscoutSettings: com.tirup.app.domain.model.NightscoutSettings? = null,
     nightscoutStatus: com.tirup.app.domain.model.NightscoutStatus? = null,
@@ -3226,10 +3211,6 @@ private fun HeroGlucoseCard(
                 if (bleBridgeSettings != null && bleBridgeSettings.isEnabled) {
                     BleBridgeBadge(
                         bleSettings = bleBridgeSettings,
-                        isBleBroadcasting = isBleBroadcasting,
-                        broadcastRemainingSec = broadcastRemainingSec,
-                        nextHeartbeatRemainingSec = nextHeartbeatRemainingSec,
-                        boostRemainingSec = boostRemainingSec,
                         blePacketReceivedAt = blePacketReceivedAt,
                         isRu = isRu,
                         onClick = onBleClick,

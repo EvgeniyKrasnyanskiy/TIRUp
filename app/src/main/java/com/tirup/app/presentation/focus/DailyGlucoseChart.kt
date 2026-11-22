@@ -3,6 +3,7 @@ package com.tirup.app.presentation.focus
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -1100,7 +1101,11 @@ fun DailyGlucoseChart(
                         }
                     }
             ) {
-                Canvas(modifier = Modifier.matchParentSize()) {
+                Canvas(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .graphicsLayer {}
+                ) {
                     val width = size.width
                     val height = size.height
                     val chartRight = width - 64f // space for Y-axis numbers

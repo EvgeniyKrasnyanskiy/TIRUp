@@ -664,6 +664,16 @@ object BleObserverManager {
         boost: Boolean,
         useLongRange: Boolean = false
     ) = mutex.withLock {
+        if (lastHandledTimestamp == 0L) {
+            val dbLatestTs = try {
+                glucoseRepository.getLatestReading().firstOrNull()?.timestamp ?: 0L
+            } catch (_: Exception) {
+                0L
+            }
+            if (dbLatestTs > 0L) {
+                lastHandledTimestamp = dbLatestTs
+            }
+        }
         startScanningInternalLocked(context, familyPin, settingsRepository, glucoseRepository, boost, useLongRange)
     }
 
@@ -988,6 +998,19 @@ object BleObserverManager {
         _channelMetricsFlow.value = calculateMetrics(if (startTimestampMs > 0L) startTimestampMs else System.currentTimeMillis())
     }
 
+    internal const val MAX_STALE_PACKET_AGE_MS = 2 * 60 * 60_000L // 2 hours
+
+    internal fun isStaleReadingPacket(
+        packetTimestampMs: Long,
+        lastHandledTimestampMs: Long,
+        nowMs: Long
+    ): Boolean {
+        if (packetTimestampMs <= 0L) return false // range test pings have timestamp 0
+        if (lastHandledTimestampMs > 0L && packetTimestampMs < lastHandledTimestampMs) return true
+        if (nowMs - packetTimestampMs > MAX_STALE_PACKET_AGE_MS) return true
+        return false
+    }
+
     private fun handleScanResult(
         context: Context,
         result: ScanResult,
@@ -1000,11 +1023,18 @@ object BleObserverManager {
 
         val packet = BlePacketCodec.decodePacket(rawData, expectedPin) ?: return
 
-        val isCodedPhy = result.primaryPhy == BluetoothDevice.PHY_LE_CODED
-        _lastPacketWasLongRange.value = isCodedPhy
-
         val rssi = result.rssi
         val now = System.currentTimeMillis()
+        val isTestPing = packet.timestamp == 0L || packet.valueMmol <= 0.1
+
+        // Drop stale packets (older than last handled reading or >2h old) BEFORE updating radio contact,
+        // battery telemetry, ECO state, or channel metrics so zombie advertisers cannot corrupt live status.
+        if (!isTestPing && isStaleReadingPacket(packet.timestamp, lastHandledTimestamp, now)) {
+            return
+        }
+
+        val isCodedPhy = result.primaryPhy == BluetoothDevice.PHY_LE_CODED
+        _lastPacketWasLongRange.value = isCodedPhy
         lastPacketReceivedSystemMs = now
 
         recordChannelPacket(now, packet.timestamp, rssi)
@@ -1019,8 +1049,8 @@ object BleObserverManager {
             }
         }
 
-        // Check if this is a repeat packet from the same burst or a fallback heartbeat with the same reading timestamp
-        if (packet.timestamp == 0L || packet.valueMmol <= 0.1) {
+        // Check if this is a pure range test ping without real sensor reading
+        if (isTestPing) {
             // Pure range test ping without real sensor reading: update in-memory radio contact and emit event without inserting into Room DB or disk I/O
             Log.i(TAG, "Test ping packet received: ts=${packet.timestamp}, rssi=$rssi (no sensor reading)")
             _liveTelemetryFlow.value = BleLiveTelemetry(
@@ -1033,8 +1063,8 @@ object BleObserverManager {
             return
         }
 
-        if (packet.timestamp <= lastHandledTimestamp) {
-            // Heartbeat or repeat packet within burst: update lightweight in-memory telemetry without disk I/O or settings churn
+        if (packet.timestamp == lastHandledTimestamp) {
+            // Heartbeat or repeat packet within current burst: update lightweight in-memory telemetry without disk I/O or settings churn
             if (now - lastHeartbeatLogMs >= 5000L) {
                 lastHeartbeatLogMs = now
                 Log.d(TAG, "Heartbeat received: ts=${packet.timestamp}, bg=${packet.valueMmol}, rssi=$rssi (duplicate, connection alive)")
